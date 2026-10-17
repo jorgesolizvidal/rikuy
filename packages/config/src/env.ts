@@ -21,13 +21,18 @@ export const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
 });
 
-export const serverEnvSchema = publicEnvSchema.extend({
-  SUPABASE_SECRET_KEY: z.string().min(1),
+/** What the request router (proxy) needs: public Supabase access + platform hosts. No secrets. */
+export const platformEnvSchema = publicEnvSchema.extend({
   PLATFORM_ROOT_DOMAIN: hostSchema,
   PLATFORM_ADMIN_HOST: hostSchema,
 });
 
+export const serverEnvSchema = platformEnvSchema.extend({
+  SUPABASE_SECRET_KEY: z.string().min(1),
+});
+
 export type PublicEnv = z.infer<typeof publicEnvSchema>;
+export type PlatformEnv = z.infer<typeof platformEnvSchema>;
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 export class EnvValidationError extends Error {
@@ -59,6 +64,13 @@ export function parsePublicEnv(
   source: Record<string, string | undefined> = process.env,
 ): PublicEnv {
   return parseWith(publicEnvSchema, source);
+}
+
+/** Validates what request routing needs, without requiring any secret. */
+export function parsePlatformEnv(
+  source: Record<string, string | undefined> = process.env,
+): PlatformEnv {
+  return parseWith(platformEnvSchema, source);
 }
 
 /** Validates server-only variables. Call it from server code, never from client components. */

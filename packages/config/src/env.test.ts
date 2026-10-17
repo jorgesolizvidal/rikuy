@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { EnvValidationError, parsePublicEnv, parseServerEnv } from "./env";
+import { EnvValidationError, parsePlatformEnv, parsePublicEnv, parseServerEnv } from "./env";
 
 const valid = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
@@ -21,6 +21,11 @@ describe("environment contract", () => {
       "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
       "NEXT_PUBLIC_SUPABASE_URL",
     ]);
+  });
+
+  it("platform parsing does not require the secret key", () => {
+    const { SUPABASE_SECRET_KEY: _secret, ...withoutSecret } = valid;
+    expect(parsePlatformEnv(withoutSecret)).not.toHaveProperty("SUPABASE_SECRET_KEY");
   });
 
   it("reports missing variables by name", () => {
