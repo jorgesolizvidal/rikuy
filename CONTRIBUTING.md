@@ -27,6 +27,7 @@ UI (RSC / Client Components)
 - Toda fila de un tenant lleva `tenant_id NOT NULL`; las relaciones entre entidades de tenant usan **FK compuestas** `(tenant_id, id)`.
 - **Ningún literal de municipio en el código** ("Ucureña", rutas, colores, textos, prompts). Todo eso es dato del tenant. Dar de alta un municipio nuevo no requiere tocar código ni variables de entorno (ZC-01).
 - Cachés (CDN, Next, React Query) incluyen tenant, idioma y versión publicada en la clave.
+- Las Server Actions **no** usan `redirect()`: Next renderiza el destino con un fetch interno a su propio origen y se salta la resolución por host. La acción devuelve estado y el cliente navega (regla de ESLint en `actions.ts`).
 
 ### 1.3 Datos y seguridad
 
