@@ -1,12 +1,24 @@
 import type { NextRequest } from "next/server";
 
+import { createAdminSessionRefresher } from "./server/admin-session-refresh";
+import { platformSettings, tenantDirectory } from "./server/platform";
 import { createPortalProxy } from "./server/portal-proxy";
-import { platformDeps } from "./server/platform";
 
 let handler: ReturnType<typeof createPortalProxy> | undefined;
 
 export async function proxy(request: NextRequest) {
-  handler ??= createPortalProxy(platformDeps());
+  if (!handler) {
+    const { env, hosts, secureCookies } = platformSettings();
+    handler = createPortalProxy({
+      hosts,
+      directory: tenantDirectory(),
+      refreshAdminSession: createAdminSessionRefresher({
+        url: env.NEXT_PUBLIC_SUPABASE_URL,
+        publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        secureCookies,
+      }),
+    });
+  }
   return handler(request);
 }
 

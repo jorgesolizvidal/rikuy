@@ -12,3 +12,8 @@ export * from "./domain/tenancy/host";
 export * from "./contracts/tenant";
 export * from "./application/tenancy/resolve-portal-tenant";
 export * from "./application/tenancy/cached-tenant-directory";
+export * from "./domain/identity/email";
+export * from "./contracts/organization";
+export * from "./application/identity/ports";
+export * from "./application/identity/sign-in";
+export * from "./application/identity/organizations";

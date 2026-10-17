@@ -141,4 +141,41 @@ describe("portal proxy", () => {
       "sur",
     );
   });
+
+  it("refreshes the session only on the admin host, never on portal or platform hosts", async () => {
+    const seen: string[] = [];
+    const withAuth = createPortalProxy({
+      hosts,
+      directory,
+      refreshAdminSession: async (req, respond) => {
+        seen.push(req.headers.get("host") ?? "");
+        const response = respond(new Headers(req.headers));
+        response.cookies.set("sb-test-auth-token", "rotated", {
+          httpOnly: true,
+          sameSite: "lax",
+          path: "/",
+        });
+        return response;
+      },
+    });
+
+    const admin = await withAuth(
+      request("http://app.localhost:3000/", { cookie: "sb-test-auth-token=old" }),
+    );
+    await withAuth(request("http://norte.localhost:3000/", { cookie: "sb-test-auth-token=old" }));
+    await withAuth(request("http://localhost:3000/"));
+
+    expect(seen).toEqual(["app.localhost:3000"]);
+    expect(rewrittenPath(admin)).toBe("/admin");
+    const setCookie = admin.headers.get("set-cookie") ?? "";
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie.toLowerCase()).not.toContain("domain=");
+  });
+
+  it("marks admin responses as not indexable and not frameable", async () => {
+    const response = await proxy(request("http://app.localhost:3000/login"));
+    expect(rewrittenPath(response)).toBe("/admin/login");
+    expect(response.headers.get("x-robots-tag")).toContain("noindex");
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+  });
 });

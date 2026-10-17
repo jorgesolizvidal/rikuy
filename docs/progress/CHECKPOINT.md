@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P1 — Fundación
-- **Último paso completado:** P1 · Paso 3 — resolución de tenant por host (2026-10-17)
-- **Rama del paso:** `feat/p1-step3-tenant-resolution` → PR hacia `main`
+- **Último paso completado:** P1 · Paso 4 — autenticación del panel de administración (2026-10-17)
+- **Rama del paso:** `feat/p1-step4-admin-auth` → PR hacia `main`
 
 ## Historial
 
@@ -20,18 +20,32 @@ Migración `20261017140000_p1_foundation.sql` (tenants, tenant_domains, membersh
 
 ### Paso 3 — resolución de tenant por host ✅
 
+`normalizeHost` / `classifyHost`, contrato `TenantContext`, caso de uso `resolvePortalTenant` (found · redirect · not_found · unavailable) con caché por instancia, adaptador RPC en `@rikuy/db` y `src/proxy.ts` (solo lee `Host`, elimina cabeceras internas entrantes, reescribe a `/admin`, `/platform` o `/portal/{host}`; 404 `noindex`, 503 `Retry-After`, 308 alias → canónico, 400 host inválido).
+
+### Paso 4 — autenticación del panel de administración ✅
+
 - `@rikuy/core`:
-  - `normalizeHost` / `classifyHost`: minúsculas, IDNA, sin punto final; rechaza userinfo, rutas, IPv6, múltiples valores y puertos fuera de local. Superficies: `admin`, `platform`, `portal`, `invalid`.
-  - Contrato `TenantContext` (Zod) y códec ASCII para la cabecera interna.
-  - Caso de uso `resolvePortalTenant`: `found` · `redirect` (alias → canónico) · `not_found` · `unavailable`.
-  - `createCachedTenantDirectory`: TTL 60 s / 10 s, sin cachear errores, deduplica búsquedas concurrentes, clave por host exacto.
-- `@rikuy/db`: adaptador `createSupabaseTenantDirectory` (RPC con clave publicable, sin sesión, timeout 2 s, filas validadas con Zod).
-- `@rikuy/config`: `parsePlatformEnv` (lo que necesita el proxy, sin secretos).
-- `apps/web`:
-  - `src/proxy.ts`: lee solo `Host`, elimina cabeceras internas entrantes, reescribe a `/admin`, `/platform` o `/portal/{host}`; 404 `noindex`, 503 con `Retry-After`, 308 de alias a canónico, 400 para host inválido.
-  - Páginas: portal mínimo con el nombre del tenant resuelto (sin literales de municipio), panel de admin placeholder, sitio de plataforma.
-- Supabase local: analytics desactivado (evita exponer el daemon de Docker en Windows). Tests pgTAP sin `NOTICE`.
-- Tests: 60 unitarios/integración (core 37, db 6, web 11, config 6) + 74 pgTAP. Verificado de punta a punta con `next start` contra el esquema real: norte/sur resuelven su tenant, desconocido 404, admin y plataforma por host, spoofing ignorado, acceso directo a `/portal/...` 404, host inválido 400, registro caído 503 (y hosts en caché siguen sirviendo).
+  - `normalizeEmail`, `normalizeOneTimeCode`; contratos `OrganizationMembership`, `Actor`, `ROLE_LABELS`.
+  - Puertos `AuthGateway` y `MembershipReader`.
+  - Casos de uso `requestSignInCode` (anti-enumeración: un correo no provisionado recibe la misma respuesta que uno válido), `verifySignInCode`, `listMyOrganizations`, `openOrganization`.
+- `@rikuy/db`:
+  - `createSessionClient`: cliente por request con `@supabase/ssr`, cookies host-only `HttpOnly` + `SameSite=Lax` (+ `Secure` fuera de `localhost`), sin `Domain` → nunca llegan a los hosts de portal.
+  - `createSupabaseAuthGateway`: OTP por correo con `shouldCreateUser: false`; errores mapeados a resultados gruesos. Un error de configuración del servidor de Auth (`email_provider_disabled`) es `unavailable`, no se esconde tras el mensaje anti-enumeración.
+  - `createMembershipReader`: membresías activas de tenants activos, leídas con el JWT del usuario (RLS).
+- `apps/web` (host de admin):
+  - `/login` con código de 6 dígitos y enlace mágico (`/auth/callback`, PKCE); `/logout` solo `POST` con verificación de `Origin`.
+  - Lista de municipios en `/` y `/o/{slug}`: cada página revalida sesión y membresía actual en servidor (`requireAdminActor` → `openOrganization`; sin membresía → 404).
+  - El proxy refresca la sesión solo en el host de admin y solo si hay cookies `sb-*`; cabeceras `noindex`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`.
+- Supabase local: registro público desactivado (`[auth] enable_signup = false`), proveedor de correo activo, plantilla en español (`supabase/templates/magic-link.html`), TOTP habilitado en el servidor.
+- Seed: 4 usuarios sintéticos sin contraseña (dueño norte, dueño sur, editor en norte + analista en sur, admin revocado).
+- CI: nuevo job **Auth integration** que levanta la pila real (GoTrue + PostgREST + Mailpit) y prueba inicio de sesión por código, aislamiento A/B por RLS, revocación aplicada a una sesión con token vigente, correo desconocido sin email y logout. Los fallos se publican como anotaciones del check.
+- Tests: 92 unitarios (core 54, db 18, web 14, config 6) + 6 de integración + 74 pgTAP.
+
+**Desviaciones respecto al plan:**
+
+- Usuarios del seed escritos en `auth.users` + `auth.identities` desde `seed.sql` (no con la Auth Admin API) para que `pnpm db:reset` siga siendo un solo comando reproducible.
+- MFA TOTP: habilitado en el servidor; la pantalla de enrolamiento y su exigencia para propietarios/administradores llegan con la gestión de miembros.
+- Operador de plataforma: movido al Paso 6 (va junto al flujo de alta de tenants).
 
 ## Cómo verificarlo en tu PC
 
@@ -40,27 +54,37 @@ git checkout main
 git pull
 pnpm install
 pnpm db:stop
-pnpm db:start      # reinicia sin analytics (ya no aparece la advertencia de Windows)
+pnpm db:start      # aplica la nueva config de Auth
+pnpm db:reset      # recarga el seed con los usuarios de prueba
 pnpm dev
 ```
 
-- http://demo-norte.localhost:3000 → «Municipio Demo Norte»
-- http://demo-sur.localhost:3000 → «Municipio Demo Sur»
-- http://otro.localhost:3000 → 404 «Sitio no encontrado»
-- http://app.localhost:3000 → panel de administración (placeholder)
-- http://localhost:3000 → sitio de Rikuy
+1. Abre http://app.localhost:3000 → redirige a «Iniciar sesión».
+2. Escribe `owner@demo-norte.example.test` → «Recibir código».
+3. Abre Mailpit en http://127.0.0.1:54324, copia el código de 6 dígitos (o pulsa el enlace del correo).
+4. Debes ver solo «Municipio Demo Norte» (Propietario). Entra a `/o/demo-norte`; prueba `/o/demo-sur` → 404.
+5. «Cerrar sesión» → vuelve a «Iniciar sesión».
+6. Repite con `editor.ambos@example.test` (ve los dos municipios con roles distintos) y `revocado@demo-norte.example.test` (entra, pero no ve ningún municipio).
+7. Un correo inventado muestra el mismo mensaje («Si … tiene acceso, te enviamos un código») y no llega nada a Mailpit.
 
-## Siguiente paso — P1 · Paso 4 (requiere autorización)
+Opcional, tests de integración contra tu pila local (PowerShell; las claves salen de `pnpm db:status`):
 
-Rama `feat/p1-step4-admin-auth`:
+```powershell
+$env:SUPABASE_PUBLISHABLE_KEY="<Publishable key>"; $env:SUPABASE_SECRET_KEY="<Secret key>"
+pnpm --filter @rikuy/db test:integration
+```
 
-1. Supabase Auth en el host de admin vía BFF: inicio de sesión con email (enlace mágico / OTP; Mailpit local en http://127.0.0.1:54324), cookies host-only `Secure`/`HttpOnly`/`SameSite=Lax`, refresh solo en servidor, logout.
-2. Cliente Supabase por request con el JWT del usuario (`@rikuy/db`), sin reutilizar clientes entre usuarios.
-3. Caso de uso `listMyOrganizations` y selector `/o/{slug}`; cada página verifica membresía actual en servidor.
-4. Usuarios del seed provisionados con la Auth Admin API (reemplazan los placeholders SQL), un usuario miembro de dos tenants y uno revocado.
-5. Protección CSRF/Origin en mutaciones; MFA TOTP preparado para administradores.
-6. Tests: sin sesión → login; rol revocado con token vigente → sin acceso; usuario de A no ve B; cookie de admin nunca enviada a hosts de portal.
+## Siguiente paso — P1 · Paso 5 (requiere autorización)
+
+Rama `feat/p1-step5-white-label-config`:
+
+1. Contrato `TenantPresentation` (Zod, versionado) en `@rikuy/core`: identidad (nombre, nombre corto, lema), tema (colores con validación de contraste WCAG AA), contactos, redes, SEO por defecto, datos del manifest PWA. Sin literales de municipio.
+2. Casos de uso `saveConfigDraft` y `sealConfigVersion` (borrador → sellada; la versión activa siempre sellada, invariante ya en la base) con RPC transaccional y evento de auditoría.
+3. Lectura pública de la versión activa sellada vía RPC anónima (solo campos públicos), cacheada por tenant + versión.
+4. Portal: `TenantPresentation` aplicada en el layout (CSS variables del tema, metadatos SEO, `manifest.webmanifest` por host).
+5. Admin: formulario de configuración en `/o/{slug}/configuracion` (solo propietario/administrador), con vista previa y botón «Publicar».
+6. Tests: pgTAP (editor no puede sellar, analista no escribe, B no lee borradores de A, anónimo solo ve la sellada), unitarios de contraste y del contrato, e2e: dos tenants con marcas distintas en el mismo build.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante para el Paso 4.
+- Ninguna bloqueante para el Paso 5.
