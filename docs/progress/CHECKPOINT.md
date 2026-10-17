@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P1 — Fundación
-- **Último paso completado:** P1 · Paso 2 — Supabase local + esquema P1 con RLS (2026-10-17)
-- **Rama del paso:** `feat/p1-step2-supabase-local` → PR hacia `main`
+- **Último paso completado:** P1 · Paso 3 — resolución de tenant por host (2026-10-17)
+- **Rama del paso:** `feat/p1-step3-tenant-resolution` → PR hacia `main`
 
 ## Historial
 
@@ -16,42 +16,51 @@ Monorepo pnpm (`apps/web`, `apps/worker`, `packages/core|db|ui|config`), TypeScr
 
 ### Paso 2 — Supabase local y esquema P1 ✅
 
-- Supabase CLI 2.121.0 como dependencia del proyecto (`pnpm db:*`). `supabase/config.toml`: Realtime y vector buckets desactivados, registro público desactivado, redirección de Auth solo al host de admin, MFA TOTP habilitado.
-- Migración `20261017140000_p1_foundation.sql`:
-  - Tablas: `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events`.
-  - FK compuestas `(tenant_id, id)` para dominio canónico y configuración activa; `tenant_id` inmutable.
-  - Invariantes en la base: tenant activo requiere owner activo; no se puede quitar el último owner (diferido, permite transferir); configuración sellada inmutable; dominio canónico debe estar activo; auditoría append-only; slugs reservados; hosts normalizados.
-  - Privilegios: `anon` sin acceso a tablas; `authenticated` solo lectura, con columnas sensibles ocultas (`verification_token_hash`, `provider_domain_id`). Escrituras llegarán por RPC por intención.
-  - RLS por membresía **actual** (revocación inmediata aunque el JWT siga vigente) con helper `private.has_tenant_role` (SECURITY DEFINER, `search_path` vacío, devuelve booleano).
-  - `public.resolve_tenant_by_host(host)`: única entrada anónima; coincidencia exacta, solo dominios y tenants activos, sin tenant por defecto.
-- Tests pgTAP (74 aserciones en 4 suites): estructura y privilegios, aislamiento por rol (anon, owner/admin/editor/analyst, revocado, miembro de A y B, externo), invariantes y resolución de tenant.
-- Seed sintético: `demo-norte.localhost` y `demo-sur.localhost` (municipios ficticios, sin datos reales).
-- CI: job de base de datos que levanta Postgres de Supabase, aplica migraciones + seed, corre pgTAP y `db lint`. El CI corre en cada push de cualquier rama.
+Migración `20261017140000_p1_foundation.sql` (tenants, tenant_domains, memberships, tenant_config_versions, audit_events) con FK compuestas, invariantes en la base, RLS por membresía actual, grants mínimos y `resolve_tenant_by_host` como única entrada anónima. 74 aserciones pgTAP en CI y en local. Seed sintético `demo-norte` / `demo-sur`.
 
-Nota técnica: los helpers SECURITY DEFINER pertenecen al rol `postgres` (dueño de las tablas en Supabase). La ADR-014 sugería un dueño NOLOGIN dedicado; en Supabase gestionado eso exige atributos de rol no disponibles de forma portable, así que se compensa con `search_path` vacío, nombres calificados, retorno booleano y `EXECUTE` revocado a `PUBLIC`.
+### Paso 3 — resolución de tenant por host ✅
+
+- `@rikuy/core`:
+  - `normalizeHost` / `classifyHost`: minúsculas, IDNA, sin punto final; rechaza userinfo, rutas, IPv6, múltiples valores y puertos fuera de local. Superficies: `admin`, `platform`, `portal`, `invalid`.
+  - Contrato `TenantContext` (Zod) y códec ASCII para la cabecera interna.
+  - Caso de uso `resolvePortalTenant`: `found` · `redirect` (alias → canónico) · `not_found` · `unavailable`.
+  - `createCachedTenantDirectory`: TTL 60 s / 10 s, sin cachear errores, deduplica búsquedas concurrentes, clave por host exacto.
+- `@rikuy/db`: adaptador `createSupabaseTenantDirectory` (RPC con clave publicable, sin sesión, timeout 2 s, filas validadas con Zod).
+- `@rikuy/config`: `parsePlatformEnv` (lo que necesita el proxy, sin secretos).
+- `apps/web`:
+  - `src/proxy.ts`: lee solo `Host`, elimina cabeceras internas entrantes, reescribe a `/admin`, `/platform` o `/portal/{host}`; 404 `noindex`, 503 con `Retry-After`, 308 de alias a canónico, 400 para host inválido.
+  - Páginas: portal mínimo con el nombre del tenant resuelto (sin literales de municipio), panel de admin placeholder, sitio de plataforma.
+- Supabase local: analytics desactivado (evita exponer el daemon de Docker en Windows). Tests pgTAP sin `NOTICE`.
+- Tests: 60 unitarios/integración (core 37, db 6, web 11, config 6) + 74 pgTAP. Verificado de punta a punta con `next start` contra el esquema real: norte/sur resuelven su tenant, desconocido 404, admin y plataforma por host, spoofing ignorado, acceso directo a `/portal/...` 404, host inválido 400, registro caído 503 (y hosts en caché siguen sirviendo).
 
 ## Cómo verificarlo en tu PC
 
 ```powershell
+git checkout main
 git pull
 pnpm install
-pnpm db:start      # la primera vez descarga imágenes (varios minutos)
-pnpm db:test       # debe terminar en "All tests successful"
-pnpm db:status     # muestra API URL, Publishable key y Secret key locales
+pnpm db:stop
+pnpm db:start      # reinicia sin analytics (ya no aparece la advertencia de Windows)
+pnpm dev
 ```
 
-Copiar `.env.example` a `apps/web/.env.local` y pegar ahí la URL y las dos claves de `db:status`. Studio local: http://127.0.0.1:54323
+- http://demo-norte.localhost:3000 → «Municipio Demo Norte»
+- http://demo-sur.localhost:3000 → «Municipio Demo Sur»
+- http://otro.localhost:3000 → 404 «Sitio no encontrado»
+- http://app.localhost:3000 → panel de administración (placeholder)
+- http://localhost:3000 → sitio de Rikuy
 
-## Siguiente paso — P1 · Paso 3 (requiere autorización)
+## Siguiente paso — P1 · Paso 4 (requiere autorización)
 
-Rama `feat/p1-step3-tenant-resolution`:
+Rama `feat/p1-step4-admin-auth`:
 
-1. `packages/core`: normalización de host (minúsculas, IDNA, sin punto final, puertos solo en local) y tipo `TenantContext` inmutable, con tests.
-2. `packages/db`: cliente Supabase por request (anon para resolución pública) y repositorio `TenantDirectory` que llama a `resolve_tenant_by_host`.
-3. `apps/web`: `proxy.ts` de Next.js que separa host de admin y hosts de portal, elimina cabeceras internas entrantes y resuelve el tenant en servidor; 404 `noindex` para host desconocido, 503 si la base no responde; redirección 308 de alias a canónico.
-4. Página de portal mínima que muestra el nombre del tenant resuelto (sin literales de municipio).
-5. Tests: host válido/alias/desconocido/suspendido, spoofing de `X-Forwarded-Host`/`X-Tenant-*`, dos tenants en peticiones simultáneas.
+1. Supabase Auth en el host de admin vía BFF: inicio de sesión con email (enlace mágico / OTP; Mailpit local en http://127.0.0.1:54324), cookies host-only `Secure`/`HttpOnly`/`SameSite=Lax`, refresh solo en servidor, logout.
+2. Cliente Supabase por request con el JWT del usuario (`@rikuy/db`), sin reutilizar clientes entre usuarios.
+3. Caso de uso `listMyOrganizations` y selector `/o/{slug}`; cada página verifica membresía actual en servidor.
+4. Usuarios del seed provisionados con la Auth Admin API (reemplazan los placeholders SQL), un usuario miembro de dos tenants y uno revocado.
+5. Protección CSRF/Origin en mutaciones; MFA TOTP preparado para administradores.
+6. Tests: sin sesión → login; rol revocado con token vigente → sin acceso; usuario de A no ve B; cookie de admin nunca enviada a hosts de portal.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante para el Paso 3.
+- Ninguna bloqueante para el Paso 4.

@@ -1,7 +1,8 @@
 /**
- * @rikuy/db — data-access adapters (Supabase Data API / RPC, request-scoped clients).
+ * @rikuy/db — data-access adapters (Supabase Data API / RPC).
  *
- * Implements the repository ports declared in @rikuy/core. Server-only.
- * Populated from roadmap P1 step 2 (local Supabase + first migration).
+ * Implements the repository ports declared in @rikuy/core. Server-only: never import
+ * this package from client components.
  */
-export {};
+export { createSupabaseTenantDirectory, mapTenantRow } from "./tenant-directory";
+export type { SupabaseTenantDirectoryOptions } from "./tenant-directory";

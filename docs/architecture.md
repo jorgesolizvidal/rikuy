@@ -43,6 +43,7 @@ flowchart TD
 - Portal por host: `{municipio}.{dominio-plataforma}` o dominio propio verificado (TXT + CNAME → SSL en Vercel). Mientras no haya dominio de plataforma se usan alias `*.vercel.app` registrados como hosts exactos.
 - Panel de administración solo en el host central; cookies host-only, sin `Domain=` compartido.
 - Resolución: normalizar host → buscar en `tenant_domains` (activo y verificado) → `TenantContext` inmutable por request. Desconocido → 404; base de datos caída → 503. Nunca adivinar.
+- Implementación (`apps/web/src/proxy.ts`): solo se lee la cabecera `Host`; `X-Forwarded-Host` y cualquier `X-Tenant-*`/`X-Rikuy-*` entrante se ignoran o eliminan. Cada petición se reescribe a una ruta interna según su superficie — `/admin`, `/platform` o `/portal/{host}` — de modo que esas rutas no pueden alcanzarse directamente. El contexto viaja a la página en una cabecera interna validada y se contrasta con el host de la ruta. Caché por instancia: 60 s para hosts conocidos, 10 s para desconocidos, nunca para errores.
 
 ## 5. Acceso a datos (ADR-016)
 

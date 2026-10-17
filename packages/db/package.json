@@ -8,6 +8,12 @@
   },
   "scripts": {
     "lint": "eslint .",
-    "typecheck": "tsc -p tsconfig.json"
+    "typecheck": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@rikuy/core": "workspace:*",
+    "@supabase/supabase-js": "2.117.3",
+    "zod": "4.6.7"
   }
 }

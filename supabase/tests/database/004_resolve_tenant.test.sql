@@ -1,5 +1,6 @@
 -- Public tenant resolution: exact host match, active only, no default tenant.
 begin;
+set local client_min_messages to warning;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
