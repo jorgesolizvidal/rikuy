@@ -1,5 +1,6 @@
 -- Structural guarantees: RLS everywhere, anon locked out, definer helpers hardened.
 begin;
+set local client_min_messages to warning;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 

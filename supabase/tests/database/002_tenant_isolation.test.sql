@@ -1,6 +1,7 @@
 -- Tenant isolation by membership: who can read what, including revocation and
 -- users that belong to two tenants. Fixtures are synthetic and rolled back.
 begin;
+set local client_min_messages to warning;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
