@@ -1,0 +1,99 @@
+:root {
+  --bg: #f6f3ee;
+  --fg: #1d1a16;
+  --muted: #6b6359;
+  --accent: #b5532b;
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color-scheme: light dark;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14120f;
+    --fg: #f1ece4;
+    --muted: #a59b8e;
+    --accent: #e0855a;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.shell {
+  min-height: 100dvh;
+  max-width: 42rem;
+  margin: 0 auto;
+  padding: clamp(1.5rem, 6vw, 4rem) 1rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.eyebrow {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+  letter-spacing: 0.04em;
+}
+
+.title {
+  margin: 0;
+  font-size: clamp(3rem, 12vw, 5.5rem);
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-weight: 700;
+}
+
+.lead {
+  margin: 0;
+  font-size: clamp(1.05rem, 2.6vw, 1.25rem);
+  color: var(--muted);
+  max-width: 36rem;
+}
+
+.status {
+  margin: 0.5rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.dot {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .dot {
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
