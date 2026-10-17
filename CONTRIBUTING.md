@@ -69,9 +69,20 @@ pnpm install          # instala todo el monorepo
 pnpm dev              # portal/admin en http://localhost:3000
 pnpm check            # format + lint + typecheck + test + build (lo mismo que el CI)
 pnpm format           # aplica Prettier
+
+# Base de datos local (requiere Docker Desktop abierto)
+pnpm db:start         # levanta Supabase local; imprime URL y claves locales
+pnpm db:status        # vuelve a mostrar URL y claves
+pnpm db:reset         # recrea la base: migraciones + seed sintético
+pnpm db:test          # tests pgTAP de RLS, aislamiento e invariantes
+pnpm db:lint          # lint de SQL/PLpgSQL
+pnpm db:types         # genera tipos TypeScript del esquema
+pnpm db:stop          # detiene los contenedores
 ```
 
-Requisitos: Node 24 (`.nvmrc`), pnpm 12 y Docker Desktop (desde el Paso 2, para Supabase local).
+Requisitos: Node 24 (`.nvmrc`), pnpm 12 y Docker Desktop (para Supabase local).
+
+Nueva migración: `pnpm exec supabase migration new <nombre>` → escribir SQL + su test en `supabase/tests/database/` → `pnpm db:reset && pnpm db:test`.
 
 ## 4. Definición de terminado (por paso)
 
