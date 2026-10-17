@@ -5,39 +5,53 @@
 ## Estado actual
 
 - **Fase:** P1 — Fundación
-- **Último paso completado:** P1 · Paso 1 — base del repositorio (2026-10-17)
-- **Rama principal:** `main`
+- **Último paso completado:** P1 · Paso 2 — Supabase local + esquema P1 con RLS (2026-10-17)
+- **Rama del paso:** `feat/p1-step2-supabase-local` → PR hacia `main`
 
-## Paso 1 — qué quedó hecho
+## Historial
 
-- Monorepo pnpm: `apps/web` (Next.js 16, App Router, placeholder), `apps/worker` (esqueleto), `packages/core` (framework-free, regla ESLint que lo garantiza), `packages/db`, `packages/ui`, `packages/config` (contrato de variables de entorno con Zod + 5 tests).
-- TypeScript strict compartido (`tsconfig.base.json`), ESLint flat config compartido (`eslint.base.mjs`), Prettier, EditorConfig, `.gitattributes` (LF).
-- CI en GitHub Actions: format, lint, typecheck, test, build y escaneo de secretos con gitleaks.
-- `.env.example` documentado; `.gitignore` excluye `.env*`, `seed-assets/` y builds.
-- Documentación: `CONTRIBUTING.md`, `docs/architecture.md`, ADRs (índice 001–018, nuevas 019 y 020), `docs/roadmap.md`, `docs/performance-budget.md`, `docs/p0-closure.md`.
+### Paso 1 — base del repositorio ✅
 
-Versiones fijadas: Node 24 (`.nvmrc`), pnpm 12.14.0, Next.js 16.4.2, React 19.3.1, TypeScript 6.0.3, ESLint 10.12.0, Vitest 5.0.5, Zod 4.6.7.
+Monorepo pnpm (`apps/web`, `apps/worker`, `packages/core|db|ui|config`), TypeScript strict, ESLint con regla de capas, Prettier, CI (format, lint, typecheck, test, build, gitleaks), `.env.example`, documentación base y ADR-019/020.
 
-## Cómo verificarlo
+### Paso 2 — Supabase local y esquema P1 ✅
 
-```bash
+- Supabase CLI 2.121.0 como dependencia del proyecto (`pnpm db:*`). `supabase/config.toml`: Realtime y vector buckets desactivados, registro público desactivado, redirección de Auth solo al host de admin, MFA TOTP habilitado.
+- Migración `20261017140000_p1_foundation.sql`:
+  - Tablas: `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events`.
+  - FK compuestas `(tenant_id, id)` para dominio canónico y configuración activa; `tenant_id` inmutable.
+  - Invariantes en la base: tenant activo requiere owner activo; no se puede quitar el último owner (diferido, permite transferir); configuración sellada inmutable; dominio canónico debe estar activo; auditoría append-only; slugs reservados; hosts normalizados.
+  - Privilegios: `anon` sin acceso a tablas; `authenticated` solo lectura, con columnas sensibles ocultas (`verification_token_hash`, `provider_domain_id`). Escrituras llegarán por RPC por intención.
+  - RLS por membresía **actual** (revocación inmediata aunque el JWT siga vigente) con helper `private.has_tenant_role` (SECURITY DEFINER, `search_path` vacío, devuelve booleano).
+  - `public.resolve_tenant_by_host(host)`: única entrada anónima; coincidencia exacta, solo dominios y tenants activos, sin tenant por defecto.
+- Tests pgTAP (74 aserciones en 4 suites): estructura y privilegios, aislamiento por rol (anon, owner/admin/editor/analyst, revocado, miembro de A y B, externo), invariantes y resolución de tenant.
+- Seed sintético: `demo-norte.localhost` y `demo-sur.localhost` (municipios ficticios, sin datos reales).
+- CI: job de base de datos que levanta Postgres de Supabase, aplica migraciones + seed, corre pgTAP y `db lint`. El CI corre en cada push de cualquier rama.
+
+Nota técnica: los helpers SECURITY DEFINER pertenecen al rol `postgres` (dueño de las tablas en Supabase). La ADR-014 sugería un dueño NOLOGIN dedicado; en Supabase gestionado eso exige atributos de rol no disponibles de forma portable, así que se compensa con `search_path` vacío, nombres calificados, retorno booleano y `EXECUTE` revocado a `PUBLIC`.
+
+## Cómo verificarlo en tu PC
+
+```powershell
+git pull
 pnpm install
-pnpm check   # format + lint + typecheck + test + build
-pnpm dev     # http://localhost:3000 muestra el placeholder de Rikuy
+pnpm db:start      # la primera vez descarga imágenes (varios minutos)
+pnpm db:test       # debe terminar en "All tests successful"
+pnpm db:status     # muestra API URL, Publishable key y Secret key locales
 ```
 
-## Siguiente paso — P1 · Paso 2 (requiere autorización)
+Copiar `.env.example` a `apps/web/.env.local` y pegar ahí la URL y las dos claves de `db:status`. Studio local: http://127.0.0.1:54323
 
-Rama `feat/p1-step2-supabase-local`:
+## Siguiente paso — P1 · Paso 3 (requiere autorización)
 
-1. `supabase init` en la raíz; scripts `db:start`, `db:stop`, `db:reset`, `db:test`, `db:types`.
-2. Migración P1: `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events` según `docs/architecture.md` §6 (FK compuestas, constraints, índices, RLS, grants mínimos, helpers definer acotados).
-3. Tests pgTAP: anon, owner/admin/editor/analyst de A, miembro de A y B, miembro revocado, intento de cambiar `tenant_id`, último owner.
-4. Seed sintético mínimo (dos tenants ficticios) sin datos reales.
-5. Job de CI con Supabase CLI para correr los tests de base de datos.
+Rama `feat/p1-step3-tenant-resolution`:
 
-Prerrequisitos del usuario: Docker Desktop abierto. Después de `pnpm db:start`, copiar la URL y las claves locales que imprime la CLI a `apps/web/.env.local` siguiendo `.env.example`.
+1. `packages/core`: normalización de host (minúsculas, IDNA, sin punto final, puertos solo en local) y tipo `TenantContext` inmutable, con tests.
+2. `packages/db`: cliente Supabase por request (anon para resolución pública) y repositorio `TenantDirectory` que llama a `resolve_tenant_by_host`.
+3. `apps/web`: `proxy.ts` de Next.js que separa host de admin y hosts de portal, elimina cabeceras internas entrantes y resuelve el tenant en servidor; 404 `noindex` para host desconocido, 503 si la base no responde; redirección 308 de alias a canónico.
+4. Página de portal mínima que muestra el nombre del tenant resuelto (sin literales de municipio).
+5. Tests: host válido/alias/desconocido/suspendido, spoofing de `X-Forwarded-Host`/`X-Tenant-*`, dos tenants en peticiones simultáneas.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante para el Paso 2.
+- Ninguna bloqueante para el Paso 3.
