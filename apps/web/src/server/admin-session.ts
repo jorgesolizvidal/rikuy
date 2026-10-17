@@ -5,6 +5,7 @@ import {
   createMembershipReader,
   createSessionClient,
   createSupabaseAuthGateway,
+  createTenantConfigRepository,
   type SessionCookieToSet,
 } from "@rikuy/db";
 import { cookies } from "next/headers";
@@ -43,6 +44,7 @@ export const adminSession = cache(async () => {
   return {
     gateway: createSupabaseAuthGateway(client),
     memberships: createMembershipReader(client),
+    config: createTenantConfigRepository(client),
   };
 });
 
