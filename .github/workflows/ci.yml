@@ -74,6 +74,43 @@ jobs:
       - name: SQL lint
         run: pnpm db:lint
 
+  auth-integration:
+    name: Auth integration · real Supabase stack
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # Postgres + Auth + PostgREST + API gateway + Mailpit; everything else is skipped.
+      - name: Start Supabase
+        run: pnpm exec supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Export local credentials
+        run: |
+          STATUS="$(pnpm exec supabase status -o json)"
+          echo "status keys: $(echo "$STATUS" | jq -c 'keys')"
+          SECRET="$(echo "$STATUS" | jq -r '.SECRET_KEY // .SERVICE_ROLE_KEY')"
+          echo "::add-mask::$SECRET"
+          {
+            echo "SUPABASE_URL=$(echo "$STATUS" | jq -r '.API_URL')"
+            echo "SUPABASE_PUBLISHABLE_KEY=$(echo "$STATUS" | jq -r '.PUBLISHABLE_KEY // .ANON_KEY')"
+            echo "SUPABASE_SECRET_KEY=$SECRET"
+            echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
+          } >> "$GITHUB_ENV"
+
+      - name: Sign-in, membership and revocation tests
+        run: pnpm --filter @rikuy/db test:integration
+
   secrets:
     name: Secret scan (gitleaks)
     runs-on: ubuntu-latest
