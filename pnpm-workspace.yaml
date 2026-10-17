@@ -1,0 +1,10 @@
+packages:
+  - "apps/*"
+  - "packages/*"
+allowBuilds:
+  unrs-resolver: true
+# eslint-config-next 16 wraps eslint-plugin-react/import/jsx-a11y with fixupPluginRules for ESLint 10,
+# but those plugins have not widened their peer range yet. Remove once they declare ^10.
+peerDependencyRules:
+  allowedVersions:
+    eslint: "10"

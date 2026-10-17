@@ -1,0 +1,39 @@
+# Dependencies
+node_modules/
+.pnpm-store/
+
+# Builds and caches
+.next/
+out/
+dist/
+build/
+coverage/
+.turbo/
+.vercel/
+*.tsbuildinfo
+next-env.d.ts
+
+# Environment and secrets — only .env.example is versioned
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Local media for seeding (images, panoramas, GLB). Never committed.
+seed-assets/
+
+# Supabase local state
+supabase/.temp/
+supabase/.branches/
+
+# Logs and OS / editor noise
+*.log
+npm-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
