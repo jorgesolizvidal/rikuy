@@ -12,6 +12,11 @@ import { TENANT_CONTEXT_HEADER, stripInternalHeaders } from "./internal-headers"
 export interface PortalProxyDeps {
   readonly hosts: PlatformHosts;
   readonly directory: TenantDirectory;
+  /** Session refresh for the admin host only; portal hosts never touch auth cookies. */
+  readonly refreshAdminSession?: (
+    request: NextRequest,
+    respond: (headers: Headers) => NextResponse,
+  ) => Promise<NextResponse>;
 }
 
 /** Internal route prefixes. Every request is re-prefixed, so they cannot be reached directly. */
@@ -41,6 +46,12 @@ function rewrite(request: NextRequest, prefix: string, headers: Headers): NextRe
   return NextResponse.rewrite(target, { request: { headers } });
 }
 
+const ADMIN_HEADERS = {
+  "x-robots-tag": "noindex, nofollow",
+  "x-frame-options": "DENY",
+  "referrer-policy": "same-origin",
+};
+
 /**
  * Routes every request by its Host header (ADR-015):
  * admin host → /admin · platform apex → /platform · portal host → /portal/{host}
@@ -55,8 +66,17 @@ export function createPortalProxy(deps: PortalProxyDeps) {
     switch (surface.kind) {
       case "invalid":
         return statusPage(400, "Solicitud no válida", "El dominio de la solicitud no es válido.");
-      case "admin":
-        return rewrite(request, ROUTES.admin, headers);
+      case "admin": {
+        const respond = (forwarded: Headers) => {
+          const response = rewrite(request, ROUTES.admin, forwarded);
+          for (const [key, value] of Object.entries(ADMIN_HEADERS))
+            response.headers.set(key, value);
+          return response;
+        };
+        return deps.refreshAdminSession
+          ? deps.refreshAdminSession(request, respond)
+          : respond(headers);
+      }
       case "platform":
         return rewrite(request, ROUTES.platform, headers);
       case "portal": {
