@@ -98,7 +98,7 @@ jobs:
       - name: Export local credentials
         run: |
           STATUS="$(pnpm exec supabase status -o json)"
-          echo "status keys: $(echo "$STATUS" | jq -c 'keys')"
+          echo "::notice title=supabase status keys::$(echo "$STATUS" | jq -c 'keys')"
           SECRET="$(echo "$STATUS" | jq -r '.SECRET_KEY // .SERVICE_ROLE_KEY')"
           echo "::add-mask::$SECRET"
           {
@@ -109,7 +109,20 @@ jobs:
           } >> "$GITHUB_ENV"
 
       - name: Sign-in, membership and revocation tests
-        run: pnpm --filter @rikuy/db test:integration
+        run: |
+          set -o pipefail
+          pnpm --filter @rikuy/db test:integration 2>&1 | tee integration.log
+
+      # Surfaces the failure output as annotations (readable from the PR checks view).
+      - name: Report integration failure
+        if: failure()
+        run: |
+          grep -E "FAIL|Error|expected|AssertionError|×|at .*int\.test" integration.log | head -40 | while IFS= read -r line; do
+            echo "::error title=integration::${line//%/%25}"
+          done
+          docker logs supabase_auth_rikuy 2>&1 | tail -15 | while IFS= read -r line; do
+            echo "::warning title=auth log::${line//%/%25}"
+          done
 
   secrets:
     name: Secret scan (gitleaks)
