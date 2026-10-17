@@ -16,3 +16,5 @@ export type {
 } from "./session-client";
 export { createSupabaseAuthGateway } from "./auth-gateway";
 export { createMembershipReader } from "./membership-reader";
+export { createSupabasePresentationReader, createTenantConfigRepository } from "./tenant-config";
+export type { SupabasePresentationReaderOptions } from "./tenant-config";
