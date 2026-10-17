@@ -17,8 +17,17 @@ function isRateLimited(error: AuthError): boolean {
   return error.status === 429 || (error.code?.startsWith("over_") ?? false);
 }
 
+// Misconfiguration of the Auth server, not a property of the account: surfacing it as
+// "not allowed" would silently hide a broken login behind the anti-enumeration message.
+const CONFIGURATION_ERRORS = new Set(["email_provider_disabled", "provider_disabled"]);
+
 function isServerOrNetwork(error: AuthError): boolean {
-  return error.status === undefined || error.status === 0 || error.status >= 500;
+  return (
+    error.status === undefined ||
+    error.status === 0 ||
+    error.status >= 500 ||
+    CONFIGURATION_ERRORS.has(error.code ?? "")
+  );
 }
 
 export function createSupabaseAuthGateway(client: SessionClient): AuthGateway {

@@ -89,6 +89,7 @@ describe("auth gateway", () => {
     [400, "validation_failed", "not_allowed"],
     [429, "over_email_send_rate_limit", "rate_limited"],
     [500, "unexpected_failure", "unavailable"],
+    [422, "email_provider_disabled", "unavailable"],
   ])("maps HTTP %s (%s) to %s", async (status, code, outcome) => {
     const h = harness(() => json({ code, msg: "x", error_code: code }, status));
     expect(await h.gateway.requestEmailCode("x@example.test", { redirectTo: "http://x" })).toBe(
