@@ -66,7 +66,12 @@ jobs:
 
       # Starts only Postgres; applies supabase/migrations and supabase/seed.sql.
       - name: Start database
-        run: pnpm exec supabase db start
+        run: |
+          set -o pipefail
+          pnpm exec supabase db start 2>&1 | tee db-start.log || {
+            tail -20 db-start.log | while IFS= read -r line; do echo "::error title=db start::${line//%/%25}"; done
+            exit 1
+          }
 
       - name: pgTAP tests
         run: pnpm db:test

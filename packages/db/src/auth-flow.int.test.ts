@@ -57,7 +57,11 @@ function newSession() {
 async function mailpit(path: string, init?: RequestInit) {
   const response = await fetch(`${env.mailpit}/api/v1${path}`, init);
   if (!response.ok) throw new Error(`Mailpit ${path}: ${response.status}`);
-  return response.status === 200 ? response.json() : null;
+  // Some endpoints (e.g. DELETE /messages) answer with plain text "ok".
+  const body = await response.text();
+  return response.headers.get("content-type")?.includes("json")
+    ? (JSON.parse(body) as unknown)
+    : null;
 }
 
 async function latestCodeFor(email: string, since: number, timeoutMs = 15_000): Promise<string> {
