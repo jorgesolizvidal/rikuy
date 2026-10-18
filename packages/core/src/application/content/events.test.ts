@@ -221,7 +221,7 @@ describe("event pages", () => {
     expect(ics).toContain("DTSTART:20261102T230000Z\r\n");
     expect(ics).toContain("DTEND:20261103T020000Z\r\n");
     expect(ics).toContain("SUMMARY:Feria del choclo\\; música\\, comida\r\n");
-    expect(ics).toContain("LOCATION:Mirador del Valle\\, Demo\r\n");
+    expect(ics).toContain("LOCATION:Mirador del Valle · Demo\r\n");
     expect(ics).toContain("GEO:-17.39;-66.15\r\n");
     expect(ics.endsWith("END:VCALENDAR\r\n")).toBe(true);
     for (const line of ics.split("\r\n")) {

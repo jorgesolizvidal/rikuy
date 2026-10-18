@@ -91,8 +91,10 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Manifest versionado por `asset_version`; cambiar la entrega nunca mueve hotspots.
 - GLB: original intacto + derivado optimizado (Meshopt/Draco, texturas KTX2) con verificación de color; carga solo al abrir el hotspot.
 
-## 9. Ubicación del visitante (ADR-021)
+## 9. Mapa y ubicación del visitante (ADR-021, ADR-023)
 
+- Mapa del portal: MapLibre con teselas vectoriales de OpenFreeMap; el estilo es configuración (`NEXT_PUBLIC_MAP_STYLE_URL`). La librería se carga solo donde hay mapa (`/mapa` y, en las fichas, cuando el visitante llega al mapa pequeño); su _worker_ se sirve desde `/vendor/maplibre-gl/<versión>/`. El panel usa Leaflet + OpenStreetMap (uso ligero).
+- El mapa pide al servidor solo los lugares de la zona visible (`portal_map_places`, tope por petición, caché por municipio y zona redondeada a ~1 km). Junto al mapa, la lista con los mismos lugares es la alternativa accesible; si el mapa no carga, la página sigue funcionando.
 - Coordenadas de destinos y eventos en `geography(Point,4326)` con índice GiST; «cerca de» y consultas por área en el servidor.
 - Posición del visitante solo en el navegador: se pide tras una acción, `watchPosition` mientras el mapa o la ficha está visible, círculo de precisión, «estás cerca de…» con la página abierta.
 - La posición exacta nunca se envía ni se guarda; al asistente llega redondeada (~100 m) en la petición que la necesita, sin registrarse. Sin permiso, todo funciona (RC-06).

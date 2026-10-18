@@ -1,10 +1,21 @@
 import "server-only";
 
-import { imageCandidates, type PublishedImage } from "@rikuy/core";
+import {
+  formatEventSchedule,
+  imageCandidates,
+  mapPlacePath,
+  type PortalMapPlace,
+  type PublishedImage,
+} from "@rikuy/core";
 import { publicMediaUrl } from "@rikuy/db";
 import { cache } from "react";
 
-import { platformSettings, publishedContentReader, publishedEventReader } from "./platform";
+import {
+  platformSettings,
+  publishedContentReader,
+  publishedEventReader,
+  publishedMapReader,
+} from "./platform";
 import type { PortalView } from "./portal-view";
 
 /** What an <img> needs to load the right derivative and reserve its space. */
@@ -60,4 +71,32 @@ export const portalEvents = cache(async (view: PortalView) =>
 /** One published event (also after it ended), or null. */
 export const portalEvent = cache(async (view: PortalView, slug: string) =>
   publishedEventReader().find(view.context.tenant.tenantId, slug),
+);
+
+/** What the browser map and its list need for one place (no internal ids). */
+export interface MapPointDto {
+  readonly key: string;
+  readonly kind: "destination" | "event";
+  readonly title: string;
+  readonly href: string;
+  /** Event date, or the destination's summary. */
+  readonly detail: string;
+  readonly lat: number;
+  readonly lng: number;
+}
+
+export function toMapPoint(place: PortalMapPlace): MapPointDto {
+  return {
+    key: `${place.kind}:${place.slug}`,
+    kind: place.kind,
+    title: place.title,
+    href: mapPlacePath(place),
+    detail: place.schedule ? formatEventSchedule(place.schedule) : place.summary,
+    lat: place.location.lat,
+    lng: place.location.lng,
+  };
+}
+
+export const portalMapExtent = cache(async (view: PortalView) =>
+  publishedMapReader().extent(view.context.tenant.tenantId),
 );

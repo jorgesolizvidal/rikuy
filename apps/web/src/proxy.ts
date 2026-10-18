@@ -24,5 +24,6 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Everything except Next.js build assets. New public files must be added here explicitly.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico).*)"],
+  // vendor/: versioned third-party files (the map worker), the same for every host.
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|vendor/).*)"],
 };

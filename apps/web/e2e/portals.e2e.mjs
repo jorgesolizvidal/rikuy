@@ -3,6 +3,7 @@
 // Usage: node e2e/portals.e2e.mjs [port]   (CI job "Integration · real Supabase stack")
 import { strict as assert } from "node:assert";
 import http from "node:http";
+import { createRequire } from "node:module";
 
 const port = Number(process.argv[2] ?? 3000);
 // After the integration suite, the ZC-01 rehearsal tenant exists and must be live too.
@@ -225,6 +226,59 @@ for (const portal of portals) {
   check(() => assert.match(xml, new RegExp(`/agenda/${slug}</loc>`)));
   if (portal.endedEvent) check(() => assert.doesNotMatch(xml, new RegExp(portal.endedEvent)));
 }
+
+// Map (P3 · Paso 5): places by area, per municipality; MapLibre outside initial bundles.
+async function initialScripts(host, path) {
+  const html = (await get(host, path)).body.toString();
+  const sources = [...html.matchAll(/<script[^>]+src="([^"]+)"/g)].map((match) => match[1]);
+  const bodies = await Promise.all(
+    sources.map(async (src) => (await get(host, src)).body.toString()),
+  );
+  return bodies;
+}
+
+for (const portal of portals) {
+  const others = portals.filter((p) => p !== portal);
+  const map = await get(portal.host, "/mapa");
+  const mapHtml = map.body.toString();
+  check(() => assert.equal(map.status, 200, `${portal.host} /mapa`));
+  check(() => assert.match(mapHtml, new RegExp(`href="/destinos/${portal.destination.slug}"`)));
+  check(() => assert.match(mapHtml, new RegExp(`href="/agenda/${portal.event.slug}"`)));
+  for (const other of others) {
+    check(() => assert.doesNotMatch(mapHtml, new RegExp(`/destinos/${other.destination.slug}"`)));
+  }
+
+  // The whole country as the area: still only this municipality's places.
+  const places = await get(portal.host, "/mapa/lugares?area=-70,-23,-57,-9");
+  check(() => assert.equal(places.status, 200));
+  const keys = JSON.parse(places.body.toString()).places.map((place) => place.key);
+  check(() => assert.ok(keys.includes(`destination:${portal.destination.slug}`)));
+  check(() => assert.ok(keys.includes(`event:${portal.event.slug}`)));
+  for (const other of others) {
+    check(() => assert.ok(!keys.includes(`destination:${other.destination.slug}`)));
+  }
+  if (portal.endedEvent) check(() => assert.ok(!keys.includes(`event:${portal.endedEvent}`)));
+  const bad = await get(portal.host, "/mapa/lugares?area=-70,-9,-57,-23");
+  check(() => assert.equal(bad.status, 400, "an inverted area is refused"));
+
+  for (const path of ["/", `/destinos/${portal.destination.slug}`]) {
+    const bodies = await initialScripts(portal.host, path);
+    check(() => assert.ok(bodies.length > 0, `${path} has scripts`));
+    check(() =>
+      assert.ok(
+        !bodies.some((body) => /maplibre/i.test(body)),
+        `${path}: MapLibre is not in the initial bundle`,
+      ),
+    );
+  }
+}
+const maplibre = createRequire(import.meta.url)("maplibre-gl/package.json").version;
+const worker = await get(
+  "demo-norte.localhost",
+  `/vendor/maplibre-gl/${maplibre}/maplibre-gl-worker.mjs`,
+);
+check(() => assert.equal(worker.status, 200, "the map worker is served from our origin"));
+check(() => assert.match(String(worker.headers["cache-control"]), /immutable/));
 
 if (withLogo) {
   // The integration suite published a destination with a cover photo in Demo Norte.

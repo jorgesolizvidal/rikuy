@@ -699,3 +699,277 @@
     margin-left: auto;
   }
 }
+
+/* ── Map (/mapa and the small map on each page) ─────────────────────────── */
+
+.portal-map-layout {
+  display: grid;
+  gap: 1.25rem;
+  margin-top: 1.75rem;
+}
+
+@media (min-width: 60rem) {
+  .portal-map-layout {
+    grid-template-columns: minmax(0, 1fr) 22rem;
+    grid-template-areas:
+      "layers layers"
+      "map list";
+    align-items: start;
+  }
+
+  .portal-map-layers {
+    grid-area: layers;
+  }
+
+  .portal-map-frame {
+    grid-area: map;
+    position: sticky;
+    top: 1rem;
+  }
+
+  .portal-map-list {
+    grid-area: list;
+  }
+}
+
+.portal-map-layers {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.5rem;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.portal-map-layers legend {
+  float: left;
+  margin-right: 0.5rem;
+  font-weight: 650;
+}
+
+.portal-map-layer {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.portal-map-layer input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--brand);
+}
+
+.portal-map-swatch {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(0 0 0 / 35%);
+}
+
+[data-kind="destination"] > .portal-map-swatch,
+.map-marker[data-kind="destination"] .map-marker-pin {
+  background: var(--brand);
+}
+
+[data-kind="event"] > .portal-map-swatch,
+.map-marker[data-kind="event"] .map-marker-pin {
+  background: var(--accent);
+}
+
+.portal-map-frame,
+.portal-mini-map {
+  position: relative;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.portal-map-frame {
+  height: min(58vh, 40rem);
+  min-height: 18rem;
+}
+
+@media (min-width: 60rem) {
+  .portal-map-frame {
+    height: min(72vh, 44rem);
+  }
+}
+
+.portal-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.portal-map-surface {
+  width: 100%;
+  height: 100%;
+}
+
+.portal-map-loading,
+.portal-map-failed {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  margin: 0;
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--muted);
+}
+
+.map-marker {
+  display: block;
+  width: 2rem;
+  height: 2.25rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: pointer;
+}
+
+.map-marker-pin {
+  position: absolute;
+  left: 0.25rem;
+  top: 0.125rem;
+  width: 1.5rem;
+  height: 1.5rem;
+  border: 3px solid #fff;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+}
+
+.map-marker:focus-visible {
+  outline: 3px solid #000;
+  outline-offset: 3px;
+}
+
+.map-popup a {
+  font-weight: 650;
+  font-size: 1rem;
+  color: #1a1a1a;
+}
+
+.map-popup p {
+  margin: 0.25rem 0 0;
+  color: #444;
+  font-size: 0.875rem;
+}
+
+.portal-map-list h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: 650;
+}
+
+.portal-map-count {
+  margin: 0.25rem 0 0.75rem;
+  color: var(--muted);
+}
+
+.portal-map-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.5rem;
+}
+
+.portal-map-list li a {
+  display: grid;
+  gap: 0.125rem;
+  padding: 0.75rem 0.875rem;
+  border-radius: 0.75rem;
+  border-left: 4px solid var(--brand);
+  background: var(--surface);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.portal-map-list li[data-kind="event"] a {
+  border-left-color: var(--accent);
+}
+
+.portal-map-list li a:hover .portal-map-title {
+  text-decoration: underline;
+}
+
+.portal-map-kind {
+  font-size: 0.75rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-map-title {
+  font-weight: 650;
+}
+
+.portal-map-detail {
+  color: var(--muted);
+  font-size: 0.9375rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.portal-location {
+  margin-top: 3rem;
+}
+
+.portal-location h2 {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+
+.portal-mini-map {
+  aspect-ratio: 16 / 7;
+  min-height: 12rem;
+  max-width: 48rem;
+}
+
+.portal-location p {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-mini-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.portal-mini-map-start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  border: 0;
+  background:
+    repeating-linear-gradient(
+      35deg,
+      transparent 0 22px,
+      color-mix(in srgb, var(--muted) 12%, transparent) 22px 23px
+    ),
+    var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.portal-mini-map-start .map-marker {
+  position: relative;
+  pointer-events: none;
+}

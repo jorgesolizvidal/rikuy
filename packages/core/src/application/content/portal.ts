@@ -2,7 +2,11 @@ import { CONTENT_IMAGE_WIDTHS } from "../../domain/media/rules";
 import { richTextToPlainText } from "../../contracts/rich-text";
 import { dayAfter } from "../../domain/events/schedule";
 import { contentImagePath } from "../media/content-images";
+import { formatBoundingBox, snapBoundingBox, type BoundingBox } from "../../domain/geo/bounds";
 import type {
+  MapPlaceKind,
+  PortalMapPlace,
+  PublishedMapReader,
   PublishedDestination,
   PublishedDestinationReader,
   PublishedDestinationSummary,
@@ -19,6 +23,8 @@ export const PORTAL_PATHS = {
   agenda: "/agenda",
   event: (slug: string) => `/agenda/${encodeURIComponent(slug)}`,
   eventCalendar: (slug: string) => `/agenda/${encodeURIComponent(slug)}/calendario.ics`,
+  map: "/mapa",
+  mapPlaces: "/mapa/lugares",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
@@ -116,6 +122,7 @@ export function buildSitemap(
     entry(PORTAL_PATHS.destinations, latest(destinations)),
     ...destinations.map((d) => entry(PORTAL_PATHS.destination(d.slug), d.updatedAt)),
     entry(PORTAL_PATHS.agenda, latest(events)),
+    entry(PORTAL_PATHS.map, latest([...destinations, ...events])),
     ...events.map((e) => entry(PORTAL_PATHS.event(e.slug), e.updatedAt)),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),
@@ -213,7 +220,8 @@ export function buildEventIcs(
   options: { readonly url: string; readonly uid: string; readonly portalName: string },
 ): string {
   const { schedule } = event;
-  const where = [event.venue?.title, options.portalName].filter(Boolean).join(", ");
+  // " · " rather than a comma: some phone calendars show the RFC 5545 comma escape as is.
+  const where = [event.venue?.title, options.portalName].filter(Boolean).join(" · ");
   const description = [event.summary, options.url].filter(Boolean).join("\n\n");
   const lines = [
     "BEGIN:VCALENDAR",
@@ -297,4 +305,43 @@ export function createCachedPublishedEventReader(
     list: (tenantId) => cached(`list:${tenantId}`, () => inner.list(tenantId)),
     find: (tenantId, slug) => cached(`find:${tenantId}:${slug}`, () => inner.find(tenantId, slug)),
   };
+}
+
+/** Where a map place links to. */
+export function mapPlacePath(place: Pick<PortalMapPlace, "kind" | "slug">): string {
+  return place.kind === "event"
+    ? PORTAL_PATHS.event(place.slug)
+    : PORTAL_PATHS.destination(place.slug);
+}
+
+/**
+ * Map reads cached per tenant; areas are snapped outwards to a ~1 km grid first, so
+ * nearby views share an entry (results are then trimmed back to the requested area).
+ */
+export function createCachedPublishedMapReader(
+  inner: PublishedMapReader,
+  options: CacheOptions = {},
+): PublishedMapReader {
+  const cached = ttlCache(options);
+  return {
+    extent: (tenantId) => cached(`extent:${tenantId}`, () => inner.extent(tenantId)),
+    async places(tenantId, area, kinds) {
+      const snapped = snapBoundingBox(area);
+      const sortedKinds = [...new Set(kinds)].sort() as MapPlaceKind[];
+      const all = await cached(
+        `places:${tenantId}:${formatBoundingBox(snapped)}:${sortedKinds.join("+")}`,
+        () => inner.places(tenantId, snapped, sortedKinds),
+      );
+      return all.filter((place) => inside(place.location, area));
+    },
+  };
+}
+
+function inside(point: { readonly lat: number; readonly lng: number }, box: BoundingBox): boolean {
+  return (
+    point.lat >= box.south &&
+    point.lat <= box.north &&
+    point.lng >= box.west &&
+    point.lng <= box.east
+  );
 }

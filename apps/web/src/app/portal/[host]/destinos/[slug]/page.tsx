@@ -13,6 +13,7 @@ import { RichTextView } from "@/components/rich-text";
 import { portalDestination, portalOrigin, responsiveImage } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
+import { MiniMap } from "../../mini-map";
 import { PortalImage } from "../../portal-image";
 import { ShareButton } from "../../share-button";
 
@@ -149,19 +150,40 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         </section>
       ) : null}
 
-      <footer className="portal-destination-meta">
-        {destination.location ? (
+      {destination.location ? (
+        <section aria-labelledby="ubicacion" className="portal-location">
+          <h2 id="ubicacion">Ubicación</h2>
+          <MiniMap
+            point={{
+              key: "here",
+              kind: "destination",
+              title: destination.title,
+              href: "",
+              detail: "",
+              lat: destination.location.lat,
+              lng: destination.location.lng,
+            }}
+          />
           <p>
-            Ubicación: {formatCoordinates(destination.location)} ·{" "}
+            {formatCoordinates(destination.location)} ·{" "}
+            <a
+              href={`${PORTAL_PATHS.map}?lat=${destination.location.lat}&lng=${destination.location.lng}`}
+            >
+              Ver en el mapa del municipio
+            </a>{" "}
+            ·{" "}
             <a
               href={openStreetMapUrl(destination.location)}
               target="_blank"
               rel="noopener noreferrer"
             >
-              Ver en OpenStreetMap
+              OpenStreetMap
             </a>
           </p>
-        ) : null}
+        </section>
+      ) : null}
+
+      <footer className="portal-destination-meta">
         <p>Actualizado el {updated}.</p>
       </footer>
     </article>

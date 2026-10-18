@@ -4,6 +4,7 @@ import {
   createContentRepository,
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
+  createSupabasePublishedMapReader,
 } from "./content";
 import { createSessionClient } from "./session-client";
 
@@ -301,5 +302,68 @@ describe("events", () => {
       location: { lat: -17.39, lng: -66.15 },
       venue: { slug: "mirador", title: "Mirador" },
     });
+  });
+});
+
+describe("map reader", () => {
+  it("asks for places inside the area with the chosen layers and a cap", async () => {
+    const bodies: unknown[] = [];
+    const reader = createSupabasePublishedMapReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      limit: 50,
+      fetch: async (_input, init = {}) => {
+        bodies.push(JSON.parse(String(init.body)));
+        return json([
+          {
+            kind: "event",
+            slug: "feria",
+            title: "Feria",
+            summary: "",
+            latitude: -17.39,
+            longitude: -66.15,
+            schedule: { allDay: true, start: "2026-11-02", end: "2026-11-02" },
+            starts_at: "2026-11-02T04:00:00+00:00",
+            cover: null,
+          },
+        ]);
+      },
+    });
+    const places = await reader.places(
+      TENANT,
+      { west: -66.2, south: -17.4, east: -66.1, north: -17.3 },
+      ["event"],
+    );
+    expect(places).toEqual([
+      {
+        kind: "event",
+        slug: "feria",
+        title: "Feria",
+        summary: "",
+        location: { lat: -17.39, lng: -66.15 },
+        schedule: { allDay: true, start: "2026-11-02", end: "2026-11-02" },
+        cover: null,
+      },
+    ]);
+    expect(bodies[0]).toEqual({
+      p_tenant_id: TENANT,
+      p_west: -66.2,
+      p_south: -17.4,
+      p_east: -66.1,
+      p_north: -17.3,
+      p_kinds: ["event"],
+      p_limit: 50,
+    });
+    expect(await reader.places(TENANT, { west: 0, south: 0, east: 1, north: 1 }, [])).toEqual([]);
+  });
+
+  it("reads an empty extent as no bounds", async () => {
+    const reader = createSupabasePublishedMapReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      fetch: async () =>
+        json([{ west: null, south: null, east: null, north: null, destinations: 0, events: 0 }]),
+    });
+    expect(await reader.extent(TENANT)).toEqual({ bounds: null, destinations: 0, events: 0 });
   });
 });

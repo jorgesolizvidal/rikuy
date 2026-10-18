@@ -1,11 +1,18 @@
 import { describe, expect, it } from "vitest";
 
-import type { PublishedDestination, PublishedDestinationReader } from "./ports";
+import type {
+  PortalMapPlace,
+  PublishedDestination,
+  PublishedDestinationReader,
+  PublishedMapReader,
+} from "./ports";
 import {
   PORTAL_PATHS,
   buildRobotsTxt,
   buildSitemap,
   createCachedPublishedDestinationReader,
+  createCachedPublishedMapReader,
+  mapPlacePath,
   destinationJsonLd,
   directionsUrl,
   imageCandidates,
@@ -146,5 +153,47 @@ describe("cached published destination reader", () => {
     setFail(false);
     await expect(reader.list("a")).resolves.toEqual([]);
     expect(calls).toEqual(["list:a", "list:a"]);
+  });
+});
+
+describe("cached map reader", () => {
+  const place = (slug: string, lat: number, lng: number): PortalMapPlace => ({
+    kind: "destination",
+    slug,
+    title: slug,
+    summary: "",
+    location: { lat, lng },
+    schedule: null,
+    cover: null,
+  });
+
+  it("asks once per snapped area and trims results back to the requested one", async () => {
+    const asked: string[] = [];
+    const inner: PublishedMapReader = {
+      extent: async () => ({ bounds: null, destinations: 0, events: 0 }),
+      async places(_tenant, area, kinds) {
+        asked.push(`${area.west},${area.south},${area.east},${area.north}:${kinds.join("+")}`);
+        return [place("dentro", -17.385, -66.145), place("borde", -17.399, -66.159)];
+      },
+    };
+    const reader = createCachedPublishedMapReader(inner);
+    const first = await reader.places(
+      "t",
+      { west: -66.151, south: -17.391, east: -66.14, north: -17.38 },
+      ["event", "destination"],
+    );
+    const second = await reader.places(
+      "t",
+      { west: -66.152, south: -17.392, east: -66.141, north: -17.381 },
+      ["destination", "event"],
+    );
+    expect(first.map((p) => p.slug)).toEqual(["dentro"]);
+    expect(second.map((p) => p.slug)).toEqual(["dentro"]);
+    expect(asked).toEqual(["-66.16,-17.4,-66.14,-17.38:destination+event"]);
+  });
+
+  it("links each place to its page", () => {
+    expect(mapPlacePath({ kind: "event", slug: "feria" })).toBe("/agenda/feria");
+    expect(mapPlacePath({ kind: "destination", slug: "plaza" })).toBe("/destinos/plaza");
   });
 });
