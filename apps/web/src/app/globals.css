@@ -523,8 +523,13 @@ a.button-quiet {
   text-align: right;
 }
 
+.cell-actions .inline-form {
+  display: flex;
+}
+
 .status-pill {
   display: inline-block;
+  white-space: nowrap;
   padding: 0.125rem 0.625rem;
   border-radius: 999px;
   font-size: 0.8125rem;
