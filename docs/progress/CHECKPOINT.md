@@ -41,6 +41,8 @@ Migración `20261017140000_p1_foundation.sql` (tenants, tenant_domains, membersh
 - CI: nuevo job **Auth integration** que levanta la pila real (GoTrue + PostgREST + Mailpit) y prueba inicio de sesión por código, aislamiento A/B por RLS, revocación aplicada a una sesión con token vigente, correo desconocido sin email y logout. Los fallos se publican como anotaciones del check.
 - Tests: 92 unitarios (core 54, db 18, web 14, config 6) + 6 de integración + 74 pgTAP.
 
+**Corrección posterior (`fix/admin-login-redirect`):** al verificar el código, el panel mostraba la página de la plataforma en `app.localhost:3000`. Causa: `redirect()` dentro de una Server Action hace que Next renderice el destino con un fetch interno a `http://localhost:3000`, saltándose la resolución por host. Ahora la acción devuelve `signed_in` y el navegador navega; ESLint prohíbe `redirect` en `actions.ts` y la regla quedó en CONTRIBUTING §1.2.
+
 **Desviaciones respecto al plan:**
 
 - Usuarios del seed escritos en `auth.users` + `auth.identities` desde `seed.sql` (no con la Auth Admin API) para que `pnpm db:reset` siga siendo un solo comando reproducible.

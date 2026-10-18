@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
 
 import { loginAction, type LoginState } from "./actions";
 
@@ -9,6 +9,21 @@ export function LoginForm({ initialError }: { readonly initialError?: string }) 
     ? { stage: "email", error: initialError }
     : { stage: "email" };
   const [state, action, pending] = useActionState(loginAction, initial);
+
+  // Full navigation (not a Server Action redirect) so the next request goes through the
+  // host-based proxy with the new session cookies.
+  useEffect(() => {
+    if (state.stage === "signed_in") window.location.replace("/");
+  }, [state.stage]);
+
+  if (state.stage === "signed_in") {
+    return (
+      <p className="lead" role="status">
+        Sesión iniciada. Abriendo tus municipios…
+      </p>
+    );
+  }
+
   const errorProps = state.error
     ? { "aria-invalid": true as const, "aria-describedby": "login-error" }
     : {};

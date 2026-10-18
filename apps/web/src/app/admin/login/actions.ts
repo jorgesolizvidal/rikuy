@@ -1,14 +1,15 @@
 "use server";
 
 import { requestSignInCode, verifySignInCode } from "@rikuy/core";
-import { redirect } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { platformSettings } from "@/server/platform";
 
 export type LoginState =
   | { readonly stage: "email"; readonly error?: string }
-  | { readonly stage: "code"; readonly email: string; readonly error?: string };
+  | { readonly stage: "code"; readonly email: string; readonly error?: string }
+  // The browser navigates itself: see the note on redirects in CONTRIBUTING (§1.2).
+  | { readonly stage: "signed_in" };
 
 const MESSAGES = {
   invalidEmail: "Escribe un correo válido.",
@@ -55,7 +56,7 @@ async function verifyCode(state: LoginState, formData: FormData): Promise<LoginS
   const { gateway } = await adminSession();
   const result = await verifySignInCode(email, formData.get("code"), gateway);
 
-  if (result.status === "signed_in") redirect("/");
+  if (result.status === "signed_in") return { stage: "signed_in" };
 
   const safeEmail = typeof email === "string" ? email : "";
   switch (result.status) {
