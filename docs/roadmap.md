@@ -12,7 +12,7 @@ Cada fase se divide en **pasos**; un paso = una rama = un PR con CI en verde y c
 
 ```
 P0 ✅ benchmarks (cerrado con límites)
-P1  Fundación · tenancy · identidad · white-label
+P1 ✅ Fundación · tenancy · identidad · white-label
 P3  Portal y admin: destinos, evento, mapa, publicación (+ imágenes básicas)
 P2  Jobs durables · pipeline de panoramas y GLB · observabilidad
 P4  Tours 360° · hotspots · GLB lazy
@@ -24,16 +24,27 @@ E1–E4 expansión · X0/X1 migración del sistema anterior
 
 ## P1 — Fundación, tenancy, identidad y white-label
 
-| Paso | Contenido                                                                                                                                                                                           | Terminado cuando                                                              |
-| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
-| 1 ✅ | Monorepo, reglas de ingeniería, CI (lint/typecheck/test/build/gitleaks), documentación base                                                                                                         | CI verde; `pnpm dev` muestra el placeholder                                   |
-| 2 ✅ | Supabase local (CLI + Docker), migración P1: `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events`; RLS + grants; tests pgTAP con casos negativos; tests de DB en CI | `pnpm db:test` verde en local y en CI                                         |
-| 3 ✅ | Resolución de tenant por host (proxy de Next.js + registro de dominios), `TenantContext` por request, 404 para host desconocido, separación portal/admin                                            | Tests: host válido, desconocido, spoofing de headers, dos tenants simultáneos |
-| 4 ✅ | Auth central en el host de admin (Supabase Auth vía BFF, cookies host-only, CSRF), membresías y selector de organización (el operador de plataforma pasa al Paso 6)                                 | Tests de rol, revocación con token vigente y acceso cruzado A/B               |
-| 5 ✅ | Configuración white-label versionada (borrador → sellada): identidad, tema validado por contraste, contactos, SEO, manifest PWA por tenant; `TenantPresentation` en el portal                       | Dos tenants con marcas distintas en el mismo build                            |
-| 6    | Operador de plataforma + onboarding genérico de tenant (flujo del operador) + seed de Ucureña y de un municipio demo sintético; primer ensayo ZC-01                                                 | Alta del tenant B sin cambios de código ni de variables de entorno            |
+| Paso | Contenido                                                                                                                                                                                                           | Terminado cuando                                                              |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| 1 ✅ | Monorepo, reglas de ingeniería, CI (lint/typecheck/test/build/gitleaks), documentación base                                                                                                                         | CI verde; `pnpm dev` muestra el placeholder                                   |
+| 2 ✅ | Supabase local (CLI + Docker), migración P1: `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events`; RLS + grants; tests pgTAP con casos negativos; tests de DB en CI                 | `pnpm db:test` verde en local y en CI                                         |
+| 3 ✅ | Resolución de tenant por host (proxy de Next.js + registro de dominios), `TenantContext` por request, 404 para host desconocido, separación portal/admin                                                            | Tests: host válido, desconocido, spoofing de headers, dos tenants simultáneos |
+| 4 ✅ | Auth central en el host de admin (Supabase Auth vía BFF, cookies host-only, CSRF), membresías y selector de organización (el operador de plataforma pasa al Paso 6)                                                 | Tests de rol, revocación con token vigente y acceso cruzado A/B               |
+| 5 ✅ | Configuración white-label versionada (borrador → sellada): identidad, tema validado por contraste, contactos, SEO, manifest PWA por tenant; `TenantPresentation` en el portal                                       | Dos tenants con marcas distintas en el mismo build                            |
+| 6 ✅ | Operador de plataforma (MFA TOTP) + onboarding genérico de tenant + invitaciones y miembros; ensayo ZC-01 en CI (el alta de Ucureña se hace desde el panel o con `pnpm platform:provision`, sin datos en el código) | Alta del tenant B sin cambios de código ni de variables de entorno            |
 
 ## P3 — Portal y administración del primer vertical
+
+Pasos propuestos (cada uno requiere autorización):
+
+| Paso | Contenido                                                                                                                                                        | Terminado cuando                                                                            |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| 1    | Storage por tenant: buckets `media-originals` (privado) y `media-public`, `assets`/`asset_versions`, subida firmada de imágenes con validación; logo en la marca | Un propietario sube el logo y aparece en su portal; B no puede leer ni escribir medios de A |
+| 2    | `content_items`/`content_revisions`: destinos con borrador → publicación → rollback, texto enriquecido como AST, imágenes por referencia                         | Publicar y revertir un destino sin tocar el resto del portal                                |
+| 3    | Portal: listado y ficha de destino SSR, imágenes responsivas, SEO y datos estructurados por tenant                                                               | Lighthouse ≥ 90 en home y ficha con datos del seed                                          |
+| 4    | Eventos de una ocurrencia y agenda                                                                                                                               | Evento pasado deja de listarse sin intervención                                             |
+| 5    | Mapa con carga diferida y alternativa textual (tiles con licencia apropiada)                                                                                     | Mapa fuera del bundle inicial; lista equivalente accesible                                  |
+| 6    | Lighthouse CI sobre previews de Vercel y contratos RC-06/09/10/11/12/15                                                                                          | CI bloquea un PR que rompe el presupuesto                                                   |
 
 `content_items`/`content_revisions` (destino y evento de una ocurrencia), `assets`/`asset_versions`/`media_references` con subida firmada de imágenes, portal SSR con SEO por tenant, mapa con alternativa textual, administración con borrador → publicación → rollback, Lighthouse CI con el [presupuesto](performance-budget.md). Contratos RC-06/09/10/11/12/15.
 

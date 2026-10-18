@@ -5,6 +5,8 @@ import { strict as assert } from "node:assert";
 import http from "node:http";
 
 const port = Number(process.argv[2] ?? 3000);
+// After the integration suite, the ZC-01 rehearsal tenant exists and must be live too.
+const zc01 = process.argv.includes("--zc01");
 
 function get(host, path) {
   return new Promise((resolve, reject) => {
@@ -65,6 +67,16 @@ for (const portal of portals) {
   check(() => assert.equal(icon.status, 200));
   check(() => assert.equal(icon.headers["content-type"], "image/png"));
   check(() => assert.match(String(icon.headers["cache-control"]), /immutable/));
+}
+
+if (zc01) {
+  // Provisioned by the operator in the integration suite: no code, no env change, no deploy.
+  const home = await get("zc-ensayo.localhost", "/");
+  const html = home.body.toString();
+  check(() => assert.equal(home.status, 200, "ZC-01 tenant is live"));
+  check(() => assert.match(html, /<title>Ensayo ZC-01<\/title>/));
+  // Neutral default brand until its owner publishes one.
+  check(() => assert.match(html, /--brand:#24557a/));
 }
 
 const unknown = await get("nadie.localhost", "/");

@@ -260,7 +260,17 @@ body {
   margin: 0;
 }
 
-.branding-heading a {
+.branding-heading a:not(.button) {
+  color: var(--fg);
+}
+
+a.button {
+  display: inline-block;
+  text-decoration: none;
+  color: #fff;
+}
+
+a.button-quiet {
   color: var(--fg);
 }
 
@@ -473,4 +483,140 @@ body {
 
 .contrast-list li[data-passes="false"] {
   font-weight: 600;
+}
+
+/* ── Admin · plataforma y miembros ───────────────────────────────────── */
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+}
+
+.data-table th,
+.data-table td {
+  text-align: left;
+  vertical-align: top;
+  padding: 0.875rem 0.75rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.data-table th {
+  font-size: 0.8125rem;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.data-table tr[data-status="revoked"] td {
+  color: var(--muted);
+}
+
+.data-table a.org-detail {
+  color: var(--muted);
+}
+
+.cell-actions {
+  text-align: right;
+}
+
+.cell-actions .inline-form {
+  display: flex;
+}
+
+.status-pill {
+  display: inline-block;
+  white-space: nowrap;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+}
+
+.status-pill[data-status="active"] {
+  border-color: var(--accent);
+}
+
+.status-pill[data-status="suspended"] {
+  border-style: dashed;
+}
+
+.inline-form {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.row-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.inline-form select,
+.invite-form select {
+  font: inherit;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.button-danger {
+  background: transparent;
+  color: var(--fg);
+  border: 2px solid var(--accent);
+}
+
+.members-invite h2,
+.invitations h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.125rem;
+}
+
+.invite-form {
+  display: grid;
+  gap: 0.75rem;
+  align-items: end;
+  grid-template-columns: minmax(0, 2fr) minmax(0, 1fr) auto;
+}
+
+.invite-form p {
+  grid-column: 1 / -1;
+  margin: 0;
+}
+
+@media (max-width: 40rem) {
+  .invite-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+.mfa-enroll {
+  display: grid;
+  gap: 0.75rem;
+  justify-items: start;
+}
+
+.mfa-enroll img {
+  background: #fff;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+}
+
+.secret {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  overflow-wrap: anywhere;
+}
+
+.org-card .inline-form {
+  flex-shrink: 0;
 }

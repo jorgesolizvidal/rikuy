@@ -124,12 +124,14 @@ describe("organizations", () => {
       slug: "sur",
       displayName: "Sur",
       role: "analyst",
+      tenantStatus: "active",
     },
     {
       tenantId: "5eed1000-0000-4000-8000-000000000001",
       slug: "norte",
       displayName: "Norte",
       role: "editor",
+      tenantStatus: "active",
     },
   ];
   const reader: MembershipReader & { calls: string[] } = {

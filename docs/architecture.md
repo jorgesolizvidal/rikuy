@@ -51,19 +51,26 @@ flowchart TD
 - El tenant elige solo modo + dos colores; la paleta completa se deriva y se exige contraste WCAG AA al guardar. La base revalida la forma del JSON, de modo que ni el RPC directo admite HTML, CSS o URLs no https.
 - El portal lee la versión activa por id (anónimo) y la guarda en caché por id: una versión sellada nunca cambia, y el id forma parte de toda clave de caché.
 
+### Alta de municipios y miembros
+
+- El **operador de plataforma** (`platform_operators`, separado de las membresías) actúa solo con segundo factor: toda verificación de operador exige `aal2` en el JWT.
+- Alta = una transacción: tenant en `provisioning` + dominio de plataforma + puntero canónico + propietario invitado + auditoría. Pasa a `active` solo cuando el propietario aceptó (la base lo exige). Ningún dato del municipio vive en el código (ZC-01).
+- La cuenta de una persona invitada la crea un adaptador aislado con la clave secreta (`src/server/identity-admin.ts`, único módulo que puede importarla), siempre después de autorizar al que invita. Las personas entran con código por correo y aceptan la invitación en el panel.
+- Propietarios gestionan todos los roles; administradores, solo editores y analistas. Un municipio activo conserva siempre un propietario activo.
+
 ## 5. Acceso a datos (ADR-016)
 
 `UI → caso de uso → autorización → repositorio`. Lecturas públicas devuelven solo la revisión publicada. Ediciones con `expected_revision` (concurrencia optimista). Publicar = sellar revisión + mover puntero + auditoría + outbox en **una** transacción RPC. Excepciones enumeradas: subida directa a Storage con capacidad firmada, adaptador de Auth, repositorio restringido del worker y health checks.
 
 ## 6. Esquema piloto (21 tablas, por fase)
 
-| Fase                    | Tablas                                                                               |
-| ----------------------- | ------------------------------------------------------------------------------------ |
-| P1                      | `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events` |
-| P3 (con assets básicos) | `content_items`, `content_revisions`, `assets`, `asset_versions`, `media_references` |
-| P2                      | `background_jobs`, `job_attempts`, `usage_buckets`                                   |
-| P4                      | `tours`, `tour_revisions`, `scenes`, `hotspots`                                      |
-| P5                      | `knowledge_chunks`, `ai_requests`, `ai_executions`, `copilot_proposals`              |
+| Fase                    | Tablas                                                                                                     |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| P1                      | `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events`, `platform_operators` |
+| P3 (con assets básicos) | `content_items`, `content_revisions`, `assets`, `asset_versions`, `media_references`                       |
+| P2                      | `background_jobs`, `job_attempts`, `usage_buckets`                                                         |
+| P4                      | `tours`, `tour_revisions`, `scenes`, `hotspots`                                                            |
+| P5                      | `knowledge_chunks`, `ai_requests`, `ai_executions`, `copilot_proposals`                                    |
 
 Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma separado y con MFA. Las tablas del modelo maduro (gastronomía, transporte, campañas, billing, analytics detallada) quedan diferidas a las expansiones E1–E4.
 

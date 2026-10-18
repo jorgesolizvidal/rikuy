@@ -149,7 +149,7 @@ describe("auth gateway", () => {
 });
 
 describe("membership reader", () => {
-  it("filters by the actor id and active status and hides inactive tenants", async () => {
+  it("filters by the actor id and active status and hides suspended tenants", async () => {
     const h = harness((url) => {
       if (url.pathname === "/rest/v1/memberships") {
         return json([
@@ -171,6 +171,15 @@ describe("membership reader", () => {
               status: "suspended",
             },
           },
+          {
+            role: "owner",
+            tenant: {
+              id: "5eed1000-0000-4000-8000-000000000004",
+              slug: "nuevo",
+              display_name: "Nuevo",
+              status: "provisioning",
+            },
+          },
         ]);
       }
       return json({}, 404);
@@ -186,6 +195,14 @@ describe("membership reader", () => {
         slug: "norte",
         displayName: "Norte",
         role: "owner",
+        tenantStatus: "active",
+      },
+      {
+        tenantId: "5eed1000-0000-4000-8000-000000000004",
+        slug: "nuevo",
+        displayName: "Nuevo",
+        role: "owner",
+        tenantStatus: "provisioning",
       },
     ]);
   });

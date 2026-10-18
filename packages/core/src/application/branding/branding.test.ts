@@ -18,7 +18,13 @@ const TENANT = "5eed1000-0000-4000-8000-000000000001";
 const CONFIG = "5eed3000-0000-4000-8000-000000000001";
 
 function member(role: OrganizationMembership["role"]): OrganizationMembership {
-  return { tenantId: TENANT, slug: "demo-norte", displayName: "Municipio Demo Norte", role };
+  return {
+    tenantId: TENANT,
+    slug: "demo-norte",
+    displayName: "Municipio Demo Norte",
+    role,
+    tenantStatus: "active",
+  };
 }
 
 function repository(overrides: Partial<TenantConfigRepository> = {}) {

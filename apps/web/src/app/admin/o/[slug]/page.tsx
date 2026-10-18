@@ -1,4 +1,4 @@
-import { canManageBranding, ROLE_LABELS } from "@rikuy/core";
+import { canManageBranding, canManageMembers, ROLE_LABELS } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -39,6 +39,17 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             </span>
           </Link>
         </li>
+        {canManageMembers(membership.role) ? (
+          <li>
+            <Link href={`/o/${membership.slug}/miembros`} className="org-card">
+              <span>
+                <span className="org-name">Miembros</span>
+                <span className="org-detail">Invitar personas, cambiar roles y quitar accesos</span>
+              </span>
+              <span className="org-role">Gestionar</span>
+            </Link>
+          </li>
+        ) : null}
       </ul>
       <p className="notice">
         Destinos, agenda, recorridos 360° y medios llegarán en las siguientes etapas.
