@@ -24,6 +24,8 @@ La velocidad de carga es un **contrato verificable**, no una intención. Estos o
 | GLB optimizado                         | ≤ 5 MB (aviso), ≤ 15 MB (rechazo sin revisión) | Meshopt/Draco + KTX2; carga solo al abrir el hotspot, con imagen poster      |
 | Fuentes tipográficas                   | ≤ 2 familias, subset latino                    | Autoalojadas, `font-display: swap`                                           |
 
+**Mapa (`/mapa`):** MapLibre se carga con `import()` dinámico solo en esta página y, en las fichas, cuando el visitante llega al mapa pequeño (al desplazarse o tocarlo), así que home, destino y evento no pagan su costo. En `/mapa` la lista de lugares es lo primero que se pinta (LCP); el mapa aparece después. En laboratorio (móvil, CPU ×4) `/mapa` queda en torno a 60–70 de rendimiento por el arranque de WebGL: se mide en dispositivos reales con Lighthouse CI y Speed Insights (P3 · Paso 7) antes de fijarle un objetivo propio.
+
 ## Reglas de implementación
 
 1. Server Components por defecto; Client Components solo para interacción (mapa, visor, formularios).

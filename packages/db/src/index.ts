@@ -38,5 +38,6 @@ export {
   createContentRepository,
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
+  createSupabasePublishedMapReader,
 } from "./content";
 export type { SupabasePublishedContentReaderOptions } from "./content";

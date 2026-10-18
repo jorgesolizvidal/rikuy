@@ -1,5 +1,6 @@
 import type { DestinationDocument, GeoPoint } from "../../contracts/destination";
 import type { EventDocument, EventSchedule } from "../../contracts/event";
+import type { BoundingBox } from "../../domain/geo/bounds";
 import type { RichText } from "../../contracts/rich-text";
 
 /** Where a destination stands for its editors. */
@@ -175,4 +176,35 @@ export interface PublishedEvent extends PublishedEventSummary {
 export interface PublishedEventReader {
   list(tenantId: string): Promise<PublishedEventSummary[]>;
   find(tenantId: string, slug: string): Promise<PublishedEvent | null>;
+}
+
+export type MapPlaceKind = "destination" | "event";
+
+/** One marker of the portal map (and its row in the equivalent list). */
+export interface PortalMapPlace {
+  readonly kind: MapPlaceKind;
+  readonly slug: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly location: GeoPoint;
+  /** Events only. */
+  readonly schedule: EventSchedule | null;
+  readonly cover: PublishedImage | null;
+}
+
+export interface PortalMapExtent {
+  /** null when the portal has nothing to show on a map yet. */
+  readonly bounds: BoundingBox | null;
+  readonly destinations: number;
+  readonly events: number;
+}
+
+/** Anonymous map reads: places by area (never the whole catalogue) and the overall extent. */
+export interface PublishedMapReader {
+  extent(tenantId: string): Promise<PortalMapExtent>;
+  places(
+    tenantId: string,
+    area: BoundingBox,
+    kinds: readonly MapPlaceKind[],
+  ): Promise<PortalMapPlace[]>;
 }

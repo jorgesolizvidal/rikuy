@@ -5,10 +5,12 @@ import {
   createCachedPresentationReader,
   createCachedPublishedDestinationReader,
   createCachedPublishedEventReader,
+  createCachedPublishedMapReader,
   createCachedTenantDirectory,
   type PlatformHosts,
   type PublishedDestinationReader,
   type PublishedEventReader,
+  type PublishedMapReader,
   type PublishedPresentationReader,
   type TenantDirectory,
 } from "@rikuy/core";
@@ -16,6 +18,7 @@ import {
   createSupabasePresentationReader,
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
+  createSupabasePublishedMapReader,
   createSupabaseTenantDirectory,
 } from "@rikuy/db";
 
@@ -40,6 +43,7 @@ let directory: TenantDirectory | undefined;
 let presentations: PublishedPresentationReader | undefined;
 let publishedContent: PublishedDestinationReader | undefined;
 let publishedEvents: PublishedEventReader | undefined;
+let publishedMap: PublishedMapReader | undefined;
 
 export function platformSettings(): PlatformSettings {
   if (settings) return settings;
@@ -113,4 +117,18 @@ export function publishedEventReader(): PublishedEventReader {
     { ttlMs: 30_000 },
   );
   return publishedEvents;
+}
+
+/** Anonymous map reader: places by area (snapped to a ~1 km grid) cached for 30 s. */
+export function publishedMapReader(): PublishedMapReader {
+  if (publishedMap) return publishedMap;
+  const { env } = platformSettings();
+  publishedMap = createCachedPublishedMapReader(
+    createSupabasePublishedMapReader({
+      url: env.NEXT_PUBLIC_SUPABASE_URL,
+      publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    }),
+    { ttlMs: 30_000 },
+  );
+  return publishedMap;
 }

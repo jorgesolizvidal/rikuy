@@ -4,7 +4,14 @@ import js from "@eslint/js";
 import tseslint from "typescript-eslint";
 
 export const ignores = {
-  ignores: ["**/node_modules/**", "**/.next/**", "**/dist/**", "**/coverage/**", "**/*.d.ts"],
+  ignores: [
+    "**/node_modules/**",
+    "**/.next/**",
+    "**/dist/**",
+    "**/coverage/**",
+    "**/*.d.ts",
+    "**/public/vendor/**",
+  ],
 };
 
 export const base = tseslint.config(js.configs.recommended, ...tseslint.configs.strict, {

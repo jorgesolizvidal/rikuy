@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
-- **Último paso completado:** P3 · Paso 4 — eventos y agenda (2026-10-18)
-- **Rama del paso:** `feat/p3-step4-events` → PR hacia `main`
+- **Último paso completado:** P3 · Paso 5 — mapa del portal (2026-10-18)
+- **Rama del paso:** `feat/p3-step5-portal-map` → PR hacia `main`
 
 ## Historial
 
@@ -160,34 +160,57 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - La hora se escribe en la hora del municipio y no se muestra la zona horaria. Para visitantes de otro país, «Añadir al calendario» la convierte a la hora de su teléfono.
 - El mapa pequeño en cada ficha queda propuesto para el Paso 5, junto con el mapa del portal.
 
+### P3 · Paso 5 — mapa del portal ✅
+
+- Decisión del usuario: **OpenFreeMap con MapLibre** para el portal ([ADR-023](../adr/ADR-023-portal-map-provider.md)); gratis, sin clave y con uso comercial permitido. El estilo es configuración (`NEXT_PUBLIC_MAP_STYLE_URL`), así que cambiar de proveedor no toca código. El panel sigue con Leaflet + OpenStreetMap. También pidió el mapa pequeño en cada ficha.
+- Base de datos (`20261019100000_p3_portal_map.sql`, solo expand): `portal_map_places` devuelve los destinos publicados y los eventos que no terminaron **dentro de una zona** (oeste, sur, este, norte), por capas y con tope (≤ 500), usando el índice GiST del punto. Rechaza zonas inválidas. `portal_map_extent` da la zona que los contiene a todos. Solo municipios activos. 16 aserciones pgTAP nuevas (zona, capas, tope, eventos terminados, borradores, otro municipio en el mismo punto, suspensión).
+- `@rikuy/core`: zonas (`parseBoundingBox`, redondeo a una cuadrícula de ~1 km para compartir caché, márgenes), lector del mapa con caché que recorta a la zona pedida, `PORTAL_PATHS.map`, `/mapa` en el sitemap.
+- Portal:
+  - **`/mapa`**: capas «Destinos» y «Eventos próximos», mapa con pines (botones con nombre accesible; al tocarlos se abre la ficha resumida con enlace) y, al lado, **la lista con los mismos lugares**, que se actualiza al mover el mapa (solo se piden los lugares de la zona visible, `GET /mapa/lugares?area=…`). Un evento en un destino comparte el punto: los pines se separan para poder tocar los dos. «Ver todos» vuelve a encuadrar todo.
+  - **Mapa pequeño en cada ficha** de destino y evento, en la sección «Ubicación», con las coordenadas, «Ver en el mapa del municipio» (abre `/mapa` centrado ahí) y OpenStreetMap.
+  - Si el mapa no puede cargar (sin WebGL o el servicio caído), la página lo dice y la lista sigue funcionando.
+  - «Mapa» en la cabecera; la página de privacidad explica que las imágenes del mapa vienen de OpenFreeMap.
+- Rendimiento: MapLibre **no está en el bundle inicial** de ninguna página (verificado en el e2e) y se carga solo en `/mapa` y, en las fichas, cuando el visitante llega al mapa pequeño (al desplazarse o tocarlo). Su _worker_ se sirve desde `/vendor/maplibre-gl/6.11.2/` (copiado al compilar, fuera de git, caché inmutable).
+- Corrección del Paso 4: en «Añadir al calendario», el lugar se escribe «Mirador del Valle · Municipio…» (antes la app de calendario de algunos celulares mostraba «\,»).
+- Tests: 315 unitarios (core 216, db 75, web 18, config 6) + 330 pgTAP + integración del mapa con Supabase real + e2e de portales (155 verificaciones: `/mapa` y `/mapa/lugares` por municipio sin fugas, zona inválida rechazada, MapLibre fuera del bundle inicial de inicio y ficha, _worker_ servido con caché inmutable).
+- Verificado en el navegador (con un estilo de prueba local, porque el entorno de pruebas no tiene internet): mapa con pines, ventana del pin con el ratón y con el teclado, capas, petición por zona al mover el mapa, mapa pequeño al desplazarse, aviso cuando el mapa falla, celular sin desbordes.
+- Lighthouse local (móvil): inicio 98, destino 95–99, evento 99 (accesibilidad, buenas prácticas y SEO 100, CLS 0). `/mapa` ~60–70 por el arranque del mapa (ver [presupuesto](../performance-budget.md)).
+
+**Desviaciones:**
+
+- `/mapa` no tiene todavía un objetivo de Lighthouse propio: el mapa es el contenido de la página y su arranque pesa en un celular simulado lento. Se mide en dispositivos reales en el Paso 7.
+- El mapa pequeño se carga al llegar a él **y** al usar la página (desplazarse o tocar), o con su botón «Mostrar el mapa», para no cargar el mapa al abrir la ficha.
+- OpenFreeMap no ofrece garantía de servicio; si un municipio la exige, se cambia el estilo por uno pagado o propio (ADR-023).
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
 git checkout main
 git pull
-pnpm install
-pnpm db:reset      # migraciones nuevas y seed con eventos (fechas relativas a hoy)
-pnpm dev
+pnpm install       # instala maplibre-gl
+pnpm db:reset
+pnpm dev           # copia el worker del mapa y arranca
 ```
 
-1. Mapa del editor: entra a http://app.localhost:3000 y abre un destino. El mapa ya debe verse. Si todavía ves «Access blocked», es la caché: «Vaciar caché y volver a cargar de manera forzada» una vez.
-2. En la página de Demo Norte, abre «Agenda»: «Feria del choclo» en próximos, «Concierto de la banda» sin fecha y «Festival de invierno» en pasados.
-3. Como `editor.ambos@example.test`, crea «Festival de prueba»: pon resumen, fecha y hora (prueba un fin antes del inicio: lo marca), elige «Mirador del Valle» como lugar (la ubicación se copia sola) → «Guardar borrador».
-4. Como `owner@demo-norte.example.test`, abre el evento → «Publicar». A la derecha aparece el QR.
-5. Abre http://demo-norte.localhost:3000/agenda (en menos de 30 s aparece el nuevo evento): ficha con fecha, lugar enlazado, «Cómo llegar», «Añadir al calendario» (descarga un `.ics`; ábrelo con tu calendario) y «Compartir».
-6. http://demo-norte.localhost:3000/agenda/festival-de-invierno: «Este evento ya terminó». En http://demo-sur.localhost:3000/agenda solo está «Noche de estrellas».
+1. Abre http://demo-norte.localhost:3000 → «Mapa» en la cabecera. Verás el mapa con los pines del Mirador y de la Feria (juntos, porque la feria es en el Mirador) y la lista al lado.
+2. Toca un pin: aparece su nombre con enlace a la ficha. Prueba también con el teclado (Tab hasta el pin y Enter).
+3. Desmarca «Eventos próximos»: desaparecen del mapa y de la lista. Aleja el mapa con el «−»: la lista se actualiza con la zona.
+4. Abre «Mirador del Valle» y baja hasta «Ubicación»: aparece el mapa pequeño. «Ver en el mapa del municipio» abre `/mapa` centrado en ese punto.
+5. En http://demo-sur.localhost:3000/mapa solo están «Laguna Espejo» y «Noche de estrellas».
+6. Opcional (celular): con la configuración de prueba que ya tienes, abre `http://demo-norte.192-168-100-105.sslip.io:3000/mapa`; recuerda volver a ejecutar el SQL de `sslip.io` después de `pnpm db:reset`.
+7. Opcional: «Añadir al calendario» en un evento → en el celular el lugar ya no muestra «\,».
 
-## Siguiente paso — P3 · Paso 5 (requiere autorización)
+## Siguiente paso — P3 · Paso 6 (requiere autorización)
 
-Rama `feat/p3-step5-portal-map`:
+Rama `feat/p3-step6-visitor-location` ([ADR-021](../adr/ADR-021-visitor-location.md)):
 
-1. Proveedor de mapas para el portal público (ADR nuevo): teselas con licencia y uso adecuados para tráfico de visitantes (los servidores de OpenStreetMap solo para uso ligero), con atribución.
-2. `/mapa` con destinos y eventos próximos, cargado con import dinámico (fuera del bundle inicial), con capas por tipo y una **lista equivalente accesible** al lado.
-3. Consultas por área (PostGIS) en vez de traer todo el catálogo, con caché por municipio.
-4. Propuesto: mapa pequeño en cada ficha de destino y de evento, cargado solo cuando se ve.
-5. Tests: e2e del mapa y de la lista en los dos municipios, bundle inicial sin la librería de mapas, accesibilidad por teclado.
+1. «Usar mi ubicación» en `/mapa` y en las listas: el permiso se pide **solo tras esa acción**; `watchPosition` mientras la página está visible (se detiene al ocultar la pestaña).
+2. En el mapa: punto del visitante con círculo de precisión y «seguirme».
+3. Distancia **en línea recta** y tiempo estimado (a pie / en auto, rotulados como estimación) en el mapa, las listas y las fichas; ordenar destinos y eventos por cercanía.
+4. «Estás cerca de…» al entrar en el radio de un destino (150 m por defecto), solo con la página abierta.
+5. Privacidad: la posición nunca sale del dispositivo; actualizar la página de privacidad.
+6. Tests (RC-06): permiso concedido, denegado y desconocido; sin permiso todo funciona; ninguna petición al servidor lleva la posición.
 
 ## Decisiones pendientes del usuario
 
-- Mapa pequeño en cada ficha (propuesto para el Paso 5): confirmar si se incluye.
-- El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).
+- Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).

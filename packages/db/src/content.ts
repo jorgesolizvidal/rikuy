@@ -9,6 +9,7 @@ import {
   type ContentStatus,
   type PublishedDestinationReader,
   type PublishedEventReader,
+  type PublishedMapReader,
 } from "@rikuy/core";
 import { z } from "zod";
 
@@ -513,6 +514,89 @@ export function createSupabasePublishedEventReader(
             gallery: row.gallery.filter((image) => image !== null),
           }
         : null;
+    },
+  };
+}
+
+/** Anonymous map reads: places inside an area (capped) and the overall extent. */
+export function createSupabasePublishedMapReader(
+  options: SupabasePublishedContentReaderOptions & { readonly limit?: number },
+): PublishedMapReader {
+  const client = createClient(options.url, options.publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
+  });
+  const timeoutMs = options.timeoutMs ?? 3_000;
+  const limit = options.limit ?? 300;
+
+  return {
+    async extent(tenantId) {
+      const { data, error } = await client
+        .rpc("portal_map_extent", { p_tenant_id: tenantId })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (error) throw unexpected("Reading the map extent", error);
+      const [row] = z
+        .array(
+          z.object({
+            west: z.number().nullable(),
+            south: z.number().nullable(),
+            east: z.number().nullable(),
+            north: z.number().nullable(),
+            destinations: z.number().int(),
+            events: z.number().int(),
+          }),
+        )
+        .max(1)
+        .parse(data);
+      if (!row) return { bounds: null, destinations: 0, events: 0 };
+      const { west, south, east, north } = row;
+      return {
+        bounds:
+          west === null || south === null || east === null || north === null
+            ? null
+            : { west, south, east, north },
+        destinations: row.destinations,
+        events: row.events,
+      };
+    },
+
+    async places(tenantId, area, kinds) {
+      if (kinds.length === 0) return [];
+      const { data, error } = await client
+        .rpc("portal_map_places", {
+          p_tenant_id: tenantId,
+          p_west: area.west,
+          p_south: area.south,
+          p_east: area.east,
+          p_north: area.north,
+          p_kinds: [...kinds],
+          p_limit: limit,
+        })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (error) throw unexpected("Reading map places", error);
+      return z
+        .array(
+          z.object({
+            kind: z.enum(["destination", "event"]),
+            slug: z.string(),
+            title: z.string(),
+            summary: z.string(),
+            latitude: z.number(),
+            longitude: z.number(),
+            schedule: eventScheduleSchema.nullable(),
+            cover: publicImageSchema.nullable(),
+          }),
+        )
+        .parse(data)
+        .map((row) => ({
+          kind: row.kind,
+          slug: row.slug,
+          title: row.title,
+          summary: row.summary,
+          location: { lat: row.latitude, lng: row.longitude },
+          schedule: row.schedule,
+          cover: row.cover,
+        }));
     },
   };
 }

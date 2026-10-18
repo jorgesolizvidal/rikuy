@@ -14,6 +14,7 @@ import { RichTextView } from "@/components/rich-text";
 import { portalEvent, portalOrigin, responsiveImage } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
+import { MiniMap } from "../../mini-map";
 import { PortalImage } from "../../portal-image";
 import { ShareButton } from "../../share-button";
 
@@ -176,15 +177,34 @@ export default async function EventPage({ params }: EventPageProps) {
         </section>
       ) : null}
 
-      <footer className="portal-destination-meta">
-        {event.location ? (
+      {event.location ? (
+        <section aria-labelledby="ubicacion" className="portal-location">
+          <h2 id="ubicacion">Ubicación</h2>
+          <MiniMap
+            point={{
+              key: "here",
+              kind: "event",
+              title: event.title,
+              href: "",
+              detail: "",
+              lat: event.location.lat,
+              lng: event.location.lng,
+            }}
+          />
           <p>
-            Ubicación: {formatCoordinates(event.location)} ·{" "}
+            {formatCoordinates(event.location)} ·{" "}
+            <a href={`${PORTAL_PATHS.map}?lat=${event.location.lat}&lng=${event.location.lng}`}>
+              Ver en el mapa del municipio
+            </a>{" "}
+            ·{" "}
             <a href={openStreetMapUrl(event.location)} target="_blank" rel="noopener noreferrer">
-              Ver en OpenStreetMap
+              OpenStreetMap
             </a>
           </p>
-        ) : null}
+        </section>
+      ) : null}
+
+      <footer className="portal-destination-meta">
         <p>Fecha y hora del municipio.</p>
       </footer>
     </article>

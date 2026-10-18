@@ -20,6 +20,9 @@ next-env.d.ts
 *.pem
 *.key
 
+# Generated third-party files served by the portal (scripts/vendor-maplibre.mjs)
+apps/web/public/vendor/
+
 # Local media for seeding (images, panoramas, GLB). Never committed.
 seed-assets/
 

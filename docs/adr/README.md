@@ -26,3 +26,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 020 | [Entrega de panoramas según resolución](ADR-020-panorama-delivery-by-resolution.md)                       | Aceptada (2026-10-17)                                             |
 | 021 | [Ubicación del visitante en tiempo real](ADR-021-visitor-location.md)                                     | Aceptada (2026-10-17)                                             |
 | 022 | [Asistente turístico: una conversación, persona por municipio y voz](ADR-022-tourist-assistant.md)        | Aceptada (2026-10-17)                                             |
+| 023 | [Mapa del portal: OpenFreeMap con MapLibre](ADR-023-portal-map-provider.md)                               | Aceptada (2026-10-18); concreta ADR-010 para el portal            |

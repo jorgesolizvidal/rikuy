@@ -54,6 +54,11 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
           funcionando. Se conservan el tiempo mínimo necesario y no se usan para crear perfiles.
         </li>
         <li>Las fotos se sirven desde el almacenamiento de la plataforma.</li>
+        <li>
+          Los mapas se dibujan con imágenes de OpenFreeMap, a partir de datos de OpenStreetMap. Al
+          ver un mapa, tu navegador se las pide directamente a ese servicio, que recibe tu dirección
+          IP como cualquier sitio web; no le enviamos tu ubicación ni otros datos.
+        </li>
       </ul>
 
       <h2>Tu ubicación</h2>
