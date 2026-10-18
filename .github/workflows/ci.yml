@@ -79,10 +79,10 @@ jobs:
       - name: SQL lint
         run: pnpm db:lint
 
-  auth-integration:
-    name: Auth integration · real Supabase stack
+  integration:
+    name: Integration · real Supabase stack
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
 
@@ -103,7 +103,6 @@ jobs:
       - name: Export local credentials
         run: |
           STATUS="$(pnpm exec supabase status -o json)"
-          echo "::notice title=supabase status keys::$(echo "$STATUS" | jq -c 'keys')"
           SECRET="$(echo "$STATUS" | jq -r '.SECRET_KEY // .SERVICE_ROLE_KEY')"
           echo "::add-mask::$SECRET"
           {
@@ -113,7 +112,7 @@ jobs:
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
           } >> "$GITHUB_ENV"
 
-      - name: Sign-in, membership and revocation tests
+      - name: Sign-in, membership, revocation and branding tests
         run: |
           set -o pipefail
           pnpm --filter @rikuy/db test:integration 2>&1 | tee integration.log
@@ -127,6 +126,28 @@ jobs:
           done
           docker logs supabase_auth_rikuy 2>&1 | tail -15 | while IFS= read -r line; do
             echo "::warning title=auth log::${line//%/%25}"
+          done
+
+      # One production build serving two municipalities with different brands (ZC-01).
+      - name: Two white-label portals on one build
+        env:
+          PLATFORM_ROOT_DOMAIN: localhost
+          PLATFORM_ADMIN_HOST: app.localhost:3000
+        run: |
+          set -o pipefail
+          export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL"
+          export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+          pnpm --filter @rikuy/web build
+          cd apps/web
+          pnpm exec next start -p 3000 > ../../next.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3000 && break; sleep 1; done
+          node e2e/portals.e2e.mjs 3000 2>&1 | tee ../../e2e.log
+
+      - name: Report portal failure
+        if: failure()
+        run: |
+          cat e2e.log next.log 2>/dev/null | tail -30 | while IFS= read -r line; do
+            echo "::error title=portals e2e::${line//%/%25}"
           done
 
   secrets:

@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P1 — Fundación
-- **Último paso completado:** P1 · Paso 4 — autenticación del panel de administración (2026-10-17)
-- **Rama del paso:** `feat/p1-step4-admin-auth` → PR hacia `main`
+- **Último paso completado:** P1 · Paso 5 — marca white-label versionada (2026-10-17)
+- **Rama del paso:** `feat/p1-step5-white-label-config` → PR hacia `main`
 
 ## Historial
 
@@ -24,30 +24,31 @@ Migración `20261017140000_p1_foundation.sql` (tenants, tenant_domains, membersh
 
 ### Paso 4 — autenticación del panel de administración ✅
 
+Inicio de sesión en el host de admin con código de 6 dígitos o enlace mágico (BFF con cookies host-only `HttpOnly`/`SameSite=Lax`), sin registro público y sin enumeración de cuentas; lista de municipios y `/o/{slug}` con membresía revalidada en cada request (revocar quita el acceso al instante); logout solo `POST` con verificación de `Origin`. Seed con 4 usuarios sintéticos. Job de CI con la pila real de Supabase (GoTrue + PostgREST + Mailpit). Desviaciones: usuarios del seed en SQL (no Auth Admin API); enrolamiento MFA y operador de plataforma diferidos.
+
+**Corrección posterior (`fix/admin-login-redirect`, PR #4):** `redirect()` dentro de una Server Action hacía que Next renderizara el destino con un fetch interno a `localhost:3000`, saltándose la resolución por host (el panel mostraba la página de la plataforma tras iniciar sesión). Ahora la acción devuelve estado y el navegador navega; ESLint prohíbe `redirect` en `actions.ts` (CONTRIBUTING §1.2).
+
+### Paso 5 — marca white-label versionada ✅
+
 - `@rikuy/core`:
-  - `normalizeEmail`, `normalizeOneTimeCode`; contratos `OrganizationMembership`, `Actor`, `ROLE_LABELS`.
-  - Puertos `AuthGateway` y `MembershipReader`.
-  - Casos de uso `requestSignInCode` (anti-enumeración: un correo no provisionado recibe la misma respuesta que uno válido), `verifySignInCode`, `listMyOrganizations`, `openOrganization`.
-- `@rikuy/db`:
-  - `createSessionClient`: cliente por request con `@supabase/ssr`, cookies host-only `HttpOnly` + `SameSite=Lax` (+ `Secure` fuera de `localhost`), sin `Domain` → nunca llegan a los hosts de portal.
-  - `createSupabaseAuthGateway`: OTP por correo con `shouldCreateUser: false`; errores mapeados a resultados gruesos. Un error de configuración del servidor de Auth (`email_provider_disabled`) es `unavailable`, no se esconde tras el mensaje anti-enumeración.
-  - `createMembershipReader`: membresías activas de tenants activos, leídas con el JWT del usuario (RLS).
-- `apps/web` (host de admin):
-  - `/login` con código de 6 dígitos y enlace mágico (`/auth/callback`, PKCE); `/logout` solo `POST` con verificación de `Origin`.
-  - Lista de municipios en `/` y `/o/{slug}`: cada página revalida sesión y membresía actual en servidor (`requireAdminActor` → `openOrganization`; sin membresía → 404).
-  - El proxy refresca la sesión solo en el host de admin y solo si hay cookies `sb-*`; cabeceras `noindex`, `X-Frame-Options: DENY`, `Referrer-Policy: same-origin`.
-- Supabase local: registro público desactivado (`[auth] enable_signup = false`), proveedor de correo activo, plantilla en español (`supabase/templates/magic-link.html`), TOTP habilitado en el servidor.
-- Seed: 4 usuarios sintéticos sin contraseña (dueño norte, dueño sur, editor en norte + analista en sur, admin revocado).
-- CI: nuevo job **Auth integration** que levanta la pila real (GoTrue + PostgREST + Mailpit) y prueba inicio de sesión por código, aislamiento A/B por RLS, revocación aplicada a una sesión con token vigente, correo desconocido sin email y logout. Los fallos se publican como anotaciones del check.
-- Tests: 92 unitarios (core 54, db 18, web 14, config 6) + 6 de integración + 74 pgTAP.
-
-**Corrección posterior (`fix/admin-login-redirect`):** al verificar el código, el panel mostraba la página de la plataforma en `app.localhost:3000`. Causa: `redirect()` dentro de una Server Action hace que Next renderice el destino con un fetch interno a `http://localhost:3000`, saltándose la resolución por host. Ahora la acción devuelve `signed_in` y el navegador navega; ESLint prohíbe `redirect` en `actions.ts` y la regla quedó en CONTRIBUTING §1.2.
-
-**Desviaciones respecto al plan:**
-
-- Usuarios del seed escritos en `auth.users` + `auth.identities` desde `seed.sql` (no con la Auth Admin API) para que `pnpm db:reset` siga siendo un solo comando reproducible.
-- MFA TOTP: habilitado en el servidor; la pantalla de enrolamiento y su exigencia para propietarios/administradores llegan con la gestión de miembros.
-- Operador de plataforma: movido al Paso 6 (va junto al flujo de alta de tenants).
+  - Contrato `TenantPresentation` (Zod estricto, `schema_version` 1): identidad (nombre, nombre corto ≤ 12, lema), tema (modo claro/oscuro + color principal + acento), contacto, redes (https, una por red), descripción SEO. Solo texto de una línea, colores `#rrggbb`, sin HTML/CSS.
+  - Contraste WCAG 2.x: color principal sobre fondo ≥ 4.5:1, texto de botones ≥ 4.5:1, acento ≥ 3:1. El resto de la paleta se deriva (`deriveTheme`), así ninguna marca produce un portal ilegible.
+  - Casos de uso `loadBrandingEditor`, `saveBrandingDraft`, `publishBranding` (solo propietario/administrador), `resolvePortalPresentation` (si no hay versión publicada, es ilegible o la lectura falla → marca neutra, nunca la de otro tenant) y lector en caché por versión sellada (inmutable).
+  - `buildWebManifest` y monograma para íconos.
+- Base de datos (`20261017200000_p1_tenant_presentation.sql`, solo expand):
+  - `revision`, `updated_at`, `updated_by`; como máximo un borrador por tenant.
+  - `private.is_valid_presentation`: la base revalida la forma (no se puede saltar el contrato llamando al RPC directo).
+  - RPC `save_tenant_config_draft` (concurrencia optimista → `PT409`), `publish_tenant_config` (sellar + mover puntero + auditoría en una transacción), `get_published_presentation` (anónimo: solo la versión activa sellada de un tenant activo). Tenants suspendidos: solo lectura.
+  - Seed: dos marcas publicadas muy distintas (Norte claro/verde, Sur oscuro/naranja).
+- `@rikuy/db`: `createTenantConfigRepository` (JWT del usuario, errores → `forbidden` / `conflict` / `invalid` / `not_found`) y `createSupabasePresentationReader` (anónimo, timeout 2 s).
+- Portal:
+  - Layout por tenant con variables CSS del tema, cabecera con monograma, pie con contacto y redes; portada con el nombre en grande sobre un mapa topográfico SVG generado a partir del id del tenant (sin imágenes ni JS).
+  - Metadatos SEO por tenant (título, descripción, canonical, Open Graph, `theme-color`, indexable).
+  - `/manifest.webmanifest` e íconos generados `/icon/{32|180|192|512}` (monograma sobre el color principal; caché inmutable con `?v=<versión>`). Portal instalable sin subir ningún logo.
+  - Tipografía Bricolage Grotesque autoalojada (subset latino, 41 KB, `font-display: swap`).
+- Admin: `/o/{slug}/configuracion` con formulario, vista previa en vivo y verificación de contraste; «Guardar borrador» y «Publicar». Editores y analistas ven la marca en solo lectura. Los cambios llegan a los visitantes en ≤ 60 s (caché del registro de dominios).
+- Tests: 156 unitarios (core 100, db 33, web 17, config 6) + 9 de integración + 115 pgTAP (41 nuevos) + e2e de portales en CI (30 comprobaciones: dos marcas en el mismo build, manifest, ícono, host desconocido, admin sin sesión).
+- Verificado localmente de punta a punta sobre las migraciones reales: publicar desde el panel cambia el portal Norte y no toca el Sur; editor en solo lectura; propietario de otro municipio y miembro revocado → 404.
 
 ## Cómo verificarlo en tu PC
 
@@ -55,38 +56,26 @@ Migración `20261017140000_p1_foundation.sql` (tenants, tenant_domains, membersh
 git checkout main
 git pull
 pnpm install
-pnpm db:stop
-pnpm db:start      # aplica la nueva config de Auth
-pnpm db:reset      # recarga el seed con los usuarios de prueba
+pnpm db:reset      # aplica la migración nueva y recarga el seed con las dos marcas
 pnpm dev
 ```
 
-1. Abre http://app.localhost:3000 → redirige a «Iniciar sesión».
-2. Escribe `owner@demo-norte.example.test` → «Recibir código».
-3. Abre Mailpit en http://127.0.0.1:54324, copia el código de 6 dígitos (o pulsa el enlace del correo).
-4. Debes ver solo «Municipio Demo Norte» (Propietario). Entra a `/o/demo-norte`; prueba `/o/demo-sur` → 404.
-5. «Cerrar sesión» → vuelve a «Iniciar sesión».
-6. Repite con `editor.ambos@example.test` (ve los dos municipios con roles distintos) y `revocado@demo-norte.example.test` (entra, pero no ve ningún municipio).
-7. Un correo inventado muestra el mismo mensaje («Si … tiene acceso, te enviamos un código») y no llega nada a Mailpit.
+1. http://demo-norte.localhost:3000 → portal claro y verde; http://demo-sur.localhost:3000 → portal oscuro y naranja. Mismo código.
+2. Entra a http://app.localhost:3000 con `owner@demo-norte.example.test` (código en Mailpit, http://127.0.0.1:54324) → «Municipio Demo Norte» → «Marca del portal».
+3. Cambia el color principal a un amarillo claro (`#ffd400`): la vista previa marca el contraste insuficiente y «Publicar» lo rechaza.
+4. Elige otro color (por ejemplo `#7a2e8f`), cambia el lema y pulsa «Publicar». En menos de un minuto el portal Norte cambia; el Sur sigue igual.
+5. Con `editor.ambos@example.test` la misma página aparece en solo lectura.
 
-Opcional, tests de integración contra tu pila local (PowerShell; las claves salen de `pnpm db:status`):
+## Siguiente paso — P1 · Paso 6 (requiere autorización)
 
-```powershell
-$env:SUPABASE_PUBLISHABLE_KEY="<Publishable key>"; $env:SUPABASE_SECRET_KEY="<Secret key>"
-pnpm --filter @rikuy/db test:integration
-```
+Rama `feat/p1-step6-tenant-onboarding`:
 
-## Siguiente paso — P1 · Paso 5 (requiere autorización)
-
-Rama `feat/p1-step5-white-label-config`:
-
-1. Contrato `TenantPresentation` (Zod, versionado) en `@rikuy/core`: identidad (nombre, nombre corto, lema), tema (colores con validación de contraste WCAG AA), contactos, redes, SEO por defecto, datos del manifest PWA. Sin literales de municipio.
-2. Casos de uso `saveConfigDraft` y `sealConfigVersion` (borrador → sellada; la versión activa siempre sellada, invariante ya en la base) con RPC transaccional y evento de auditoría.
-3. Lectura pública de la versión activa sellada vía RPC anónima (solo campos públicos), cacheada por tenant + versión.
-4. Portal: `TenantPresentation` aplicada en el layout (CSS variables del tema, metadatos SEO, `manifest.webmanifest` por host).
-5. Admin: formulario de configuración en `/o/{slug}/configuracion` (solo propietario/administrador), con vista previa y botón «Publicar».
-6. Tests: pgTAP (editor no puede sellar, analista no escribe, B no lee borradores de A, anónimo solo ve la sellada), unitarios de contraste y del contrato, e2e: dos tenants con marcas distintas en el mismo build.
+1. Operador de plataforma: tabla `platform_operators` (separada de las membresías), acceso solo con MFA TOTP (enrolamiento en el panel) y área `/platform` en el host de admin.
+2. Caso de uso `provisionTenant` en una transacción RPC: tenant `provisioning` → dominio de plataforma (`{slug}.{dominio}` o alias `*.vercel.app` exacto) → invitación del primer propietario (Auth Admin API, solo en el adaptador de plataforma) → activación; auditoría en cada paso.
+3. Aceptación de invitación por el propietario (primer inicio de sesión) y gestión básica de miembros (invitar, cambiar rol, revocar) con las reglas de último propietario ya presentes en la base.
+4. Script de alta reproducible para Ucureña (datos del tenant, sin binarios; logos y fotos los sube Jorge desde el panel cuando exista Storage en P3) y un municipio demo sintético.
+5. Ensayo ZC-01: dar de alta un tenant B desde el panel del operador sin tocar código ni variables de entorno, con test e2e en CI.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante para el Paso 5.
+- Ninguna bloqueante para el Paso 6. El PR #4 (corrección del redirect tras iniciar sesión) es independiente y puede mergearse antes o después de este.

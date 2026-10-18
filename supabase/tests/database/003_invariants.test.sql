@@ -68,7 +68,7 @@ select lives_ok(
 
 -- Sealed configuration is immutable; drafts are editable
 select throws_ok(
-  $$update public.tenant_config_versions set branding = '{"x":1}' where id = 'cccccccc-0000-4000-8000-00000000000a'$$,
+  $$update public.tenant_config_versions set settings = '{"x":1}' where id = 'cccccccc-0000-4000-8000-00000000000a'$$,
   '23514', null, 'sealed config cannot be edited'
 );
 select throws_ok(
@@ -76,7 +76,7 @@ select throws_ok(
   '23514', null, 'sealed config cannot be deleted'
 );
 select lives_ok(
-  $$update public.tenant_config_versions set branding = '{"name":"A"}' where id = 'cccccccc-0000-4000-8000-0000000000a2'$$,
+  $$update public.tenant_config_versions set settings = '{"name":"A"}' where id = 'cccccccc-0000-4000-8000-0000000000a2'$$,
   'draft config can be edited'
 );
 

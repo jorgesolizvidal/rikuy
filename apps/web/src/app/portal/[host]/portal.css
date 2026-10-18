@@ -1,0 +1,224 @@
+/* Public portal. Every color comes from the tenant palette (CSS variables set on .portal),
+   so this stylesheet is shared by all municipalities without a single tenant literal. */
+
+.portal {
+  --font-display: "Bricolage Grotesque Variable", var(--font-sans);
+  --gutter: clamp(1rem, 5vw, 3.5rem);
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.portal[data-mode="light"] {
+  color-scheme: light;
+}
+
+.portal[data-mode="dark"] {
+  color-scheme: dark;
+}
+
+.portal a {
+  color: var(--brand);
+  text-underline-offset: 0.2em;
+}
+
+.portal :focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 3px;
+  border-radius: 2px;
+}
+
+.portal-skip {
+  position: absolute;
+  left: var(--gutter);
+  top: -4rem;
+  padding: 0.5rem 1rem;
+  background: var(--brand);
+  color: var(--on-brand) !important;
+  font-weight: 600;
+  z-index: 2;
+}
+
+.portal-skip:focus {
+  top: 0.75rem;
+}
+
+/* ── Header ─────────────────────────────────────────────────────────────── */
+
+.portal-header {
+  padding: 1.25rem var(--gutter);
+}
+
+.portal .portal-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--fg);
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.portal-mark {
+  display: inline-grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.5rem;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-family: var(--font-display);
+  font-weight: 700;
+  font-size: 0.95rem;
+  letter-spacing: 0.02em;
+}
+
+/* ── Hero: the municipality's name over its own contour map ─────────────── */
+
+.portal-hero {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  padding: clamp(3rem, 12vh, 8rem) var(--gutter) clamp(3rem, 10vh, 6rem);
+}
+
+.portal-contour {
+  position: absolute;
+  inset: 0 0 0 auto;
+  width: min(100%, 60rem);
+  height: 100%;
+  z-index: -1;
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.1;
+  opacity: 0.55;
+  /* Fade the map out toward the edges and away from the text column. */
+  mask-image: radial-gradient(ellipse 55% 70% at 68% 50%, #000 35%, transparent 100%);
+}
+
+@media (max-width: 40rem) {
+  .portal-contour {
+    opacity: 0.3;
+    mask-image: radial-gradient(ellipse 90% 60% at 60% 35%, #000 30%, transparent 100%);
+  }
+}
+
+.portal-contour .index-line {
+  stroke-width: 2.2;
+}
+
+.portal-hero-text {
+  max-width: 48rem;
+}
+
+.portal-hero h1 {
+  margin: 0;
+  max-width: 11ch;
+  font-family: var(--font-display);
+  font-size: clamp(3rem, 10.5vw, 7.25rem);
+  font-weight: 760;
+  line-height: 0.92;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.portal-tagline {
+  margin: 1.5rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 3vw, 1.75rem);
+  font-weight: 500;
+  line-height: 1.25;
+  color: var(--brand);
+  max-width: 28ch;
+}
+
+.portal-intro {
+  margin: 1rem 0 0;
+  max-width: 40ch;
+  font-size: 1.0625rem;
+  color: var(--muted);
+}
+
+/* ── Upcoming sections ─────────────────────────────────────────────────── */
+
+.portal-upcoming {
+  padding: clamp(2.5rem, 8vh, 4.5rem) var(--gutter);
+}
+
+.portal-upcoming h2,
+.portal-footer h2 {
+  margin: 0 0 1.5rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.4rem, 3vw, 1.875rem);
+  font-weight: 650;
+  letter-spacing: -0.015em;
+}
+
+.portal-upcoming ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr));
+  gap: 2rem clamp(1.5rem, 4vw, 3rem);
+  max-width: 72rem;
+}
+
+.portal-upcoming li {
+  padding-top: 1rem;
+  border-top: 3px solid var(--accent);
+}
+
+.portal-upcoming h3 {
+  margin: 0 0 0.375rem;
+  font-size: 1.0625rem;
+  font-weight: 650;
+}
+
+.portal-upcoming p {
+  margin: 0;
+  color: var(--muted);
+  max-width: 34ch;
+}
+
+/* ── Footer ─────────────────────────────────────────────────────────────── */
+
+.portal-footer {
+  margin-top: auto;
+  padding: clamp(2rem, 6vh, 3.5rem) var(--gutter);
+  background: var(--surface);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
+  gap: 2rem;
+  align-items: start;
+}
+
+.portal-footer h2 {
+  font-size: 1.125rem;
+  margin-bottom: 0.75rem;
+}
+
+.portal-footer address {
+  font-style: normal;
+}
+
+.portal-footer address p {
+  margin: 0 0 0.25rem;
+}
+
+.portal-social {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+}
+
+.portal-credit {
+  grid-column: 1 / -1;
+  margin: 1rem 0 0;
+  font-size: 0.875rem;
+  color: var(--muted);
+}

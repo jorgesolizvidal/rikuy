@@ -45,6 +45,12 @@ flowchart TD
 - Resolución: normalizar host → buscar en `tenant_domains` (activo y verificado) → `TenantContext` inmutable por request. Desconocido → 404; base de datos caída → 503. Nunca adivinar.
 - Implementación (`apps/web/src/proxy.ts`): solo se lee la cabecera `Host`; `X-Forwarded-Host` y cualquier `X-Tenant-*`/`X-Rikuy-*` entrante se ignoran o eliminan. Cada petición se reescribe a una ruta interna según su superficie — `/admin`, `/platform` o `/portal/{host}` — de modo que esas rutas no pueden alcanzarse directamente. El contexto viaja a la página en una cabecera interna validada y se contrasta con el host de la ruta. Caché por instancia: 60 s para hosts conocidos, 10 s para desconocidos, nunca para errores.
 
+### Marca por tenant (white-label)
+
+- La presentación pública de cada municipio (`TenantPresentation`: identidad, tema, contacto, redes, SEO) es **dato versionado** en `tenant_config_versions`: un borrador editable con concurrencia optimista y versiones selladas inmutables. Publicar sella la versión, mueve `tenants.active_config_id` y audita, en una transacción.
+- El tenant elige solo modo + dos colores; la paleta completa se deriva y se exige contraste WCAG AA al guardar. La base revalida la forma del JSON, de modo que ni el RPC directo admite HTML, CSS o URLs no https.
+- El portal lee la versión activa por id (anónimo) y la guarda en caché por id: una versión sellada nunca cambia, y el id forma parte de toda clave de caché.
+
 ## 5. Acceso a datos (ADR-016)
 
 `UI → caso de uso → autorización → repositorio`. Lecturas públicas devuelven solo la revisión publicada. Ediciones con `expected_revision` (concurrencia optimista). Publicar = sellar revisión + mover puntero + auditoría + outbox en **una** transacción RPC. Excepciones enumeradas: subida directa a Storage con capacidad firmada, adaptador de Auth, repositorio restringido del worker y health checks.

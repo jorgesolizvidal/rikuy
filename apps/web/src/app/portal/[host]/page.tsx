@@ -1,39 +1,57 @@
-import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { getPortalTenantContext } from "@/server/tenant-context";
+import { portalView } from "@/server/portal-view";
+
+import { Contour } from "./contour";
 
 interface PortalPageProps {
   readonly params: Promise<{ host: string }>;
 }
 
-export async function generateMetadata({ params }: PortalPageProps): Promise<Metadata> {
-  const context = await getPortalTenantContext((await params).host);
-  if (context === null) return {};
-  return {
-    title: context.tenant.displayName,
-    description: `Portal turístico de ${context.tenant.displayName}.`,
-  };
-}
+const UPCOMING = [
+  {
+    title: "Lugares para visitar",
+    text: "Fichas de cada destino con fotos, horarios y cómo llegar.",
+  },
+  { title: "Agenda", text: "Ferias, fiestas y actividades con su fecha y lugar." },
+  {
+    title: "Recorridos 360°",
+    text: "Recorre los sitios desde el celular antes de viajar.",
+  },
+  {
+    title: "Guía local",
+    text: "Pregunta qué hacer y recibe respuestas basadas en la información del municipio.",
+  },
+] as const;
 
 export default async function PortalHomePage({ params }: PortalPageProps) {
-  const context = await getPortalTenantContext((await params).host);
-  if (context === null) notFound();
+  const view = await portalView((await params).host);
+  if (view === null) notFound();
 
-  const { tenant } = context;
+  const { identity, seo } = view.resolved.presentation;
 
   return (
-    <main className="shell" lang={tenant.defaultLocale}>
-      <p className="eyebrow">Portal turístico</p>
-      <h1 className="title">{tenant.displayName}</h1>
-      <p className="lead">
-        Este portal pronto mostrará los destinos, eventos, tours 360° y la guía de{" "}
-        {tenant.displayName}.
-      </p>
-      <p className="status" role="status">
-        <span className="dot" aria-hidden="true" />
-        En construcción
-      </p>
-    </main>
+    <>
+      <section className="portal-hero" aria-labelledby="portal-title">
+        <Contour seed={view.context.tenant.tenantId} />
+        <div className="portal-hero-text">
+          <h1 id="portal-title">{identity.siteName}</h1>
+          {identity.tagline ? <p className="portal-tagline">{identity.tagline}</p> : null}
+          {seo.description ? <p className="portal-intro">{seo.description}</p> : null}
+        </div>
+      </section>
+
+      <section className="portal-upcoming" aria-labelledby="pronto">
+        <h2 id="pronto">Muy pronto en este portal</h2>
+        <ul>
+          {UPCOMING.map((item) => (
+            <li key={item.title}>
+              <h3>{item.title}</h3>
+              <p>{item.text}</p>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </>
   );
 }

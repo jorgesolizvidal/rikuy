@@ -1,8 +1,14 @@
 import "server-only";
 
 import { parsePlatformEnv, type PlatformEnv } from "@rikuy/config/env";
-import { createCachedTenantDirectory, type PlatformHosts, type TenantDirectory } from "@rikuy/core";
-import { createSupabaseTenantDirectory } from "@rikuy/db";
+import {
+  createCachedPresentationReader,
+  createCachedTenantDirectory,
+  type PlatformHosts,
+  type PublishedPresentationReader,
+  type TenantDirectory,
+} from "@rikuy/core";
+import { createSupabasePresentationReader, createSupabaseTenantDirectory } from "@rikuy/db";
 
 /**
  * Lazily built platform dependencies. Environment is read on first use (not at import
@@ -16,20 +22,27 @@ export interface PlatformSettings {
   readonly secureCookies: boolean;
   /** Absolute origin of the central admin host, e.g. `https://app.rikuy.app`. */
   readonly adminOrigin: string;
+  /** Public origin of a portal hostname (adds the dev port locally). */
+  portalOrigin(hostname: string): string;
 }
 
 let settings: PlatformSettings | undefined;
 let directory: TenantDirectory | undefined;
+let presentations: PublishedPresentationReader | undefined;
 
 export function platformSettings(): PlatformSettings {
   if (settings) return settings;
   const env = parsePlatformEnv();
   const local = env.PLATFORM_ROOT_DOMAIN === "localhost";
+  // Locally every host shares the dev server's port (taken from the admin host).
+  const devPort = local ? (env.PLATFORM_ADMIN_HOST.split(":")[1] ?? "") : "";
   settings = {
     env,
     hosts: { rootDomain: env.PLATFORM_ROOT_DOMAIN, adminHost: env.PLATFORM_ADMIN_HOST },
     secureCookies: !local,
     adminOrigin: `${local ? "http" : "https"}://${env.PLATFORM_ADMIN_HOST}`,
+    portalOrigin: (hostname) =>
+      `${local ? "http" : "https"}://${hostname}${devPort ? `:${devPort}` : ""}`,
   };
   return settings;
 }
@@ -44,4 +57,17 @@ export function tenantDirectory(): TenantDirectory {
     }),
   );
   return directory;
+}
+
+/** Anonymous reader of published presentations; sealed versions are cached per instance. */
+export function presentationReader(): PublishedPresentationReader {
+  if (presentations) return presentations;
+  const { env } = platformSettings();
+  presentations = createCachedPresentationReader(
+    createSupabasePresentationReader({
+      url: env.NEXT_PUBLIC_SUPABASE_URL,
+      publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    }),
+  );
+  return presentations;
 }
