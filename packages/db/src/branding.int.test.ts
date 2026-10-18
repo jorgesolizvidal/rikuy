@@ -11,6 +11,12 @@ import { createSupabasePresentationReader } from "./tenant-config";
 import { createSupabaseTenantDirectory } from "./tenant-directory";
 
 const NORTE = "5eed1000-0000-4000-8000-000000000001";
+// These brands carry no logo: publishing must never touch media.
+const noLogo = {
+  publish: async () => {
+    throw new Error("no logo expected");
+  },
+};
 
 // Built lazily: without stack credentials the suite is skipped and no client may be created.
 let anonymousClients:
@@ -66,6 +72,7 @@ describe.runIf(stackAvailable)("tenant branding against local Supabase", () => {
       rebrand,
       snapshot.draft?.revision ?? null,
       owner.config,
+      noLogo,
     );
     expect(result.status).toBe("published");
 
@@ -85,6 +92,7 @@ describe.runIf(stackAvailable)("tenant branding against local Supabase", () => {
         before.presentation,
         null,
         owner.config,
+        noLogo,
       );
       expect(restored.status).toBe("published");
     }
