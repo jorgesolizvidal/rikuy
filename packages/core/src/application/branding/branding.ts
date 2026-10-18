@@ -9,6 +9,8 @@ import {
 } from "../../contracts/presentation";
 import type { PortalTenant } from "../../contracts/tenant";
 import { deriveTheme, type ThemePalette } from "../../domain/branding/theme";
+import { LOGO_FILES } from "../../domain/media/logo";
+import type { MediaAdmin } from "../media/ports";
 import type {
   PublishedPresentationReader,
   PublishOutcome,
@@ -83,7 +85,17 @@ export async function saveBrandingDraft(
     validation.value,
     expectedRevision,
   );
-  return outcome.status === "invalid" ? { status: "invalid", issues: [] } : outcome;
+  return outcome.status === "invalid"
+    ? { status: "invalid", issues: databaseIssues(validation.value) }
+    : outcome;
+}
+
+/**
+ * The shape was valid, so a database refusal is about references the database checks: today
+ * only the logo (missing, not ready, or from another tenant).
+ */
+function databaseIssues(presentation: TenantPresentation): readonly PresentationIssue[] {
+  return presentation.logo ? [{ path: "logo", code: "invalid" }] : [];
 }
 
 export type PublishBrandingResult =
@@ -99,12 +111,25 @@ export async function publishBranding(
   input: unknown,
   expectedRevision: number | null,
   repository: TenantConfigRepository,
+  logoPublisher: Pick<MediaAdmin, "publish">,
 ): Promise<PublishBrandingResult> {
   const saved = await saveBrandingDraft(membership, input, expectedRevision, repository);
   if (saved.status !== "saved") return saved;
 
+  // The logo's public derivatives must exist before the portal points at them; the
+  // database refuses to publish a brand whose logo is not published.
+  const validated = validatePresentation(input);
+  if (validated.ok && validated.value.logo) {
+    const { assetId, version } = validated.value.logo;
+    await logoPublisher.publish(membership.tenantId, assetId, version, LOGO_FILES);
+  }
+
   const outcome = await repository.publish(membership.tenantId, saved.configId, saved.revision);
-  return outcome.status === "invalid" ? { status: "invalid", issues: [] } : outcome;
+  return outcome.status === "invalid" && validated.ok
+    ? { status: "invalid", issues: databaseIssues(validated.value) }
+    : outcome.status === "invalid"
+      ? { status: "invalid", issues: [] }
+      : outcome;
 }
 
 export interface ResolvedPresentation {
