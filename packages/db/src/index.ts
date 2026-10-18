@@ -18,3 +18,11 @@ export { createSupabaseAuthGateway } from "./auth-gateway";
 export { createMembershipReader } from "./membership-reader";
 export { createSupabasePresentationReader, createTenantConfigRepository } from "./tenant-config";
 export type { SupabasePresentationReaderOptions } from "./tenant-config";
+export {
+  createInvitationRepository,
+  createMemberRepository,
+  createMfaGateway,
+  createPlatformRepository,
+  createSupabaseIdentityAdmin,
+} from "./platform";
+export type { IdentityAdminOptions } from "./platform";

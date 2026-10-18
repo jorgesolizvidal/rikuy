@@ -14,6 +14,7 @@ const rowSchema = z.object({
 });
 
 /**
+ * Active memberships of provisioning or active tenants (suspended tenants are hidden).
  * Reads memberships with the user's own JWT: RLS decides what is visible. The explicit
  * `user_id` filter matters because owners/admins can also see their tenant's roster.
  */
@@ -31,12 +32,16 @@ export function createMembershipReader(client: SessionClient): MembershipReader 
       return z
         .array(rowSchema)
         .parse(data)
-        .filter((row) => row.tenant.status === "active")
+        .flatMap((row) => {
+          const status = row.tenant.status;
+          return status === "suspended" ? [] : [{ ...row, tenantStatus: status }];
+        })
         .map((row) => ({
           tenantId: row.tenant.id,
           slug: row.tenant.slug,
           displayName: row.tenant.display_name,
           role: row.role,
+          tenantStatus: row.tenantStatus,
         }));
     },
   };

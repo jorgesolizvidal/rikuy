@@ -24,3 +24,7 @@ export * from "./application/branding/ports";
 export * from "./application/branding/branding";
 export * from "./application/branding/cached-presentation-reader";
 export * from "./application/branding/manifest";
+export * from "./domain/tenancy/slug";
+export * from "./application/platform/ports";
+export * from "./application/platform/platform";
+export * from "./application/platform/members";

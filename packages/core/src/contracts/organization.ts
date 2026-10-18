@@ -9,6 +9,8 @@ export const organizationMembershipSchema = z.object({
   slug: z.string().min(1),
   displayName: z.string().min(1),
   role: membershipRoleSchema,
+  /** Owners can prepare a provisioning tenant before it goes live; suspended ones are hidden. */
+  tenantStatus: z.enum(["provisioning", "active"]),
 });
 export type OrganizationMembership = z.infer<typeof organizationMembershipSchema>;
 
