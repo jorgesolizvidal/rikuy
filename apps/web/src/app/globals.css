@@ -685,3 +685,254 @@ a.button-quiet {
   max-width: 6rem;
   object-fit: contain;
 }
+
+/* Destinations (P3 · Paso 2) */
+.cell-detail {
+  display: block;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.status-pill[data-status="published"] {
+  border-color: var(--accent);
+}
+
+.status-pill[data-status="draft"] {
+  border-style: dashed;
+}
+
+.editor-layout {
+  display: grid;
+  gap: 2rem;
+  align-items: start;
+}
+
+@media (min-width: 64rem) {
+  .editor-layout {
+    grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
+  }
+
+  .history {
+    position: sticky;
+    top: 1.5rem;
+  }
+}
+
+.destination-form {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.destination-form fieldset {
+  margin: 0;
+  padding: 0 0 1.5rem;
+  border: 0;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.destination-form fieldset[disabled] {
+  opacity: 0.75;
+}
+
+.destination-form legend {
+  padding: 0 0 0.75rem;
+  font-size: 1.125rem;
+  font-weight: 700;
+}
+
+.markup-input {
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
+.format-help {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.format-help summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.format-help ul {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+}
+
+.format-help code {
+  font-size: 0.8125rem;
+  padding: 0 0.25rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--fg) 8%, transparent);
+}
+
+.markup-preview {
+  padding: 1rem 1.25rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+}
+
+.preview-label {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.rich-text > :first-child {
+  margin-top: 0;
+}
+
+.rich-text h3,
+.rich-text h4 {
+  margin: 1.25rem 0 0.25rem;
+  font-size: 1.0625rem;
+}
+
+.rich-text p,
+.rich-text ul,
+.rich-text ol {
+  margin: 0.5rem 0;
+}
+
+.rich-text a {
+  color: var(--accent);
+}
+
+.location-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(10rem, 1fr));
+  gap: 1rem;
+}
+
+.location-actions,
+.photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.map-picker {
+  height: 20rem;
+  border-radius: 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+  overflow: hidden;
+  z-index: 0;
+}
+
+.map-loading {
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.map-pin span {
+  display: block;
+  width: 28px;
+  height: 28px;
+  border-radius: 50% 50% 50% 0;
+  transform: rotate(-45deg);
+  background: var(--accent);
+  border: 3px solid #fff;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 35%);
+}
+
+.photo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: flex-start;
+}
+
+.photo-controls {
+  flex: 1 1 16rem;
+  display: grid;
+  gap: 0.75rem;
+}
+
+.photo-thumb {
+  display: grid;
+  place-items: center;
+  width: 9rem;
+  aspect-ratio: 3 / 2;
+  border-radius: 0.5rem;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.photo-thumb[data-empty="true"] {
+  border-style: dashed;
+}
+
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.photo-actions label.button {
+  display: inline-block;
+}
+
+.photo-actions label[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.photo-input:focus-visible + .photo-actions label,
+.photo-input:focus-visible + label {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.gallery-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1.25rem;
+}
+
+.discard-draft {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.history h2 {
+  margin: 0 0 0.25rem;
+  font-size: 1.125rem;
+}
+
+.history-list {
+  margin: 1rem 0 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 1rem;
+}
+
+.history-list li {
+  display: grid;
+  gap: 0.5rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.history-version {
+  font-weight: 700;
+  margin-right: 0.5rem;
+}
+
+.history-list .inline-form {
+  justify-content: flex-start;
+}

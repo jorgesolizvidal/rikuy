@@ -5,10 +5,15 @@ import {
   createCachedPresentationReader,
   createCachedTenantDirectory,
   type PlatformHosts,
+  type PublishedDestinationReader,
   type PublishedPresentationReader,
   type TenantDirectory,
 } from "@rikuy/core";
-import { createSupabasePresentationReader, createSupabaseTenantDirectory } from "@rikuy/db";
+import {
+  createSupabasePresentationReader,
+  createSupabasePublishedContentReader,
+  createSupabaseTenantDirectory,
+} from "@rikuy/db";
 
 /**
  * Lazily built platform dependencies. Environment is read on first use (not at import
@@ -29,6 +34,7 @@ export interface PlatformSettings {
 let settings: PlatformSettings | undefined;
 let directory: TenantDirectory | undefined;
 let presentations: PublishedPresentationReader | undefined;
+let publishedContent: PublishedDestinationReader | undefined;
 
 export function platformSettings(): PlatformSettings {
   if (settings) return settings;
@@ -70,4 +76,15 @@ export function presentationReader(): PublishedPresentationReader {
     }),
   );
   return presentations;
+}
+
+/** Anonymous reader of published destinations (only active tenants, sealed revisions). */
+export function publishedContentReader(): PublishedDestinationReader {
+  if (publishedContent) return publishedContent;
+  const { env } = platformSettings();
+  publishedContent = createSupabasePublishedContentReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedContent;
 }
