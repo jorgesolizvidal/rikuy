@@ -4,6 +4,12 @@ import type { OrganizationMembership } from "../../contracts/organization";
 import { validatePresentation } from "../../contracts/presentation";
 import { inspectImage } from "../../domain/media/image";
 import { checkDeclaredLogo, checkUploadedLogo, LOGO_RULES } from "../../domain/media/logo";
+import { CONTENT_IMAGE_FILES } from "../../domain/media/rules";
+import {
+  confirmContentImageUpload,
+  publishContentImages,
+  requestContentImageUpload,
+} from "./content-images";
 import { samplePresentation } from "../../testing/presentation-fixture";
 import { confirmLogoUpload, publishedLogoPath, requestLogoUpload } from "./logo";
 import type { ImageProcessor, ImageVersionRecord, MediaAdmin, MediaRepository } from "./ports";
@@ -182,6 +188,8 @@ function fakes(
     signedUploadUrl: async (path) => `https://storage.test/upload/${path}?token=t`,
     findVersion: async () => version,
     signedPreviewUrl: async (path) => `https://storage.test/sign/${path}`,
+    signedPreviewUrls: async (paths) =>
+      new Map(paths.map((path) => [path, `https://storage.test/sign/${path}`])),
   };
   const admin: MediaAdmin = {
     readOriginal: async () => (options.original === undefined ? png(512, 512) : options.original),
@@ -203,6 +211,14 @@ function fakes(
         { name: "logo.webp", contentType: "image/webp", bytes: new Uint8Array([1]) },
         { name: "logo.png", contentType: "image/png", bytes: new Uint8Array([2]) },
       ];
+    },
+    async contentDerivatives() {
+      if (options.failProcessing) throw new Error("corrupt");
+      return CONTENT_IMAGE_FILES.map((name) => ({
+        name,
+        contentType: "image/webp" as const,
+        bytes: new Uint8Array([3]),
+      }));
     },
   };
   return { media, admin, processor, calls };
@@ -287,5 +303,74 @@ describe("logo upload use cases", () => {
     expect(await confirmLogoUpload({ ...owner, role: "analyst" }, VERSION, fakes())).toEqual({
       status: "forbidden",
     });
+  });
+});
+
+describe("content image use cases", () => {
+  const editor: OrganizationMembership = { ...owner, role: "editor" };
+
+  it("lets editors upload photos up to 10 MB, never SVG", async () => {
+    const f = fakes();
+    expect(
+      await requestContentImageUpload(editor, { mime: "image/jpeg", bytes: 8_000_000 }, f.media),
+    ).toMatchObject({ status: "upload" });
+    expect(f.calls).toEqual(["create:content:image/jpeg:8000000"]);
+    expect(
+      await requestContentImageUpload(editor, { mime: "image/svg+xml", bytes: 10 }, f.media),
+    ).toEqual({ status: "invalid", problem: "unsupported_type" });
+    expect(
+      await requestContentImageUpload(
+        { ...owner, role: "analyst" },
+        { mime: "image/jpeg", bytes: 10 },
+        f.media,
+      ),
+    ).toEqual({ status: "forbidden" });
+  });
+
+  it("stores responsive derivatives and previews the smallest one", async () => {
+    const f = fakes({
+      version: { purpose: "content", declaredMime: "image/png" },
+      original: png(2000, 1500),
+    });
+    expect(await confirmContentImageUpload(editor, VERSION, f)).toEqual({
+      status: "ready",
+      image: { assetId: ASSET, version: 1 },
+      previewUrl: `https://storage.test/sign/${TENANT}/${ASSET}/1/w480.webp`,
+    });
+    expect(f.calls[0]).toBe(`store:${TENANT}/${ASSET}/1/:w480.webp,w960.webp,w1600.webp`);
+  });
+
+  it("rejects photos too small to look good on a phone", async () => {
+    const f = fakes({
+      version: { purpose: "content", declaredMime: "image/png" },
+      original: png(300, 200),
+    });
+    expect(await confirmContentImageUpload(editor, VERSION, f)).toEqual({
+      status: "rejected",
+      problem: "too_small",
+    });
+  });
+
+  it("does not confirm a logo upload as a content photo", async () => {
+    const f = fakes({ version: { purpose: "logo" } });
+    expect(await confirmContentImageUpload(editor, VERSION, f)).toEqual({ status: "not_found" });
+  });
+
+  it("publishes each referenced image once", async () => {
+    const published: string[] = [];
+    await publishContentImages(
+      TENANT,
+      [
+        { assetId: ASSET, version: 1 },
+        { assetId: ASSET, version: 1 },
+        { assetId: VERSION, version: 2 },
+      ],
+      {
+        publish: async (tenant, asset, version, files) => {
+          published.push(`${asset}/${version}:${files.length}`);
+        },
+      },
+    );
+    expect(published).toEqual([`${ASSET}/1:3`, `${VERSION}/2:3`]);
   });
 });

@@ -41,6 +41,8 @@ export interface MediaRepository {
   findVersion(versionId: string): Promise<ImageVersionRecord | null>;
   /** Short-lived URL to preview a (not yet public) derivative. */
   signedPreviewUrl(path: string): Promise<string | null>;
+  /** Same for several paths at once (missing ones are absent from the map). */
+  signedPreviewUrls(paths: readonly string[]): Promise<ReadonlyMap<string, string>>;
 }
 
 export interface DerivedFile {
@@ -78,6 +80,8 @@ export interface MediaAdmin {
 /** Re-encodes an image into safe, metadata-free derivatives. Throws on undecodable input. */
 export interface ImageProcessor {
   logoDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
+  /** WebP at each of CONTENT_IMAGE_WIDTHS (never enlarged). */
+  contentDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
 }
 
 /** {tenant}/{asset}/{version}/ — prefix shared by the original and its derivatives. */

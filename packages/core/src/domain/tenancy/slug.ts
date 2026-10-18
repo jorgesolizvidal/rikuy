@@ -24,13 +24,18 @@ export function isValidSlug(value: string): boolean {
 }
 
 /** "Villa Peña (Norte)" → "villa-pena-norte". Accents are folded, never dropped words. */
-export function suggestSlug(name: string): string {
+export function slugify(name: string, maxLength: number): string {
   return name
     .normalize("NFD")
     .replace(/\p{Mn}/gu, "")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 63)
+    .slice(0, maxLength)
     .replace(/-+$/g, "");
+}
+
+/** Tenant slug (also a DNS label: at most 63 characters). */
+export function suggestSlug(name: string): string {
+  return slugify(name, 63);
 }
