@@ -9,6 +9,7 @@
 --   owner@demo-sur.example.test       owner of Demo Sur
 --   editor.ambos@example.test         editor in Demo Norte, analyst in Demo Sur
 --   revocado@demo-norte.example.test  admin of Demo Norte whose access was revoked
+--   operador@rikuy.example.test       platform operator (/plataforma; enrolls TOTP on first visit)
 --
 -- Users are written the way Supabase Auth stores them (auth.users + auth.identities) so
 -- `db reset` stays a single reproducible command. Token columns are empty strings, not
@@ -28,7 +29,8 @@ from (values
   ('5eed0000-0000-4000-8000-000000000001'::uuid, 'owner@demo-norte.example.test'),
   ('5eed0000-0000-4000-8000-000000000002'::uuid, 'owner@demo-sur.example.test'),
   ('5eed0000-0000-4000-8000-000000000003'::uuid, 'editor.ambos@example.test'),
-  ('5eed0000-0000-4000-8000-000000000004'::uuid, 'revocado@demo-norte.example.test')
+  ('5eed0000-0000-4000-8000-000000000004'::uuid, 'revocado@demo-norte.example.test'),
+  ('5eed0000-0000-4000-8000-000000000005'::uuid, 'operador@rikuy.example.test')
 ) as u (id, email)
 on conflict (id) do nothing;
 
@@ -40,6 +42,9 @@ select
 from auth.users u
 where u.id::text like '5eed0000-%'
 on conflict do nothing;
+
+-- Platform operator (separate from tenant memberships; acts only with a second factor).
+insert into public.platform_operators (user_id) values ('5eed0000-0000-4000-8000-000000000005');
 
 -- Municipalities follow the real onboarding order: provision → owner → domain → activate.
 insert into public.tenants (id, slug, display_name, status, default_locale, timezone)
@@ -88,4 +93,4 @@ where d.tenant_id = t.id and d.kind = 'platform'
   and c.tenant_id = t.id and c.state = 'sealed';
 
 insert into public.audit_events (scope, action, outcome, diff)
-values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 4, "published_configs": 2}');
+values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2}');
