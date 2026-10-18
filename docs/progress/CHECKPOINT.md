@@ -6,7 +6,8 @@
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
 - **Último paso completado:** P3 · Paso 1 — medios por municipio y logo en la marca (2026-10-17)
-- **Rama del paso:** `feat/p3-step1-tenant-media` → PR hacia `main`
+- **Rama del paso:** `feat/p3-step1-tenant-media` (PR #7, mergeado)
+- **Después:** `docs/roadmap-geo-chaski` — revisión de paridad con el sistema anterior (solo documentación)
 
 ## Historial
 
@@ -78,6 +79,15 @@ Contrato `TenantPresentation` (identidad, tema con contraste WCAG AA, contacto, 
 - Las imágenes se procesan en el momento de confirmar la subida (sin cola de trabajos): suficiente para logos e imágenes simples; panoramas y GLB llegan con P2.
 - Una versión de logo rechazada o abandonada queda registrada sin binario; la limpieza programada de versiones huérfanas llega con los jobs de P2.
 
+### Revisión de paridad con el sistema anterior (documentación) ✅
+
+Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del código del sistema anterior. Resultado en [paridad funcional](../paridad-funcional.md): cada capacidad del sistema anterior con su fase en Rikuy, los fallos que no se repiten y mejoras propuestas.
+
+- Faltaba en el roadmap la **ubicación del visitante**: nuevo P3 · Paso 6 en tiempo real ([ADR-021](../adr/ADR-021-visitor-location.md)); las coordenadas de los destinos entran en el Paso 2 (ya previstas en el esquema piloto de la auditoría).
+- El asistente del visitante queda detallado en P5 con pasos ([ADR-022](../adr/ADR-022-tourist-assistant.md)): una sola conversación (portal + tours), «qué hay cerca», «plan para hoy», «ruta sugerida», español/inglés y **voz** (adelantada desde E3).
+- Decisión del usuario: el nombre del asistente es dato de la marca de cada municipio; **«Chaski» es el de Ucureña** y no aparece en el código.
+- P3 · Paso 3 suma «Cómo llegar», compartir, QR por destino, botón «Instalar» y páginas de privacidad y términos por municipio.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
@@ -102,12 +112,12 @@ Ten a mano una imagen PNG, JPG o WebP de hasta 2 MB (por ejemplo, el logo de Ucu
 Rama `feat/p3-step2-content-items`:
 
 1. Tablas `content_items` y `content_revisions` (FK compuestas, tipo `destination`), revisión con concurrencia optimista, publicación y **rollback** en una transacción RPC (sellar revisión + puntero + auditoría), lectura anónima solo de la revisión publicada.
-2. Texto enriquecido como AST permitido (párrafos, títulos, listas, enlaces `https`, énfasis) validado en `@rikuy/core` y en la base; sin HTML.
-3. `media_references`: imágenes de un destino por referencia a `asset_versions` listas (portada + galería), reutilizando la subida firmada del Paso 1 con propósito `content` (los editores sí pueden subir).
-4. Panel: lista de destinos, editor con borrador → publicar → historial y «Volver a esta versión».
-5. Tests: pgTAP (aislamiento, visitante sin borradores, rollback), unitarios del AST y de los casos de uso, integración y e2e (publicar y revertir un destino sin tocar el resto del portal).
+2. **Ubicación del destino** en `geography(Point,4326)` (PostGIS) con índice GiST y validación de rango; selector de coordenadas en el mapa en el editor (accesible, también con campos numéricos).
+3. Texto enriquecido como AST permitido (párrafos, títulos, listas, enlaces `https`, énfasis) validado en `@rikuy/core` y en la base; sin HTML.
+4. `media_references`: portada y galería por referencia a `asset_versions` listas, reutilizando la subida firmada del Paso 1 con propósito `content` (los editores sí pueden subir).
+5. Panel: lista de destinos, editor con borrador → publicar → historial y «Volver a esta versión».
+6. Tests: pgTAP (aislamiento, visitante sin borradores, rollback, coordenadas fuera de rango), unitarios del AST y de los casos de uso, integración y e2e (publicar y revertir un destino sin tocar el resto del portal).
 
 ## Decisiones pendientes del usuario
 
 - Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).
-- Borrar en GitHub la rama `probe/storage-schema` (fue una prueba de CI; el entorno no puede borrarla).

@@ -24,3 +24,5 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 018 | IA: gateway + model routing por capacidad + RAG con evals                                                 | Aceptada; binding inicial fijado en [cierre P0](../p0-closure.md) |
 | 019 | [Jobs del piloto en Vercel con ledger PostgreSQL](ADR-019-pilot-jobs-on-vercel.md)                        | Aceptada (2026-10-17)                                             |
 | 020 | [Entrega de panoramas según resolución](ADR-020-panorama-delivery-by-resolution.md)                       | Aceptada (2026-10-17)                                             |
+| 021 | [Ubicación del visitante en tiempo real](ADR-021-visitor-location.md)                                     | Aceptada (2026-10-17)                                             |
+| 022 | [Asistente turístico: una conversación, persona por municipio y voz](ADR-022-tourist-assistant.md)        | Aceptada (2026-10-17)                                             |
