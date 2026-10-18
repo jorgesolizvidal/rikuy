@@ -136,7 +136,7 @@ jobs:
 
       # One production build serving every municipality, including the one the operator just
       # provisioned in the integration suite (ZC-01).
-      - name: Two white-label portals on one build
+      - name: Two white-label portals on one build, and visitor location (RC-06)
         env:
           PLATFORM_ROOT_DOMAIN: localhost
           PLATFORM_ADMIN_HOST: app.localhost:3000
@@ -149,6 +149,8 @@ jobs:
           pnpm exec next start -p 3000 > ../../next.log 2>&1 &
           for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3000 && break; sleep 1; done
           node e2e/portals.e2e.mjs 3000 --zc01 --logo 2>&1 | tee ../../e2e.log
+          # RC-06: visitor location in a real browser (the runner's Google Chrome).
+          CHROME_PATH="$(command -v google-chrome)" node e2e/location.e2e.mjs 3000 2>&1 | tee -a ../../e2e.log
 
       - name: Report portal failure
         if: failure()

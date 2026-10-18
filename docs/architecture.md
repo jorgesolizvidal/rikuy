@@ -94,9 +94,9 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 ## 9. Mapa y ubicación del visitante (ADR-021, ADR-023)
 
 - Mapa del portal: MapLibre con teselas vectoriales de OpenFreeMap; el estilo es configuración (`NEXT_PUBLIC_MAP_STYLE_URL`). La librería se carga solo donde hay mapa (`/mapa` y, en las fichas, cuando el visitante llega al mapa pequeño); su _worker_ se sirve desde `/vendor/maplibre-gl/<versión>/`. El panel usa Leaflet + OpenStreetMap (uso ligero).
-- El mapa pide al servidor solo los lugares de la zona visible (`portal_map_places`, tope por petición, caché por municipio y zona redondeada a ~1 km). Junto al mapa, la lista con los mismos lugares es la alternativa accesible; si el mapa no carga, la página sigue funcionando.
+- La página del mapa trae los lugares de la zona del municipio (`portal_map_places`, tope por petición, caché por municipio y zona redondeada a ~1 km); mientras la vista queda dentro de esa zona, el navegador filtra lo que ya tiene. Solo una vista fuera de ella vuelve a preguntar al servidor, y **nunca** una vista que sigue al visitante (revelaría dónde está). Junto al mapa, la lista con los mismos lugares es la alternativa accesible; si el mapa no carga, la página sigue funcionando.
 - Coordenadas de destinos y eventos en `geography(Point,4326)` con índice GiST; «cerca de» y consultas por área en el servidor.
-- Posición del visitante solo en el navegador: se pide tras una acción, `watchPosition` mientras el mapa o la ficha está visible, círculo de precisión, «estás cerca de…» con la página abierta.
+- Posición del visitante solo en el navegador (P3 · Paso 6): se pide tras pulsar «Usar mi ubicación», `watchPosition` mientras la página está visible (se detiene al ocultarla), punto y círculo de precisión, «Seguirme», distancia en línea recta y tiempo estimado, orden por cercanía y «Estás cerca de…» con la página abierta (radio por municipio en la marca, 150 m por defecto). Las reglas son código puro de `@rikuy/core` (`domain/geo/proximity`); en la pestaña solo se recuerda que se activó, nunca la posición.
 - La posición exacta nunca se envía ni se guarda; al asistente llega redondeada (~100 m) en la petición que la necesita, sin registrarse. Sin permiso, todo funciona (RC-06).
 
 ## 10. IA (ADR-018 + cierre P0 + ADR-022)

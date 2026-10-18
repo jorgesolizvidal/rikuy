@@ -1,11 +1,12 @@
-import { PORTAL_PATHS } from "@rikuy/core";
+import { nearbyRadiusOf, PORTAL_PATHS } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { portalDestinations } from "@/server/portal-content";
+import { portalDestinations, portalNearbyTargets } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { DestinationCard } from "../destination-card";
+import { LocationButton, NearbyNotice, ProximityList, ProximityNote } from "../visitor-location";
 
 interface DestinationsPageProps {
   readonly params: Promise<{ host: string }>;
@@ -27,7 +28,10 @@ export async function generateMetadata({ params }: DestinationsPageProps): Promi
 export default async function DestinationsPage({ params }: DestinationsPageProps) {
   const view = await portalView((await params).host);
   if (view === null) notFound();
-  const destinations = await portalDestinations(view);
+  const [destinations, targets] = await Promise.all([
+    portalDestinations(view),
+    portalNearbyTargets(view),
+  ]);
 
   return (
     <div className="portal-page">
@@ -46,17 +50,28 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
       {destinations.length === 0 ? (
         <p className="portal-empty">Pronto publicaremos aquí los lugares para visitar.</p>
       ) : (
-        <ul className="portal-cards">
-          {destinations.map((destination, index) => (
-            <DestinationCard
-              key={destination.slug}
-              tenantId={view.context.tenant.tenantId}
-              destination={destination}
-              headingLevel={2}
-              priority={index < 2}
-            />
-          ))}
-        </ul>
+        <>
+          <div className="portal-list-tools">
+            <LocationButton label="Ordenar por cercanía" />
+            <ProximityNote />
+          </div>
+          <ProximityList
+            className="portal-cards"
+            entries={destinations.map((destination, index) => ({
+              key: destination.slug,
+              point: destination.location,
+              node: (
+                <DestinationCard
+                  tenantId={view.context.tenant.tenantId}
+                  destination={destination}
+                  headingLevel={2}
+                  priority={index < 2}
+                />
+              ),
+            }))}
+          />
+          <NearbyNotice targets={targets} radius={nearbyRadiusOf(view.resolved.presentation)} />
+        </>
       )}
     </div>
   );

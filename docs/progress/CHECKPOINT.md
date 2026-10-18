@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
-- **Último paso completado:** P3 · Paso 5 — mapa del portal (2026-10-18)
-- **Rama del paso:** `feat/p3-step5-portal-map` → PR hacia `main`
+- **Último paso completado:** P3 · Paso 6 — ubicación del visitante en tiempo real (2026-10-18)
+- **Rama del paso:** `feat/p3-step6-visitor-location` → PR hacia `main`
 
 ## Historial
 
@@ -182,34 +182,64 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - El mapa pequeño se carga al llegar a él **y** al usar la página (desplazarse o tocar), o con su botón «Mostrar el mapa», para no cargar el mapa al abrir la ficha.
 - OpenFreeMap no ofrece garantía de servicio; si un municipio la exige, se cambia el estilo por uno pagado o propio (ADR-023).
 
+### P3 · Paso 6 — ubicación del visitante en tiempo real ✅
+
+- Todo se calcula **en el dispositivo** ([ADR-021](../adr/ADR-021-visitor-location.md)): la posición no llega al servidor ni se guarda.
+- Base de datos (`20261019200000_p3_visitor_location.sql`, solo expand): la marca acepta `visitors.nearbyRadius` (radio de «Estás cerca de…», 50–1000 m; sin él, 150 m). 15 aserciones pgTAP nuevas (límites, decimales, texto, claves extra, guardado por la RPC y ninguna columna que guarde posiciones).
+- `@rikuy/core` (`domain/geo/proximity`): distancia en línea recta (haversine), tiempos estimados a pie y en auto (con factor de desvío y rotulados como estimación), formato en español («80 m», «1,2 km», «1.250 km»), orden por cercanía, filtro de lecturas que no cambian nada (< 10 m), «Estás cerca de…» con margen para no repetir el aviso en el borde e ignorando lecturas imprecisas, y el círculo de precisión.
+- Portal:
+  - **«Usar mi ubicación»**: el permiso se pide solo al pulsarlo. `watchPosition` mientras la página está a la vista; al ocultar la pestaña se detiene y al volver sigue. «Dejar de usar mi ubicación» lo apaga.
+  - En la pestaña solo se recuerda que se activó (no la posición), para que la página siguiente siga sin preguntar, y solo si el navegador dice que el permiso está concedido.
+  - **`/mapa`**: punto azul con círculo de precisión, «Seguirme» (arrastrar el mapa lo apaga) y la lista del más cercano al más lejano con su distancia. Si el visitante está lejos del municipio, se dice a qué distancia está y el mapa no se mueve.
+  - **Ninguna petición lleva la posición:** mientras la vista está dentro de la zona del municipio, el navegador filtra los lugares que ya tiene; con «Seguirme» nunca se pregunta al servidor por la zona.
+  - **Destinos**: «Ordenar por cercanía» y distancia en cada tarjeta. **Agenda**: distancia en cada evento y «Ordenar: por fecha / por cercanía». **Fichas**: «A 790 m en línea recta · ~14 min a pie · ~2 min en auto (estimado)» en «Ubicación». El inicio muestra distancias si ya se activó en la pestaña.
+  - **«Estás cerca de…»**: aviso al entrar en el radio de un destino (mapa, destinos, agenda y fichas), con enlace a su ficha; uno por lugar hasta que el visitante se aleja.
+  - Mensajes para permiso denegado, señal no disponible, http (la ubicación exige https) y navegadores sin ubicación; sin permiso todo funciona igual.
+  - Página de privacidad actualizada: qué se usa, que no sale del dispositivo, que solo funciona con la página abierta, qué se recuerda en la pestaña y que las imágenes del mapa de esa zona se piden a OpenFreeMap.
+- Panel, «Marca del portal»: nuevo apartado «Visitantes» con el radio del aviso «Estás cerca de…».
+- Seed: Demo Norte suma «Plaza principal», a ~800 m del Mirador, para probar el orden por cercanía y el aviso.
+- Correcciones: el mapa pequeño de las fichas se salía de la pantalla en celulares angostos (390 px); los avisos «Image … could not be loaded» del estilo del mapa ya no aparecen.
+- Tests: 341 unitarios (core 232, db 75, web 28, config 6) + 345 pgTAP + e2e de portales (159 verificaciones) + **e2e RC-06 en un navegador real** (29 verificaciones, en CI con el Chrome del runner): permiso concedido, denegado y desconocido (sin responder y sin Permissions API); nada se pide al cargar; sin permiso todo funciona en el orden del municipio; seguir sin pedir zonas al servidor; ninguna petición ni almacenamiento del navegador contiene la posición.
+- Lighthouse local (móvil): inicio 95, destinos 97, ficha de destino 96, agenda 98, ficha de evento 97 (accesibilidad, buenas prácticas y SEO 100, CLS 0).
+
+**Desviaciones:**
+
+- El aviso «Estás cerca de…» es para destinos (como dice el ADR); los eventos muestran su distancia, sin aviso propio.
+- No hay aviso en segundo plano (ni notificaciones push): solo con la página abierta, como prevé el ADR.
+- En el celular hace falta https para probar la ubicación (los navegadores no la dan en `http://192.168…`). Se podrá probar en los previews de Vercel del Paso 7, o con un túnel https si se quiere antes.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
 git checkout main
 git pull
-pnpm install       # instala maplibre-gl
-pnpm db:reset
-pnpm dev           # copia el worker del mapa y arranca
+pnpm install       # instala playwright-core (solo para el e2e)
+pnpm db:reset      # trae «Plaza principal» en Demo Norte
+pnpm dev
 ```
 
-1. Abre http://demo-norte.localhost:3000 → «Mapa» en la cabecera. Verás el mapa con los pines del Mirador y de la Feria (juntos, porque la feria es en el Mirador) y la lista al lado.
-2. Toca un pin: aparece su nombre con enlace a la ficha. Prueba también con el teclado (Tab hasta el pin y Enter).
-3. Desmarca «Eventos próximos»: desaparecen del mapa y de la lista. Aleja el mapa con el «−»: la lista se actualiza con la zona.
-4. Abre «Mirador del Valle» y baja hasta «Ubicación»: aparece el mapa pequeño. «Ver en el mapa del municipio» abre `/mapa` centrado en ese punto.
-5. En http://demo-sur.localhost:3000/mapa solo están «Laguna Espejo» y «Noche de estrellas».
-6. Opcional (celular): con la configuración de prueba que ya tienes, abre `http://demo-norte.192-168-100-105.sslip.io:3000/mapa`; recuerda volver a ejecutar el SQL de `sslip.io` después de `pnpm db:reset`.
-7. Opcional: «Añadir al calendario» en un evento → en el celular el lugar ya no muestra «\,».
+En la PC, `localhost` cuenta como conexión segura, así que la ubicación funciona (el navegador usará la ubicación de tu PC, por Wi-Fi). Para probar como si estuvieras en el municipio de prueba, en Chrome: F12 → menú ⋮ → More tools → **Sensors** → Location → «Other…» con latitud `-17.3905` y longitud `-66.1508` (al lado del Mirador).
 
-## Siguiente paso — P3 · Paso 6 (requiere autorización)
+1. Abre http://demo-norte.localhost:3000/mapa y pulsa **«Usar mi ubicación»**: el navegador pide permiso solo en ese momento. Aparece el punto azul con su círculo, «Siguiéndote», la lista ordenada con «A 80 m en línea recta» y el aviso **«Estás cerca de Mirador del Valle»**.
+2. Arrastra el mapa: «Seguirme» se apaga. Púlsalo y el mapa vuelve a ti.
+3. En Sensors cambia a latitud `-17.3951`, longitud `-66.1555` (la Plaza principal): la lista cambia de orden y aparece «Estás cerca de Plaza principal».
+4. Abre «Destinos»: ya muestra las distancias y la Plaza primero. Abre «Mirador del Valle» y baja a «Ubicación»: distancia y tiempos estimados.
+5. «Agenda» → «Ordenar: Por cercanía».
+6. «Dejar de usar mi ubicación»: desaparecen el punto, las distancias y el aviso.
+7. Bloquea el permiso (candado de la barra de direcciones → Ubicación → Bloquear), recarga y pulsa «Usar mi ubicación»: el portal explica que no tiene permiso y todo sigue funcionando.
+8. Opcional, el radio: panel → municipio → «Marca del portal» → «Visitantes» → por ejemplo `500`, publica, y el aviso aparece desde más lejos.
 
-Rama `feat/p3-step6-visitor-location` ([ADR-021](../adr/ADR-021-visitor-location.md)):
+## Siguiente paso — P3 · Paso 7 (requiere autorización)
 
-1. «Usar mi ubicación» en `/mapa` y en las listas: el permiso se pide **solo tras esa acción**; `watchPosition` mientras la página está visible (se detiene al ocultar la pestaña).
-2. En el mapa: punto del visitante con círculo de precisión y «seguirme».
-3. Distancia **en línea recta** y tiempo estimado (a pie / en auto, rotulados como estimación) en el mapa, las listas y las fichas; ordenar destinos y eventos por cercanía.
-4. «Estás cerca de…» al entrar en el radio de un destino (150 m por defecto), solo con la página abierta.
-5. Privacidad: la posición nunca sale del dispositivo; actualizar la página de privacidad.
-6. Tests (RC-06): permiso concedido, denegado y desconocido; sin permiso todo funciona; ninguna petición al servidor lleva la posición.
+Rama `feat/p3-step7-lighthouse-ci`:
+
+1. Previews de Vercel por PR (proyecto conectado al repositorio, variables de entorno del preview y base de datos de prueba).
+2. Lighthouse CI sobre el preview con el [presupuesto](../performance-budget.md): el PR falla si una ruta pública lo rompe; `/mapa` con su objetivo propio medido en un celular real.
+3. Caché de CDN por municipio, idioma y versión publicada (pendiente desde el Paso 3).
+4. Contratos RC-06/09/10/11/12/15 como pruebas automáticas (leer primero su definición en la auditoría, solo lectura).
+5. Prueba de la ubicación en un celular con https (el preview).
+
+Antes de empezar hará falta: conectar Vercel con el repositorio (o autorizarme a hacerlo con el conector) y permitir `*.vercel.app` y `*.supabase.co` en los dominios de mi entorno.
 
 ## Decisiones pendientes del usuario
 

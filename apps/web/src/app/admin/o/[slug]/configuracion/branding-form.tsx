@@ -1,6 +1,12 @@
 "use client";
 
-import { isHexColor, PRESENTATION_LIMITS, SOCIAL_NETWORKS, type SocialNetwork } from "@rikuy/core";
+import {
+  isHexColor,
+  NEARBY_RADIUS,
+  PRESENTATION_LIMITS,
+  SOCIAL_NETWORKS,
+  type SocialNetwork,
+} from "@rikuy/core";
 import {
   useActionState,
   useEffect,
@@ -237,6 +243,21 @@ export function BrandingForm({
           />
         </fieldset>
 
+        <fieldset disabled={!canEdit || pending}>
+          <legend>Visitantes</legend>
+          <TextField
+            field="nearbyRadius"
+            label="Aviso «Estás cerca de…» (metros)"
+            hint={`Cuando un visitante con la ubicación activada llega a esta distancia de un destino, el portal se lo avisa. Entre ${NEARBY_RADIUS.min} y ${NEARBY_RADIUS.max}; vacío usa ${NEARBY_RADIUS.default} m.`}
+            value={values.nearbyRadius}
+            maxLength={4}
+            placeholder={String(NEARBY_RADIUS.default)}
+            inputMode="numeric"
+            onChange={(v) => set("nearbyRadius", v)}
+            error={errors.nearbyRadius}
+          />
+        </fieldset>
+
         {canEdit ? (
           <div className="form-actions branding-actions">
             <button
@@ -334,8 +355,10 @@ function TextField({
   placeholder,
   required,
   multiline,
+  inputMode,
 }: FieldProps & {
   readonly type?: "text" | "email" | "tel" | "url";
+  readonly inputMode?: "numeric";
   readonly maxLength: number;
   readonly placeholder?: string;
   readonly required?: boolean;
@@ -359,6 +382,7 @@ function TextField({
         <input
           {...common}
           type={type}
+          inputMode={inputMode}
           placeholder={placeholder}
           onChange={(e) => onChange(e.target.value)}
         />

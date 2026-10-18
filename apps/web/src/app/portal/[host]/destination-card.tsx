@@ -3,6 +3,7 @@ import { PORTAL_PATHS, type PublishedDestinationSummary } from "@rikuy/core";
 import { responsiveImage } from "@/server/portal-content";
 
 import { PortalImage } from "./portal-image";
+import { DistanceText } from "./visitor-location";
 
 const CARD_SIZES = "(min-width: 72rem) 22rem, (min-width: 40rem) 45vw, 100vw";
 
@@ -33,6 +34,7 @@ export function DestinationCard({
         </div>
         <Heading className="portal-card-title">{destination.title}</Heading>
         {destination.summary ? <p className="portal-card-text">{destination.summary}</p> : null}
+        {destination.location ? <DistanceText point={destination.location} compact /> : null}
       </a>
     </li>
   );

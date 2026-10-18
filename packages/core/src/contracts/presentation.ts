@@ -1,6 +1,7 @@
 import { z } from "zod";
 
 import { HEX_COLOR_PATTERN } from "../domain/branding/color";
+import { NEARBY_RADIUS } from "../domain/geo/proximity";
 import { themeContrast, type ContrastCheck } from "../domain/branding/theme";
 
 /**
@@ -84,6 +85,13 @@ export const tenantPresentationSchema = z.strictObject({
       version: z.number().int().min(1).max(999_999),
     })
     .optional(),
+  /** Optional visitor settings; absent means the defaults. */
+  visitors: z
+    .strictObject({
+      /** «Estás cerca de…» radius around a destination, in meters (ADR-021). */
+      nearbyRadius: z.number().int().min(NEARBY_RADIUS.min).max(NEARBY_RADIUS.max),
+    })
+    .optional(),
 });
 
 export type TenantPresentation = z.infer<typeof tenantPresentationSchema>;
@@ -132,6 +140,11 @@ export function validatePresentation(input: unknown): PresentationValidation {
 export function parseStoredPresentation(value: unknown): TenantPresentation | null {
   const parsed = tenantPresentationSchema.safeParse(value);
   return parsed.success ? parsed.data : null;
+}
+
+/** The municipality's «Estás cerca de…» radius in meters (default 150 m). */
+export function nearbyRadiusOf(presentation: TenantPresentation): number {
+  return presentation.visitors?.nearbyRadius ?? NEARBY_RADIUS.default;
 }
 
 /** Up to 12 characters taken from the end of the name ("Municipio Demo Norte" → "Demo Norte"). */

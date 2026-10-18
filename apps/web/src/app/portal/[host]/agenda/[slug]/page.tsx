@@ -1,4 +1,5 @@
 import {
+  nearbyRadiusOf,
   PORTAL_PATHS,
   directionsUrl,
   eventJsonLd,
@@ -11,12 +12,18 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { RichTextView } from "@/components/rich-text";
-import { portalEvent, portalOrigin, responsiveImage } from "@/server/portal-content";
+import {
+  portalEvent,
+  portalNearbyTargets,
+  portalOrigin,
+  responsiveImage,
+} from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { MiniMap } from "../../mini-map";
 import { PortalImage } from "../../portal-image";
 import { ShareButton } from "../../share-button";
+import { DistanceText, LocationButton, NearbyNotice } from "../../visitor-location";
 
 interface EventPageProps {
   readonly params: Promise<{ host: string; slug: string }>;
@@ -70,6 +77,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const loaded = await load(params);
   if (loaded === null) notFound();
   const { view, event } = loaded;
+  const targets = await portalNearbyTargets(view);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
   const origin = portalOrigin(view);
@@ -191,6 +199,10 @@ export default async function EventPage({ params }: EventPageProps) {
               lng: event.location.lng,
             }}
           />
+          <div className="portal-location-visitor">
+            <DistanceText point={event.location} />
+            <LocationButton label="Ver a qué distancia estoy" />
+          </div>
           <p>
             {formatCoordinates(event.location)} ·{" "}
             <a href={`${PORTAL_PATHS.map}?lat=${event.location.lat}&lng=${event.location.lng}`}>
@@ -207,6 +219,7 @@ export default async function EventPage({ params }: EventPageProps) {
       <footer className="portal-destination-meta">
         <p>Fecha y hora del municipio.</p>
       </footer>
+      <NearbyNotice targets={targets} radius={nearbyRadiusOf(view.resolved.presentation)} />
     </article>
   );
 }

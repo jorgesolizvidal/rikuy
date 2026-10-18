@@ -4,8 +4,10 @@ import {
   defaultPresentation,
   deriveShortName,
   monogram,
+  nearbyRadiusOf,
   parseStoredPresentation,
   validatePresentation,
+  type TenantPresentation,
 } from "./presentation";
 import { samplePresentation } from "../testing/presentation-fixture";
 
@@ -19,6 +21,15 @@ describe("presentation contract", () => {
     const result = validatePresentation(samplePresentation());
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.theme.brand).toBe("#1f6f4a");
+  });
+
+  it("takes the «Estás cerca de…» radius from the presentation, 150 m by default", () => {
+    expect(nearbyRadiusOf(samplePresentation() as TenantPresentation)).toBe(150);
+    const result = validatePresentation({
+      ...samplePresentation(),
+      visitors: { nearbyRadius: 300 },
+    });
+    expect(result.ok && nearbyRadiusOf(result.value)).toBe(300);
   });
 
   it("rejects unknown keys anywhere (no smuggled fields)", () => {
@@ -55,6 +66,10 @@ describe("presentation contract", () => {
       },
     ],
     ["seo.description", { seo: { description: "a".repeat(161) } }],
+    ["visitors.nearbyRadius", { visitors: { nearbyRadius: 49 } }],
+    ["visitors.nearbyRadius", { visitors: { nearbyRadius: 1001 } }],
+    ["visitors.nearbyRadius", { visitors: { nearbyRadius: 150.5 } }],
+    ["visitors", { visitors: { nearbyRadius: 150, track: true } }],
   ])("rejects an invalid %s", (path, patch) => {
     expect(issues({ ...samplePresentation(), ...patch }).map((i) => i.path)).toContain(path);
   });

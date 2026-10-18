@@ -1,12 +1,24 @@
 "use client";
 
-import { formatBoundingBox, PORTAL_PATHS, type BoundingBox } from "@rikuy/core";
+import {
+  containsBox,
+  containsPoint,
+  describeProximity,
+  distanceMeters,
+  formatBoundingBox,
+  padBoundingBox,
+  PORTAL_PATHS,
+  sortByDistance,
+  type BoundingBox,
+} from "@rikuy/core";
 import dynamic from "next/dynamic";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import { useVisitorLocation } from "@/lib/use-visitor-location";
 import type { MapPointDto } from "@/server/portal-content";
 
 import type { MapCanvasProps } from "./map-canvas";
+import { LocationButton, NearbyNotice } from "./visitor-location";
 
 const MapCanvas = dynamic<MapCanvasProps>(() => import("./map-canvas"), {
   ssr: false,
@@ -23,16 +35,23 @@ const LAYERS: readonly { kind: Kind; label: string }[] = [
 /**
  * The /mapa experience: layers, the map (loaded on demand) and the same places as an
  * ordinary list of links, which is what keyboards, screen readers and phones without
- * WebGL use. Moving the map asks the server for the places in that area only.
+ * WebGL use. Views inside the municipality's area are filtered here from the places the
+ * page already has; only views beyond it ask the server (and never a view that followed
+ * the visitor's position, which would reveal where they are).
  */
 export function MapExplorer({
   initialPoints,
   initialArea,
+  complete,
   center,
+  nearbyRadius,
 }: {
   readonly initialPoints: readonly MapPointDto[];
   readonly initialArea: BoundingBox;
+  /** The initial points are every place of the municipality (not cut by the limit). */
+  readonly complete: boolean;
   readonly center?: { readonly lat: number; readonly lng: number; readonly zoom: number };
+  readonly nearbyRadius: number;
 }) {
   const [points, setPoints] = useState(initialPoints);
   const [layers, setLayers] = useState<Record<Kind, boolean>>({ destination: true, event: true });
@@ -43,6 +62,20 @@ export function MapExplorer({
   const [loading, setLoading] = useState(false);
   const pending = useRef<AbortController | null>(null);
   const timer = useRef<number | undefined>(undefined);
+  const { fix } = useVisitorLocation();
+  const [follow, setFollow] = useState(false);
+  // Whether the first reading was handled (center on the visitor or say they are far).
+  const [placedVisitor, setPlacedVisitor] = useState<"near" | "far" | null>(null);
+
+  if (!fix && placedVisitor !== null) {
+    setPlacedVisitor(null);
+    setFollow(false);
+  }
+  if (fix && placedVisitor === null) {
+    const near = containsPoint(padBoundingBox(initialArea), fix);
+    setPlacedVisitor(near ? "near" : "far");
+    if (near) setFollow(true);
+  }
 
   useEffect(
     () => () => {
@@ -52,8 +85,15 @@ export function MapExplorer({
     [],
   );
 
-  function moved(bounds: BoundingBox) {
+  function moved(bounds: BoundingBox, fromVisitor: boolean) {
     window.clearTimeout(timer.current);
+    // While following, the view is centered on the visitor even when they zoom out.
+    if (fromVisitor || follow || (complete && containsBox(initialArea, bounds))) {
+      pending.current?.abort();
+      setLoading(false);
+      setPoints(initialPoints.filter((point) => containsPoint(bounds, point)));
+      return;
+    }
     timer.current = window.setTimeout(async () => {
       pending.current?.abort();
       const controller = new AbortController();
@@ -75,7 +115,17 @@ export function MapExplorer({
     }, 350);
   }
 
-  const visible = useMemo(() => points.filter((point) => layers[point.kind]), [points, layers]);
+  const visible = useMemo(() => {
+    const shown = points.filter((point) => layers[point.kind]);
+    return fix ? sortByDistance(shown, fix, (point) => point) : shown;
+  }, [points, layers, fix]);
+  const targets = useMemo(
+    () =>
+      initialPoints
+        .filter((point) => point.kind === "destination")
+        .map(({ key, title, href, lat, lng }) => ({ key, title, href, lat, lng })),
+    [initialPoints],
+  );
   const counts = useMemo(
     () => ({
       destination: points.filter((p) => p.kind === "destination").length,
@@ -105,6 +155,7 @@ export function MapExplorer({
           type="button"
           className="portal-button"
           onClick={() => {
+            setFollow(false);
             setFocus(undefined);
             setArea({ ...initialArea });
           }}
@@ -113,6 +164,31 @@ export function MapExplorer({
           Ver todos
         </button>
       </fieldset>
+
+      <div className="portal-map-visitor">
+        <LocationButton />
+        {fix && placedVisitor === "near" ? (
+          <button
+            type="button"
+            className="portal-button"
+            aria-pressed={follow}
+            onClick={() => setFollow((current) => !current)}
+            disabled={failed}
+          >
+            {follow ? "Siguiéndote" : "Seguirme"}
+          </button>
+        ) : null}
+        {fix && placedVisitor === "far" ? (
+          <p className="portal-map-far">
+            Estás{" "}
+            {describeProximity(distanceMeters(fix, centerOf(initialArea)))
+              .distance.replace(/^A /u, "a ")
+              .replace(" en línea recta", "")}{" "}
+            de esta zona. Las distancias de la lista son en línea recta desde donde estás.
+          </p>
+        ) : null}
+      </div>
+      <NearbyNotice targets={targets} radius={nearbyRadius} />
 
       <div className="portal-map-frame">
         {failed ? (
@@ -127,6 +203,8 @@ export function MapExplorer({
             interactive
             onMove={moved}
             onFailure={() => setFailed(true)}
+            visitor={{ fix, follow }}
+            onStopFollowing={() => setFollow(false)}
           />
         )}
       </div>
@@ -138,7 +216,9 @@ export function MapExplorer({
             ? "Buscando lugares…"
             : visible.length === 0
               ? "No hay lugares en esta zona. Aleja el mapa o activa otra capa."
-              : `${visible.length} ${visible.length === 1 ? "lugar" : "lugares"}`}
+              : `${visible.length} ${visible.length === 1 ? "lugar" : "lugares"}${
+                  fix ? ", del más cercano al más lejano" : ""
+                }`}
         </p>
         <ul>
           {visible.map((point) => (
@@ -149,6 +229,11 @@ export function MapExplorer({
                 </span>
                 <span className="portal-map-title">{point.title}</span>
                 {point.detail ? <span className="portal-map-detail">{point.detail}</span> : null}
+                {fix ? (
+                  <span className="portal-distance">
+                    {describeProximity(distanceMeters(fix, point)).distance}
+                  </span>
+                ) : null}
               </a>
             </li>
           ))}
@@ -156,6 +241,10 @@ export function MapExplorer({
       </section>
     </div>
   );
+}
+
+function centerOf(box: BoundingBox) {
+  return { lat: (box.south + box.north) / 2, lng: (box.west + box.east) / 2 };
 }
 
 /** ~100 m precision is plenty for an area request (and keeps URLs short). */

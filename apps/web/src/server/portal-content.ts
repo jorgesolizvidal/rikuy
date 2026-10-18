@@ -4,6 +4,7 @@ import {
   formatEventSchedule,
   imageCandidates,
   mapPlacePath,
+  PORTAL_PATHS,
   type PortalMapPlace,
   type PublishedImage,
 } from "@rikuy/core";
@@ -16,6 +17,8 @@ import {
   publishedEventReader,
   publishedMapReader,
 } from "./platform";
+import type { NearbyTargetDto } from "@/app/portal/[host]/visitor-location";
+
 import type { PortalView } from "./portal-view";
 
 /** What an <img> needs to load the right derivative and reserve its space. */
@@ -62,6 +65,23 @@ export const portalDestination = cache(async (view: PortalView, slug: string) =>
 export function portalOrigin(view: PortalView): string {
   return platformSettings().portalOrigin(view.context.tenant.canonicalHost ?? view.context.host);
 }
+
+/** Destinations with a location, for «Estás cerca de…» (decided in the browser). */
+export const portalNearbyTargets = cache(async (view: PortalView): Promise<NearbyTargetDto[]> =>
+  (await portalDestinations(view)).flatMap((destination) =>
+    destination.location
+      ? [
+          {
+            key: destination.slug,
+            title: destination.title,
+            href: PORTAL_PATHS.destination(destination.slug),
+            lat: destination.location.lat,
+            lng: destination.location.lng,
+          },
+        ]
+      : [],
+  ),
+);
 
 /** Upcoming and ongoing events of the portal's tenant, soonest first. */
 export const portalEvents = cache(async (view: PortalView) =>

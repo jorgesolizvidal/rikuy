@@ -85,4 +85,21 @@ describe("branding form mapping", () => {
     if (contrastResult.ok) throw new Error("expected a contrast issue");
     expect(fieldErrors(contrastResult.issues, contrast.social).brand).toMatch(/4\.5:1/);
   });
+
+  it("keeps the «Estás cerca de…» radius optional and explains a wrong one", () => {
+    expect("visitors" in presentationInputFromForm(form(filled))).toBe(false);
+    const ok = validatePresentation(
+      presentationInputFromForm(form({ ...filled, nearbyRadius: "300" })),
+    );
+    expect(ok.ok && ok.value.visitors).toEqual({ nearbyRadius: 300 });
+    if (ok.ok) expect(valuesFromPresentation(ok.value).nearbyRadius).toBe("300");
+    for (const wrong of ["20", "5000", "1.5", "cien"]) {
+      const result = validatePresentation(
+        presentationInputFromForm(form({ ...filled, nearbyRadius: wrong })),
+      );
+      expect(result.ok).toBe(false);
+      if (!result.ok)
+        expect(fieldErrors(result.issues, []).nearbyRadius).toMatch(/entre 50 y 1000/u);
+    }
+  });
 });

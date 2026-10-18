@@ -65,3 +65,22 @@ export function padBoundingBox(box: BoundingBox, minSpan = 0.02, ratio = 0.15): 
     north: Math.min(90, cy + h),
   };
 }
+
+export function containsPoint(box: BoundingBox, point: { lat: number; lng: number }): boolean {
+  return (
+    point.lng >= box.west &&
+    point.lng <= box.east &&
+    point.lat >= box.south &&
+    point.lat <= box.north
+  );
+}
+
+/** Whether `inner` lies entirely inside `outer`. */
+export function containsBox(outer: BoundingBox, inner: BoundingBox): boolean {
+  return (
+    inner.west >= outer.west &&
+    inner.east <= outer.east &&
+    inner.south >= outer.south &&
+    inner.north <= outer.north
+  );
+}

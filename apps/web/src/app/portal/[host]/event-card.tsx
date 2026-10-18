@@ -5,6 +5,8 @@ import {
   type PublishedEventSummary,
 } from "@rikuy/core";
 
+import { DistanceText } from "./visitor-location";
+
 /** An event in a list: date badge, title, when and where; one link named by its title. */
 export function EventCard({
   event,
@@ -26,6 +28,7 @@ export function EventCard({
           <Heading className="portal-event-title">{event.title}</Heading>
           <span className="portal-event-when">{formatEventSchedule(event.schedule)}</span>
           {event.venue ? <span className="portal-event-where">{event.venue.title}</span> : null}
+          {event.location ? <DistanceText point={event.location} compact /> : null}
         </span>
       </a>
     </li>

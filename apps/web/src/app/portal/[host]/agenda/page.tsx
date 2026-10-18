@@ -5,7 +5,9 @@ import { notFound } from "next/navigation";
 import { portalEvents } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
+import { AgendaList } from "../agenda-list";
 import { EventCard } from "../event-card";
+import { LocationButton } from "../visitor-location";
 
 interface AgendaPageProps {
   readonly params: Promise<{ host: string }>;
@@ -48,20 +50,22 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
       {months.length === 0 ? (
         <p className="portal-empty">No hay eventos próximos por ahora. Vuelve pronto.</p>
       ) : (
-        months.map((month) => (
-          <section
-            key={month.monthKey}
-            className="portal-month"
-            aria-labelledby={`mes-${month.monthKey}`}
-          >
-            <h2 id={`mes-${month.monthKey}`}>{formatEventMonth(month.monthKey)}</h2>
-            <ul className="portal-events">
-              {month.items.map((event) => (
-                <EventCard key={event.slug} event={event} />
-              ))}
-            </ul>
-          </section>
-        ))
+        <>
+          <div className="portal-list-tools">
+            <LocationButton label="Ver a qué distancia está cada evento" />
+          </div>
+          <AgendaList
+            months={months.map((month) => ({
+              key: month.monthKey,
+              label: formatEventMonth(month.monthKey),
+              entries: month.items.map((event) => ({
+                key: event.slug,
+                point: event.location,
+                node: <EventCard event={event} />,
+              })),
+            }))}
+          />
+        </>
       )}
     </div>
   );

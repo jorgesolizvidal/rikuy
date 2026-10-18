@@ -2,7 +2,8 @@
 
 import "maplibre-gl/dist/maplibre-gl.css";
 
-import type { BoundingBox } from "@rikuy/core";
+import { circleRing, type BoundingBox, type PositionFix } from "@rikuy/core";
+import type { GeoJSONSource } from "maplibre-gl";
 import {
   LngLatBounds,
   Map as MapLibre,
@@ -11,7 +12,7 @@ import {
   Popup,
   setWorkerUrl,
 } from "maplibre-gl";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { PORTAL_MAP } from "@/lib/map-tiles";
 import type { MapPointDto } from "@/server/portal-content";
@@ -27,7 +28,15 @@ export interface MapCanvasProps {
   readonly center?:
     { readonly lat: number; readonly lng: number; readonly zoom: number } | undefined;
   readonly interactive: boolean;
-  readonly onMove?: ((bounds: BoundingBox) => void) | undefined;
+  /**
+   * The camera stopped. `fromVisitor` is true when the move followed the visitor's
+   * position: such views must not be sent to the server (they reveal where they are).
+   */
+  readonly onMove?: ((bounds: BoundingBox, fromVisitor: boolean) => void) | undefined;
+  /** The visitor's position (device only) and whether the camera follows it. */
+  readonly visitor?: { readonly fix: PositionFix | null; readonly follow: boolean } | undefined;
+  /** The visitor dragged the map: stop following. */
+  readonly onStopFollowing?: (() => void) | undefined;
   /** The style or WebGL could not load: the page keeps working without the map. */
   readonly onFailure?: (() => void) | undefined;
 }
@@ -46,6 +55,51 @@ const SPANISH = {
 };
 
 let workerConfigured = false;
+
+const VISITOR_SOURCE = "rikuy-visitor-accuracy";
+const FROM_VISITOR = { fromVisitor: true } as const;
+
+/** The accuracy circle: a translucent area that says how sure the device is. */
+function showAccuracy(instance: MapLibre, fix: PositionFix | null) {
+  const data = {
+    type: "FeatureCollection" as const,
+    features: fix
+      ? [
+          {
+            type: "Feature" as const,
+            properties: {},
+            geometry: { type: "Polygon" as const, coordinates: [circleRing(fix, fix.accuracy)] },
+          },
+        ]
+      : [],
+  };
+  const source = instance.getSource<GeoJSONSource>(VISITOR_SOURCE);
+  if (source) {
+    source.setData(data);
+    return;
+  }
+  instance.addSource(VISITOR_SOURCE, { type: "geojson", data });
+  instance.addLayer({
+    id: `${VISITOR_SOURCE}-fill`,
+    type: "fill",
+    source: VISITOR_SOURCE,
+    paint: { "fill-color": "#1a73e8", "fill-opacity": 0.12 },
+  });
+  instance.addLayer({
+    id: `${VISITOR_SOURCE}-line`,
+    type: "line",
+    source: VISITOR_SOURCE,
+    paint: { "line-color": "#1a73e8", "line-opacity": 0.5, "line-width": 1 },
+  });
+}
+
+function visitorElement(): HTMLElement {
+  const element = document.createElement("span");
+  element.className = "map-visitor";
+  // The page says the same in text («Estás a…», the list sorted by distance).
+  element.setAttribute("aria-hidden", "true");
+  return element;
+}
 
 function popupContent(point: MapPointDto): HTMLElement {
   const box = document.createElement("div");
@@ -92,14 +146,18 @@ export default function MapCanvas({
   interactive,
   onMove,
   onFailure,
+  visitor,
+  onStopFollowing,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre | null>(null);
   const markers = useRef(new globalThis.Map<string, Marker>());
   const openPopup = useRef<Popup | null>(null);
-  const callbacks = useRef({ onMove, onFailure });
+  const visitorMarker = useRef<Marker | null>(null);
+  const [styleReady, setStyleReady] = useState(false);
+  const callbacks = useRef({ onMove, onFailure, onStopFollowing });
   useEffect(() => {
-    callbacks.current = { onMove, onFailure };
+    callbacks.current = { onMove, onFailure, onStopFollowing };
   });
 
   useEffect(() => {
@@ -142,7 +200,15 @@ export default function MapCanvas({
     instance.on("load", () => {
       loaded = true;
       window.clearTimeout(giveUp);
+      setStyleReady(true);
     });
+    // Some styles name icons their sprite lacks: draw nothing instead of logging warnings.
+    instance.setMissingStyleImageResolver((id) => {
+      if (!instance.hasImage(id)) {
+        instance.addImage(id, { width: 1, height: 1, data: new Uint8Array(4) });
+      }
+    });
+    instance.on("dragstart", () => callbacks.current.onStopFollowing?.());
     instance.on("error", () => {
       // Errors after the first render (a missing tile) are not fatal.
       if (!loaded) {
@@ -150,14 +216,17 @@ export default function MapCanvas({
         callbacks.current.onFailure?.();
       }
     });
-    instance.on("moveend", () => {
+    instance.on("moveend", (event) => {
       const b = instance.getBounds();
-      callbacks.current.onMove?.({
-        west: Math.max(-180, b.getWest()),
-        south: Math.max(-90, b.getSouth()),
-        east: Math.min(180, b.getEast()),
-        north: Math.min(90, b.getNorth()),
-      });
+      callbacks.current.onMove?.(
+        {
+          west: Math.max(-180, b.getWest()),
+          south: Math.max(-90, b.getSouth()),
+          east: Math.min(180, b.getEast()),
+          north: Math.min(90, b.getNorth()),
+        },
+        (event as { fromVisitor?: unknown }).fromVisitor === true,
+      );
     });
 
     // Follow the box's size (layout changes, CSS loading after the map, rotation).
@@ -169,6 +238,7 @@ export default function MapCanvas({
       resize.disconnect();
       window.clearTimeout(giveUp);
       placed.clear();
+      visitorMarker.current = null;
       instance.remove();
       map.current = null;
     };
@@ -231,6 +301,38 @@ export default function MapCanvas({
     const target = new LngLatBounds([bounds.west, bounds.south], [bounds.east, bounds.north]);
     instance.fitBounds(target, { padding: 32, maxZoom: 15, animate: !reducedMotion() });
   }, [bounds]);
+
+  // The visitor's dot and accuracy circle; the camera follows when asked.
+  const fix = visitor?.fix ?? null;
+  const follow = visitor?.follow ?? false;
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance) return;
+    if (!fix) {
+      visitorMarker.current?.remove();
+      visitorMarker.current = null;
+    } else if (visitorMarker.current) {
+      visitorMarker.current.setLngLat([fix.lng, fix.lat]);
+    } else {
+      visitorMarker.current = new Marker({ element: visitorElement() })
+        .setLngLat([fix.lng, fix.lat])
+        .addTo(instance);
+    }
+    if (styleReady) showAccuracy(instance, fix);
+  }, [fix, styleReady]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !fix || !follow) return;
+    instance.easeTo(
+      {
+        center: [fix.lng, fix.lat],
+        zoom: Math.max(instance.getZoom(), 15),
+        duration: reducedMotion() ? 0 : 600,
+      },
+      FROM_VISITOR,
+    );
+  }, [fix, follow]);
 
   // MapLibre styles its own container (position: relative), so it gets a full-size child.
   return (

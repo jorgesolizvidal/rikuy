@@ -1,4 +1,5 @@
 import {
+  NEARBY_RADIUS,
   SOCIAL_NETWORKS,
   type PresentationIssue,
   type SocialNetwork,
@@ -20,6 +21,8 @@ export interface BrandingValues {
   phone: string;
   address: string;
   description: string;
+  /** «Estás cerca de…» radius in meters; empty: the default (150 m). */
+  nearbyRadius: string;
   social: Record<SocialNetwork, string>;
   /** Logo reference (hidden fields `logo.assetId` / `logo.version`); empty: no logo. */
   logoAssetId: string;
@@ -48,6 +51,7 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     phone: presentation.contact.phone ?? "",
     address: presentation.contact.address ?? "",
     description: presentation.seo.description,
+    nearbyRadius: presentation.visitors ? String(presentation.visitors.nearbyRadius) : "",
     social,
     logoAssetId: presentation.logo?.assetId ?? "",
     logoVersion: presentation.logo ? String(presentation.logo.version) : "",
@@ -86,7 +90,15 @@ export function presentationInputFromForm(formData: FormData) {
     }),
     seo: { description: text(formData, "description") },
     ...logoFromForm(formData),
+    ...visitorsFromForm(formData),
   };
+}
+
+function visitorsFromForm(formData: FormData) {
+  const radius = text(formData, "nearbyRadius");
+  if (radius === "") return {};
+  // Not a whole number → NaN, which validation rejects with a message.
+  return { visitors: { nearbyRadius: /^\d{1,5}$/u.test(radius) ? Number(radius) : Number.NaN } };
 }
 
 function logoFromForm(formData: FormData) {
@@ -108,6 +120,8 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   "contact.phone": "phone",
   "contact.address": "address",
   "seo.description": "description",
+  visitors: "nearbyRadius",
+  "visitors.nearbyRadius": "nearbyRadius",
   logo: "logo",
   "logo.assetId": "logo",
   "logo.version": "logo",
@@ -124,6 +138,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   phone: "Usa solo números, espacios, paréntesis o guiones; puede empezar con +.",
   address: "La dirección admite una línea de hasta 160 caracteres.",
   description: "La descripción admite hasta 160 caracteres, en una línea.",
+  nearbyRadius: `Escribe un número entero de metros entre ${NEARBY_RADIUS.min} y ${NEARBY_RADIUS.max}, o déjalo vacío para usar ${NEARBY_RADIUS.default} m.`,
   social: "Pega el enlace completo de la página, empezando por https://.",
   logo: "Este logo ya no se puede usar. Sube otro o quítalo para publicar sin logo.",
 };

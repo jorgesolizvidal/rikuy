@@ -52,7 +52,7 @@ const portals = [
     mode: "dark",
     logo: false,
     destination: { slug: "laguna-espejo", title: "Laguna Espejo", lat: -21.5302 },
-    hidden: ["mirador-del-valle", "feria-de-los-domingos"],
+    hidden: ["mirador-del-valle", "plaza-principal", "feria-de-los-domingos"],
     event: { slug: "noche-de-estrellas", title: "Noche de estrellas", allDay: true },
     hiddenEvents: ["feria-del-choclo", "concierto-de-la-banda", "festival-de-invierno"],
     endedEvent: null,

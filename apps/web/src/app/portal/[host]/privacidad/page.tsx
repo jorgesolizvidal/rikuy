@@ -63,10 +63,32 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
 
       <h2>Tu ubicación</h2>
       <p>
-        Hoy el portal no pide tu ubicación. Cuando incorpore funciones como «qué hay cerca», tu
-        navegador te pedirá permiso primero; la ubicación se usará en tu dispositivo y no se
-        guardará. Esta página se actualizará antes de que eso ocurra.
+        El portal puede mostrarte dónde estás en el mapa, a qué distancia queda cada lugar y
+        avisarte cuando estás cerca de un destino. Solo lo hace si presionas «Usar mi ubicación»;
+        entonces tu navegador te pide permiso.
       </p>
+      <ul>
+        <li>
+          Tu ubicación se usa solo en tu dispositivo: las distancias, el orden por cercanía y el
+          aviso «Estás cerca de…» se calculan ahí. No se envía a {siteName} ni a la plataforma y no
+          se guarda.
+        </li>
+        <li>
+          Solo se sigue mientras la página está abierta y a la vista; al cambiar de pestaña o
+          bloquear el teléfono se detiene. No hay avisos en segundo plano ni historial de
+          recorridos.
+        </li>
+        <li>
+          Para no preguntarte en cada página, el navegador recuerda en esta pestaña que la activaste
+          (no recuerda dónde estabas). «Dejar de usar mi ubicación» lo borra; también puedes quitar
+          el permiso en los ajustes del navegador.
+        </li>
+        <li>
+          Si el mapa se centra en tu posición, tu navegador pide a OpenFreeMap las imágenes de esa
+          zona, como con cualquier mapa en línea.
+        </li>
+        <li>Sin permiso, el portal funciona igual: listas, fichas y mapa siguen disponibles.</li>
+      </ul>
 
       <h2>Enlaces a otros servicios</h2>
       <p>
