@@ -39,7 +39,7 @@ describe.runIf(stackAvailable)("map reads against local Supabase", () => {
   it("frames the extent of the published places", async () => {
     const extent = await visitors().extent(NORTE);
     expect(extent.destinations).toBeGreaterThanOrEqual(1);
-    expect(extent.bounds?.south).toBeLessThanOrEqual(-17.39);
-    expect(extent.bounds?.north).toBeGreaterThanOrEqual(-17.39);
+    expect(extent.bounds?.south).toBeLessThanOrEqual(-17.3901); // Mirador del Valle
+    expect(extent.bounds?.north).toBeGreaterThanOrEqual(-17.3901);
   });
 });
