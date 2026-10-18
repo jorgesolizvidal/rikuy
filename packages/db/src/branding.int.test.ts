@@ -7,14 +7,18 @@ import { publishBranding, type OrganizationMembership, type TenantPresentation }
 import { beforeAll, describe, expect, it } from "vitest";
 
 import { signIn, stackAvailable, env, USERS } from "./integration/local-stack";
+import { createSupabaseMediaAdmin } from "./media";
 import { createSupabasePresentationReader } from "./tenant-config";
 import { createSupabaseTenantDirectory } from "./tenant-directory";
 
 const NORTE = "5eed1000-0000-4000-8000-000000000001";
-// These brands carry no logo: publishing must never touch media.
-const noLogo = {
-  publish: async () => {
-    throw new Error("no logo expected");
+// Test files run in any order: if the media suite already left a logo on Demo Norte, the
+// brands below carry it, and republishing a published logo is idempotent.
+let media: ReturnType<typeof createSupabaseMediaAdmin> | undefined;
+const logoPublisher = {
+  publish: (...args: Parameters<ReturnType<typeof createSupabaseMediaAdmin>["publish"]>) => {
+    media ??= createSupabaseMediaAdmin({ url: env.url, secretKey: env.secretKey });
+    return media.publish(...args);
   },
 };
 
@@ -72,7 +76,7 @@ describe.runIf(stackAvailable)("tenant branding against local Supabase", () => {
       rebrand,
       snapshot.draft?.revision ?? null,
       owner.config,
-      noLogo,
+      logoPublisher,
     );
     expect(result.status).toBe("published");
 
@@ -92,7 +96,7 @@ describe.runIf(stackAvailable)("tenant branding against local Supabase", () => {
         before.presentation,
         null,
         owner.config,
-        noLogo,
+        logoPublisher,
       );
       expect(restored.status).toBe("published");
     }
