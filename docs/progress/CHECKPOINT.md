@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P1 — Fundación
-- **Último paso completado:** P1 · Paso 5 — marca white-label versionada (2026-10-17)
-- **Rama del paso:** `feat/p1-step5-white-label-config` → PR hacia `main`
+- **Fase:** P1 — Fundación ✅ (completa). Siguiente fase: P3.
+- **Último paso completado:** P1 · Paso 6 — alta de municipios, invitaciones y miembros (2026-10-17)
+- **Rama del paso:** `feat/p1-step6-tenant-onboarding` → PR hacia `main`
 
 ## Historial
 
@@ -30,25 +30,33 @@ Inicio de sesión en el host de admin con código de 6 dígitos o enlace mágico
 
 ### Paso 5 — marca white-label versionada ✅
 
-- `@rikuy/core`:
-  - Contrato `TenantPresentation` (Zod estricto, `schema_version` 1): identidad (nombre, nombre corto ≤ 12, lema), tema (modo claro/oscuro + color principal + acento), contacto, redes (https, una por red), descripción SEO. Solo texto de una línea, colores `#rrggbb`, sin HTML/CSS.
-  - Contraste WCAG 2.x: color principal sobre fondo ≥ 4.5:1, texto de botones ≥ 4.5:1, acento ≥ 3:1. El resto de la paleta se deriva (`deriveTheme`), así ninguna marca produce un portal ilegible.
-  - Casos de uso `loadBrandingEditor`, `saveBrandingDraft`, `publishBranding` (solo propietario/administrador), `resolvePortalPresentation` (si no hay versión publicada, es ilegible o la lectura falla → marca neutra, nunca la de otro tenant) y lector en caché por versión sellada (inmutable).
-  - `buildWebManifest` y monograma para íconos.
-- Base de datos (`20261017200000_p1_tenant_presentation.sql`, solo expand):
-  - `revision`, `updated_at`, `updated_by`; como máximo un borrador por tenant.
-  - `private.is_valid_presentation`: la base revalida la forma (no se puede saltar el contrato llamando al RPC directo).
-  - RPC `save_tenant_config_draft` (concurrencia optimista → `PT409`), `publish_tenant_config` (sellar + mover puntero + auditoría en una transacción), `get_published_presentation` (anónimo: solo la versión activa sellada de un tenant activo). Tenants suspendidos: solo lectura.
-  - Seed: dos marcas publicadas muy distintas (Norte claro/verde, Sur oscuro/naranja).
-- `@rikuy/db`: `createTenantConfigRepository` (JWT del usuario, errores → `forbidden` / `conflict` / `invalid` / `not_found`) y `createSupabasePresentationReader` (anónimo, timeout 2 s).
-- Portal:
-  - Layout por tenant con variables CSS del tema, cabecera con monograma, pie con contacto y redes; portada con el nombre en grande sobre un mapa topográfico SVG generado a partir del id del tenant (sin imágenes ni JS).
-  - Metadatos SEO por tenant (título, descripción, canonical, Open Graph, `theme-color`, indexable).
-  - `/manifest.webmanifest` e íconos generados `/icon/{32|180|192|512}` (monograma sobre el color principal; caché inmutable con `?v=<versión>`). Portal instalable sin subir ningún logo.
-  - Tipografía Bricolage Grotesque autoalojada (subset latino, 41 KB, `font-display: swap`).
-- Admin: `/o/{slug}/configuracion` con formulario, vista previa en vivo y verificación de contraste; «Guardar borrador» y «Publicar». Editores y analistas ven la marca en solo lectura. Los cambios llegan a los visitantes en ≤ 60 s (caché del registro de dominios).
-- Tests: 156 unitarios (core 100, db 33, web 17, config 6) + 9 de integración + 115 pgTAP (41 nuevos) + e2e de portales en CI (30 comprobaciones: dos marcas en el mismo build, manifest, ícono, host desconocido, admin sin sesión).
-- Verificado localmente de punta a punta sobre las migraciones reales: publicar desde el panel cambia el portal Norte y no toca el Sur; editor en solo lectura; propietario de otro municipio y miembro revocado → 404.
+Contrato `TenantPresentation` (identidad, tema con contraste WCAG AA, contacto, redes, SEO) versionado en `tenant_config_versions`: borrador con concurrencia optimista, publicación en una transacción (sellar + puntero + auditoría) y lectura anónima solo de la versión activa sellada; la base revalida la forma del JSON. Portal con tema por variables CSS, SEO por tenant, `manifest.webmanifest` e íconos generados; editor de marca con vista previa en `/o/{slug}/configuracion`. E2E en CI: dos marcas en un mismo build.
+
+### Paso 6 — alta de municipios, invitaciones y miembros ✅
+
+- Base de datos (`20261018000000_p1_platform_onboarding.sql`, solo expand):
+  - `platform_operators` separado de las membresías; toda verificación de operador exige `aal2` (segundo factor) en el JWT. Sin acceso directo a la tabla.
+  - `provision_tenant`: tenant `provisioning` + dominio de plataforma activo + puntero canónico + propietario **invitado** + auditoría, en una transacción. `set_tenant_status`: preparación → en línea (solo con propietario activo) ⇄ suspendido.
+  - `my_pending_invitations` / `accept_membership_invitation`; `list_tenant_members`, `add_tenant_member`, `change_member_role`, `revoke_member` con reglas de rol (los administradores solo gestionan editores y analistas) y de último propietario.
+  - `platform_user_id_by_email` solo para `service_role` (adaptador de identidad).
+  - **Corrección encontrada en la prueba local:** los triggers diferidos de invariantes se ejecutaban al hacer COMMIT con el rol del operador y, por RLS, no veían el dominio ni la membresía recién creados → el alta fallaba. Ahora corren con derechos de propietario; el test pgTAP reproduce el momento del COMMIT.
+  - Seed: operador sintético `operador@rikuy.example.test`.
+- `@rikuy/core`: `operatorGate` (enroll / verify / granted), `provisionTenant` (verifica al operador **antes** de crear cualquier cuenta), `changeTenantStatus`, invitaciones, `inviteMember` / `changeMemberRole` / `revokeMember` con `canAssignRole`, `suggestSlug`.
+- `@rikuy/db`: repositorios con la sesión del usuario, `createMfaGateway` (TOTP) y `createSupabaseIdentityAdmin`, el único adaptador con la clave secreta (crea cuentas confirmadas sin contraseña). Comandos `pnpm platform:add-operator <correo>` y `pnpm platform:provision <archivo.json>`.
+- Panel:
+  - `/plataforma`: verificación en dos pasos (enrolamiento con QR y verificación), lista de municipios con estado y propietario, «Poner en línea» / «Suspender». Para quien no es operador, no existe (404).
+  - `/plataforma/nuevo`: alta con identificador y dirección sugeridos a partir del nombre.
+  - Inicio: invitaciones pendientes con «Aceptar»; los municipios en preparación ya se pueden configurar (marca) antes de salir en línea.
+  - `/o/{slug}/miembros`: invitar, cambiar rol y quitar acceso (con confirmación).
+  - ESLint: la clave secreta solo se puede importar desde `src/server/identity-admin.ts`.
+- Tests: 190 unitarios (core 125, db 42, web 17, config 6) + 12 de integración + 169 pgTAP (54 nuevos) + e2e de portales.
+- **Ensayo ZC-01 en CI:** el operador entra con código por correo, enrola TOTP con un código real, da de alta «Ensayo ZC-01», su propietaria acepta, el operador lo pone en línea y el portal `zc-ensayo.localhost` responde desde el mismo build, sin tocar código ni variables de entorno.
+- Verificado localmente de punta a punta en el navegador (MFA, alta, aceptación, puesta en línea, miembros, editor sin acceso a `/miembros` ni `/plataforma`).
+
+**Desviaciones:**
+
+- No se envía un correo de invitación todavía (no hay proveedor de correo transaccional). La persona invitada entra al panel con su correo, recibe el código de acceso habitual y ve la invitación. Llega con el proveedor de correo.
+- La exigencia de MFA a propietarios y administradores de municipios queda para más adelante; hoy solo la tiene el operador.
 
 ## Cómo verificarlo en tu PC
 
@@ -56,26 +64,44 @@ Inicio de sesión en el host de admin con código de 6 dígitos o enlace mágico
 git checkout main
 git pull
 pnpm install
-pnpm db:reset      # aplica la migración nueva y recarga el seed con las dos marcas
+pnpm db:reset      # aplica la migración nueva y crea el operador de prueba
 pnpm dev
 ```
 
-1. http://demo-norte.localhost:3000 → portal claro y verde; http://demo-sur.localhost:3000 → portal oscuro y naranja. Mismo código.
-2. Entra a http://app.localhost:3000 con `owner@demo-norte.example.test` (código en Mailpit, http://127.0.0.1:54324) → «Municipio Demo Norte» → «Marca del portal».
-3. Cambia el color principal a un amarillo claro (`#ffd400`): la vista previa marca el contraste insuficiente y «Publicar» lo rechaza.
-4. Elige otro color (por ejemplo `#7a2e8f`), cambia el lema y pulsa «Publicar». En menos de un minuto el portal Norte cambia; el Sur sigue igual.
-5. Con `editor.ambos@example.test` la misma página aparece en solo lectura.
+Necesitas una app de autenticación en el celular (Google Authenticator, Microsoft Authenticator…) y la hora del PC y del celular correctas.
 
-## Siguiente paso — P1 · Paso 6 (requiere autorización)
+1. Entra a http://app.localhost:3000 con `operador@rikuy.example.test` (código en Mailpit, http://127.0.0.1:54324) → «Administrar la plataforma».
+2. «Configurar la app de autenticación» → escanea el QR → escribe el código de 6 dígitos → ves la lista de municipios.
+3. «Dar de alta un municipio»: nombre `Ucureña` (el identificador `ucurena` y la dirección `ucurena.localhost` se completan solos), correo del propietario `propietario@ucurena.example.test` → «Dar de alta».
+4. Cierra sesión y entra con `propietario@ucurena.example.test` → «Invitaciones pendientes» → «Aceptar». Ya puedes abrir Ucureña y preparar su marca.
+5. Vuelve como operador (te pedirá el código de la app) → «Poner en línea». En unos segundos http://ucurena.localhost:3000 muestra el portal.
+6. Como propietario de Ucureña, «Miembros» → invita a alguien, cambia su rol y prueba quitar tu propio acceso (lo impide: debe quedar un propietario).
 
-Rama `feat/p1-step6-tenant-onboarding`:
+`pnpm db:reset` borra lo creado. Para recrear Ucureña sin el formulario, guarda en `seed-assets/tenants/ucurena.json` (carpeta ignorada por git):
 
-1. Operador de plataforma: tabla `platform_operators` (separada de las membresías), acceso solo con MFA TOTP (enrolamiento en el panel) y área `/platform` en el host de admin.
-2. Caso de uso `provisionTenant` en una transacción RPC: tenant `provisioning` → dominio de plataforma (`{slug}.{dominio}` o alias `*.vercel.app` exacto) → invitación del primer propietario (Auth Admin API, solo en el adaptador de plataforma) → activación; auditoría en cada paso.
-3. Aceptación de invitación por el propietario (primer inicio de sesión) y gestión básica de miembros (invitar, cambiar rol, revocar) con las reglas de último propietario ya presentes en la base.
-4. Script de alta reproducible para Ucureña (datos del tenant, sin binarios; logos y fotos los sube Jorge desde el panel cuando exista Storage en P3) y un municipio demo sintético.
-5. Ensayo ZC-01: dar de alta un tenant B desde el panel del operador sin tocar código ni variables de entorno, con test e2e en CI.
+```json
+{
+  "displayName": "Ucureña",
+  "slug": "ucurena",
+  "hostname": "ucurena.localhost",
+  "ownerEmail": "propietario@ucurena.example.test"
+}
+```
+
+y ejecuta `pnpm platform:provision seed-assets/tenants/ucurena.json` (después: aceptar como propietario y poner en línea como operador).
+
+**Producción (cuando despleguemos):** el operador real se registra una sola vez con `pnpm platform:add-operator <tu-correo>` usando las variables del proyecto de producción; nunca se guarda en el repositorio.
+
+## Siguiente paso — P3 · Paso 1 (requiere autorización)
+
+P1 está completa. Según el roadmap, P3 va antes que P2. Rama `feat/p3-step1-tenant-media`:
+
+1. Storage por ambiente: buckets `media-originals` (privado) y `media-public` (solo derivados publicados), rutas `{tenant_id}/{asset_id}/{version}/{variante}` sin nombres de municipio, políticas de Storage por membresía y tests negativos (B no lee ni escribe medios de A).
+2. Tablas `assets` y `asset_versions` (FK compuestas, estados `uploading → ready → published`), casos de uso `requestImageUpload` (URL firmada emitida por el servidor, el binario no pasa por el BFF) y `confirmImageUpload` (validación de tipo real, peso y dimensiones).
+3. Primer uso: **logo del municipio** en la marca (`TenantPresentation` v2 con `logoAssetId`, migración expand) mostrado en el portal y en el manifest; el monograma queda como respaldo.
+4. Panel: subir y reemplazar el logo desde «Marca del portal», con vista previa.
+5. Tests: pgTAP de Storage, unitarios de validación, integración (subida firmada real contra Supabase local) y e2e del logo en el portal.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante para el Paso 6. El PR #4 (corrección del redirect tras iniciar sesión) es independiente y puede mergearse antes o después de este.
+- Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).
