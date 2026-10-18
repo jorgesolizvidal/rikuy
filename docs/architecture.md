@@ -80,6 +80,7 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Rutas: `{tenant_id}/{asset_id}/{version}/{variante}` — nunca nombres de municipio.
 - Subida directa desde el navegador con URL firmada emitida por un caso de uso; los binarios no pasan por el BFF.
 - Derivados inmutables con caché larga en CDN; despublicar no revoca copias ya descargadas.
+- Ciclo de una imagen (P3 · Paso 1): `create_image_upload` reserva la versión (`uploading`) y la política de Storage solo deja escribir ese `original` exacto → el navegador sube con la URL firmada → el servidor lee los bytes reales (firma PNG/JPEG/WebP, peso, dimensiones), genera derivados sin metadatos con sharp y marca `ready` (o `rejected` y borra el original) → al publicar la marca, el adaptador con clave secreta copia solo los derivados a `media-public`. SVG no se acepta (puede contener scripts).
 
 ## 8. Medios: panoramas y 3D (ADR-017, ADR-020)
 

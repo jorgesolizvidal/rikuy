@@ -35,11 +35,11 @@ E1–E4 expansión · X0/X1 migración del sistema anterior
 
 ## P3 — Portal y administración del primer vertical
 
-Pasos propuestos (cada uno requiere autorización):
+Pasos (cada uno requiere autorización):
 
 | Paso | Contenido                                                                                                                                                        | Terminado cuando                                                                            |
 | ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 1    | Storage por tenant: buckets `media-originals` (privado) y `media-public`, `assets`/`asset_versions`, subida firmada de imágenes con validación; logo en la marca | Un propietario sube el logo y aparece en su portal; B no puede leer ni escribir medios de A |
+| 1 ✅ | Storage por tenant: buckets `media-originals` (privado) y `media-public`, `assets`/`asset_versions`, subida firmada de imágenes con validación; logo en la marca | Un propietario sube el logo y aparece en su portal; B no puede leer ni escribir medios de A |
 | 2    | `content_items`/`content_revisions`: destinos con borrador → publicación → rollback, texto enriquecido como AST, imágenes por referencia                         | Publicar y revertir un destino sin tocar el resto del portal                                |
 | 3    | Portal: listado y ficha de destino SSR, imágenes responsivas, SEO y datos estructurados por tenant                                                               | Lighthouse ≥ 90 en home y ficha con datos del seed                                          |
 | 4    | Eventos de una ocurrencia y agenda                                                                                                                               | Evento pasado deja de listarse sin intervención                                             |
