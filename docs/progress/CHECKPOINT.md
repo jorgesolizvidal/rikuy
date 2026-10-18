@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
-- **Último paso completado:** P3 · Paso 2 — destinos con revisiones, ubicación y fotos (2026-10-18)
-- **Rama del paso:** `feat/p3-step2-content-items` → PR hacia `main`
+- **Último paso completado:** P3 · Paso 3 — destinos en el portal, SEO, QR e instalación (2026-10-18)
+- **Rama del paso:** `feat/p3-step3-portal-destinations` → PR hacia `main`
 
 ## Historial
 
@@ -109,35 +109,58 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - La dirección (`slug`) se elige al crear el destino y no se cambia todavía desde el editor: cambiarla rompería enlaces ya compartidos; llegará con redirecciones.
 - El mapa del editor usa las teselas estándar de OpenStreetMap (uso ligero, con atribución); el portal elegirá proveedor en el Paso 5.
 
+### P3 · Paso 3 — destinos en el portal, SEO, QR e instalación ✅
+
+- Base de datos (`20261018300000_p3_portal_destinations.sql`, solo expand): `portal_destinations` y `portal_destination` devuelven lo que el portal muestra, con el **tamaño en píxeles** de cada foto para reservar su espacio; solo revisiones selladas de municipios activos y fotos publicadas. `tenant_portal_host` da la dirección del portal a los miembros (para el enlace y el QR). 13 aserciones pgTAP nuevas (borradores, otro municipio, municipio suspendido, anónimos sin acceso a la dirección).
+- `@rikuy/core`: `PORTAL_PATHS` (una sola fuente para enlaces, sitemap y QR), variantes responsivas a partir del tamaño original (480/960/1600 sin agrandar), «Cómo llegar» (Google Maps) y OpenStreetMap, JSON-LD `TouristAttraction` con coordenadas y serialización segura, `sitemap.xml` y `robots.txt` por portal, lector público con caché por municipio y destino (30 s, sin cachear errores). `loadDestinationEditor` devuelve la dirección pública del destino publicado.
+- Portal:
+  - `/destinos` (listado) y `/destinos/{dirección}` (ficha SSR): texto enriquecido, portada con prioridad alta y galería diferida (`srcset` + `sizes` + ancho/alto), «Cómo llegar», «Compartir» (menú del teléfono o copia del enlace), ubicación en texto y fecha de actualización.
+  - Inicio con «Lugares para visitar» (hasta 6) y enlace «Destinos» en la cabecera; 404 dentro del portal con su marca.
+  - SEO: título, descripción, canonical, Open Graph con la portada, `sitemap.xml`, `robots.txt` y datos estructurados.
+  - Botón «Instalar» cuando el navegador lo ofrece (en iPhone/iPad, los dos pasos de Safari); la cabecera no cambia de alto al aparecer (sin CLS).
+  - `/privacidad` y `/terminos`: plantilla de la plataforma con los datos del municipio, fiel a lo que el portal hace hoy (sin cuentas ni cookies de seguimiento; la ubicación aún no se pide).
+- Panel, editor del destino: «Para visitantes» con «Ver en el portal» y **código QR** (PNG 1200 px y SVG) cuando está publicado.
+- Correcciones del Paso 2:
+  - El mapa del editor avisa cuando no puede cargar sus imágenes (sin conexión, bloqueadas o caché vieja) y recuerda que las coordenadas funcionan igual.
+  - El editor ya no reenvía al servidor la copia local del formulario (con URLs firmadas) al guardar: solo el estado necesario.
+  - Las listas escritas sin espacio (`-Naturaleza`, `•Comida`) se reconocen; `-5 °C` sigue siendo texto.
+  - El aviso `refresh_token_not_found` que aparece en la terminal tras `pnpm db:reset` no es un error de Rikuy: la cookie del navegador apunta a una sesión que la base recreada ya no tiene; la librería de Supabase lo escribe en consola, borra la sesión y el panel pide iniciar sesión. Se va solo al volver a entrar.
+- Tests: 287 unitarios (core 198, db 69, web 18, config 6) + 280 pgTAP + e2e de portales ampliado (listado, ficha, 404 de otro municipio y de borradores, sitemap, robots, páginas legales, portada responsiva de la integración).
+- Lighthouse local (móvil, con datos del seed): rendimiento 96–99, accesibilidad, buenas prácticas y SEO 100 en inicio, listado y fichas de los dos municipios; CLS ≤ 0,006.
+
+**Desviaciones:**
+
+- Fotos con `<img srcset>` sobre derivados ya optimizados en vez de `next/image` (evita un segundo redimensionado); las URLs son versionadas e inmutables.
+- Las páginas del portal se renderizan por petición con una caché corta por instancia; la caché de CDN por municipio y versión llega con Lighthouse CI y los previews de Vercel (Paso 7).
+- El portal de un municipio en preparación no está en línea: el panel muestra el QR con un aviso de que funcionará cuando lo esté.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
 git checkout main
 git pull
-pnpm install       # instala leaflet
-pnpm db:reset      # aplica la migración (PostGIS, destinos) y el seed con destinos de ejemplo
+pnpm install       # instala qrcode
+pnpm db:reset      # aplica la migración nueva y el seed
 pnpm dev
 ```
 
-1. Entra a http://app.localhost:3000 con `editor.ambos@example.test` (código en Mailpit, http://127.0.0.1:54324) → Municipio Demo Norte → «Destinos». Verás «Mirador del Valle» (publicado) y «Feria de los domingos» (borrador).
-2. Crea «Plaza Central»: la dirección se sugiere sola. En el editor escribe un resumen y un texto con `## Qué ver`, una lista con `- ` y algo en `**negrita**`; mira la vista previa.
-3. Ubicación: en Google Maps, clic derecho sobre un lugar → copia las coordenadas → pégalas en «Pegar coordenadas» → «Usar». También puedes hacer clic en el mapa.
-4. Sube una portada y una o dos fotos a la galería, escribe la descripción de cada una → «Guardar borrador». Como editor no ves «Publicar».
-5. Cierra sesión y entra como `owner@demo-norte.example.test` → abre «Plaza Central» → «Publicar». Cambia el resumen → «Publicar» otra vez (versión 2).
-6. En «Historial de publicaciones», en la versión 1 → «Volver a esta versión» → confirmar: la versión 1 vuelve a ser la publicada.
-7. Opcional: en «Mirador del Valle» cambia el nombre → «Guardar borrador» → «Descartar borrador y volver a lo publicado».
+1. Abre http://demo-norte.localhost:3000: aparece «Lugares para visitar» con «Mirador del Valle». En la cabecera, «Destinos».
+2. Entra a la ficha: texto con formato, «Cómo llegar» (abre Google Maps con el punto) y «Compartir» (en la computadora copia el enlace). Si tiene fotos, la portada y la galería se ven nítidas en el celular y en la computadora.
+3. Prueba que no hay fugas: http://demo-norte.localhost:3000/destinos/laguna-espejo (es de Demo Sur) y …/destinos/feria-de-los-domingos (borrador) muestran «No encontramos esta página».
+4. Mira http://demo-norte.localhost:3000/sitemap.xml y /robots.txt, y al pie «Privacidad» y «Términos de uso».
+5. En el panel (http://app.localhost:3000) como `owner@demo-norte.example.test`, abre un destino publicado: a la derecha, «Para visitantes» con «Ver en el portal» y el código QR (escanéalo con el celular si está en tu red, o descarga PNG/SVG).
+6. Publica un destino nuevo con portada y galería: aparece en el portal en menos de 30 segundos.
+7. En Chrome (o Edge), si el navegador lo ofrece, aparece «Instalar» junto a «Destinos».
+8. Opcional: en el editor escribe una lista como `-Naturaleza` (sin espacio) y mira la vista previa.
 
-La ficha pública del destino en el portal llega con el Paso 3.
+## Siguiente paso — P3 · Paso 4 (requiere autorización)
 
-## Siguiente paso — P3 · Paso 3 (requiere autorización)
+Rama `feat/p3-step4-events`:
 
-Rama `feat/p3-step3-portal-destinations`:
-
-1. Portal: listado de destinos y ficha SSR (`/destinos` y `/destinos/{slug}`) con el texto enriquecido, portada y galería responsivas (`srcset` 480/960/1600, dimensiones reservadas, carga diferida) y caché por municipio y versión publicada.
-2. SEO por municipio y destino: título, descripción, canonical, Open Graph con la portada, `sitemap.xml`, `robots.txt` y datos estructurados (`TouristAttraction` con coordenadas).
-3. «Cómo llegar» (abre la app de mapas con las coordenadas), «Compartir» y **código QR por destino** en el panel para carteles en el lugar.
-4. Botón «Instalar» del portal y páginas de privacidad y términos por municipio (contenido del municipio, plantilla de la plataforma).
-5. Tests: e2e de listado y ficha en los dos municipios (sin fugas), Lighthouse ≥ 90 en inicio y ficha con datos del seed, accesibilidad de la galería.
+1. Base de datos: `event` como nuevo tipo de contenido con revisiones (mismo modelo que destinos), inicio y fin con **zona horaria del municipio**, todo el día o con hora, lugar (destino existente o coordenadas propias), portada; RPC por intención y lecturas públicas que **no listan eventos terminados** sin intervención de nadie.
+2. Panel: «Agenda» con lista (próximos / pasados / borradores), editor con fechas y horas validadas (fin ≥ inicio), reutilizando texto, fotos, ubicación e historial.
+3. Portal: `/agenda` con los próximos eventos agrupados por mes, ficha del evento (fecha legible en la hora local, «Añadir al calendario» `.ics`, «Cómo llegar», compartir, QR en el panel), sección en el inicio y en el sitemap; datos estructurados `Event`.
+4. Tests: pgTAP (vigencia por zona horaria, aislamiento, borradores), unitarios de fechas, e2e de agenda en los dos municipios y un evento vencido que desaparece solo.
 
 ## Decisiones pendientes del usuario
 

@@ -38,6 +38,8 @@ const portals = [
     brand: "#1f6f4a",
     mode: "light",
     logo: withLogo,
+    destination: { slug: "mirador-del-valle", title: "Mirador del Valle", lat: -17.3901 },
+    hidden: ["laguna-espejo", "feria-de-los-domingos"],
   },
   {
     host: "demo-sur.localhost",
@@ -45,6 +47,8 @@ const portals = [
     brand: "#f0a868",
     mode: "dark",
     logo: false,
+    destination: { slug: "laguna-espejo", title: "Laguna Espejo", lat: -21.5302 },
+    hidden: ["mirador-del-valle", "feria-de-los-domingos"],
   },
 ];
 
@@ -99,6 +103,88 @@ for (const portal of portals) {
   check(() => assert.equal(icon.status, 200));
   check(() => assert.equal(icon.headers["content-type"], "image/png"));
   check(() => assert.match(String(icon.headers["cache-control"]), /immutable/));
+}
+
+// Destinations (P3 · Paso 3): each portal lists and renders only its own published ones.
+for (const portal of portals) {
+  const { slug, title, lat } = portal.destination;
+  const others = portals.filter((p) => p !== portal);
+
+  const list = await get(portal.host, "/destinos");
+  const listHtml = list.body.toString();
+  check(() => assert.equal(list.status, 200, `${portal.host} /destinos`));
+  check(() => assert.match(listHtml, new RegExp(`href="/destinos/${slug}"`)));
+  for (const hidden of portal.hidden) {
+    // Another municipality's destination, or a draft never published.
+    check(() => assert.doesNotMatch(listHtml, new RegExp(`/destinos/${hidden}"`)));
+  }
+  check(() => assert.match(listHtml, /<link rel="canonical" href="[^"]+\/destinos"/));
+
+  const home = (await get(portal.host, "/")).body.toString();
+  check(() => assert.match(home, new RegExp(`href="/destinos/${slug}"`), "home lists it"));
+
+  const page = await get(portal.host, `/destinos/${slug}`);
+  const html = page.body.toString();
+  check(() => assert.equal(page.status, 200, `${portal.host} ficha`));
+  check(() => assert.match(html, new RegExp(`<h1[^>]*>${title}</h1>`)));
+  check(() =>
+    assert.match(
+      html,
+      new RegExp(`<link rel="canonical" href="http://${portal.host}:${port}/destinos/${slug}"`),
+    ),
+  );
+  check(() => assert.match(html, /<script type="application\/ld\+json">/));
+  const jsonLd = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(html)[1]);
+  check(() => assert.equal(jsonLd["@type"], "TouristAttraction"));
+  check(() => assert.equal(jsonLd.geo.latitude, lat));
+  check(() =>
+    assert.match(html, new RegExp(`google.com/maps/dir/\\?api=1&amp;destination=${lat}`)),
+  );
+  for (const other of others) check(() => assert.doesNotMatch(html, new RegExp(other.name)));
+
+  // Responsive photos: srcset with real widths and reserved size, when there are any.
+  for (const [, srcset] of html.matchAll(/srcSet="([^"]+)"/g)) {
+    check(() => assert.match(srcset, /\/w480\.webp 480w/));
+  }
+
+  for (const hidden of portal.hidden) {
+    const missing = await get(portal.host, `/destinos/${hidden}`);
+    check(() => assert.equal(missing.status, 404, `${portal.host} /destinos/${hidden}`));
+    check(() => assert.match(missing.body.toString(), /No encontramos esta página/));
+  }
+
+  const sitemap = await get(portal.host, "/sitemap.xml");
+  const xml = sitemap.body.toString();
+  check(() => assert.equal(sitemap.status, 200));
+  check(() =>
+    assert.match(xml, new RegExp(`<loc>http://${portal.host}:${port}/destinos/${slug}</loc>`)),
+  );
+  for (const hidden of portal.hidden) check(() => assert.doesNotMatch(xml, new RegExp(hidden)));
+  const robots = (await get(portal.host, "/robots.txt")).body.toString();
+  check(() =>
+    assert.match(robots, new RegExp(`Sitemap: http://${portal.host}:${port}/sitemap.xml`)),
+  );
+
+  for (const path of ["/privacidad", "/terminos"]) {
+    const legal = await get(portal.host, path);
+    check(() => assert.equal(legal.status, 200, `${portal.host}${path}`));
+    check(() => assert.match(legal.body.toString(), new RegExp(portal.name)));
+  }
+}
+
+if (withLogo) {
+  // The integration suite published a destination with a cover photo in Demo Norte.
+  const list = (await get("demo-norte.localhost", "/destinos")).body.toString();
+  const slug = /href="\/destinos\/(integracion-\d+)"/.exec(list)?.[1];
+  check(() => assert.ok(slug, "the integration destination is listed"));
+  const html = (await get("demo-norte.localhost", `/destinos/${slug}`)).body.toString();
+  const cover = /<img[^>]*class="portal-cover"[^>]*>/.exec(html)?.[0] ?? "";
+  check(() => assert.match(cover, /fetchPriority="high"|fetchpriority="high"/));
+  check(() => assert.match(cover, /width="\d+" height="\d+"/));
+  const src = /src="([^"]+)"/.exec(cover)?.[1];
+  const image = await fetch(src.replaceAll("&amp;", "&"));
+  check(() => assert.equal(image.status, 200, "cover derivative is public"));
+  check(() => assert.match(html, /<meta property="og:image" content="[^"]+\/w1600\.webp"/));
 }
 
 if (zc01) {

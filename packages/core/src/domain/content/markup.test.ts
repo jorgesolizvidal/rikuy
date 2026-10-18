@@ -104,6 +104,21 @@ describe("writing format → rich text", () => {
   });
 });
 
+describe("lists written without a space after the dash", () => {
+  it("reads -Item as a list item, but keeps -5 °C as a paragraph", () => {
+    expect(parseMarkup("-Naturaleza\n-Historia viva\n•Comida").blocks).toEqual([
+      {
+        type: "list",
+        ordered: false,
+        items: [[text("Naturaleza")], [text("Historia viva")], [text("Comida")]],
+      },
+    ]);
+    expect(parseMarkup("-5 °C en invierno").blocks).toEqual([
+      { type: "paragraph", children: [text("-5 °C en invierno")] },
+    ]);
+  });
+});
+
 describe("rich text → writing format", () => {
   const samples: RichText[] = [
     [
@@ -122,6 +137,8 @@ describe("rich text → writing format", () => {
       { type: "list", ordered: true, items: [[text("uno")], [text("dos", ["italic"])]] },
       { type: "paragraph", children: [text("# parece título")] },
       { type: "paragraph", children: [text("- parece lista")] },
+      { type: "paragraph", children: [text("-parece lista sin espacio")] },
+      { type: "paragraph", children: [text("-5 °C en invierno")] },
       { type: "paragraph", children: [text("3. parece numerada")] },
     ],
   ];

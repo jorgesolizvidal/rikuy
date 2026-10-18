@@ -65,6 +65,9 @@ function repository(overrides: Partial<ContentRepository> = {}) {
       calls.push(`discard:${expected}`);
       return { status: "discarded" };
     },
+    async portalHostname() {
+      return "demo-norte.localhost";
+    },
     ...overrides,
   };
   return { repo, calls };
@@ -262,6 +265,7 @@ describe("editor state", () => {
         document: { title: "Mirador del Valle" },
         editCount: null,
         canPublish: true,
+        portalPath: { hostname: "demo-norte.localhost", path: "/destinos/mirador-del-valle" },
       },
     );
     expect(await loadDestinationEditor(member("owner"), CONTENT, repository().repo)).toBeNull();

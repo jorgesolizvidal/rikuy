@@ -131,36 +131,83 @@ describe("content repository", () => {
 });
 
 describe("published destination reader", () => {
-  it("reads the published revision with its location", async () => {
+  const cover = {
+    assetId: "5eed3000-0000-4000-8000-000000000001",
+    version: 1,
+    alt: "El mirador",
+    width: 1200,
+    height: 800,
+  };
+
+  it("lists published destinations with their location and cover size", async () => {
+    const reader = createSupabasePublishedContentReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      fetch: async (input) => {
+        expect(String(input)).toContain("/rest/v1/rpc/portal_destinations");
+        return json([
+          {
+            slug: "mirador",
+            title: "Mirador",
+            summary: "Vista",
+            latitude: -17.39,
+            longitude: -66.15,
+            cover,
+            published_at: "2026-10-18T00:00:00Z",
+            updated_at: "2026-10-18T01:00:00Z",
+          },
+        ]);
+      },
+    });
+    expect(await reader.list(TENANT)).toEqual([
+      {
+        slug: "mirador",
+        title: "Mirador",
+        summary: "Vista",
+        location: { lat: -17.39, lng: -66.15 },
+        cover,
+        publishedAt: "2026-10-18T00:00:00Z",
+        updatedAt: "2026-10-18T01:00:00Z",
+      },
+    ]);
+  });
+
+  it("reads one destination and drops gallery images that are no longer public", async () => {
     const reader = createSupabasePublishedContentReader({
       url: BASE,
       publishableKey: "sb_publishable_test",
       fetch: async () =>
         json([
           {
-            content_id: CONTENT,
             slug: "mirador",
             revision_no: 2,
             title: "Mirador",
             summary: "Vista",
-            latitude: -17.39,
-            longitude: -66.15,
+            body: [{ type: "paragraph", children: [{ type: "text", text: "Hola" }] }],
+            latitude: null,
+            longitude: null,
             cover: null,
+            gallery: [cover, null],
             published_at: "2026-10-18T00:00:00Z",
+            updated_at: "2026-10-18T01:00:00Z",
           },
         ]),
     });
-    expect(await reader.list(TENANT)).toEqual([
-      {
-        contentId: CONTENT,
-        slug: "mirador",
-        revisionNo: 2,
-        title: "Mirador",
-        summary: "Vista",
-        location: { lat: -17.39, lng: -66.15 },
-        cover: null,
-        publishedAt: "2026-10-18T00:00:00Z",
-      },
+    const destination = await reader.find(TENANT, "mirador");
+    expect(destination?.revisionNo).toBe(2);
+    expect(destination?.location).toBeNull();
+    expect(destination?.gallery).toEqual([cover]);
+    expect(destination?.body).toEqual([
+      { type: "paragraph", children: [{ type: "text", text: "Hola" }] },
     ]);
+  });
+
+  it("returns null for an unknown slug", async () => {
+    const reader = createSupabasePublishedContentReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      fetch: async () => json([]),
+    });
+    expect(await reader.find(TENANT, "nada")).toBeNull();
   });
 });

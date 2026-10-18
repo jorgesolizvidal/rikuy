@@ -41,3 +41,4 @@ export * from "./domain/content/markup";
 export * from "./domain/geo/coordinates";
 export * from "./application/content/ports";
 export * from "./application/content/destinations";
+export * from "./application/content/portal";

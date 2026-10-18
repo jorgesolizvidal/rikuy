@@ -1,4 +1,5 @@
 import type { DestinationDocument } from "../../contracts/destination";
+import type { RichText } from "../../contracts/rich-text";
 
 /** Where a destination stands for its editors. */
 export type ContentStatus = "draft" | "published" | "changed";
@@ -90,26 +91,33 @@ export interface ContentRepository {
     contentId: string,
     expectedEdit: number,
   ): Promise<DiscardDraftOutcome>;
+  /** Canonical portal hostname of the tenant (public information), or null. */
+  portalHostname(tenantId: string): Promise<string | null>;
+}
+
+/** A published image with the pixel size of its original (to reserve layout space). */
+export interface PublishedImage {
+  readonly assetId: string;
+  readonly version: number;
+  readonly alt: string;
+  readonly width: number;
+  readonly height: number;
 }
 
 export interface PublishedDestinationSummary {
-  readonly contentId: string;
   readonly slug: string;
-  readonly revisionNo: number;
   readonly title: string;
   readonly summary: string;
   readonly location: { readonly lat: number; readonly lng: number } | null;
-  readonly cover: DestinationDocument["cover"];
-  readonly publishedAt: string;
-}
-
-export interface PublishedDestination {
-  readonly contentId: string;
-  readonly slug: string;
-  readonly revisionNo: number;
-  readonly document: DestinationDocument;
+  readonly cover: PublishedImage | null;
   readonly publishedAt: string;
   readonly updatedAt: string;
+}
+
+export interface PublishedDestination extends PublishedDestinationSummary {
+  readonly revisionNo: number;
+  readonly body: RichText;
+  readonly gallery: readonly PublishedImage[];
 }
 
 /** Anonymous reads for portals: only published revisions of active tenants. */
