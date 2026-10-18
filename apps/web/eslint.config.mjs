@@ -9,13 +9,27 @@ const noSupabaseInUi = {
   message: "UI must not talk to Supabase directly. Call a use case / server action.",
 };
 
+// The secret key reaches exactly one module (CONTRIBUTING §1.3).
+const secretKeyPaths = [
+  {
+    name: "@rikuy/db",
+    importNames: ["createSupabaseIdentityAdmin"],
+    message: "Identity administration (secret key) lives only in src/server/identity-admin.ts.",
+  },
+  {
+    name: "@rikuy/config/env",
+    importNames: ["parseServerEnv"],
+    message: "Server secrets are read only in src/server/identity-admin.ts.",
+  },
+];
+
 const config = [
   ignores,
   ...nextVitals,
   ...nextTs,
   {
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi] }],
+      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
     },
   },
   {
@@ -29,6 +43,7 @@ const config = [
         {
           patterns: [noSupabaseInUi],
           paths: [
+            ...secretKeyPaths,
             {
               name: "next/navigation",
               importNames: ["redirect", "permanentRedirect"],
@@ -39,6 +54,10 @@ const config = [
         },
       ],
     },
+  },
+  {
+    files: ["src/server/identity-admin.ts"],
+    rules: { "no-restricted-imports": ["error", { patterns: [noSupabaseInUi] }] },
   },
 ];
 

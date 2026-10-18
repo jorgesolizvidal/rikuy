@@ -112,7 +112,7 @@ jobs:
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
           } >> "$GITHUB_ENV"
 
-      - name: Sign-in, membership, revocation and branding tests
+      - name: Sign-in, membership, branding and onboarding (ZC-01) tests
         run: |
           set -o pipefail
           pnpm --filter @rikuy/db test:integration 2>&1 | tee integration.log
@@ -128,7 +128,8 @@ jobs:
             echo "::warning title=auth log::${line//%/%25}"
           done
 
-      # One production build serving two municipalities with different brands (ZC-01).
+      # One production build serving every municipality, including the one the operator just
+      # provisioned in the integration suite (ZC-01).
       - name: Two white-label portals on one build
         env:
           PLATFORM_ROOT_DOMAIN: localhost
@@ -141,7 +142,7 @@ jobs:
           cd apps/web
           pnpm exec next start -p 3000 > ../../next.log 2>&1 &
           for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3000 && break; sleep 1; done
-          node e2e/portals.e2e.mjs 3000 2>&1 | tee ../../e2e.log
+          node e2e/portals.e2e.mjs 3000 --zc01 2>&1 | tee ../../e2e.log
 
       - name: Report portal failure
         if: failure()

@@ -22,7 +22,9 @@
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
     "db:lint": "supabase db lint --level warning --fail-on warning",
-    "db:types": "supabase gen types --lang typescript --local > packages/db/src/database.types.ts"
+    "db:types": "supabase gen types --lang typescript --local > packages/db/src/database.types.ts",
+    "platform:add-operator": "node --env-file-if-exists=apps/web/.env.local packages/db/scripts/platform.mjs add-operator",
+    "platform:provision": "node --env-file-if-exists=apps/web/.env.local packages/db/scripts/platform.mjs provision"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

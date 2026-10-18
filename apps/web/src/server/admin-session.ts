@@ -4,6 +4,10 @@ import type { Actor } from "@rikuy/core";
 import {
   createMembershipReader,
   createSessionClient,
+  createInvitationRepository,
+  createMemberRepository,
+  createMfaGateway,
+  createPlatformRepository,
   createSupabaseAuthGateway,
   createTenantConfigRepository,
   type SessionCookieToSet,
@@ -45,6 +49,10 @@ export const adminSession = cache(async () => {
     gateway: createSupabaseAuthGateway(client),
     memberships: createMembershipReader(client),
     config: createTenantConfigRepository(client),
+    platform: createPlatformRepository(client),
+    invitations: createInvitationRepository(client),
+    members: createMemberRepository(client),
+    mfa: createMfaGateway(client),
   };
 });
 
