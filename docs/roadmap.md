@@ -4,7 +4,8 @@ Ajuste del roadmap P0–P6 aprobado en septiembre de 2026. Cambios respecto del 
 
 1. **P3 se adelanta a P2**: el portal con imágenes simples (subida firmada + validación síncrona) llega antes que el pipeline durable, que solo hace falta para panoramas y GLB.
 2. **Hito "Demo / Portafolio"** después de P4: dos municipios en vivo con el mismo build.
-3. Gate P6 ajustado por [ADR-020](adr/ADR-020-panorama-delivery-by-resolution.md) (tiles condicionados a fuentes > 4096 px), [ADR-019](adr/ADR-019-pilot-jobs-on-vercel.md) (jobs en Vercel) y el [cierre P0](p0-closure.md) (gold inicial de 40 casos). El dominio propio verificado pasa a opcional.
+3. Revisión de paridad con el sistema anterior (2026-10-17, [paridad funcional](paridad-funcional.md)): se agregan la **ubicación del visitante en tiempo real** (P3 · Paso 6, [ADR-021](adr/ADR-021-visitor-location.md)) y el **asistente turístico con voz** detallado en P5 ([ADR-022](adr/ADR-022-tourist-assistant.md)).
+4. Gate P6 ajustado por [ADR-020](adr/ADR-020-panorama-delivery-by-resolution.md) (tiles condicionados a fuentes > 4096 px), [ADR-019](adr/ADR-019-pilot-jobs-on-vercel.md) (jobs en Vercel) y el [cierre P0](p0-closure.md) (gold inicial de 40 casos). El dominio propio verificado pasa a opcional.
 
 Cada fase se divide en **pasos**; un paso = una rama = un PR con CI en verde y checkpoint actualizado. Ningún paso se inicia sin autorización explícita.
 
@@ -13,11 +14,11 @@ Cada fase se divide en **pasos**; un paso = una rama = un PR con CI en verde y c
 ```
 P0 ✅ benchmarks (cerrado con límites)
 P1 ✅ Fundación · tenancy · identidad · white-label
-P3  Portal y admin: destinos, evento, mapa, publicación (+ imágenes básicas)
+P3  Portal y admin: destinos, evento, mapa, ubicación del visitante, publicación (+ imágenes básicas)
 P2  Jobs durables · pipeline de panoramas y GLB · observabilidad
 P4  Tours 360° · hotspots · GLB lazy
 ★   Hito Demo / Portafolio
-P5  IA turística · Copilot V1/V2
+P5  Asistente turístico (una conversación, guía en tours, voz) · Copilot V1/V2
 P6  Gate Early SaaS Pilot
 E1–E4 expansión · X0/X1 migración del sistema anterior
 ```
@@ -37,16 +38,17 @@ E1–E4 expansión · X0/X1 migración del sistema anterior
 
 Pasos (cada uno requiere autorización):
 
-| Paso | Contenido                                                                                                                                                        | Terminado cuando                                                                            |
-| ---- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| 1 ✅ | Storage por tenant: buckets `media-originals` (privado) y `media-public`, `assets`/`asset_versions`, subida firmada de imágenes con validación; logo en la marca | Un propietario sube el logo y aparece en su portal; B no puede leer ni escribir medios de A |
-| 2    | `content_items`/`content_revisions`: destinos con borrador → publicación → rollback, texto enriquecido como AST, imágenes por referencia                         | Publicar y revertir un destino sin tocar el resto del portal                                |
-| 3    | Portal: listado y ficha de destino SSR, imágenes responsivas, SEO y datos estructurados por tenant                                                               | Lighthouse ≥ 90 en home y ficha con datos del seed                                          |
-| 4    | Eventos de una ocurrencia y agenda                                                                                                                               | Evento pasado deja de listarse sin intervención                                             |
-| 5    | Mapa con carga diferida y alternativa textual (tiles con licencia apropiada)                                                                                     | Mapa fuera del bundle inicial; lista equivalente accesible                                  |
-| 6    | Lighthouse CI sobre previews de Vercel y contratos RC-06/09/10/11/12/15                                                                                          | CI bloquea un PR que rompe el presupuesto                                                   |
+| Paso | Contenido                                                                                                                                                                                                   | Terminado cuando                                                                                                    |
+| ---- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| 1 ✅ | Storage por tenant: buckets `media-originals` (privado) y `media-public`, `assets`/`asset_versions`, subida firmada de imágenes con validación; logo en la marca                                            | Un propietario sube el logo y aparece en su portal; B no puede leer ni escribir medios de A                         |
+| 2    | `content_items`/`content_revisions`: destinos con borrador → publicación → rollback, texto enriquecido como AST, **coordenadas (PostGIS)** con selector en el mapa, imágenes por referencia                 | Publicar y revertir un destino sin tocar el resto del portal                                                        |
+| 3    | Portal: listado y ficha de destino SSR, imágenes responsivas, SEO y datos estructurados por tenant, «Cómo llegar», compartir, QR por destino, botón «Instalar», páginas de privacidad y términos            | Lighthouse ≥ 90 en home y ficha con datos del seed                                                                  |
+| 4    | Eventos de una ocurrencia y agenda                                                                                                                                                                          | Evento pasado deja de listarse sin intervención                                                                     |
+| 5    | Mapa con carga diferida y alternativa textual (tiles con licencia apropiada), consultas por área                                                                                                            | Mapa fuera del bundle inicial; lista equivalente accesible                                                          |
+| 6    | **Ubicación del visitante en tiempo real** ([ADR-021](adr/ADR-021-visitor-location.md)): seguir mi posición, distancia y tiempo estimado, ordenar por cercanía, «estás cerca de…», sin guardar la ubicación | RC-06: permiso concedido/denegado/desconocido; sin permiso todo funciona; ninguna posición exacta llega al servidor |
+| 7    | Lighthouse CI sobre previews de Vercel y contratos RC-06/09/10/11/12/15                                                                                                                                     | CI bloquea un PR que rompe el presupuesto                                                                           |
 
-`content_items`/`content_revisions` (destino y evento de una ocurrencia), `assets`/`asset_versions`/`media_references` con subida firmada de imágenes, portal SSR con SEO por tenant, mapa con alternativa textual, administración con borrador → publicación → rollback, Lighthouse CI con el [presupuesto](performance-budget.md). Contratos RC-06/09/10/11/12/15.
+`content_items`/`content_revisions` (destino y evento de una ocurrencia, con ubicación), `assets`/`asset_versions`/`media_references` con subida firmada de imágenes, portal SSR con SEO por tenant, mapa con alternativa textual, ubicación del visitante, administración con borrador → publicación → rollback, Lighthouse CI con el [presupuesto](performance-budget.md). Contratos RC-06/09/10/11/12/15.
 
 ## P2 — Jobs durables, pipeline de medios y observabilidad
 
@@ -58,11 +60,23 @@ Pasos (cada uno requiere autorización):
 
 ## ★ Hito Demo / Portafolio
 
-Proyecto Supabase en la nube + Vercel. Dos portales en vivo (`rikuy-ucurena.vercel.app` y un municipio demo) desde el mismo deployment, panel de administración con una cuenta de demostración sobre un tenant sandbox que se reinicia periódicamente, README con capturas y métricas de Speed Insights.
+Proyecto Supabase en la nube + Vercel. Dos portales en vivo (`rikuy-ucurena.vercel.app` y un municipio demo) desde el mismo deployment, con mapa y ubicación del visitante, panel de administración con una cuenta de demostración sobre un tenant sandbox que se reinicia periódicamente, README con capturas y métricas de Speed Insights.
 
-## P5 — IA turística y Copilot V1/V2
+## P5 — Asistente turístico y Copilot V1/V2
 
-Gateway con un modelo (D4), consultas estructuradas + FTS (D6), citas (D5), guía contextual de escena/hotspot, presupuesto por tenant y degradación sin IA. Copilot V1 (leer/analizar) y V2 (propuestas con diff que guardan borrador). Evaluación con el gold inicial de 40 casos (D7).
+Gateway con un modelo (D4), consultas estructuradas + FTS (D6), citas (D5), presupuesto por tenant y degradación sin IA. Evaluación con el gold inicial de 40 casos (D7). Detalle del asistente del visitante en [ADR-022](adr/ADR-022-tourist-assistant.md).
+
+Pasos propuestos (cada uno requiere autorización):
+
+| Paso | Contenido                                                                                                                                                 | Terminado cuando                                                     |
+| ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| 1    | Gateway de IA: perfiles, `ai_requests`/`ai_executions`, cuotas y degradación sin IA                                                                       | Una cuota agotada detiene la IA y el portal sigue funcionando        |
+| 2    | Conocimiento: `knowledge_chunks` desde contenidos publicados y documentos del municipio (texto/PDF), FTS en español, citas                                | Un borrador o un documento retirado nunca aparece en una respuesta   |
+| 3    | Asistente del visitante en el portal: una conversación con contexto de página, persona por municipio (nombre, saludo), español/inglés, acciones validadas | Respuestas con citas válidas y abstención en el gold de 40 casos     |
+| 4    | «Qué hay cerca», «plan para hoy» y «ruta sugerida» con motor determinista (distancia, horario, vigencia)                                                  | 0 eventos o lugares vencidos recomendados como vigentes              |
+| 5    | Guía dentro del tour 360° (escena y hotspot resueltos en el servidor), en la misma conversación                                                           | RC-05: contexto conocido, ausente y malicioso                        |
+| 6    | Voz: dictado con cuota de segundos y lectura en voz alta del navegador; texto como alternativa                                                            | Sin micrófono o con el proveedor caído, el asistente sigue por texto |
+| 7    | Copilot V1 (leer/analizar) y V2 (propuestas con diff que guardan borrador)                                                                                | Aceptar una propuesta sobre una revisión vieja se rechaza            |
 
 ## P6 — Gate Early SaaS Pilot (ajustado)
 
@@ -72,6 +86,6 @@ Los diez criterios originales con estos cambios: (5) política de entrega por re
 
 - **E1** patrimonio, gastronomía/menús, transporte, eventos avanzados, traducciones (incluido quechua si se prioriza).
 - **E2** PWA offline selectiva, analítica/reportes, newsletter/push con ledger de entregas.
-- **E3** IA avanzada (embeddings/híbrido, reranker, voz) y Copilot V3 con aprobación vinculante.
+- **E3** IA avanzada (embeddings/híbrido, reranker, multimodal) y Copilot V3 con aprobación vinculante.
 - **E4** billing, planes, roles configurables, escala.
 - **X0/X1** ensayo y corte de la migración del sistema anterior, con autorización separada.

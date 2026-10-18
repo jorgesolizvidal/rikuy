@@ -7,15 +7,16 @@ Cada municipio tiene su propio portal —con su marca, dominio y contenidos— c
 
 ![CI](https://github.com/jorgesolizvidal/rikuy/actions/workflows/ci.yml/badge.svg)
 
-**Estado:** en desarrollo — fase P1 (fundación). Ver [roadmap](docs/roadmap.md) y [checkpoint](docs/progress/CHECKPOINT.md).
+**Estado:** en desarrollo — P1 (fundación) completa; fase P3 (portal y administración) en curso. Ver [roadmap](docs/roadmap.md) y [checkpoint](docs/progress/CHECKPOINT.md).
 
 ## Características (objetivo del piloto)
 
 - **Multi-tenant de verdad:** un solo build sirve a todos los municipios; dar de alta uno nuevo no requiere cambiar código. Aislamiento con Row Level Security en PostgreSQL.
 - **White-label:** identidad, colores, contactos, SEO y PWA configurables por municipio, versionados y validados (contraste, accesibilidad).
 - **Tours 360° y 3D con carga profesional:** preview inmediato, entrega según resolución (imagen única o tiles), modelos GLB optimizados que se cargan solo al abrirlos.
+- **Ubicación en tiempo real:** distancias, «cerca de mí» y «estás cerca de…» calculados en el dispositivo, sin guardar la posición del visitante.
 - **Publicación editorial:** borrador → revisión sellada → publicación → rollback, con auditoría.
-- **IA con fuentes:** guía turística y asistente de administración que citan sus fuentes, se abstienen cuando no hay evidencia y nunca deciden permisos.
+- **IA con fuentes:** asistente turístico con identidad propia de cada municipio (una sola conversación en el portal y en los tours, con voz) y asistente de administración; citan sus fuentes, se abstienen cuando no hay evidencia y nunca deciden permisos.
 - **Rendimiento como contrato:** presupuestos de LCP/INP/CLS y de peso de JavaScript verificados en CI.
 
 ## Stack
@@ -31,6 +32,7 @@ Next.js 16 · React 19 · TypeScript · Supabase (PostgreSQL, Auth, Storage) · 
 | [Roadmap](docs/roadmap.md)                               | Fases, pasos y criterios de terminado                         |
 | [Presupuesto de rendimiento](docs/performance-budget.md) | Objetivos medibles de carga                                   |
 | [Cierre P0](docs/p0-closure.md)                          | Decisiones tomadas a partir de benchmarks reales              |
+| [Paridad funcional](docs/paridad-funcional.md)           | Qué se conserva del sistema anterior y en qué fase            |
 | [Guía de ingeniería](CONTRIBUTING.md)                    | Reglas no negociables, convenciones y definición de terminado |
 
 ## Desarrollo local

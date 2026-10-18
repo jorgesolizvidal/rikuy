@@ -1,6 +1,6 @@
 # Arquitectura de Rikuy
 
-Resumen operativo de la arquitectura aprobada. Las decisiones completas están en los [ADRs](adr/README.md). Este documento condensa la auditoría y la propuesta SaaS elaboradas en septiembre de 2026 sobre el sistema anterior (Ucureña Explorer); esos informes completos se conservan fuera del repositorio.
+Resumen operativo de la arquitectura aprobada. Las decisiones completas están en los [ADRs](adr/README.md). Este documento condensa la auditoría y la propuesta SaaS elaboradas en septiembre de 2026 sobre el sistema anterior (Ucureña Explorer); esos informes completos se conservan fuera del repositorio; lo que se conserva del sistema anterior y en qué fase se cubre está en [paridad funcional](paridad-funcional.md).
 
 ## 1. Qué es
 
@@ -91,14 +91,21 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Manifest versionado por `asset_version`; cambiar la entrega nunca mueve hotspots.
 - GLB: original intacto + derivado optimizado (Meshopt/Draco, texturas KTX2) con verificación de color; carga solo al abrir el hotspot.
 
-## 9. IA (ADR-018 + cierre P0)
+## 9. Ubicación del visitante (ADR-021)
+
+- Coordenadas de destinos y eventos en `geography(Point,4326)` con índice GiST; «cerca de» y consultas por área en el servidor.
+- Posición del visitante solo en el navegador: se pide tras una acción, `watchPosition` mientras el mapa o la ficha está visible, círculo de precisión, «estás cerca de…» con la página abierta.
+- La posición exacta nunca se envía ni se guarda; al asistente llega redondeada (~100 m) en la petición que la necesita, sin registrarse. Sin permiso, todo funciona (RC-06).
+
+## 10. IA (ADR-018 + cierre P0 + ADR-022)
 
 - Gateway propio con perfiles por caso de uso; proveedor intercambiable sin tocar módulos.
 - Datos vigentes (eventos, horarios, ubicaciones) por **consultas estructuradas**; narrativa por **FTS en español**. Embeddings y búsqueda híbrida se activan solo si superan a FTS en evaluación.
 - Respuestas con citas verificables, abstención cuando falta evidencia y presupuesto por tenant. Si la IA falla, catálogo, mapa y tours siguen funcionando.
-- Copilot V1 (leer/analizar) y V2 (proponer borradores con diff). Publicar o enviar comunicaciones nunca es automático.
+- **Asistente del visitante** (ADR-022): una sola conversación con contexto de página, tour/escena/hotspot y ubicación redondeada; «qué hay cerca», «plan para hoy» y «ruta sugerida» desde un motor determinista; persona (nombre, saludo, tono) configurada por cada municipio en su marca; voz con dictado por cuota y lectura del navegador. La conversación vive en el dispositivo; el servidor no guarda su texto.
+- Copilot V1 (leer/analizar) y V2 (proponer borradores con diff) para el personal del municipio. Publicar o enviar comunicaciones nunca es automático.
 
-## 10. Ambientes
+## 11. Ambientes
 
 | Ambiente   | Web                             | Datos                           | Notas                                 |
 | ---------- | ------------------------------- | ------------------------------- | ------------------------------------- |
