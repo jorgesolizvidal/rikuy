@@ -5,9 +5,8 @@
 ## Estado actual
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
-- **Último paso completado:** P3 · Paso 1 — medios por municipio y logo en la marca (2026-10-17)
-- **Rama del paso:** `feat/p3-step1-tenant-media` (PR #7, mergeado)
-- **Después:** `docs/roadmap-geo-chaski` — revisión de paridad con el sistema anterior (solo documentación)
+- **Último paso completado:** P3 · Paso 2 — destinos con revisiones, ubicación y fotos (2026-10-18)
+- **Rama del paso:** `feat/p3-step2-content-items` → PR hacia `main`
 
 ## Historial
 
@@ -88,35 +87,57 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - Decisión del usuario: el nombre del asistente es dato de la marca de cada municipio; **«Chaski» es el de Ucureña** y no aparece en el código.
 - P3 · Paso 3 suma «Cómo llegar», compartir, QR por destino, botón «Instalar» y páginas de privacidad y términos por municipio.
 
+### P3 · Paso 2 — destinos con revisiones, ubicación y fotos ✅
+
+- Base de datos (`20261018200000_p3_content_items.sql`, solo expand):
+  - PostGIS en el esquema `extensions`. `content_items` (identidad + dirección única por municipio + punteros a borrador y versión publicada), `content_revisions` (revisiones numeradas; el borrador se edita con concurrencia optimista y al publicar queda **sellado e inmutable**) y `media_references` (portada y galería por versión de imagen, con **descripción obligatoria**).
+  - Ubicación en latitud/longitud con un punto `geography` generado e índice GiST (ADR-021).
+  - Texto enriquecido como AST permitido (párrafos, títulos 2–3, listas, negrita/cursiva, enlaces https); la base lo revalida, sin HTML.
+  - RPC por intención: `create_content_item`, `save_content_draft`, `publish_content` (exige resumen, ubicación y fotos publicadas), `restore_content_revision` (volver a una versión sellada), `discard_content_draft`; lecturas anónimas `list_published_destinations` y `get_published_destination` solo de municipios activos.
+  - Editores crean y guardan borradores y suben fotos; solo propietarios y administradores publican y vuelven a versiones anteriores. Todo queda en `audit_events`.
+  - Seed: Demo Norte con un destino publicado en su versión 2 y un borrador nunca publicado; Demo Sur con uno publicado.
+- `@rikuy/core`: contrato `richText` y formato de escritura tipo Markdown limitado (`## título`, `- lista`, `**negrita**`, `*cursiva*`, `[texto](https://…)`) que va y vuelve al AST sin pérdidas; `destinationDocument`; `parseCoordinates` (decimal y grados/minutos/segundos, como los copia Google Maps); casos de uso de destinos; perfiles de imagen comunes a logo y fotos.
+- `@rikuy/db`: repositorio de contenido, lector público anónimo, derivados de fotos 480/960/1600 px WebP sin metadatos y firmas de vista previa en lote.
+- Panel: «Destinos» en la página del municipio; lista con estado (borrador / publicado / con cambios); editor con vista previa del texto, ubicación (mapa Leaflet cargado bajo demanda, campos numéricos, pegar coordenadas, «usar mi ubicación actual»), portada y galería (varias fotos a la vez, reordenar, descripción obligatoria), guardar borrador, publicar, descartar borrador y historial con «Volver a esta versión». Aviso al salir con cambios sin guardar.
+- `pnpm db:lint` revisa solo nuestros esquemas (`public`, `private`): PostGIS trae cientos de avisos propios en `extensions`.
+- Tests: 280 unitarios (core 189, db 67, web 18, config 6) + 267 pgTAP (57 nuevos) + integración con Supabase real (borrador → publicar → editar → publicar → volver a la versión 1 sin tocar el resto; editor sin permiso de publicar; aislamiento entre municipios; imagen de otro municipio rechazada).
+- Verificado en el navegador: crear con dirección sugerida (`plaza-central-de-nuflo`), enlace `http://` señalado con su línea, coordenadas pegadas, foto pequeña rechazada, descripción obligatoria, publicar, versión 2, volver a la 1, descartar borrador, analista en solo lectura y celular sin desbordes.
+
+**Desviaciones:**
+
+- La ficha pública del destino llega en el Paso 3 (este paso deja listas las lecturas públicas y su prueba).
+- La dirección (`slug`) se elige al crear el destino y no se cambia todavía desde el editor: cambiarla rompería enlaces ya compartidos; llegará con redirecciones.
+- El mapa del editor usa las teselas estándar de OpenStreetMap (uso ligero, con atribución); el portal elegirá proveedor en el Paso 5.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
 git checkout main
 git pull
-pnpm install       # instala sharp
-pnpm db:reset      # aplica la migración nueva (buckets y tablas de medios)
+pnpm install       # instala leaflet
+pnpm db:reset      # aplica la migración (PostGIS, destinos) y el seed con destinos de ejemplo
 pnpm dev
 ```
 
-Ten a mano una imagen PNG, JPG o WebP de hasta 2 MB (por ejemplo, el logo de Ucureña). No la copies dentro del repositorio; si quieres guardarla cerca, usa `seed-assets/` (ignorada por git).
+1. Entra a http://app.localhost:3000 con `editor.ambos@example.test` (código en Mailpit, http://127.0.0.1:54324) → Municipio Demo Norte → «Destinos». Verás «Mirador del Valle» (publicado) y «Feria de los domingos» (borrador).
+2. Crea «Plaza Central»: la dirección se sugiere sola. En el editor escribe un resumen y un texto con `## Qué ver`, una lista con `- ` y algo en `**negrita**`; mira la vista previa.
+3. Ubicación: en Google Maps, clic derecho sobre un lugar → copia las coordenadas → pégalas en «Pegar coordenadas» → «Usar». También puedes hacer clic en el mapa.
+4. Sube una portada y una o dos fotos a la galería, escribe la descripción de cada una → «Guardar borrador». Como editor no ves «Publicar».
+5. Cierra sesión y entra como `owner@demo-norte.example.test` → abre «Plaza Central» → «Publicar». Cambia el resumen → «Publicar» otra vez (versión 2).
+6. En «Historial de publicaciones», en la versión 1 → «Volver a esta versión» → confirmar: la versión 1 vuelve a ser la publicada.
+7. Opcional: en «Mirador del Valle» cambia el nombre → «Guardar borrador» → «Descartar borrador y volver a lo publicado».
 
-1. Entra a http://app.localhost:3000 con `owner@demo-norte.example.test` (código en Mailpit, http://127.0.0.1:54324) → Municipio Demo Norte → «Marca del portal».
-2. En «Logo», «Subir logo» con un archivo que no sea imagen renombrado a `.png` → mensaje «No pudimos leer la imagen».
-3. «Subir logo» con tu imagen → aparece en la miniatura y en la vista previa → «Publicar».
-4. Abre http://demo-norte.localhost:3000 (en menos de un minuto): el logo está en la cabecera y en el ícono de la pestaña. http://demo-sur.localhost:3000 sigue con sus iniciales.
-5. Vuelve al panel → «Quitar logo» → «Publicar»: el portal vuelve a mostrar las iniciales.
-6. Opcional, con Ucureña: recréala como en el paso anterior (`pnpm platform:provision seed-assets/tenants/ucurena.json`, aceptar como propietario y poner en línea como operador) y sube su logo desde su «Marca del portal».
+La ficha pública del destino en el portal llega con el Paso 3.
 
-## Siguiente paso — P3 · Paso 2 (requiere autorización)
+## Siguiente paso — P3 · Paso 3 (requiere autorización)
 
-Rama `feat/p3-step2-content-items`:
+Rama `feat/p3-step3-portal-destinations`:
 
-1. Tablas `content_items` y `content_revisions` (FK compuestas, tipo `destination`), revisión con concurrencia optimista, publicación y **rollback** en una transacción RPC (sellar revisión + puntero + auditoría), lectura anónima solo de la revisión publicada.
-2. **Ubicación del destino** en `geography(Point,4326)` (PostGIS) con índice GiST y validación de rango; selector de coordenadas en el mapa en el editor (accesible, también con campos numéricos).
-3. Texto enriquecido como AST permitido (párrafos, títulos, listas, enlaces `https`, énfasis) validado en `@rikuy/core` y en la base; sin HTML.
-4. `media_references`: portada y galería por referencia a `asset_versions` listas, reutilizando la subida firmada del Paso 1 con propósito `content` (los editores sí pueden subir).
-5. Panel: lista de destinos, editor con borrador → publicar → historial y «Volver a esta versión».
-6. Tests: pgTAP (aislamiento, visitante sin borradores, rollback, coordenadas fuera de rango), unitarios del AST y de los casos de uso, integración y e2e (publicar y revertir un destino sin tocar el resto del portal).
+1. Portal: listado de destinos y ficha SSR (`/destinos` y `/destinos/{slug}`) con el texto enriquecido, portada y galería responsivas (`srcset` 480/960/1600, dimensiones reservadas, carga diferida) y caché por municipio y versión publicada.
+2. SEO por municipio y destino: título, descripción, canonical, Open Graph con la portada, `sitemap.xml`, `robots.txt` y datos estructurados (`TouristAttraction` con coordenadas).
+3. «Cómo llegar» (abre la app de mapas con las coordenadas), «Compartir» y **código QR por destino** en el panel para carteles en el lugar.
+4. Botón «Instalar» del portal y páginas de privacidad y términos por municipio (contenido del municipio, plantilla de la plataforma).
+5. Tests: e2e de listado y ficha en los dos municipios (sin fugas), Lighthouse ≥ 90 en inicio y ficha con datos del seed, accesibilidad de la galería.
 
 ## Decisiones pendientes del usuario
 
