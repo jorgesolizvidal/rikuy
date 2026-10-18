@@ -40,6 +40,7 @@ export async function generateMetadata({
     },
     openGraph: {
       type: "website",
+      ...(view.logo ? { images: [{ url: view.logo.png, alt: siteName }] } : {}),
       siteName,
       title: siteName,
       ...(description ? { description } : {}),
@@ -77,9 +78,16 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
       </a>
       <header className="portal-header">
         <a href="/" className="portal-brand">
-          <span className="portal-mark" aria-hidden="true">
-            {monogram(identity.shortName)}
-          </span>
+          {view.logo ? (
+            // Versioned, immutable public derivative (≤512 px WebP); the site name next to it
+            // is the accessible name, so the image is decorative.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img className="portal-logo" src={view.logo.webp} alt="" decoding="async" />
+          ) : (
+            <span className="portal-mark" aria-hidden="true">
+              {monogram(identity.shortName)}
+            </span>
+          )}
           <span>{identity.siteName}</span>
         </a>
       </header>

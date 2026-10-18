@@ -17,12 +17,15 @@ import { SOCIAL_LABELS } from "@/lib/social-labels";
 import { brandingAction, type BrandingFormState } from "./actions";
 import type { BrandingField, BrandingValues } from "./branding-fields";
 import { BrandingPreview } from "./branding-preview";
+import { LogoField, type LogoSelection } from "./logo-field";
 
 interface BrandingFormProps {
   readonly slug: string;
   readonly initial: BrandingValues;
   readonly revision: number | null;
   readonly canEdit: boolean;
+  /** Signed preview of the logo the editor starts with (draft or published), if any. */
+  readonly logoPreviewUrl: string | null;
 }
 
 const STATUS_MESSAGES: Readonly<Record<Exclude<BrandingFormState["status"], "idle">, string>> = {
@@ -36,8 +39,15 @@ const STATUS_MESSAGES: Readonly<Record<Exclude<BrandingFormState["status"], "idl
   error: "No pudimos guardar los cambios. Inténtalo de nuevo en unos segundos.",
 };
 
-export function BrandingForm({ slug, initial, revision, canEdit }: BrandingFormProps) {
+export function BrandingForm({
+  slug,
+  initial,
+  revision,
+  canEdit,
+  logoPreviewUrl,
+}: BrandingFormProps) {
   const [values, setValues] = useState(initial);
+  const [logoPreview, setLogoPreview] = useState(logoPreviewUrl);
   const [state, dispatch, pending] = useActionState(brandingAction, {
     status: "idle",
     revision,
@@ -56,6 +66,15 @@ export function BrandingForm({ slug, initial, revision, canEdit }: BrandingFormP
     setValues((current) => ({ ...current, [key]: value }));
   const setSocial = (network: SocialNetwork, url: string) =>
     setValues((current) => ({ ...current, social: { ...current.social, [network]: url } }));
+  const setLogo = (logo: LogoSelection | null) => {
+    setValues((current) => ({
+      ...current,
+      logoAssetId: logo?.assetId ?? "",
+      logoVersion: logo?.version ?? "",
+    }));
+    setLogoPreview(logo?.previewUrl ?? null);
+  };
+  const hasLogo = values.logoAssetId !== "";
 
   // Submitted manually (not through `action=`) so React does not reset the controlled
   // fields after the action; `intent` comes from the button that was pressed.
@@ -71,6 +90,8 @@ export function BrandingForm({ slug, initial, revision, canEdit }: BrandingFormP
       <form ref={formRef} className="form branding-form" onSubmit={submit} noValidate>
         <input type="hidden" name="slug" value={slug} />
         <input type="hidden" name="revision" value={state.revision ?? ""} />
+        <input type="hidden" name="logo.assetId" value={values.logoAssetId} />
+        <input type="hidden" name="logo.version" value={values.logoVersion} />
 
         <fieldset disabled={!canEdit || pending}>
           <legend>Identidad</legend>
@@ -102,6 +123,14 @@ export function BrandingForm({ slug, initial, revision, canEdit }: BrandingFormP
             maxLength={PRESENTATION_LIMITS.tagline}
             onChange={(v) => set("tagline", v)}
             error={errors.tagline}
+          />
+          <LogoField
+            slug={slug}
+            disabled={!canEdit || pending}
+            hasLogo={hasLogo}
+            previewUrl={logoPreview}
+            error={errors.logo}
+            onChange={setLogo}
           />
         </fieldset>
 
@@ -243,7 +272,7 @@ export function BrandingForm({ slug, initial, revision, canEdit }: BrandingFormP
         </p>
       </form>
 
-      <BrandingPreview values={values} />
+      <BrandingPreview values={values} logoUrl={hasLogo ? logoPreview : null} />
     </div>
   );
 }

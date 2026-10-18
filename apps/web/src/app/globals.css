@@ -620,3 +620,68 @@ a.button-quiet {
 .org-card .inline-form {
   flex-shrink: 0;
 }
+
+/* Logo upload (Marca del portal) */
+.logo-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+}
+
+.logo-thumb {
+  display: grid;
+  place-items: center;
+  width: 7rem;
+  height: 4.5rem;
+  padding: 0.5rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  /* Checkerboard: shows whether the logo has a transparent background. */
+  background: repeating-conic-gradient(
+      color-mix(in srgb, var(--fg) 8%, transparent) 0% 25%,
+      transparent 0% 50%
+    )
+    0 0 / 16px 16px;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--fg) 70%, transparent);
+}
+
+.logo-thumb[data-empty="true"] {
+  background: transparent;
+  border-style: dashed;
+}
+
+.logo-thumb img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.logo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.logo-actions label.button {
+  display: inline-block;
+}
+
+.logo-actions label[aria-disabled="true"] {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* The file input is visually hidden; its label carries the visible focus ring. */
+.logo-input:focus-visible + label {
+  outline: 3px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.preview-logo {
+  height: 1.75rem;
+  width: auto;
+  max-width: 6rem;
+  object-fit: contain;
+}

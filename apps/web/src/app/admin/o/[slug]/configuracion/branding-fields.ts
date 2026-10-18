@@ -21,9 +21,15 @@ export interface BrandingValues {
   address: string;
   description: string;
   social: Record<SocialNetwork, string>;
+  /** Logo reference (hidden fields `logo.assetId` / `logo.version`); empty: no logo. */
+  logoAssetId: string;
+  logoVersion: string;
 }
 
-export type BrandingField = Exclude<keyof BrandingValues, "social"> | `social.${SocialNetwork}`;
+export type BrandingField =
+  | Exclude<keyof BrandingValues, "social" | "logoAssetId" | "logoVersion">
+  | `social.${SocialNetwork}`
+  | "logo";
 
 export function valuesFromPresentation(presentation: TenantPresentation): BrandingValues {
   const social = Object.fromEntries(SOCIAL_NETWORKS.map((network) => [network, ""])) as Record<
@@ -43,6 +49,8 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     address: presentation.contact.address ?? "",
     description: presentation.seo.description,
     social,
+    logoAssetId: presentation.logo?.assetId ?? "",
+    logoVersion: presentation.logo ? String(presentation.logo.version) : "",
   };
 }
 
@@ -77,7 +85,16 @@ export function presentationInputFromForm(formData: FormData) {
       return url === "" ? [] : [{ network, url }];
     }),
     seo: { description: text(formData, "description") },
+    ...logoFromForm(formData),
   };
+}
+
+function logoFromForm(formData: FormData) {
+  const assetId = text(formData, "logo.assetId");
+  const version = text(formData, "logo.version");
+  if (assetId === "" && version === "") return {};
+  // A non-numeric version becomes NaN and fails validation (never a silent default).
+  return { logo: { assetId, version: /^\d+$/u.test(version) ? Number(version) : Number.NaN } };
 }
 
 const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
@@ -91,6 +108,9 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   "contact.phone": "phone",
   "contact.address": "address",
   "seo.description": "description",
+  logo: "logo",
+  "logo.assetId": "logo",
+  "logo.version": "logo",
 };
 
 const MESSAGES: Readonly<Record<string, string>> = {
@@ -105,6 +125,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   address: "La dirección admite una línea de hasta 160 caracteres.",
   description: "La descripción admite hasta 160 caracteres, en una línea.",
   social: "Pega el enlace completo de la página, empezando por https://.",
+  logo: "Este logo ya no se puede usar. Sube otro o quítalo para publicar sin logo.",
 };
 
 const CONTRAST_MESSAGES: Readonly<Record<string, string>> = {

@@ -15,6 +15,13 @@ import { buildWebManifest, isPortalIconSize, portalIconPath } from "./manifest";
 import type { PublishedPresentationReader, TenantConfigRepository } from "./ports";
 
 const TENANT = "5eed1000-0000-4000-8000-000000000001";
+const LOGO = "5eed4000-0000-4000-8000-000000000001";
+const published: string[] = [];
+const logoPublisher = {
+  async publish(tenantId: string, assetId: string, version: number, files: readonly string[]) {
+    published.push(`${tenantId}/${assetId}/${version}:${files.join(",")}`);
+  },
+};
 const CONFIG = "5eed3000-0000-4000-8000-000000000001";
 
 function member(role: OrganizationMembership["role"]): OrganizationMembership {
@@ -73,9 +80,10 @@ describe("branding permissions", () => {
       expect((await saveBrandingDraft(member(role), samplePresentation(), null, repo)).status).toBe(
         "forbidden",
       );
-      expect((await publishBranding(member(role), samplePresentation(), null, repo)).status).toBe(
-        "forbidden",
-      );
+      expect(
+        (await publishBranding(member(role), samplePresentation(), null, repo, logoPublisher))
+          .status,
+      ).toBe("forbidden");
       expect(calls).toEqual([]);
     },
   );
@@ -115,7 +123,9 @@ describe("saving and publishing", () => {
 
   it("publishes exactly the revision it just saved", async () => {
     const { repo, calls } = repository();
-    expect(await publishBranding(member("owner"), samplePresentation(), 5, repo)).toEqual({
+    expect(
+      await publishBranding(member("owner"), samplePresentation(), 5, repo, logoPublisher),
+    ).toEqual({
       status: "published",
       configId: CONFIG,
       version: 2,
@@ -123,11 +133,38 @@ describe("saving and publishing", () => {
     expect(calls).toEqual(["save:5", `publish:${CONFIG}:6`]);
   });
 
+  it("publishes the logo derivatives before the brand that uses them", async () => {
+    published.length = 0;
+    const { repo, calls } = repository({
+      async publish(_tenant, configId) {
+        calls.push(`publish-after-logo:${published.length}`);
+        return { status: "published", configId, version: 2 };
+      },
+    });
+    const withLogo = { ...samplePresentation(), logo: { assetId: LOGO, version: 3 } };
+    expect(
+      (await publishBranding(member("owner"), withLogo, null, repo, logoPublisher)).status,
+    ).toBe("published");
+    expect(published).toEqual([`${TENANT}/${LOGO}/3:logo.webp,logo.png`]);
+    expect(calls).toEqual(["save:null", "publish-after-logo:1"]);
+  });
+
+  it("points at the logo when the database refuses its reference", async () => {
+    published.length = 0;
+    const { repo } = repository({ saveDraft: async () => ({ status: "invalid" }) });
+    const withLogo = { ...samplePresentation(), logo: { assetId: LOGO, version: 9 } };
+    expect(await publishBranding(member("owner"), withLogo, null, repo, logoPublisher)).toEqual({
+      status: "invalid",
+      issues: [{ path: "logo", code: "invalid" }],
+    });
+    expect(published).toEqual([]);
+  });
+
   it("does not publish when saving fails", async () => {
     const { repo, calls } = repository({ saveDraft: async () => ({ status: "conflict" }) });
-    expect((await publishBranding(member("owner"), samplePresentation(), 1, repo)).status).toBe(
-      "conflict",
-    );
+    expect(
+      (await publishBranding(member("owner"), samplePresentation(), 1, repo, logoPublisher)).status,
+    ).toBe("conflict");
     expect(calls).toEqual([]);
   });
 });

@@ -26,3 +26,11 @@ export {
   createSupabaseIdentityAdmin,
 } from "./platform";
 export type { IdentityAdminOptions } from "./platform";
+export {
+  createMediaRepository,
+  createSharpImageProcessor,
+  createSupabaseMediaAdmin,
+  MEDIA_BUCKETS,
+  publicMediaUrl,
+} from "./media";
+export type { MediaAdminOptions } from "./media";

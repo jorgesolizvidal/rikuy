@@ -9,17 +9,18 @@ const noSupabaseInUi = {
   message: "UI must not talk to Supabase directly. Call a use case / server action.",
 };
 
-// The secret key reaches exactly one module (CONTRIBUTING §1.3).
+// The secret key reaches exactly two isolated modules (CONTRIBUTING §1.3).
+const secretKeyModules = ["src/server/identity-admin.ts", "src/server/media-admin.ts"];
 const secretKeyPaths = [
   {
     name: "@rikuy/db",
-    importNames: ["createSupabaseIdentityAdmin"],
-    message: "Identity administration (secret key) lives only in src/server/identity-admin.ts.",
+    importNames: ["createSupabaseIdentityAdmin", "createSupabaseMediaAdmin"],
+    message: `Adapters with the secret key live only in ${secretKeyModules.join(" and ")}.`,
   },
   {
     name: "@rikuy/config/env",
     importNames: ["parseServerEnv"],
-    message: "Server secrets are read only in src/server/identity-admin.ts.",
+    message: `Server secrets are read only in ${secretKeyModules.join(" and ")}.`,
   },
 ];
 
@@ -56,7 +57,7 @@ const config = [
     },
   },
   {
-    files: ["src/server/identity-admin.ts"],
+    files: secretKeyModules,
     rules: { "no-restricted-imports": ["error", { patterns: [noSupabaseInUi] }] },
   },
 ];

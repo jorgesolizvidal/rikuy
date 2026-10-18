@@ -28,3 +28,7 @@ export * from "./domain/tenancy/slug";
 export * from "./application/platform/ports";
 export * from "./application/platform/platform";
 export * from "./application/platform/members";
+export * from "./domain/media/image";
+export * from "./domain/media/logo";
+export * from "./application/media/ports";
+export * from "./application/media/logo";

@@ -77,6 +77,13 @@ export const tenantPresentationSchema = z.strictObject({
   seo: z.strictObject({
     description: line(0, PRESENTATION_LIMITS.description),
   }),
+  /** Optional logo: a reference to a ready image of the same tenant, never a URL. */
+  logo: z
+    .strictObject({
+      assetId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+      version: z.number().int().min(1).max(999_999),
+    })
+    .optional(),
 });
 
 export type TenantPresentation = z.infer<typeof tenantPresentationSchema>;
