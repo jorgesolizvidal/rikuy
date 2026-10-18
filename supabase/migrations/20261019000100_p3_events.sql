@@ -61,10 +61,11 @@ create index content_revisions_venue_idx on public.content_revisions (tenant_id,
 
 -- {allDay, start, end} → local bounds, or no row when invalid. Dates must exist
 -- (no 30 February, no 24:00), the end is not before the start, at most a year long.
+-- STABLE, not IMMUTABLE: text → timestamp casts and to_char depend on session settings.
 create function private.parse_event_schedule(p jsonb)
 returns table (starts_local timestamp, ends_local timestamp, all_day boolean)
 language plpgsql
-immutable
+stable
 set search_path = ''
 as $$
 declare
@@ -115,7 +116,7 @@ $$;
 create function private.is_valid_event_draft(p jsonb)
 returns boolean
 language sql
-immutable
+stable
 set search_path = ''
 as $$
   select coalesce(

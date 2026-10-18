@@ -76,8 +76,14 @@ jobs:
       - name: pgTAP tests
         run: pnpm db:test
 
+      # Job logs are not always reachable: on failure, the findings also go to annotations.
       - name: SQL lint
-        run: pnpm db:lint
+        run: |
+          set -o pipefail
+          pnpm db:lint 2>&1 | tee sql-lint.log || {
+            tail -40 sql-lint.log | while IFS= read -r line; do echo "::error title=SQL lint::${line//%/%25}"; done
+            exit 1
+          }
 
   integration:
     name: Integration · real Supabase stack
