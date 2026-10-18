@@ -1,0 +1,53 @@
+import "server-only";
+
+import { imageCandidates, type PublishedImage } from "@rikuy/core";
+import { publicMediaUrl } from "@rikuy/db";
+import { cache } from "react";
+
+import { platformSettings, publishedContentReader } from "./platform";
+import type { PortalView } from "./portal-view";
+
+/** What an <img> needs to load the right derivative and reserve its space. */
+export interface ResponsiveImage {
+  readonly src: string;
+  readonly srcSet: string;
+  readonly width: number;
+  readonly height: number;
+  readonly alt: string;
+  /** Largest derivative (Open Graph, "ver en tamaño completo"). */
+  readonly largest: { readonly url: string; readonly width: number; readonly height: number };
+}
+
+export function responsiveImage(tenantId: string, image: PublishedImage): ResponsiveImage {
+  const supabaseUrl = platformSettings().env.NEXT_PUBLIC_SUPABASE_URL;
+  const candidates = imageCandidates(tenantId, image).map((candidate) => ({
+    ...candidate,
+    url: publicMediaUrl(supabaseUrl, candidate.path),
+  }));
+  const middle = candidates[Math.min(1, candidates.length - 1)];
+  const largest = candidates.at(-1);
+  if (!middle || !largest) throw new Error("An image has at least one derivative");
+  return {
+    src: middle.url,
+    srcSet: candidates.map((candidate) => `${candidate.url} ${candidate.width}w`).join(", "),
+    width: largest.width,
+    height: largest.height,
+    alt: image.alt,
+    largest: { url: largest.url, width: largest.width, height: largest.height },
+  };
+}
+
+/** Published destinations of the portal's tenant (memoized per request). */
+export const portalDestinations = cache(async (view: PortalView) =>
+  publishedContentReader().list(view.context.tenant.tenantId),
+);
+
+/** One published destination, or null (unknown slug, draft only, other tenant). */
+export const portalDestination = cache(async (view: PortalView, slug: string) =>
+  publishedContentReader().find(view.context.tenant.tenantId, slug),
+);
+
+/** Absolute public origin of this portal (its canonical host). */
+export function portalOrigin(view: PortalView): string {
+  return platformSettings().portalOrigin(view.context.tenant.canonicalHost ?? view.context.host);
+}

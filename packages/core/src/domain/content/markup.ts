@@ -31,7 +31,9 @@ export interface ParsedMarkup {
 
 const ESCAPABLE = new Set(["\\", "*", "[", "]", "(", ")", "#", "-", ".", "•", "_"]);
 const HEADING = /^(#{1,3})\s+(.*)$/u;
-const BULLET = /^[-*•]\s+(.*)$/u;
+// "- item", "* item", "• item" — and "-item" when a letter follows (people often skip the
+// space); "-5 °C" stays a paragraph.
+const BULLET = /^(?:[-*•]\s+|[-•](?=\p{L}))(.*)$/u;
 const NUMBERED = /^\d{1,3}[.)]\s+(.*)$/u;
 
 type Segment =
@@ -331,7 +333,7 @@ function linkTarget(href: string): string {
 
 /** Escapes a paragraph that would otherwise read as a heading or a list item. */
 function protectLineStart(text: string): string {
-  if (/^#/u.test(text) || /^[-•]\s/u.test(text)) return `\\${text}`;
+  if (/^#/u.test(text) || /^[-•](?:\s|\p{L})/u.test(text)) return `\\${text}`;
   const numbered = /^(\d{1,3})([.)])(\s)/u.exec(text);
   return numbered ? `${numbered[1]}\\${text.slice((numbered[1] ?? "").length)}` : text;
 }

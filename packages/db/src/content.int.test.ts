@@ -137,8 +137,8 @@ describe.runIf(stackAvailable)("destinations against local Supabase", () => {
       revisionNo: 1,
     });
     const v1 = await visitors().find(NORTE, slug);
-    expect(v1?.document.summary).toBe("Una plaza para probar la publicación.");
-    expect(v1?.document.cover?.alt).toBe("La plaza vista desde la esquina");
+    expect(v1?.summary).toBe("Una plaza para probar la publicación.");
+    expect(v1?.cover?.alt).toBe("La plaza vista desde la esquina");
     const image = await fetch(
       publicMediaUrl(env.url, contentImagePath(NORTE, ready.image, "w960.webp")),
     );
@@ -149,7 +149,7 @@ describe.runIf(stackAvailable)("destinations against local Supabase", () => {
     const second = { ...first, summary: "Segunda versión, con más detalle.", cover: null };
     const draft2 = await saveDestinationDraft(editorNorte, contentId, second, null, editorContent);
     if (draft2.status !== "saved") throw new Error(`save 2: ${draft2.status}`);
-    expect((await visitors().find(NORTE, slug))?.document.summary).toBe(
+    expect((await visitors().find(NORTE, slug))?.summary).toBe(
       "Una plaza para probar la publicación.",
     );
     expect(
@@ -165,9 +165,7 @@ describe.runIf(stackAvailable)("destinations against local Supabase", () => {
       status: "published",
       revisionNo: 2,
     });
-    expect((await visitors().find(NORTE, slug))?.document.summary).toBe(
-      "Segunda versión, con más detalle.",
-    );
+    expect((await visitors().find(NORTE, slug))?.summary).toBe("Segunda versión, con más detalle.");
 
     // Roll back to revision 1: only this destination changes.
     const record = await ownerContent.findDestination(NORTE, contentId);
@@ -184,7 +182,7 @@ describe.runIf(stackAvailable)("destinations against local Supabase", () => {
       status: "restored",
       revisionNo: 1,
     });
-    expect((await visitors().find(NORTE, slug))?.document.summary).toBe(
+    expect((await visitors().find(NORTE, slug))?.summary).toBe(
       "Una plaza para probar la publicación.",
     );
     const after = await visitors().list(NORTE);

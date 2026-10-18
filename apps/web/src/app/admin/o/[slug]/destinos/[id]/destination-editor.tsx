@@ -117,7 +117,11 @@ export function DestinationEditor({
       previous: SaveDestinationState & { readonly stored: string },
       submission: { readonly payload: DestinationPayload; readonly snapshot: string },
     ) => {
-      const result = await saveDestinationAction(previous, submission.payload);
+      // Only what the server needs: the stored snapshot (with signed preview URLs) stays here.
+      const result = await saveDestinationAction(
+        { status: previous.status, editCount: previous.editCount },
+        submission.payload,
+      );
       const ok = result.status === "saved" || result.status === "published";
       return { ...result, stored: ok ? submission.snapshot : previous.stored };
     },

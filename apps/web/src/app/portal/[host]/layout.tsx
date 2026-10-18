@@ -1,7 +1,7 @@
 import "@fontsource-variable/bricolage-grotesque";
 import "./portal.css";
 
-import { monogram, portalIconPath, themeCssVariables } from "@rikuy/core";
+import { PORTAL_PATHS, monogram, portalIconPath, themeCssVariables } from "@rikuy/core";
 import type { Metadata, Viewport } from "next";
 import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
@@ -9,6 +9,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { platformSettings } from "@/server/platform";
 import { portalView } from "@/server/portal-view";
 
+import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
 
 interface PortalLayoutProps {
@@ -88,8 +89,12 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
               {monogram(identity.shortName)}
             </span>
           )}
-          <span>{identity.siteName}</span>
+          <span className="portal-brand-name">{identity.siteName}</span>
         </a>
+        <nav aria-label="Principal" className="portal-nav">
+          <a href={PORTAL_PATHS.destinations}>Destinos</a>
+          <InstallButton siteName={identity.siteName} />
+        </nav>
       </header>
 
       <main id="contenido">{children}</main>
@@ -119,6 +124,10 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
             <SocialLinks links={social} />
           </section>
         ) : null}
+        <nav aria-label="Información legal" className="portal-legal-links">
+          <a href={PORTAL_PATHS.privacy}>Privacidad</a>
+          <a href={PORTAL_PATHS.terms}>Términos de uso</a>
+        </nav>
         <p className="portal-credit">Portal oficial de {identity.siteName}. Funciona con Rikuy.</p>
       </footer>
     </div>

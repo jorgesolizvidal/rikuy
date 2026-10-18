@@ -3,7 +3,7 @@
 import "leaflet/dist/leaflet.css";
 
 import L from "leaflet";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ADMIN_TILES } from "@/lib/map-tiles";
 
@@ -34,6 +34,7 @@ export default function MapPicker({ value, center, disabled, onPick }: MapPicker
   const marker = useRef<L.Marker | null>(null);
   const pick = useRef(onPick);
   const locked = useRef(disabled);
+  const [tilesFailing, setTilesFailing] = useState(false);
   useEffect(() => {
     pick.current = onPick;
     locked.current = disabled;
@@ -45,10 +46,22 @@ export default function MapPicker({ value, center, disabled, onPick }: MapPicker
       value ? [value.lat, value.lng] : [center.lat, center.lng],
       value ? 16 : center.zoom,
     );
+    // If the map images cannot be loaded (offline, blocked by the network or a stale
+    // browser cache), say so: the coordinate fields keep working without them.
+    let failed = 0;
     L.tileLayer(ADMIN_TILES.url, {
       attribution: ADMIN_TILES.attribution,
       maxZoom: ADMIN_TILES.maxZoom,
-    }).addTo(instance);
+    })
+      .on("tileerror", () => {
+        failed += 1;
+        if (failed >= 3) setTilesFailing(true);
+      })
+      .on("tileload", () => {
+        failed = 0;
+        setTilesFailing(false);
+      })
+      .addTo(instance);
     instance.on("click", (event: L.LeafletMouseEvent) => {
       if (!locked.current)
         pick.current({ lat: round(event.latlng.lat), lng: round(event.latlng.lng) });
@@ -91,5 +104,16 @@ export default function MapPicker({ value, center, disabled, onPick }: MapPicker
     }
   }, [value, disabled]);
 
-  return <div ref={container} className="map-picker" aria-hidden="true" />;
+  return (
+    <>
+      <div ref={container} className="map-picker" aria-hidden="true" />
+      {tilesFailing ? (
+        <p className="field-error" role="status">
+          No se pudieron cargar las imágenes del mapa (sin conexión o bloqueadas por la red o la
+          caché del navegador). Puedes escribir o pegar las coordenadas igual; si el problema sigue,
+          recarga la página sin caché.
+        </p>
+      ) : null}
+    </>
+  );
 }

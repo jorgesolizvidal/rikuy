@@ -18,6 +18,7 @@ import type {
   DiscardDraftOutcome,
   RestoreContentOutcome,
 } from "./ports";
+import { PORTAL_PATHS } from "./portal";
 
 /** Owners, admins and editors write drafts and upload photos. */
 export function canEditContent(role: MembershipRole): boolean {
@@ -78,6 +79,8 @@ export interface DestinationEditor {
   readonly editCount: number | null;
   readonly canEdit: boolean;
   readonly canPublish: boolean;
+  /** Public page of the destination, or null while it is not published (or no portal). */
+  readonly portalPath: { readonly hostname: string; readonly path: string } | null;
 }
 
 export async function loadDestinationEditor(
@@ -85,7 +88,10 @@ export async function loadDestinationEditor(
   contentId: string,
   repository: ContentRepository,
 ): Promise<DestinationEditor | null> {
-  const record = await repository.findDestination(membership.tenantId, contentId);
+  const [record, hostname] = await Promise.all([
+    repository.findDestination(membership.tenantId, contentId),
+    repository.portalHostname(membership.tenantId),
+  ]);
   if (record === null) return null;
   const document = record.draft?.document ?? record.published?.document;
   if (!document) return null;
@@ -95,6 +101,10 @@ export async function loadDestinationEditor(
     editCount: record.draft?.editCount ?? null,
     canEdit: canEditContent(membership.role),
     canPublish: canPublishContent(membership.role),
+    portalPath:
+      record.published && hostname
+        ? { hostname, path: PORTAL_PATHS.destination(record.slug) }
+        : null,
   };
 }
 

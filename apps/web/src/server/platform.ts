@@ -3,6 +3,7 @@ import "server-only";
 import { parsePlatformEnv, type PlatformEnv } from "@rikuy/config/env";
 import {
   createCachedPresentationReader,
+  createCachedPublishedDestinationReader,
   createCachedTenantDirectory,
   type PlatformHosts,
   type PublishedDestinationReader,
@@ -78,13 +79,20 @@ export function presentationReader(): PublishedPresentationReader {
   return presentations;
 }
 
-/** Anonymous reader of published destinations (only active tenants, sealed revisions). */
+/**
+ * Anonymous reader of published destinations (only active tenants, sealed revisions),
+ * cached per instance for a few seconds by tenant and slug: a publication reaches
+ * visitors within that window.
+ */
 export function publishedContentReader(): PublishedDestinationReader {
   if (publishedContent) return publishedContent;
   const { env } = platformSettings();
-  publishedContent = createSupabasePublishedContentReader({
-    url: env.NEXT_PUBLIC_SUPABASE_URL,
-    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-  });
+  publishedContent = createCachedPublishedDestinationReader(
+    createSupabasePublishedContentReader({
+      url: env.NEXT_PUBLIC_SUPABASE_URL,
+      publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    }),
+    { ttlMs: 30_000 },
+  );
   return publishedContent;
 }

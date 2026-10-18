@@ -12,11 +12,12 @@ import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
-import { publishedContentReader } from "@/server/platform";
+import { platformSettings, publishedContentReader } from "@/server/platform";
 
 import { SignOutButton } from "../../../../sign-out-button";
 import { DestinationEditor, type EditorValues } from "./destination-editor";
 import type { EditorImage } from "./image-fields";
+import { PortalShare } from "./portal-share";
 import { RevisionHistory } from "./revision-history";
 
 export const metadata: Metadata = { title: "Editar destino" };
@@ -121,19 +122,29 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
           hasPublished={record.published !== null}
           mapCenter={center}
         />
-        <aside className="history" aria-labelledby="historial">
-          <h2 id="historial">Historial de publicaciones</h2>
-          <p className="field-hint">
-            Cada publicación queda guardada. Volver a una versión la muestra otra vez a los
-            visitantes sin borrar las demás.
-          </p>
-          <RevisionHistory
-            org={membership.slug}
-            contentId={record.contentId}
-            entries={record.history}
-            publishedRevisionId={record.published?.revisionId ?? null}
-            canPublish={editor.canPublish}
-          />
+        <aside className="history">
+          {editor.portalPath ? (
+            <PortalShare
+              url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}
+              slug={record.slug}
+              title={published?.title ?? document.title}
+              portalOnline={membership.tenantStatus === "active"}
+            />
+          ) : null}
+          <section aria-labelledby="historial">
+            <h2 id="historial">Historial de publicaciones</h2>
+            <p className="field-hint">
+              Cada publicación queda guardada. Volver a una versión la muestra otra vez a los
+              visitantes sin borrar las demás.
+            </p>
+            <RevisionHistory
+              org={membership.slug}
+              contentId={record.contentId}
+              entries={record.history}
+              publishedRevisionId={record.published?.revisionId ?? null}
+              canPublish={editor.canPublish}
+            />
+          </section>
         </aside>
       </div>
     </main>

@@ -711,11 +711,12 @@ a.button-quiet {
   .editor-layout {
     grid-template-columns: minmax(0, 1fr) minmax(16rem, 22rem);
   }
+}
 
-  .history {
-    position: sticky;
-    top: 1.5rem;
-  }
+.history {
+  display: grid;
+  gap: 2rem;
+  align-content: start;
 }
 
 .destination-form {
@@ -935,4 +936,45 @@ a.button-quiet {
 
 .history-list .inline-form {
   justify-content: flex-start;
+}
+
+/* ── Destination: link and QR for visitors ─────────────────────────────── */
+
+.portal-share {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.portal-share h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.portal-share p {
+  margin: 0;
+}
+
+.portal-share a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+.portal-share-url {
+  overflow-wrap: anywhere;
+}
+
+.portal-share .qr {
+  display: block;
+  margin: 0.5rem 0;
+  background: #fff;
+  border-radius: 0.5rem;
+}
+
+.qr-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
 }

@@ -1,6 +1,7 @@
 import { createClient, type PostgrestError } from "@supabase/supabase-js";
 import {
   destinationDocumentSchema,
+  richTextSchema,
   type ContentRepository,
   type ContentStatus,
   type DestinationDocument,
@@ -271,6 +272,12 @@ export function createContentRepository(client: SessionClient): ContentRepositor
       }
       return { status: "discarded" };
     },
+
+    async portalHostname(tenantId) {
+      const { data, error } = await client.rpc("tenant_portal_host", { p_tenant_id: tenantId });
+      if (error) throw unexpected("Reading the portal address", error);
+      return z.string().nullable().parse(data);
+    },
   };
 }
 
@@ -281,9 +288,16 @@ export interface SupabasePublishedContentReaderOptions {
   readonly fetch?: typeof fetch;
 }
 
-const imageSchema = z
-  .object({ assetId: z.uuid(), version: z.number().int(), alt: z.string() })
-  .nullable();
+const publicImageSchema = z.object({
+  assetId: z.uuid(),
+  version: z.number().int(),
+  alt: z.string(),
+  width: z.number().int().positive(),
+  height: z.number().int().positive(),
+});
+
+const point = (latitude: number | null, longitude: number | null) =>
+  latitude === null || longitude === null ? null : { lat: latitude, lng: longitude };
 
 export function createSupabasePublishedContentReader(
   options: SupabasePublishedContentReaderOptions,
@@ -297,51 +311,52 @@ export function createSupabasePublishedContentReader(
   return {
     async list(tenantId) {
       const { data, error } = await client
-        .rpc("list_published_destinations", { p_tenant_id: tenantId })
+        .rpc("portal_destinations", { p_tenant_id: tenantId })
         .abortSignal(AbortSignal.timeout(timeoutMs));
       if (error) throw unexpected("Listing published destinations", error);
       return z
         .array(
           z.object({
-            content_id: z.uuid(),
             slug: z.string(),
-            revision_no: z.number().int(),
             title: z.string(),
             summary: z.string(),
             latitude: z.number().nullable(),
             longitude: z.number().nullable(),
-            cover: imageSchema,
+            cover: publicImageSchema.nullable(),
             published_at: z.string(),
+            updated_at: z.string(),
           }),
         )
         .parse(data)
         .map((row) => ({
-          contentId: row.content_id,
           slug: row.slug,
-          revisionNo: row.revision_no,
           title: row.title,
           summary: row.summary,
-          location:
-            row.latitude === null || row.longitude === null
-              ? null
-              : { lat: row.latitude, lng: row.longitude },
+          location: point(row.latitude, row.longitude),
           cover: row.cover,
           publishedAt: row.published_at,
+          updatedAt: row.updated_at,
         }));
     },
 
     async find(tenantId, slug) {
       const { data, error } = await client
-        .rpc("get_published_destination", { p_tenant_id: tenantId, p_slug: slug })
+        .rpc("portal_destination", { p_tenant_id: tenantId, p_slug: slug })
         .abortSignal(AbortSignal.timeout(timeoutMs));
       if (error) throw unexpected("Reading a published destination", error);
       const [row] = z
         .array(
           z.object({
-            content_id: z.uuid(),
             slug: z.string(),
             revision_no: z.number().int(),
-            document: z.unknown(),
+            title: z.string(),
+            summary: z.string(),
+            body: richTextSchema,
+            latitude: z.number().nullable(),
+            longitude: z.number().nullable(),
+            cover: publicImageSchema.nullable(),
+            // An image unpublished later would come back null: drop it rather than break.
+            gallery: z.array(publicImageSchema.nullable()),
             published_at: z.string(),
             updated_at: z.string(),
           }),
@@ -350,10 +365,14 @@ export function createSupabasePublishedContentReader(
         .parse(data);
       return row
         ? {
-            contentId: row.content_id,
             slug: row.slug,
             revisionNo: row.revision_no,
-            document: parseDocument(row.document),
+            title: row.title,
+            summary: row.summary,
+            body: row.body,
+            location: point(row.latitude, row.longitude),
+            cover: row.cover,
+            gallery: row.gallery.filter((image) => image !== null),
             publishedAt: row.published_at,
             updatedAt: row.updated_at,
           }
