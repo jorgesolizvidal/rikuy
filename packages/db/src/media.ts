@@ -1,11 +1,12 @@
 import { createClient, type PostgrestError } from "@supabase/supabase-js";
-import type {
-  CreateUploadOutcome,
-  DerivedFile,
-  ImageProcessor,
-  ImageVersionRecord,
-  MediaAdmin,
-  MediaRepository,
+import {
+  CONTENT_IMAGE_WIDTHS,
+  type CreateUploadOutcome,
+  type DerivedFile,
+  type ImageProcessor,
+  type ImageVersionRecord,
+  type MediaAdmin,
+  type MediaRepository,
 } from "@rikuy/core";
 import sharp from "sharp";
 import { z } from "zod";
@@ -134,6 +135,22 @@ export function createMediaRepository(client: SessionClient): MediaRepository {
         .createSignedUrl(path, PREVIEW_SECONDS);
       return error || !data ? null : data.signedUrl;
     },
+
+    async signedPreviewUrls(paths) {
+      const unique = [...new Set(paths)];
+      if (unique.length === 0) return new Map();
+      const { data, error } = await client.storage
+        .from(MEDIA_BUCKETS.originals)
+        .createSignedUrls(unique, PREVIEW_SECONDS);
+      if (error || !data) return new Map();
+      return new Map(
+        data.flatMap((entry) =>
+          entry.path && entry.signedUrl && !entry.error
+            ? [[entry.path, entry.signedUrl] as const]
+            : [],
+        ),
+      );
+    },
   };
 }
 
@@ -206,7 +223,7 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
         const { error: uploadError } = await admin.storage
           .from(MEDIA_BUCKETS.public)
           .upload(`${prefix}${name}`, source.data, {
-            contentType: source.data.type || (name.endsWith(".png") ? "image/png" : "image/webp"),
+            contentType: name.endsWith(".png") ? "image/png" : "image/webp",
             upsert: true,
             // Versioned path: the content never changes, so caches may keep it forever.
             cacheControl: "31536000",
@@ -220,6 +237,25 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
 /** Logo derivatives: at most 512 px, WebP for pages and PNG for app icons. */
 export function createSharpImageProcessor(): ImageProcessor {
   return {
+    async contentDerivatives(original) {
+      // Photos up to 8192 px per side (CONTENT_IMAGE_RULES); EXIF orientation applied, then
+      // every derivative is re-encoded without metadata (no GPS of the photographer).
+      const base = sharp(original, { failOn: "error", limitInputPixels: 8192 * 8192 }).rotate();
+      return Promise.all(
+        CONTENT_IMAGE_WIDTHS.map(async (width) => ({
+          name: `w${width}.webp`,
+          contentType: "image/webp" as const,
+          bytes: new Uint8Array(
+            await base
+              .clone()
+              .resize({ width, withoutEnlargement: true })
+              .webp({ quality: 80, effort: 4 })
+              .toBuffer(),
+          ),
+        })),
+      );
+    },
+
     async logoDerivatives(original) {
       // failOn: reject truncated or corrupt files; limitInputPixels: no decompression bombs.
       const base = sharp(original, { failOn: "error", limitInputPixels: 4096 * 4096 })
