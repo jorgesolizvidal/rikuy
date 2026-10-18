@@ -52,6 +52,10 @@ export default function MapPicker({ value, center, disabled, onPick }: MapPicker
     L.tileLayer(ADMIN_TILES.url, {
       attribution: ADMIN_TILES.attribution,
       maxZoom: ADMIN_TILES.maxZoom,
+      // The admin host sends `Referrer-Policy: same-origin`, so by default tile requests
+      // would carry no Referer, and OpenStreetMap's usage policy blocks those (403
+      // "Access blocked"). Tiles alone send the origin — never the page path.
+      referrerPolicy: ADMIN_TILES.referrerPolicy,
     })
       .on("tileerror", () => {
         failed += 1;
@@ -91,7 +95,7 @@ export default function MapPicker({ value, center, disabled, onPick }: MapPicker
         icon: MARKER,
         draggable: !disabled,
         keyboard: false,
-        title: "Ubicación del destino",
+        title: "Ubicación",
       }).addTo(instance);
       pin.on("dragend", () => {
         const point = pin.getLatLng();

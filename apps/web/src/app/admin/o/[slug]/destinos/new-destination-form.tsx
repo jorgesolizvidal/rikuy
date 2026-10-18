@@ -4,19 +4,51 @@ import { DESTINATION_LIMITS, suggestContentSlug } from "@rikuy/core";
 import { useRouter } from "next/navigation";
 import { useActionState, useEffect, useId, useState } from "react";
 
-import { createDestinationAction, type CreateDestinationState } from "./actions";
+import {
+  createDestinationAction,
+  type ContentKindName,
+  type CreateDestinationState,
+} from "./actions";
 
-const MESSAGES: Partial<Record<CreateDestinationState["status"], string>> = {
-  invalid_title: "Escribe el nombre del destino en una línea, hasta 120 caracteres.",
-  invalid_slug:
-    "La dirección solo admite minúsculas, números y guiones, por ejemplo mirador-del-valle.",
-  slug_taken: "Ya existe un destino con esa dirección. Elige otra.",
-  forbidden: "Tu rol no permite crear destinos.",
-  signed_out: "Tu sesión venció. Inicia sesión de nuevo.",
-  error: "No se pudo crear. Inténtalo de nuevo en unos segundos.",
-};
+const WORDS = {
+  destination: {
+    one: "destino",
+    many: "destinos",
+    article: "un",
+    example: "mirador-del-valle",
+    path: "destinos",
+  },
+  event: {
+    one: "evento",
+    many: "eventos",
+    article: "un",
+    example: "feria-del-choclo",
+    path: "agenda",
+  },
+} as const;
 
-export function NewDestinationForm({ org }: { readonly org: string }) {
+function messages(
+  kind: ContentKindName,
+): Partial<Record<CreateDestinationState["status"], string>> {
+  const words = WORDS[kind];
+  return {
+    invalid_title: `Escribe el nombre del ${words.one} en una línea, hasta 120 caracteres.`,
+    invalid_slug: `La dirección solo admite minúsculas, números y guiones, por ejemplo ${words.example}.`,
+    slug_taken: `Ya existe ${words.article} ${words.one} con esa dirección. Elige otra.`,
+    forbidden: `Tu rol no permite crear ${words.many}.`,
+    signed_out: "Tu sesión venció. Inicia sesión de nuevo.",
+    error: "No se pudo crear. Inténtalo de nuevo en unos segundos.",
+  };
+}
+
+export function NewDestinationForm({
+  org,
+  kind = "destination",
+}: {
+  readonly org: string;
+  readonly kind?: ContentKindName;
+}) {
+  const words = WORDS[kind];
   const router = useRouter();
   const id = useId();
   const [state, action, pending] = useActionState(createDestinationAction, {
@@ -28,16 +60,17 @@ export function NewDestinationForm({ org }: { readonly org: string }) {
 
   useEffect(() => {
     if (state.status === "created" && state.contentId) {
-      router.push(`/o/${org}/destinos/${state.contentId}`);
+      router.push(`/o/${org}/${words.path}/${state.contentId}`);
     }
-  }, [state, org, router]);
+  }, [state, org, router, words.path]);
 
-  const message = MESSAGES[state.status];
+  const message = messages(kind)[state.status];
   const slugInvalid = state.status === "invalid_slug" || state.status === "slug_taken";
 
   return (
     <form action={action} className="invite-form">
       <input type="hidden" name="org" value={org} />
+      <input type="hidden" name="kind" value={kind} />
       <div className="field">
         <label htmlFor={`${id}-title`}>Nombre</label>
         <input
@@ -70,11 +103,11 @@ export function NewDestinationForm({ org }: { readonly org: string }) {
           }}
         />
         <span id={`${id}-slug-hint`} className="field-hint">
-          Forma parte del enlace del destino. Se completa sola a partir del nombre.
+          Forma parte del enlace del {words.one}. Se completa sola a partir del nombre.
         </span>
       </div>
       <button type="submit" className="button" disabled={pending || title.trim() === ""}>
-        {pending ? "Creando…" : "Crear destino"}
+        {pending ? "Creando…" : `Crear ${words.one}`}
       </button>
       {message ? (
         <span className="field-error" role="status">

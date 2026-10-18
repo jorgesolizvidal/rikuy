@@ -93,6 +93,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         </a>
         <nav aria-label="Principal" className="portal-nav">
           <a href={PORTAL_PATHS.destinations}>Destinos</a>
+          <a href={PORTAL_PATHS.agenda}>Agenda</a>
           <InstallButton siteName={identity.siteName} />
         </nav>
       </header>

@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createContentRepository, createSupabasePublishedContentReader } from "./content";
+import {
+  createContentRepository,
+  createSupabasePublishedContentReader,
+  createSupabasePublishedEventReader,
+} from "./content";
 import { createSessionClient } from "./session-client";
 
 const BASE = "http://127.0.0.1:54321";
@@ -209,5 +213,93 @@ describe("published destination reader", () => {
       fetch: async () => json([]),
     });
     expect(await reader.find(TENANT, "nada")).toBeNull();
+  });
+});
+
+describe("events", () => {
+  it("lists the panel agenda with status and whether each event ended", async () => {
+    const { repo, calls } = session(() =>
+      json([
+        {
+          content_id: CONTENT,
+          slug: "feria",
+          title: "Feria",
+          has_draft: true,
+          is_published: true,
+          schedule: { allDay: true, start: "2026-11-02", end: "2026-11-03" },
+          starts_at: "2026-11-02T04:00:00+00:00",
+          ends_at: "2026-11-04T04:00:00+00:00",
+          ended: false,
+          updated_at: "2026-10-18T00:00:00Z",
+          published_at: "2026-10-17T00:00:00Z",
+        },
+      ]),
+    );
+    expect(await repo.listEvents(TENANT)).toEqual([
+      {
+        contentId: CONTENT,
+        slug: "feria",
+        title: "Feria",
+        status: "changed",
+        schedule: { allDay: true, start: "2026-11-02", end: "2026-11-03" },
+        ended: false,
+        updatedAt: "2026-10-18T00:00:00Z",
+        publishedAt: "2026-10-17T00:00:00Z",
+      },
+    ]);
+    expect(calls[0]?.path).toBe("/rest/v1/rpc/list_content_events");
+  });
+
+  it("creates events with their kind and reports a rejected venue", async () => {
+    const created = session(() => json([{ content_id: CONTENT }]));
+    expect(await created.repo.createEvent(TENANT, "feria", "Feria")).toEqual({
+      status: "created",
+      contentId: CONTENT,
+    });
+    expect(created.calls[0]?.body).toMatchObject({ p_kind: "event", p_slug: "feria" });
+    const venue = session(() => pgError("23514", 400, "venue"));
+    expect(await venue.repo.saveDraft(TENANT, CONTENT, doc, 1)).toEqual({
+      status: "invalid",
+      reason: "venue",
+    });
+  });
+
+  it("only finds items of the requested kind", async () => {
+    const { repo, calls } = session(() => json(null));
+    expect(await repo.findEvent(TENANT, CONTENT)).toBeNull();
+    expect(calls[0]?.path).toContain("kind=eq.event");
+    await repo.findDestination(TENANT, CONTENT);
+    expect(calls[1]?.path).toContain("kind=eq.destination");
+  });
+
+  it("reads upcoming events with instants and their venue", async () => {
+    const reader = createSupabasePublishedEventReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      fetch: async () =>
+        json([
+          {
+            slug: "feria",
+            title: "Feria",
+            summary: "Música",
+            schedule: { allDay: false, start: "2026-11-02T19:00", end: "2026-11-02T22:00" },
+            starts_at: "2026-11-02T23:00:00+00:00",
+            ends_at: "2026-11-03T02:00:00+00:00",
+            latitude: -17.39,
+            longitude: -66.15,
+            cover: null,
+            venue: { slug: "mirador", title: "Mirador" },
+            published_at: "2026-10-18T00:00:00Z",
+            updated_at: "2026-10-18T01:00:00Z",
+          },
+        ]),
+    });
+    const [event] = await reader.list(TENANT);
+    expect(event).toMatchObject({
+      startsAt: "2026-11-02T23:00:00.000Z",
+      endsAt: "2026-11-03T02:00:00.000Z",
+      location: { lat: -17.39, lng: -66.15 },
+      venue: { slug: "mirador", title: "Mirador" },
+    });
   });
 });

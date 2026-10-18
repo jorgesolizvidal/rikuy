@@ -135,5 +135,63 @@ from (values
 ) as v (id, published, published_at, draft)
 where i.id = v.id;
 
+-- Events (synthetic), dated relative to today in each tenant's time zone so the agenda
+-- always has something upcoming. Demo Norte: one upcoming (at a destination), one that
+-- already ended, one draft. Demo Sur: one upcoming all-day event.
+insert into public.content_items (id, tenant_id, kind, slug, created_by)
+values
+  ('5eed4100-0000-4000-8000-000000000011', '5eed1000-0000-4000-8000-000000000001', 'event', 'feria-del-choclo',
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4100-0000-4000-8000-000000000012', '5eed1000-0000-4000-8000-000000000001', 'event', 'festival-de-invierno',
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4100-0000-4000-8000-000000000013', '5eed1000-0000-4000-8000-000000000001', 'event', 'concierto-de-la-banda',
+   '5eed0000-0000-4000-8000-000000000003'),
+  ('5eed4100-0000-4000-8000-000000000014', '5eed1000-0000-4000-8000-000000000002', 'event', 'noche-de-estrellas',
+   '5eed0000-0000-4000-8000-000000000002');
+
+with today as (
+  select t.id as tenant_id, date_trunc('day', now() at time zone t.timezone) as day
+  from public.tenants t
+)
+insert into public.content_revisions
+  (id, tenant_id, content_id, revision_no, state, title, summary, body, latitude, longitude,
+   starts_local, ends_local, all_day, venue_content_id, created_by, sealed_at, sealed_by)
+select v.id::uuid, v.tenant_id::uuid, v.content_id::uuid, 1, v.state::public.config_state, v.title, v.summary,
+       v.body::jsonb, v.latitude, v.longitude,
+       today.day + v.starts_offset::interval, today.day + v.ends_offset::interval, v.all_day,
+       v.venue::uuid, v.created_by::uuid,
+       case when v.state = 'sealed' then now() - interval '1 day' end,
+       case when v.state = 'sealed' then v.created_by::uuid end
+from (values
+  ('5eed4200-0000-4000-8000-000000000011', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000011',
+   'sealed', 'Feria del choclo', 'Productores del valle, comida y música en el mirador.',
+   '[{"type": "paragraph", "children": [{"type": "text", "text": "Una feria de demostración con "},
+                                         {"type": "text", "text": "entrada libre", "marks": ["bold"]},
+                                         {"type": "text", "text": "."}]}]',
+   -17.3901, -66.1502, '10 days 10 hours', '10 days 18 hours', false, '5eed4100-0000-4000-8000-000000000001',
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4200-0000-4000-8000-000000000012', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000012',
+   'sealed', 'Festival de invierno', 'Un evento que ya terminó: no aparece en la agenda.',
+   '[]', -17.3925, -66.1540, '-40 days', '-38 days', true, null,
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4200-0000-4000-8000-000000000013', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000013',
+   'draft', 'Concierto de la banda', '', '[]', null, null, null, null, null, null,
+   '5eed0000-0000-4000-8000-000000000003'),
+  ('5eed4200-0000-4000-8000-000000000014', '5eed1000-0000-4000-8000-000000000002', '5eed4100-0000-4000-8000-000000000014',
+   'sealed', 'Noche de estrellas', 'Observación del cielo junto a la laguna, con guías locales.',
+   '[{"type": "paragraph", "children": [{"type": "text", "text": "Evento de demostración para el municipio Sur."}]}]',
+   -21.5302, -64.7298, '20 days', '21 days', true, '5eed4100-0000-4000-8000-000000000003',
+   '5eed0000-0000-4000-8000-000000000002')
+) as v (id, tenant_id, content_id, state, title, summary, body, latitude, longitude,
+        starts_offset, ends_offset, all_day, venue, created_by)
+join today on today.tenant_id = v.tenant_id::uuid;
+
+update public.content_items i
+set published_revision_id = case when r.state = 'sealed' then r.id end,
+    published_at = case when r.state = 'sealed' then now() - interval '1 day' end,
+    draft_revision_id = case when r.state = 'draft' then r.id end
+from public.content_revisions r
+where r.content_id = i.id and i.kind = 'event';
+
 insert into public.audit_events (scope, action, outcome, diff)
-values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3}');
+values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3, "events": 4}');

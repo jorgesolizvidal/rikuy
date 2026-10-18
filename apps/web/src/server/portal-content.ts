@@ -4,7 +4,7 @@ import { imageCandidates, type PublishedImage } from "@rikuy/core";
 import { publicMediaUrl } from "@rikuy/db";
 import { cache } from "react";
 
-import { platformSettings, publishedContentReader } from "./platform";
+import { platformSettings, publishedContentReader, publishedEventReader } from "./platform";
 import type { PortalView } from "./portal-view";
 
 /** What an <img> needs to load the right derivative and reserve its space. */
@@ -51,3 +51,13 @@ export const portalDestination = cache(async (view: PortalView, slug: string) =>
 export function portalOrigin(view: PortalView): string {
   return platformSettings().portalOrigin(view.context.tenant.canonicalHost ?? view.context.host);
 }
+
+/** Upcoming and ongoing events of the portal's tenant, soonest first. */
+export const portalEvents = cache(async (view: PortalView) =>
+  publishedEventReader().list(view.context.tenant.tenantId),
+);
+
+/** One published event (also after it ended), or null. */
+export const portalEvent = cache(async (view: PortalView, slug: string) =>
+  publishedEventReader().find(view.context.tenant.tenantId, slug),
+);

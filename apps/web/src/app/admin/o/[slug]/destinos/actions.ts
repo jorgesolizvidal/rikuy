@@ -3,13 +3,16 @@
 import {
   confirmContentImageUpload,
   createDestination,
+  createEvent,
   discardDestinationDraft,
   openOrganization,
   parseMarkup,
   publishDestination,
+  publishEvent,
   requestContentImageUpload,
   restoreDestinationRevision,
   saveDestinationDraft,
+  saveEventDraft,
   type ConfirmImageUploadResult,
   type DestinationIssue,
   type OrganizationMembership,
@@ -20,7 +23,7 @@ import { adminSession, currentAdminActor } from "@/server/admin-session";
 import { imageProcessor, mediaAdmin } from "@/server/media-admin";
 
 /*
- * Destination Server Actions. Every action re-opens the organization with the CURRENT
+ * Editorial content Server Actions (destinations and events). Every action re-opens the organization with the CURRENT
  * membership, calls one use case and returns state; the browser navigates or refreshes
  * itself (no redirects inside Server Actions, see CONTRIBUTING §1.2).
  */
@@ -41,7 +44,9 @@ async function context(
   return membership === null ? { status: "forbidden" } : { membership, session };
 }
 
-// ── New destination ──────────────────────────────────────────────────────────
+export type ContentKindName = "destination" | "event";
+
+// ── New destination or event ─────────────────────────────────────────────────
 
 export interface CreateDestinationState {
   readonly status:
@@ -63,11 +68,11 @@ export async function createDestinationAction(
   try {
     const access = await context(formData.get("org"));
     if (!("membership" in access)) return access;
-    const result = await createDestination(
-      access.membership,
-      { title: formData.get("title"), slug: formData.get("slug") },
-      access.session.content,
-    );
+    const input = { title: formData.get("title"), slug: formData.get("slug") };
+    const result =
+      formData.get("kind") === "event"
+        ? await createEvent(access.membership, input, access.session.content)
+        : await createDestination(access.membership, input, access.session.content);
     switch (result.status) {
       case "created":
         return { status: "created", contentId: result.contentId };
@@ -84,6 +89,7 @@ export async function createDestinationAction(
 // ── Editor: save draft / publish ─────────────────────────────────────────────
 
 export interface DestinationPayload {
+  readonly kind: ContentKindName;
   readonly org: string;
   readonly contentId: string;
   readonly intent: "save" | "publish";
@@ -103,6 +109,13 @@ export interface DestinationPayload {
     readonly version: number;
     readonly alt: string;
   }[];
+  /** Events only. */
+  readonly schedule?: {
+    readonly allDay: boolean;
+    readonly start: string;
+    readonly end: string;
+  } | null;
+  readonly venueId?: string | null;
 }
 
 export interface SaveDestinationState {
@@ -141,7 +154,7 @@ export async function saveDestinationAction(
         linkLines: parsed.problems.map((problem) => problem.line),
       };
     }
-    const document = {
+    const base = {
       title: payload.title,
       summary: payload.summary,
       body: parsed.blocks,
@@ -149,24 +162,43 @@ export async function saveDestinationAction(
       cover: payload.cover,
       gallery: payload.gallery,
     };
+    const { membership, session } = access;
+    const publish = payload.intent === "publish";
 
     const result =
-      payload.intent === "publish"
-        ? await publishDestination(
-            access.membership,
-            payload.contentId,
-            document,
-            payload.expectedEdit,
-            access.session.content,
-            mediaAdmin(),
-          )
-        : await saveDestinationDraft(
-            access.membership,
-            payload.contentId,
-            document,
-            payload.expectedEdit,
-            access.session.content,
-          );
+      payload.kind === "event"
+        ? publish
+          ? await publishEvent(
+              membership,
+              payload.contentId,
+              { ...base, schedule: payload.schedule ?? null, venueId: payload.venueId ?? null },
+              payload.expectedEdit,
+              session.content,
+              mediaAdmin(),
+            )
+          : await saveEventDraft(
+              membership,
+              payload.contentId,
+              { ...base, schedule: payload.schedule ?? null, venueId: payload.venueId ?? null },
+              payload.expectedEdit,
+              session.content,
+            )
+        : publish
+          ? await publishDestination(
+              membership,
+              payload.contentId,
+              base,
+              payload.expectedEdit,
+              session.content,
+              mediaAdmin(),
+            )
+          : await saveDestinationDraft(
+              membership,
+              payload.contentId,
+              base,
+              payload.expectedEdit,
+              session.content,
+            );
 
     switch (result.status) {
       case "saved":

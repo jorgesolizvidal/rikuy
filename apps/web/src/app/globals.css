@@ -134,7 +134,8 @@ body {
   font-size: 0.875rem;
 }
 
-.field input {
+.field input,
+.field select {
   font: inherit;
   font-weight: 400;
   font-size: 1rem;
@@ -146,6 +147,7 @@ body {
 }
 
 .field input:focus-visible,
+.field select:focus-visible,
 .button:focus-visible,
 .org-card:focus-visible {
   outline: 3px solid var(--accent);
@@ -977,4 +979,35 @@ a.button-quiet {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem 1.25rem;
+}
+
+/* ── Events: schedule fields and agenda ───────────────────────────────── */
+
+.schedule-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 11rem), 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.checkbox input[type="checkbox"] {
+  width: 1.125rem;
+  height: 1.125rem;
+  accent-color: var(--accent);
+}
+
+.agenda-section {
+  margin-top: 2rem;
+}
+
+.agenda-section h2 {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
 }

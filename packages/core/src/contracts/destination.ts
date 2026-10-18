@@ -52,7 +52,8 @@ export const destinationDocumentSchema = z.strictObject({
 });
 export type DestinationDocument = z.infer<typeof destinationDocumentSchema>;
 
-export type DestinationIssueCode = "invalid" | "required" | "media";
+/** `order`: the end of an event is before its start. */
+export type DestinationIssueCode = "invalid" | "required" | "media" | "order";
 
 export interface DestinationIssue {
   /** Dot path, e.g. `title`, `location`, `gallery.2.alt`. */

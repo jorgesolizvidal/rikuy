@@ -18,12 +18,15 @@ import { RichTextView } from "@/components/rich-text";
 import {
   discardDraftAction,
   saveDestinationAction,
+  type ContentKindName,
   type DestinationPayload,
   type RevisionActionState,
   type SaveDestinationState,
 } from "../actions";
 import { CoverField, GalleryField, type EditorImage } from "./image-fields";
 import { LocationField } from "./location-field";
+import { ScheduleField, VenueField, type VenueOption } from "./schedule-field";
+import { toSchedule, type ScheduleValues } from "./schedule-values";
 
 export interface EditorValues {
   readonly title: string;
@@ -32,9 +35,13 @@ export interface EditorValues {
   readonly location: { readonly lat: number; readonly lng: number } | null;
   readonly cover: EditorImage | null;
   readonly gallery: readonly EditorImage[];
+  /** Events only. */
+  readonly schedule?: ScheduleValues;
+  readonly venueId?: string | null;
 }
 
 interface DestinationEditorProps {
+  readonly kind: ContentKindName;
   readonly org: string;
   readonly contentId: string;
   readonly initial: EditorValues;
@@ -43,19 +50,28 @@ interface DestinationEditorProps {
   readonly canPublish: boolean;
   readonly hasPublished: boolean;
   readonly mapCenter: { readonly lat: number; readonly lng: number; readonly zoom: number };
+  /** Events: destinations that can be the venue, and the time zone note. */
+  readonly venues?: readonly VenueOption[];
+  readonly timezoneNote?: string;
 }
 
-const STATUS_MESSAGES: Partial<Record<SaveDestinationState["status"], string>> = {
-  saved: "Borrador guardado. Los visitantes siguen viendo la versión publicada.",
-  published: "Publicado. Los visitantes ya ven esta versión.",
-  invalid: "Revisa los campos marcados.",
-  conflict:
-    "Otra persona cambió este destino mientras editabas, así que tus cambios no se guardaron. Copia lo que necesites y recarga la página.",
-  forbidden: "Tu rol ya no permite este cambio.",
-  not_found: "Este destino ya no existe.",
-  signed_out: "Tu sesión venció. Inicia sesión de nuevo para guardar.",
-  error: "No pudimos guardar. Inténtalo de nuevo en unos segundos.",
-};
+const NOUN = { destination: "este destino", event: "este evento" } as const;
+
+function statusMessages(
+  kind: ContentKindName,
+): Partial<Record<SaveDestinationState["status"], string>> {
+  const noun = NOUN[kind];
+  return {
+    saved: "Borrador guardado. Los visitantes siguen viendo la versión publicada.",
+    published: "Publicado. Los visitantes ya ven esta versión.",
+    invalid: "Revisa los campos marcados.",
+    conflict: `Otra persona cambió ${noun} mientras editabas, así que tus cambios no se guardaron. Copia lo que necesites y recarga la página.`,
+    forbidden: "Tu rol ya no permite este cambio.",
+    not_found: `${noun.charAt(0).toUpperCase()}${noun.slice(1)} ya no existe.`,
+    signed_out: "Tu sesión venció. Inicia sesión de nuevo para guardar.",
+    error: "No pudimos guardar. Inténtalo de nuevo en unos segundos.",
+  };
+}
 
 const FIELD_MESSAGES = {
   title: "Escribe el nombre en una línea, hasta 120 caracteres.",
@@ -66,11 +82,18 @@ const FIELD_MESSAGES = {
   location: "Revisa la ubicación.",
   images: "Una de las fotos ya no está disponible. Quítala y vuelve a subirla.",
   alt: "Escribe la descripción de cada foto.",
+  scheduleRequired: "Indica cuándo es: los visitantes lo necesitan para ir.",
+  scheduleOrder: "El final no puede ser antes del inicio.",
+  schedule: "Revisa la fecha y la hora (un evento dura como máximo un año).",
+  venue: "Ese destino ya no está disponible. Elige otro o ninguno.",
 } as const;
 
 function fieldErrors(issues: readonly DestinationIssue[] = []) {
   const errors: Partial<
-    Record<"title" | "summary" | "body" | "location" | "images" | "coverAlt", string>
+    Record<
+      "title" | "summary" | "body" | "location" | "images" | "coverAlt" | "schedule" | "venue",
+      string
+    >
   > = {};
   const galleryAlts = new Set<number>();
   for (const issue of issues) {
@@ -84,6 +107,14 @@ function fieldErrors(issues: readonly DestinationIssue[] = []) {
       errors.location =
         issue.code === "required" ? FIELD_MESSAGES.locationRequired : FIELD_MESSAGES.location;
     else if (head === "images") errors.images = FIELD_MESSAGES.images;
+    else if (head === "schedule")
+      errors.schedule =
+        issue.code === "required"
+          ? FIELD_MESSAGES.scheduleRequired
+          : issue.code === "order"
+            ? FIELD_MESSAGES.scheduleOrder
+            : FIELD_MESSAGES.schedule;
+    else if (head === "venueId") errors.venue = FIELD_MESSAGES.venue;
     else if (head === "cover") errors.coverAlt = FIELD_MESSAGES.alt;
     else if (head === "gallery" && third === "alt") galleryAlts.add(Number(second));
     else if (head === "gallery") errors.images = FIELD_MESSAGES.images;
@@ -98,6 +129,7 @@ const toImage = (image: EditorImage) => ({
 });
 
 export function DestinationEditor({
+  kind,
   org,
   contentId,
   initial,
@@ -106,11 +138,14 @@ export function DestinationEditor({
   canPublish,
   hasPublished,
   mapCenter,
+  venues = [],
+  timezoneNote = "",
 }: DestinationEditorProps) {
   const router = useRouter();
   const id = useId();
   const formRef = useRef<HTMLFormElement>(null);
   const [values, setValues] = useState<EditorValues>(initial);
+  const [venueNote, setVenueNote] = useState("");
   // The action result also remembers what is stored, to tell unsaved changes apart.
   const [state, dispatch, pending] = useActionState(
     async (
@@ -164,6 +199,7 @@ export function DestinationEditor({
     event.preventDefault();
     const submitter = (event.nativeEvent as SubmitEvent).submitter as HTMLButtonElement | null;
     const payload: DestinationPayload = {
+      kind,
       org,
       contentId,
       intent: submitter?.value === "publish" ? "publish" : "save",
@@ -174,6 +210,12 @@ export function DestinationEditor({
       location: values.location,
       cover: values.cover ? toImage(values.cover) : null,
       gallery: values.gallery.map(toImage),
+      ...(kind === "event"
+        ? {
+            schedule: values.schedule ? toSchedule(values.schedule) : null,
+            venueId: values.venueId ?? null,
+          }
+        : {}),
     };
     startTransition(() => dispatch({ payload, snapshot: JSON.stringify(values) }));
   }
@@ -183,7 +225,7 @@ export function DestinationEditor({
       ? dirty
         ? "Tienes cambios sin guardar."
         : ""
-      : `${STATUS_MESSAGES[state.status] ?? ""}${
+      : `${statusMessages(kind)[state.status] ?? ""}${
           state.status === "published" && state.revisionNo ? ` (versión ${state.revisionNo})` : ""
         }`;
 
@@ -281,6 +323,47 @@ export function DestinationEditor({
           )}
         </section>
       </fieldset>
+
+      {kind === "event" && values.schedule ? (
+        <ScheduleField
+          value={values.schedule}
+          disabled={locked}
+          error={errors.schedule}
+          timezoneNote={timezoneNote}
+          onChange={(schedule) => set("schedule", schedule)}
+        />
+      ) : null}
+
+      {kind === "event" ? (
+        <fieldset disabled={locked}>
+          <legend>Lugar</legend>
+          <VenueField
+            value={values.venueId ?? null}
+            options={venues}
+            disabled={locked}
+            error={errors.venue}
+            onChange={(venue) => {
+              setValues((current) => ({
+                ...current,
+                venueId: venue?.contentId ?? null,
+                ...(venue?.location ? { location: venue.location } : {}),
+              }));
+              setVenueNote(
+                venue?.location
+                  ? `Se copió la ubicación de «${venue.title}».`
+                  : venue
+                    ? `«${venue.title}» aún no tiene una ubicación publicada: marca el punto abajo.`
+                    : "",
+              );
+            }}
+          />
+          {venueNote ? (
+            <p className="field-hint" role="status">
+              {venueNote}
+            </p>
+          ) : null}
+        </fieldset>
+      ) : null}
 
       <LocationField
         value={values.location}
