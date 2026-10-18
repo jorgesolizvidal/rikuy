@@ -1,6 +1,6 @@
 import "@fontsource-variable/bricolage-grotesque";
 
-import { loadBrandingEditor, ROLE_LABELS } from "@rikuy/core";
+import { loadBrandingEditor, logoPreviewUrl, ROLE_LABELS } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -27,7 +27,9 @@ const DATE = new Intl.DateTimeFormat("es-BO", {
 
 export default async function BrandingPage({ params }: BrandingPageProps) {
   const membership = await requireOrganization((await params).slug);
-  const editor = await loadBrandingEditor(membership, (await adminSession()).config);
+  const session = await adminSession();
+  const editor = await loadBrandingEditor(membership, session.config);
+  const logoPreview = await logoPreviewUrl(membership.tenantId, editor.initial, session.media);
   const portalUrl = editor.portalHostname
     ? platformSettings().portalOrigin(editor.portalHostname)
     : null;
@@ -70,6 +72,7 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
         initial={valuesFromPresentation(editor.initial)}
         revision={editor.draft?.revision ?? null}
         canEdit={editor.canEdit}
+        logoPreviewUrl={logoPreview}
       />
     </main>
   );

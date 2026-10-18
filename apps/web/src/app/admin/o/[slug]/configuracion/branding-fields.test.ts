@@ -38,6 +38,30 @@ describe("branding form mapping", () => {
       expect(valuesFromPresentation(result.value).social.instagram).toContain("instagram");
   });
 
+  it("carries the logo reference only when both hidden fields are present", () => {
+    const asset = "5eed4000-0000-4000-8000-000000000001";
+    const withLogo = presentationInputFromForm(
+      form({ ...filled, "logo.assetId": asset, "logo.version": "2" }),
+    );
+    expect(withLogo.logo).toEqual({ assetId: asset, version: 2 });
+    const result = validatePresentation(withLogo);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(valuesFromPresentation(result.value)).toMatchObject({
+        logoAssetId: asset,
+        logoVersion: "2",
+      });
+    }
+    expect(presentationInputFromForm(form(filled))).not.toHaveProperty("logo");
+
+    const forged = presentationInputFromForm(
+      form({ ...filled, "logo.assetId": "https://evil.example.test/x.svg", "logo.version": "1e3" }),
+    );
+    const refused = validatePresentation(forged);
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(Object.keys(fieldErrors(refused.issues, []))).toEqual(["logo"]);
+  });
+
   it("ignores fields that are not part of the contract", () => {
     const input = presentationInputFromForm(
       form({ ...filled, css: "body{}", "social.myspace": "https://x" }),

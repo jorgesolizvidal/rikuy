@@ -21,7 +21,13 @@ const CHECK_LABELS: Readonly<Record<ContrastCheck, string>> = {
 const ratio = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 1 });
 
 /** Live preview of the portal header and hero with WCAG contrast checks. */
-export function BrandingPreview({ values }: { readonly values: BrandingValues }) {
+export function BrandingPreview({
+  values,
+  logoUrl,
+}: {
+  readonly values: BrandingValues;
+  readonly logoUrl: string | null;
+}) {
   const brand = values.brand.trim().toLowerCase();
   const accent = values.accent.trim().toLowerCase();
   const colorsValid = isHexColor(brand) && isHexColor(accent);
@@ -41,7 +47,13 @@ export function BrandingPreview({ values }: { readonly values: BrandingValues })
           aria-hidden="true"
         >
           <div className="preview-header">
-            <span className="preview-mark">{monogram(shortName)}</span>
+            {logoUrl ? (
+              // Short-lived signed URL from Storage (see LogoField).
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="preview-logo" src={logoUrl} alt="" />
+            ) : (
+              <span className="preview-mark">{monogram(shortName)}</span>
+            )}
             <span>{values.siteName || "Nombre del portal"}</span>
           </div>
           <p className="preview-title">{values.siteName || "Nombre del portal"}</p>

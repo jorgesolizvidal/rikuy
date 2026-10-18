@@ -7,6 +7,8 @@ import http from "node:http";
 const port = Number(process.argv[2] ?? 3000);
 // After the integration suite, the ZC-01 rehearsal tenant exists and must be live too.
 const zc01 = process.argv.includes("--zc01");
+// After the integration suite, Demo Norte has a published logo (media.int.test.ts).
+const withLogo = process.argv.includes("--logo");
 
 function get(host, path) {
   return new Promise((resolve, reject) => {
@@ -30,8 +32,20 @@ function get(host, path) {
 }
 
 const portals = [
-  { host: "demo-norte.localhost", name: "Municipio Demo Norte", brand: "#1f6f4a", mode: "light" },
-  { host: "demo-sur.localhost", name: "Municipio Demo Sur", brand: "#f0a868", mode: "dark" },
+  {
+    host: "demo-norte.localhost",
+    name: "Municipio Demo Norte",
+    brand: "#1f6f4a",
+    mode: "light",
+    logo: withLogo,
+  },
+  {
+    host: "demo-sur.localhost",
+    name: "Municipio Demo Sur",
+    brand: "#f0a868",
+    mode: "dark",
+    logo: false,
+  },
 ];
 
 let checks = 0;
@@ -52,6 +66,24 @@ for (const portal of portals) {
   // No other tenant's brand leaks into this page.
   for (const other of portals.filter((p) => p !== portal)) {
     check(() => assert.doesNotMatch(html, new RegExp(other.name)));
+  }
+
+  // Logo: a versioned public derivative from Storage, or the monogram when there is none.
+  const logoSrc = /<img class="portal-logo" src="([^"]+)"/.exec(html)?.[1];
+  if (portal.logo) {
+    check(() => assert.ok(logoSrc, `${portal.host} shows its logo`));
+    check(() =>
+      assert.match(
+        logoSrc,
+        /\/storage\/v1\/object\/public\/media-public\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/\d+\/logo\.webp$/,
+      ),
+    );
+    const image = await fetch(logoSrc);
+    check(() => assert.equal(image.status, 200, "logo is publicly reachable"));
+    check(() => assert.equal(image.headers.get("content-type"), "image/webp"));
+    check(() => assert.match(html, /<meta property="og:image" content="[^"]+\/logo\.png"/));
+  } else {
+    check(() => assert.equal(logoSrc, undefined, `${portal.host} uses the monogram`));
   }
 
   const manifest = await get(portal.host, "/manifest.webmanifest");

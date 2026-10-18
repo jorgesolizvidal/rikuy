@@ -96,9 +96,9 @@ jobs:
       - name: Install
         run: pnpm install --frozen-lockfile
 
-      # Postgres + Auth + PostgREST + API gateway + Mailpit; everything else is skipped.
+      # Postgres + Auth + PostgREST + Storage + API gateway + Mailpit; everything else is skipped.
       - name: Start Supabase
-        run: pnpm exec supabase start -x realtime,storage-api,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+        run: pnpm exec supabase start -x realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
 
       - name: Export local credentials
         run: |
@@ -112,7 +112,7 @@ jobs:
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
           } >> "$GITHUB_ENV"
 
-      - name: Sign-in, membership, branding and onboarding (ZC-01) tests
+      - name: Sign-in, membership, branding, media and onboarding (ZC-01) tests
         run: |
           set -o pipefail
           pnpm --filter @rikuy/db test:integration 2>&1 | tee integration.log
@@ -142,7 +142,7 @@ jobs:
           cd apps/web
           pnpm exec next start -p 3000 > ../../next.log 2>&1 &
           for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3000 && break; sleep 1; done
-          node e2e/portals.e2e.mjs 3000 --zc01 2>&1 | tee ../../e2e.log
+          node e2e/portals.e2e.mjs 3000 --zc01 --logo 2>&1 | tee ../../e2e.log
 
       - name: Report portal failure
         if: failure()

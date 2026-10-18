@@ -222,3 +222,11 @@
   font-size: 0.875rem;
   color: var(--muted);
 }
+
+.portal-logo {
+  display: block;
+  height: 2.5rem;
+  width: auto;
+  max-width: 10rem;
+  object-fit: contain;
+}
