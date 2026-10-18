@@ -1,4 +1,4 @@
-import { canManageBranding, canManageMembers, ROLE_LABELS } from "@rikuy/core";
+import { canEditContent, canManageBranding, canManageMembers, ROLE_LABELS } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -29,6 +29,15 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
       <p className="lead">Tu rol: {ROLE_LABELS[membership.role]}.</p>
       <ul className="org-list">
         <li>
+          <Link href={`/o/${membership.slug}/destinos`} className="org-card">
+            <span>
+              <span className="org-name">Destinos</span>
+              <span className="org-detail">Lugares para visitar: texto, ubicación y fotos</span>
+            </span>
+            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
               <span className="org-name">Marca del portal</span>
@@ -52,7 +61,7 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
         ) : null}
       </ul>
       <p className="notice">
-        Destinos, agenda, recorridos 360° y medios llegarán en las siguientes etapas.
+        La agenda, el mapa del portal y los recorridos 360° llegarán en las siguientes etapas.
       </p>
     </main>
   );

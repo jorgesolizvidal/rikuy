@@ -92,5 +92,48 @@ from public.tenant_domains d, public.tenant_config_versions c
 where d.tenant_id = t.id and d.kind = 'platform'
   and c.tenant_id = t.id and c.state = 'sealed';
 
+-- Destinations (synthetic). Demo Norte: one published destination with two sealed
+-- revisions (the second is live) and one never-published draft. Demo Sur: one published.
+insert into public.content_items (id, tenant_id, kind, slug, created_by)
+values
+  ('5eed4100-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 'destination', 'mirador-del-valle',
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4100-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000001', 'destination', 'feria-de-los-domingos',
+   '5eed0000-0000-4000-8000-000000000003'),
+  ('5eed4100-0000-4000-8000-000000000003', '5eed1000-0000-4000-8000-000000000002', 'destination', 'laguna-espejo',
+   '5eed0000-0000-4000-8000-000000000002');
+
+insert into public.content_revisions
+  (id, tenant_id, content_id, revision_no, state, title, summary, body, latitude, longitude, created_by, sealed_at, sealed_by)
+values
+  ('5eed4200-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001',
+   1, 'sealed', 'Mirador del Valle', 'Vista panorámica del valle al atardecer.',
+   '[{"type": "paragraph", "children": [{"type": "text", "text": "Un mirador de demostración."}]}]',
+   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '2 days', '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4200-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001',
+   2, 'sealed', 'Mirador del Valle', 'El mejor punto para ver el valle al atardecer, a 15 minutos de la plaza.',
+   '[{"type": "heading", "level": 2, "children": [{"type": "text", "text": "Cómo llegar"}]},
+     {"type": "paragraph", "children": [{"type": "text", "text": "Sube por el camino de herradura desde la plaza. "},
+                                        {"type": "text", "text": "Lleva agua", "marks": ["bold"]},
+                                        {"type": "text", "text": "."}]},
+     {"type": "list", "ordered": false, "items": [[{"type": "text", "text": "Mejor hora: atardecer"}],
+                                                  [{"type": "text", "text": "Entrada libre"}]]}]',
+   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4200-0000-4000-8000-000000000003', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000002',
+   1, 'draft', 'Feria de los domingos', '', '[]', null, null, '5eed0000-0000-4000-8000-000000000003', null, null),
+  ('5eed4200-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000002', '5eed4100-0000-4000-8000-000000000003',
+   1, 'sealed', 'Laguna Espejo', 'Una laguna de altura que refleja el cielo nocturno.',
+   '[{"type": "paragraph", "children": [{"type": "text", "text": "Laguna de demostración para el municipio Sur."}]}]',
+   -21.5302, -64.7298, '5eed0000-0000-4000-8000-000000000002', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000002');
+
+update public.content_items i
+set published_revision_id = v.published, published_at = v.published_at, draft_revision_id = v.draft
+from (values
+  ('5eed4100-0000-4000-8000-000000000001'::uuid, '5eed4200-0000-4000-8000-000000000002'::uuid, now() - interval '1 day', null::uuid),
+  ('5eed4100-0000-4000-8000-000000000002'::uuid, null::uuid, null::timestamptz, '5eed4200-0000-4000-8000-000000000003'::uuid),
+  ('5eed4100-0000-4000-8000-000000000003'::uuid, '5eed4200-0000-4000-8000-000000000004'::uuid, now() - interval '1 day', null::uuid)
+) as v (id, published, published_at, draft)
+where i.id = v.id;
+
 insert into public.audit_events (scope, action, outcome, diff)
-values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2}');
+values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3}');

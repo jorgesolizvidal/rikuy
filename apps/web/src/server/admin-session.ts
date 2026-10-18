@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Actor } from "@rikuy/core";
 import {
+  createContentRepository,
   createMediaRepository,
   createMembershipReader,
   createSessionClient,
@@ -55,6 +56,7 @@ export const adminSession = cache(async () => {
     members: createMemberRepository(client),
     mfa: createMfaGateway(client),
     media: createMediaRepository(client),
+    content: createContentRepository(client),
   };
 });
 

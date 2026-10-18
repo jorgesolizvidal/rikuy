@@ -133,4 +133,29 @@ describe("sharp image processor", () => {
       createSharpImageProcessor().logoDerivatives(new Uint8Array(png.subarray(0, 60))),
     ).rejects.toThrow();
   });
+
+  it("produces 480/960/1600 px WebP photos without metadata, never enlarged", async () => {
+    const photo = await sharp({
+      create: { width: 2400, height: 1600, channels: 3, background: "#7a8f3c" },
+    })
+      .withExif({ IFD0: { Copyright: "fotógrafo", ImageDescription: "GPS 17.4S 66.1W" } })
+      .jpeg()
+      .toBuffer();
+    const files = await createSharpImageProcessor().contentDerivatives(new Uint8Array(photo));
+    expect(files.map((file) => file.name)).toEqual(["w480.webp", "w960.webp", "w1600.webp"]);
+    for (const [file, width] of files.map((f, i) => [f, [480, 960, 1600][i]] as const)) {
+      expect(inspectImage(file.bytes)).toMatchObject({ mime: "image/webp", width });
+      expect((await sharp(file.bytes).metadata()).exif).toBeUndefined();
+    }
+
+    const small = await sharp({
+      create: { width: 700, height: 400, channels: 3, background: "#fff" },
+    })
+      .png()
+      .toBuffer();
+    const widths = (
+      await createSharpImageProcessor().contentDerivatives(new Uint8Array(small))
+    ).map((file) => inspectImage(file.bytes)?.width);
+    expect(widths).toEqual([480, 700, 700]);
+  });
 });
