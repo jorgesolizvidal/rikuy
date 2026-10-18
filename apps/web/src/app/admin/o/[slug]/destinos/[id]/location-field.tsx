@@ -35,6 +35,23 @@ export function LocationField({ value, center, disabled, error, onChange }: Loca
   const [paste, setPaste] = useState("");
   const [note, setNote] = useState<string | null>(null);
 
+  // The point can also change from outside (e.g. an event copies its venue's location):
+  // show it in the fields, unless they already say the same or hold a half-typed number.
+  const [seen, setSeen] = useState(value);
+  if (value !== seen) {
+    setSeen(value);
+    const a = numberOrNull(lat, -90, 90);
+    const b = numberOrNull(lng, -180, 180);
+    const shown = a !== null && b !== null ? { lat: a, lng: b } : null;
+    const differs = value
+      ? shown === null || shown.lat !== value.lat || shown.lng !== value.lng
+      : shown !== null;
+    if (differs) {
+      setLat(value ? String(value.lat) : "");
+      setLng(value ? String(value.lng) : "");
+    }
+  }
+
   const apply = (point: Point | null, message: string | null = null) => {
     setLat(point ? String(point.lat) : "");
     setLng(point ? String(point.lng) : "");

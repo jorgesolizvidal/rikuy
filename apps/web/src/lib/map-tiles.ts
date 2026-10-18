@@ -7,4 +7,6 @@ export const ADMIN_TILES = {
   url: "https://tile.openstreetmap.org/{z}/{x}/{y}.png",
   attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
   maxZoom: 19,
+  /** OSM requires a Referer; send only the origin (e.g. `https://app.example/`). */
+  referrerPolicy: "strict-origin",
 } as const;

@@ -113,6 +113,7 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
 
       <div className="editor-layout">
         <DestinationEditor
+          kind="destination"
           org={membership.slug}
           contentId={record.contentId}
           initial={initial}

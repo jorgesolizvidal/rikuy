@@ -90,7 +90,7 @@ export function RevisionHistory({
   readonly canPublish: boolean;
 }) {
   if (entries.length === 0) {
-    return <p className="field-hint">Este destino todavía no se ha publicado.</p>;
+    return <p className="field-hint">Todavía no se ha publicado.</p>;
   }
   return (
     <ol className="history-list" reversed>

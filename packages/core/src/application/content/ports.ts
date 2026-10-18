@@ -1,4 +1,5 @@
-import type { DestinationDocument } from "../../contracts/destination";
+import type { DestinationDocument, GeoPoint } from "../../contracts/destination";
+import type { EventDocument, EventSchedule } from "../../contracts/event";
 import type { RichText } from "../../contracts/rich-text";
 
 /** Where a destination stands for its editors. */
@@ -21,28 +22,44 @@ export interface ContentRevisionEntry {
   readonly sealedAt: string;
 }
 
-export interface OpenDraft {
+export interface OpenDraft<D = DestinationDocument> {
   readonly revisionId: string;
   readonly revisionNo: number;
   readonly editCount: number;
   readonly updatedAt: string;
-  readonly document: DestinationDocument;
+  readonly document: D;
 }
 
-export interface PublishedRevision {
+export interface PublishedRevision<D = DestinationDocument> {
   readonly revisionId: string;
   readonly revisionNo: number;
-  readonly document: DestinationDocument;
+  readonly document: D;
 }
 
-export interface DestinationRecord {
+export interface ContentRecord<D> {
   readonly contentId: string;
   readonly tenantId: string;
   readonly slug: string;
-  readonly draft: OpenDraft | null;
-  readonly published: PublishedRevision | null;
+  readonly draft: OpenDraft<D> | null;
+  readonly published: PublishedRevision<D> | null;
   /** Sealed revisions, newest first. */
   readonly history: readonly ContentRevisionEntry[];
+}
+
+export type DestinationRecord = ContentRecord<DestinationDocument>;
+export type EventRecord = ContentRecord<EventDocument>;
+
+/** An event in the panel's agenda (schedule of the draft, else of the published one). */
+export interface EventListEntry {
+  readonly contentId: string;
+  readonly slug: string;
+  readonly title: string;
+  readonly status: ContentStatus;
+  readonly schedule: EventSchedule | null;
+  /** Already over in the municipality's time zone. */
+  readonly ended: boolean;
+  readonly updatedAt: string;
+  readonly publishedAt: string | null;
 }
 
 export type CreateContentOutcome =
@@ -51,7 +68,7 @@ export type CreateContentOutcome =
 
 export type SaveContentOutcome =
   | { readonly status: "saved"; readonly revisionNo: number; readonly editCount: number }
-  | { readonly status: "invalid"; readonly reason: "shape" | "media" }
+  | { readonly status: "invalid"; readonly reason: "shape" | "media" | "venue" }
   | { readonly status: "conflict" | "forbidden" | "not_found" };
 
 export type PublishContentOutcome =
@@ -74,10 +91,14 @@ export interface ContentRepository {
   findDestination(tenantId: string, contentId: string): Promise<DestinationRecord | null>;
   /** Any revision of the item (to preview history). */
   revisionDocument(tenantId: string, revisionId: string): Promise<DestinationDocument | null>;
+  listEvents(tenantId: string): Promise<EventListEntry[]>;
+  createEvent(tenantId: string, slug: string, title: string): Promise<CreateContentOutcome>;
+  findEvent(tenantId: string, contentId: string): Promise<EventRecord | null>;
+  /** Saves the whole draft; the database validates it for the item's kind. */
   saveDraft(
     tenantId: string,
     contentId: string,
-    document: DestinationDocument,
+    document: DestinationDocument | EventDocument,
     expectedEdit: number | null,
   ): Promise<SaveContentOutcome>;
   publish(
@@ -124,4 +145,34 @@ export interface PublishedDestination extends PublishedDestinationSummary {
 export interface PublishedDestinationReader {
   list(tenantId: string): Promise<PublishedDestinationSummary[]>;
   find(tenantId: string, slug: string): Promise<PublishedDestination | null>;
+}
+
+export interface PublishedEventSummary {
+  readonly slug: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly schedule: EventSchedule;
+  /** Instants (ISO 8601) computed with the municipality's time zone. */
+  readonly startsAt: string;
+  readonly endsAt: string;
+  readonly location: GeoPoint | null;
+  readonly cover: PublishedImage | null;
+  /** The published destination where it happens, if any. */
+  readonly venue: { readonly slug: string; readonly title: string } | null;
+  readonly publishedAt: string;
+  readonly updatedAt: string;
+}
+
+export interface PublishedEvent extends PublishedEventSummary {
+  readonly revisionNo: number;
+  readonly body: RichText;
+  readonly gallery: readonly PublishedImage[];
+  /** The page stays reachable after the event; it says it is over. */
+  readonly ended: boolean;
+}
+
+/** Anonymous reads for portals: upcoming events (list) and any published one (find). */
+export interface PublishedEventReader {
+  list(tenantId: string): Promise<PublishedEventSummary[]>;
+  find(tenantId: string, slug: string): Promise<PublishedEvent | null>;
 }

@@ -48,6 +48,12 @@ function repository(overrides: Partial<ContentRepository> = {}) {
       return { status: "created", contentId: CONTENT };
     },
     findDestination: async () => null,
+    listEvents: async () => [],
+    async createEvent(_tenant, slug, title) {
+      calls.push(`create-event:${slug}:${title}`);
+      return { status: "created", contentId: CONTENT };
+    },
+    findEvent: async () => null,
     revisionDocument: async () => null,
     async saveDraft(_tenant, _content, document, expected) {
       calls.push(`save:${expected}:${document.title}`);

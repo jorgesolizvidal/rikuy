@@ -38,6 +38,15 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/agenda`} className="org-card">
+            <span>
+              <span className="org-name">Agenda</span>
+              <span className="org-detail">Eventos con fecha, lugar y fotos</span>
+            </span>
+            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
               <span className="org-name">Marca del portal</span>

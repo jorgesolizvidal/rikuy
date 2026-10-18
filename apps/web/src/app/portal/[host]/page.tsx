@@ -1,11 +1,12 @@
 import { PORTAL_PATHS } from "@rikuy/core";
 import { notFound } from "next/navigation";
 
-import { portalDestinations } from "@/server/portal-content";
+import { portalDestinations, portalEvents } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { Contour } from "./contour";
 import { DestinationCard } from "./destination-card";
+import { EventCard } from "./event-card";
 
 interface PortalPageProps {
   readonly params: Promise<{ host: string }>;
@@ -19,8 +20,15 @@ const PLACES_SOON = {
   text: "Fichas de cada destino con fotos, ubicación y cómo llegar.",
 } as const;
 
+/** Next events shown on the home page. */
+const HOME_EVENTS = 3;
+
+const AGENDA_SOON = {
+  title: "Agenda",
+  text: "Ferias, fiestas y actividades con su fecha y lugar.",
+} as const;
+
 const UPCOMING = [
-  { title: "Agenda", text: "Ferias, fiestas y actividades con su fecha y lugar." },
   {
     title: "Recorridos 360°",
     text: "Recorre los sitios desde el celular antes de viajar.",
@@ -36,8 +44,12 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
   if (view === null) notFound();
 
   const { identity, seo } = view.resolved.presentation;
-  const destinations = await portalDestinations(view);
-  const upcoming = destinations.length > 0 ? UPCOMING : [PLACES_SOON, ...UPCOMING];
+  const [destinations, events] = await Promise.all([portalDestinations(view), portalEvents(view)]);
+  const upcoming = [
+    ...(destinations.length > 0 ? [] : [PLACES_SOON]),
+    ...(events.length > 0 ? [] : [AGENDA_SOON]),
+    ...UPCOMING,
+  ];
 
   return (
     <>
@@ -67,6 +79,20 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
                 tenantId={view.context.tenant.tenantId}
                 destination={destination}
               />
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
+      {events.length > 0 ? (
+        <section className="portal-section" aria-labelledby="eventos">
+          <div className="portal-section-head">
+            <h2 id="eventos">Próximos eventos</h2>
+            <a href={PORTAL_PATHS.agenda}>Ver la agenda</a>
+          </div>
+          <ul className="portal-events">
+            {events.slice(0, HOME_EVENTS).map((event) => (
+              <EventCard key={event.slug} event={event} />
             ))}
           </ul>
         </section>

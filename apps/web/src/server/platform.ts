@@ -4,15 +4,18 @@ import { parsePlatformEnv, type PlatformEnv } from "@rikuy/config/env";
 import {
   createCachedPresentationReader,
   createCachedPublishedDestinationReader,
+  createCachedPublishedEventReader,
   createCachedTenantDirectory,
   type PlatformHosts,
   type PublishedDestinationReader,
+  type PublishedEventReader,
   type PublishedPresentationReader,
   type TenantDirectory,
 } from "@rikuy/core";
 import {
   createSupabasePresentationReader,
   createSupabasePublishedContentReader,
+  createSupabasePublishedEventReader,
   createSupabaseTenantDirectory,
 } from "@rikuy/db";
 
@@ -36,6 +39,7 @@ let settings: PlatformSettings | undefined;
 let directory: TenantDirectory | undefined;
 let presentations: PublishedPresentationReader | undefined;
 let publishedContent: PublishedDestinationReader | undefined;
+let publishedEvents: PublishedEventReader | undefined;
 
 export function platformSettings(): PlatformSettings {
   if (settings) return settings;
@@ -95,4 +99,18 @@ export function publishedContentReader(): PublishedDestinationReader {
     { ttlMs: 30_000 },
   );
   return publishedContent;
+}
+
+/** Anonymous agenda reader, cached like destinations (an ended event leaves within 30 s). */
+export function publishedEventReader(): PublishedEventReader {
+  if (publishedEvents) return publishedEvents;
+  const { env } = platformSettings();
+  publishedEvents = createCachedPublishedEventReader(
+    createSupabasePublishedEventReader({
+      url: env.NEXT_PUBLIC_SUPABASE_URL,
+      publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+    }),
+    { ttlMs: 30_000 },
+  );
+  return publishedEvents;
 }

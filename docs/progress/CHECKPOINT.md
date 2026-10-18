@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
-- **Último paso completado:** P3 · Paso 3 — destinos en el portal, SEO, QR e instalación (2026-10-18)
-- **Rama del paso:** `feat/p3-step3-portal-destinations` → PR hacia `main`
+- **Último paso completado:** P3 · Paso 4 — eventos y agenda (2026-10-18)
+- **Rama del paso:** `feat/p3-step4-events` → PR hacia `main`
 
 ## Historial
 
@@ -134,34 +134,59 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - Las páginas del portal se renderizan por petición con una caché corta por instancia; la caché de CDN por municipio y versión llega con Lighthouse CI y los previews de Vercel (Paso 7).
 - El portal de un municipio en preparación no está en línea: el panel muestra el QR con un aviso de que funcionará cuando lo esté.
 
+### P3 · Paso 4 — eventos y agenda ✅
+
+- Base de datos (`20261019000000_p3_event_kind.sql` y `20261019000100_p3_events.sql`, solo expand):
+  - `event` como nuevo tipo de contenido con el mismo modelo de revisiones que los destinos (borrador → publicar → volver a una versión).
+  - Fecha **en hora local del municipio** (`starts_local`/`ends_local`, todo el día o con hora; en todo el día, el último día cuenta entero). Se convierte a instantes con la zona horaria del municipio al leer. La base rechaza fechas que no existen (30 de febrero, 24:00), un fin antes del inicio y eventos de más de un año.
+  - Lugar opcional: un destino del mismo municipio (otro municipio o un evento → rechazado). El evento guarda sus propias coordenadas.
+  - `save_content_draft` y `publish_content` validan según el tipo; publicar un evento exige resumen, fecha y ubicación.
+  - `list_content_events` (panel) y, anónimas, `portal_events` (solo los que **no terminaron**, sin que nadie los despublique) y `portal_event` (también los terminados, marcados como tales).
+  - Las zonas horarias de los municipios se validan al guardarlas.
+  - Seed: Demo Norte con un evento próximo en el Mirador, uno que ya terminó y un borrador; Demo Sur con un evento de todo el día. Las fechas son relativas al día en que se carga el seed.
+  - 34 aserciones pgTAP nuevas (validación, permisos, lugar, terminado por zona horaria —una hora atrás en Bolivia sigue «en el futuro» si se leyera como UTC—, todo el día hasta medianoche, aislamiento, suspensión).
+- `@rikuy/core`: contrato `eventDocument` y `eventSchedule`, fechas legibles en español sin desfases (`formatEventSchedule`, «Sábado, 2 de noviembre de 2026, 19:00–22:00»), agrupación por mes, casos de uso de eventos (`createEvent`, `loadAgenda`, `saveEventDraft`, `publishEvent`) sobre un flujo editorial común a destinos y eventos (`editing.ts`), `.ics` (RFC 5545: instantes UTC, fechas en todo el día, texto escapado y líneas plegadas), JSON-LD `Event` y sitemap con la agenda.
+- Panel: «Agenda» en la página del municipio, con lista en tres grupos (próximos y en curso, sin fecha, pasados) y nuevo evento. Editor con los mismos campos de texto, fotos, ubicación e historial que los destinos, más «Fecha y hora» (todo el día, vista previa de cómo se mostrará) y «Lugar» (al elegir un destino se copia su ubicación). QR y «Ver en el portal» al publicar.
+- Portal: «Agenda» en la cabecera; `/agenda` agrupada por mes; ficha del evento con fecha y lugar enlazado, «Cómo llegar», **«Añadir al calendario»** (.ics), «Compartir», fotos y JSON-LD. Un evento terminado conserva su página con el aviso «Este evento ya terminó» y sale de buscadores y del sitemap. «Próximos eventos» en el inicio.
+- Corrección del mapa del editor: las imágenes del mapa ahora envían el origen del panel a OpenStreetMap (`referrerPolicy: strict-origin`), que es lo que exige su política. Antes la cabecera `Referrer-Policy: same-origin` del panel las dejaba sin `Referer` y respondían «403 Access blocked». Verificado que cada petición del mapa lleva `http://app.localhost:3000/`.
+- Otras mejoras: los campos de latitud y longitud se actualizan cuando la ubicación cambia desde fuera (al elegir un lugar). En celulares, la navegación del portal va en su propia fila, así el nombre del municipio no se aprieta cuando aparece «Instalar».
+- Tests: 308 unitarios (core 211, db 73, web 18, config 6) + 314 pgTAP + integración de eventos con Supabase real + e2e de portales con agenda (126 verificaciones).
+- Lighthouse local (móvil): inicio, agenda y fichas de evento y destino con rendimiento 95–98, accesibilidad, buenas prácticas y SEO 100, CLS 0.
+
+**Desviaciones:**
+
+- Un evento tiene una sola ocurrencia, como dice el roadmap. Los eventos que se repiten (cada domingo, cada año) quedan para más adelante.
+- La hora se escribe en la hora del municipio y no se muestra la zona horaria. Para visitantes de otro país, «Añadir al calendario» la convierte a la hora de su teléfono.
+- El mapa pequeño en cada ficha queda propuesto para el Paso 5, junto con el mapa del portal.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
 git checkout main
 git pull
-pnpm install       # instala qrcode
-pnpm db:reset      # aplica la migración nueva y el seed
+pnpm install
+pnpm db:reset      # migraciones nuevas y seed con eventos (fechas relativas a hoy)
 pnpm dev
 ```
 
-1. Abre http://demo-norte.localhost:3000: aparece «Lugares para visitar» con «Mirador del Valle». En la cabecera, «Destinos».
-2. Entra a la ficha: texto con formato, «Cómo llegar» (abre Google Maps con el punto) y «Compartir» (en la computadora copia el enlace). Si tiene fotos, la portada y la galería se ven nítidas en el celular y en la computadora.
-3. Prueba que no hay fugas: http://demo-norte.localhost:3000/destinos/laguna-espejo (es de Demo Sur) y …/destinos/feria-de-los-domingos (borrador) muestran «No encontramos esta página».
-4. Mira http://demo-norte.localhost:3000/sitemap.xml y /robots.txt, y al pie «Privacidad» y «Términos de uso».
-5. En el panel (http://app.localhost:3000) como `owner@demo-norte.example.test`, abre un destino publicado: a la derecha, «Para visitantes» con «Ver en el portal» y el código QR (escanéalo con el celular si está en tu red, o descarga PNG/SVG).
-6. Publica un destino nuevo con portada y galería: aparece en el portal en menos de 30 segundos.
-7. En Chrome (o Edge), si el navegador lo ofrece, aparece «Instalar» junto a «Destinos».
-8. Opcional: en el editor escribe una lista como `-Naturaleza` (sin espacio) y mira la vista previa.
+1. Mapa del editor: entra a http://app.localhost:3000 y abre un destino. El mapa ya debe verse. Si todavía ves «Access blocked», es la caché: «Vaciar caché y volver a cargar de manera forzada» una vez.
+2. En la página de Demo Norte, abre «Agenda»: «Feria del choclo» en próximos, «Concierto de la banda» sin fecha y «Festival de invierno» en pasados.
+3. Como `editor.ambos@example.test`, crea «Festival de prueba»: pon resumen, fecha y hora (prueba un fin antes del inicio: lo marca), elige «Mirador del Valle» como lugar (la ubicación se copia sola) → «Guardar borrador».
+4. Como `owner@demo-norte.example.test`, abre el evento → «Publicar». A la derecha aparece el QR.
+5. Abre http://demo-norte.localhost:3000/agenda (en menos de 30 s aparece el nuevo evento): ficha con fecha, lugar enlazado, «Cómo llegar», «Añadir al calendario» (descarga un `.ics`; ábrelo con tu calendario) y «Compartir».
+6. http://demo-norte.localhost:3000/agenda/festival-de-invierno: «Este evento ya terminó». En http://demo-sur.localhost:3000/agenda solo está «Noche de estrellas».
 
-## Siguiente paso — P3 · Paso 4 (requiere autorización)
+## Siguiente paso — P3 · Paso 5 (requiere autorización)
 
-Rama `feat/p3-step4-events`:
+Rama `feat/p3-step5-portal-map`:
 
-1. Base de datos: `event` como nuevo tipo de contenido con revisiones (mismo modelo que destinos), inicio y fin con **zona horaria del municipio**, todo el día o con hora, lugar (destino existente o coordenadas propias), portada; RPC por intención y lecturas públicas que **no listan eventos terminados** sin intervención de nadie.
-2. Panel: «Agenda» con lista (próximos / pasados / borradores), editor con fechas y horas validadas (fin ≥ inicio), reutilizando texto, fotos, ubicación e historial.
-3. Portal: `/agenda` con los próximos eventos agrupados por mes, ficha del evento (fecha legible en la hora local, «Añadir al calendario» `.ics`, «Cómo llegar», compartir, QR en el panel), sección en el inicio y en el sitemap; datos estructurados `Event`.
-4. Tests: pgTAP (vigencia por zona horaria, aislamiento, borradores), unitarios de fechas, e2e de agenda en los dos municipios y un evento vencido que desaparece solo.
+1. Proveedor de mapas para el portal público (ADR nuevo): teselas con licencia y uso adecuados para tráfico de visitantes (los servidores de OpenStreetMap solo para uso ligero), con atribución.
+2. `/mapa` con destinos y eventos próximos, cargado con import dinámico (fuera del bundle inicial), con capas por tipo y una **lista equivalente accesible** al lado.
+3. Consultas por área (PostGIS) en vez de traer todo el catálogo, con caché por municipio.
+4. Propuesto: mapa pequeño en cada ficha de destino y de evento, cargado solo cuando se ve.
+5. Tests: e2e del mapa y de la lista en los dos municipios, bundle inicial sin la librería de mapas, accesibilidad por teclado.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).
+- Mapa pequeño en cada ficha (propuesto para el Paso 5): confirmar si se incluye.
+- El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).

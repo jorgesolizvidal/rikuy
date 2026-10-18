@@ -40,6 +40,9 @@ const portals = [
     logo: withLogo,
     destination: { slug: "mirador-del-valle", title: "Mirador del Valle", lat: -17.3901 },
     hidden: ["laguna-espejo", "feria-de-los-domingos"],
+    event: { slug: "feria-del-choclo", title: "Feria del choclo", allDay: false },
+    hiddenEvents: ["concierto-de-la-banda", "noche-de-estrellas"],
+    endedEvent: "festival-de-invierno",
   },
   {
     host: "demo-sur.localhost",
@@ -49,6 +52,9 @@ const portals = [
     logo: false,
     destination: { slug: "laguna-espejo", title: "Laguna Espejo", lat: -21.5302 },
     hidden: ["mirador-del-valle", "feria-de-los-domingos"],
+    event: { slug: "noche-de-estrellas", title: "Noche de estrellas", allDay: true },
+    hiddenEvents: ["feria-del-choclo", "concierto-de-la-banda", "festival-de-invierno"],
+    endedEvent: null,
   },
 ];
 
@@ -170,6 +176,54 @@ for (const portal of portals) {
     check(() => assert.equal(legal.status, 200, `${portal.host}${path}`));
     check(() => assert.match(legal.body.toString(), new RegExp(portal.name)));
   }
+}
+
+// Agenda (P3 · Paso 4): upcoming events only, per municipality; ended events keep a page.
+for (const portal of portals) {
+  const { slug, title, allDay } = portal.event;
+  const others = portals.filter((p) => p !== portal);
+
+  const agenda = await get(portal.host, "/agenda");
+  const agendaHtml = agenda.body.toString();
+  check(() => assert.equal(agenda.status, 200, `${portal.host} /agenda`));
+  check(() => assert.match(agendaHtml, new RegExp(`href="/agenda/${slug}"`)));
+  for (const hidden of [...portal.hiddenEvents, portal.endedEvent].filter(Boolean)) {
+    check(() => assert.doesNotMatch(agendaHtml, new RegExp(`/agenda/${hidden}"`)));
+  }
+  const home = (await get(portal.host, "/")).body.toString();
+  check(() => assert.match(home, new RegExp(`href="/agenda/${slug}"`), "home shows next events"));
+
+  const page = await get(portal.host, `/agenda/${slug}`);
+  const html = page.body.toString();
+  check(() => assert.equal(page.status, 200, `${portal.host} event page`));
+  check(() => assert.match(html, new RegExp(`<h1[^>]*>${title}</h1>`)));
+  const jsonLd = JSON.parse(/<script type="application\/ld\+json">(.*?)<\/script>/s.exec(html)[1]);
+  check(() => assert.equal(jsonLd["@type"], "Event"));
+  check(() => assert.match(html, new RegExp(`href="/agenda/${slug}/calendario.ics"`)));
+  for (const other of others) check(() => assert.doesNotMatch(html, new RegExp(other.name)));
+
+  const ics = await get(portal.host, `/agenda/${slug}/calendario.ics`);
+  const icsText = ics.body.toString();
+  check(() => assert.equal(ics.status, 200));
+  check(() => assert.match(String(ics.headers["content-type"]), /text\/calendar/));
+  check(() => assert.match(icsText, /BEGIN:VEVENT\r\n/));
+  check(() =>
+    assert.match(icsText, allDay ? /DTSTART;VALUE=DATE:\d{8}\r\n/ : /DTSTART:\d{8}T\d{6}Z\r\n/),
+  );
+
+  for (const hidden of portal.hiddenEvents) {
+    const missing = await get(portal.host, `/agenda/${hidden}`);
+    check(() => assert.equal(missing.status, 404, `${portal.host} /agenda/${hidden}`));
+  }
+  if (portal.endedEvent) {
+    const ended = (await get(portal.host, `/agenda/${portal.endedEvent}`)).body.toString();
+    check(() => assert.match(ended, /Este evento ya terminó/));
+    check(() => assert.match(ended, /<meta name="robots" content="noindex, follow"/));
+  }
+
+  const xml = (await get(portal.host, "/sitemap.xml")).body.toString();
+  check(() => assert.match(xml, new RegExp(`/agenda/${slug}</loc>`)));
+  if (portal.endedEvent) check(() => assert.doesNotMatch(xml, new RegExp(portal.endedEvent)));
 }
 
 if (withLogo) {
