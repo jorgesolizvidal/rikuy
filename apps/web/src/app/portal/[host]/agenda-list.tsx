@@ -1,6 +1,6 @@
 "use client";
 
-import { sortByDistance } from "@rikuy/core";
+import { sortByDistance } from "@rikuy/core/geo";
 import { Fragment, useState } from "react";
 
 import { useVisitorLocation } from "@/lib/use-visitor-location";
