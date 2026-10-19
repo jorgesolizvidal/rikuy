@@ -6,7 +6,7 @@
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
 - **Último paso completado:** P3 · Paso 7 — Lighthouse CI y contratos de regresión (2026-10-19)
-- **Rama del paso:** `feat/p3-step7-lighthouse-ci` → PR hacia `main`
+- **En curso:** P3 · Paso 8 — despliegue. Parte 1 (código) en `feat/p3-step8-deploy` → PR hacia `main`; parte 2 (puesta en marcha en la nube) tras el merge.
 
 ## Historial
 
@@ -236,34 +236,32 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - La caché de CDN por municipio, idioma y versión queda para el Paso 8: solo tiene sentido con el CDN de Vercel delante.
 - RC-10 es una revisión automática más teclado básico; no equivale a declarar conformidad WCAG completa (como advierte la propia auditoría).
 
+### P3 · Paso 8 — despliegue (parte 1: código) 🔄
+
+- Decisiones del usuario (2026-10-19): Supabase en **São Paulo** (`sa-east-1`); direcciones gratuitas **`*.vercel.app`**; Lighthouse en Vercel **sobre producción tras cada merge** (los PR siguen bloqueados por el job del Paso 7). Pausó `el-chavo-pos` para liberar el proyecto gratuito y permitió `*.vercel.app` y `*.supabase.co` en mi entorno.
+- Proyecto Supabase `rikuy` creado (ref `jltzysyxqureudfavgpj`, São Paulo, plan gratuito), todavía sin tablas.
+- **Caché por municipio ([ADR-024](../adr/ADR-024-portal-page-cache.md)):** las páginas del portal se generan en la primera visita y se guardan por host (ISR, `revalidate = 120`); publicar contenido o la marca, o volver a una versión, invalida solo las páginas de ese municipio. La página resuelve su municipio desde el host de la ruta (registro sin caché) en lugar de la cabecera interna. `/mapa` sigue dinámico. Las lecturas de destinos y eventos ya no tienen caché por instancia.
+- **Speed Insights** solo en Vercel (`VERCEL=1`); `_vercel/` fuera del proxy; página de privacidad actualizada.
+- Workflows nuevos: **«Deploy database»** (`supabase db push`, con seed opcional la primera vez; en cada merge a `main` con migraciones) y **«Lighthouse on production»** (tras cada despliegue de producción, mismo `lighthouse-budget.json`; `e2e/lighthouse.mjs` acepta `LIGHTHOUSE_ORIGINS`).
+- [`docs/deploy.md`](../deploy.md): configuración única de Supabase, GitHub y Vercel, y el primer despliegue. `supabase/demo/vercel-demo.sql` pasa la demo a `rikuy-demo-norte.vercel.app` y `rikuy-demo-sur.vercel.app`.
+- Verificado local: publicar un lema se ve en la siguiente visita (MISS → página nueva) y el otro municipio conserva su caché (HIT); portales 159, ubicación 35 y contratos 189 verificaciones en verde.
+
+**Desviaciones:**
+
+- El conector de Vercel no tiene permiso de escritura en la cuenta: el proyecto Vercel lo crea el usuario desde el panel (pasos en `docs/deploy.md`).
+- El correo incluido de Supabase solo envía códigos a miembros del equipo de la organización: para la demo se entra con un correo del equipo; para municipios reales hace falta SMTP propio.
+
 ## Cómo verificarlo en tu PC
 
-```powershell
-git checkout main
-git pull
-pnpm install       # instala lighthouse y axe-core (solo para pruebas)
-pnpm db:reset
-```
+Tras el merge no hace falta nada nuevo en local (`pnpm install` instala `@vercel/speed-insights`). La verificación de este paso es en la nube: parte 2.
 
-1. En GitHub, abre el PR → pestaña **Checks** → «Contracts (RC-09/10/11/12) · Lighthouse budget» → **Summary**: está la tabla de Lighthouse por página. Abajo, en **Artifacts**, `lighthouse-reports` trae los informes completos (se abren en https://googlechrome.github.io/lighthouse/viewer/ arrastrando el archivo).
-2. Opcional, en tu PC (con `pnpm build` y `pnpm --filter @rikuy/web start` corriendo): `cd apps/web` y `node e2e/lighthouse.mjs 3000` con `$env:CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"`.
-3. En el panel: «Miembros» en el celular ya no se sale de la pantalla (la tabla se desliza dentro de su recuadro) y, al pulsar Tab al entrar, aparece «Saltar al contenido».
+## Siguiente paso — P3 · Paso 8, parte 2 (tras el merge)
 
-## Siguiente paso — P3 · Paso 8 (requiere autorización y decisiones)
-
-Rama `feat/p3-step8-deploy`. Antes de empezar:
-
-- **Supabase en la nube:** liberar un proyecto de la organización gratuita (pausar uno) o pasar al plan Pro. No tocar `ucurena-storage` mientras el sistema anterior siga en uso.
-- **Vercel:** el plan Hobby sirve para previews y pruebas; para municipios reales (uso comercial) hace falta Pro.
-- Permitir `*.vercel.app` y `*.supabase.co` en los dominios de mi entorno.
-
-Contenido:
-
-1. Proyecto Supabase de Rikuy (migraciones, seed sintético de demo, claves en Vercel; nunca en el repo).
-2. Proyecto Vercel conectado al repositorio con previews por PR y dominios `*.vercel.app` por municipio de demo.
-3. Lighthouse CI sobre el preview con el mismo `lighthouse-budget.json`.
-4. Caché de CDN por municipio, idioma y versión publicada, invalidada al publicar.
-5. Speed Insights y prueba de la ubicación en un celular con https.
+1. Configuración única de Supabase, GitHub y Vercel (`docs/deploy.md`).
+2. Actions → «Deploy database» con **seed** (primera vez).
+3. `supabase/demo/vercel-demo.sql` en el proyecto de la nube; alta del operador y de su membresía en los municipios de demo.
+4. Comprobar portales, panel (inicio de sesión con código), publicar → visible en la siguiente visita, ubicación en un celular con https.
+5. «Lighthouse on production» en verde; checkpoint de cierre del Paso 8.
 
 ## Decisiones pendientes del usuario
 
