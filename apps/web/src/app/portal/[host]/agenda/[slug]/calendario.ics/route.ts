@@ -3,6 +3,9 @@ import { buildEventIcs, PORTAL_PATHS } from "@rikuy/core";
 import { portalEvent, portalOrigin } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
+/** Resolved per request: these small responses carry their own Cache-Control. */
+export const dynamic = "force-dynamic";
+
 interface CalendarContext {
   readonly params: Promise<{ host: string; slug: string }>;
 }

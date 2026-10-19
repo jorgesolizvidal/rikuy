@@ -13,6 +13,7 @@ import {
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
 import { imageProcessor, mediaAdmin } from "@/server/media-admin";
+import { refreshPortal } from "@/server/portal-cache";
 
 import { fieldErrors, presentationInputFromForm, type BrandingField } from "./branding-fields";
 
@@ -62,6 +63,10 @@ export async function brandingAction(
       case "saved":
         return { status: "saved", revision: result.revision };
       case "published":
+        await refreshPortal(
+          (tenantId) => session.content.portalHostname(tenantId),
+          membership.tenantId,
+        );
         return { status: "published", revision: null, version: result.version };
       case "invalid":
         return { status: "invalid", ...keep, errors: fieldErrors(result.issues, input.social) };

@@ -2,6 +2,9 @@ import { buildWebManifest } from "@rikuy/core";
 
 import { portalView } from "@/server/portal-view";
 
+/** Resolved per request: these small responses carry their own Cache-Control. */
+export const dynamic = "force-dynamic";
+
 interface ManifestContext {
   readonly params: Promise<{ host: string }>;
 }

@@ -1,6 +1,7 @@
-// Lighthouse against one production build (`next start`) and the seed: every public page
-// kind of both municipalities, measured `runs` times (mobile, simulated 4G, CPU x4); the
-// median run must meet lighthouse-budget.json. Fails the CI step when a page breaks it.
+// Lighthouse against one production build (`next start`) and the seed, or against the
+// deployed sites (LIGHTHOUSE_ORIGINS): every public page kind of both municipalities,
+// measured `runs` times (mobile, simulated 4G, CPU x4); the median run must meet
+// lighthouse-budget.json. Fails the CI step when a page breaks it.
 //
 // Usage: CHROME_PATH=/path/to/chrome node e2e/lighthouse.mjs [port]
 //   Writes lighthouse-reports/<page>.json and a summary table (also to $GITHUB_STEP_SUMMARY).
@@ -17,23 +18,34 @@ const budget = JSON.parse(await readFile(new URL("../lighthouse-budget.json", im
 const OUT = new URL("../lighthouse-reports/", import.meta.url);
 const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"];
 
+// The seed's municipalities. Locally (and in the PR job) they are served by `next start`
+// on *.localhost; after a deployment, LIGHTHOUSE_ORIGINS points at the real sites, e.g.
+// "demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app".
 const PORTALS = [
-  { host: "demo-norte.localhost", destination: "mirador-del-valle", event: "feria-del-choclo" },
-  { host: "demo-sur.localhost", destination: "laguna-espejo", event: "noche-de-estrellas" },
+  { slug: "demo-norte", destination: "mirador-del-valle", event: "feria-del-choclo" },
+  { slug: "demo-sur", destination: "laguna-espejo", event: "noche-de-estrellas" },
 ];
-const pages = PORTALS.flatMap((portal) =>
-  Object.entries({
-    home: "/",
-    destinations: "/destinos",
-    destination: `/destinos/${portal.destination}`,
-    agenda: "/agenda",
-    event: `/agenda/${portal.event}`,
-    map: "/mapa",
-  }).map(([kind, path]) => ({
-    kind,
-    label: `${portal.host}${path}`,
-    url: `http://${portal.host}:${port}${path}`,
-  })),
+const origins = new Map(
+  (process.env.LIGHTHOUSE_ORIGINS ?? "")
+    .split(",")
+    .map((pair) => pair.trim().split("="))
+    .filter(([slug, origin]) => slug && origin),
+);
+const originOf = (slug) =>
+  (origins.get(slug) ?? `http://${slug}.localhost:${port}`).replace(/\/$/u, "");
+const pages = PORTALS.filter((portal) => origins.size === 0 || origins.has(portal.slug)).flatMap(
+  (portal) =>
+    Object.entries({
+      home: "/",
+      destinations: "/destinos",
+      destination: `/destinos/${portal.destination}`,
+      agenda: "/agenda",
+      event: `/agenda/${portal.event}`,
+      map: "/mapa",
+    }).map(([kind, path]) => {
+      const url = `${originOf(portal.slug)}${path}`;
+      return { kind, label: url.replace(/^https?:\/\//u, ""), url };
+    }),
 );
 
 // One headless Chrome for every run (Lighthouse opens a fresh tab each time).
@@ -154,7 +166,11 @@ const table = [
   ),
 ].join("\n");
 if (process.env.GITHUB_STEP_SUMMARY) {
-  await appendFile(process.env.GITHUB_STEP_SUMMARY, `## Lighthouse (móvil)\n\n${table}\n`);
+  const where = origins.size > 0 ? "sitio publicado" : "compilación del PR";
+  await appendFile(
+    process.env.GITHUB_STEP_SUMMARY,
+    `## Lighthouse (móvil, ${where})\n\n${table}\n`,
+  );
 }
 
 if (problems.length > 0) {
