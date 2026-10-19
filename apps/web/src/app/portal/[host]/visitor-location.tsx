@@ -6,7 +6,7 @@ import {
   sortByDistance,
   updateNearby,
   type GeoPoint,
-} from "@rikuy/core";
+} from "@rikuy/core/geo";
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react";
 
 import { useVisitorLocation } from "@/lib/use-visitor-location";

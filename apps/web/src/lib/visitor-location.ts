@@ -1,4 +1,4 @@
-import { isMeaningfulFix, type PositionFix } from "@rikuy/core";
+import { isMeaningfulFix, type PositionFix } from "@rikuy/core/geo";
 
 /**
  * The visitor's position, in the browser only (ADR-021, RC-06).

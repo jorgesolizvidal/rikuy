@@ -1,0 +1,164 @@
+// Lighthouse against one production build (`next start`) and the seed: every public page
+// kind of both municipalities, measured `runs` times (mobile, simulated 4G, CPU x4); the
+// median run must meet lighthouse-budget.json. Fails the CI step when a page breaks it.
+//
+// Usage: CHROME_PATH=/path/to/chrome node e2e/lighthouse.mjs [port]
+//   Writes lighthouse-reports/<page>.json and a summary table (also to $GITHUB_STEP_SUMMARY).
+import { spawn } from "node:child_process";
+import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import lighthouse from "lighthouse";
+
+const port = Number(process.argv[2] ?? 3000);
+const executablePath = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
+const budget = JSON.parse(await readFile(new URL("../lighthouse-budget.json", import.meta.url)));
+const OUT = new URL("../lighthouse-reports/", import.meta.url);
+const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"];
+
+const PORTALS = [
+  { host: "demo-norte.localhost", destination: "mirador-del-valle", event: "feria-del-choclo" },
+  { host: "demo-sur.localhost", destination: "laguna-espejo", event: "noche-de-estrellas" },
+];
+const pages = PORTALS.flatMap((portal) =>
+  Object.entries({
+    home: "/",
+    destinations: "/destinos",
+    destination: `/destinos/${portal.destination}`,
+    agenda: "/agenda",
+    event: `/agenda/${portal.event}`,
+    map: "/mapa",
+  }).map(([kind, path]) => ({
+    kind,
+    label: `${portal.host}${path}`,
+    url: `http://${portal.host}:${port}${path}`,
+  })),
+);
+
+// One headless Chrome for every run (Lighthouse opens a fresh tab each time).
+const profile = await mkdtemp(join(tmpdir(), "rikuy-lh-"));
+const debugPort = 9300 + Math.floor(Math.random() * 500);
+const chrome = spawn(
+  executablePath,
+  [
+    "--headless=new",
+    `--remote-debugging-port=${debugPort}`,
+    `--user-data-dir=${profile}`,
+    "--no-first-run",
+    "--no-default-browser-check",
+    "--disable-dev-shm-usage",
+    "--disable-background-networking",
+    "--disable-component-update",
+    "--disable-sync",
+    "--no-sandbox",
+  ],
+  { stdio: "ignore" },
+);
+for (let i = 0; ; i += 1) {
+  try {
+    await fetch(`http://127.0.0.1:${debugPort}/json/version`);
+    break;
+  } catch {
+    if (i > 50) throw new Error("Chrome did not start");
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+}
+
+const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
+
+function measure(lhr) {
+  const scripts = lhr.audits["resource-summary"]?.details?.items?.find(
+    (item) => item.resourceType === "script",
+  );
+  return {
+    scores: Object.fromEntries(
+      CATEGORIES.map((id) => [id, Math.round((lhr.categories[id]?.score ?? 0) * 100)]),
+    ),
+    lcpMs: Math.round(lhr.audits["largest-contentful-paint"].numericValue),
+    tbtMs: Math.round(lhr.audits["total-blocking-time"].numericValue),
+    cls: Number(lhr.audits["cumulative-layout-shift"].numericValue.toFixed(3)),
+    scriptKb: Math.round((scripts?.transferSize ?? 0) / 1024),
+  };
+}
+
+await mkdir(OUT, { recursive: true });
+const rows = [];
+const problems = [];
+try {
+  for (const page of pages) {
+    const runs = [];
+    for (let run = 0; run < budget.runs; run += 1) {
+      const result = await lighthouse(page.url, {
+        port: debugPort,
+        output: "json",
+        logLevel: "error",
+        onlyCategories: CATEGORIES,
+      });
+      if (!result?.lhr || result.lhr.runtimeError) {
+        throw new Error(`${page.label}: ${result?.lhr?.runtimeError?.message ?? "no result"}`);
+      }
+      runs.push({ lhr: result.lhr, report: result.report, ...measure(result.lhr) });
+    }
+    // The run with the median performance score represents the page (as Lighthouse CI does).
+    const target = median(runs.map((r) => r.scores.performance));
+    const chosen = runs.find((r) => r.scores.performance === target) ?? runs[0];
+    await writeFile(
+      new URL(`${page.label.replace(/[^a-z0-9]+/giu, "_")}.json`, OUT),
+      chosen.report,
+    );
+
+    const limits = budget.pages[page.kind];
+    const fail = [];
+    if (limits.performance !== null && chosen.scores.performance < limits.performance) {
+      fail.push(`performance ${chosen.scores.performance} < ${limits.performance}`);
+    }
+    for (const [id, min] of Object.entries(budget.categories)) {
+      if (chosen.scores[id] < min) fail.push(`${id} ${chosen.scores[id]} < ${min}`);
+    }
+    if (limits.lcpMs !== null && chosen.lcpMs > limits.lcpMs) {
+      fail.push(`LCP ${chosen.lcpMs} ms > ${limits.lcpMs} ms`);
+    }
+    if (limits.cls !== null && chosen.cls > limits.cls)
+      fail.push(`CLS ${chosen.cls} > ${limits.cls}`);
+    if (limits.scriptKb !== null && chosen.scriptKb > limits.scriptKb) {
+      fail.push(`JS ${chosen.scriptKb} KB > ${limits.scriptKb} KB`);
+    }
+    if (fail.length > 0) problems.push(`${page.label}: ${fail.join(", ")}`);
+    rows.push({ page, chosen, runs: runs.map((r) => r.scores.performance), ok: fail.length === 0 });
+    console.log(
+      `${fail.length === 0 ? "✓" : "✗"} ${page.label} perf ${chosen.scores.performance} [${runs
+        .map((r) => r.scores.performance)
+        .join(
+          ", ",
+        )}] a11y ${chosen.scores.accessibility} bp ${chosen.scores["best-practices"]} seo ${
+        chosen.scores.seo
+      } LCP ${chosen.lcpMs} ms TBT ${chosen.tbtMs} ms CLS ${chosen.cls} JS ${chosen.scriptKb} KB`,
+    );
+  }
+} finally {
+  chrome.kill();
+  await rm(profile, { recursive: true, force: true }).catch(() => {});
+}
+
+const table = [
+  "| Página | Rendimiento (3 corridas) | Accesibilidad | Buenas prácticas | SEO | LCP | TBT | CLS | JS | |",
+  "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+  ...rows.map(
+    ({ page, chosen, runs, ok }) =>
+      `| ${page.label} | ${chosen.scores.performance} (${runs.join(", ")}) | ${chosen.scores.accessibility} | ${
+        chosen.scores["best-practices"]
+      } | ${chosen.scores.seo} | ${(chosen.lcpMs / 1000).toFixed(1)} s | ${chosen.tbtMs} ms | ${chosen.cls} | ${
+        chosen.scriptKb
+      } KB | ${ok ? "✅" : "❌"} |`,
+  ),
+].join("\n");
+if (process.env.GITHUB_STEP_SUMMARY) {
+  await appendFile(process.env.GITHUB_STEP_SUMMARY, `## Lighthouse (móvil)\n\n${table}\n`);
+}
+
+if (problems.length > 0) {
+  console.error(`\nOver budget:\n${problems.map((p) => `  ${p}`).join("\n")}`);
+  process.exit(1);
+}
+console.log(`lighthouse: ${rows.length} pages within budget`);

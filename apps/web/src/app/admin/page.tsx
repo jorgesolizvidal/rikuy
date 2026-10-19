@@ -16,7 +16,7 @@ export default async function AdminHomePage() {
   ]);
 
   return (
-    <main className="shell">
+    <main id="contenido" tabIndex={-1} className="shell">
       <header className="admin-header">
         <p className="eyebrow">Rikuy · panel central</p>
         <SignOutButton />

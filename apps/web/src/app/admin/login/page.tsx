@@ -16,7 +16,7 @@ export default async function LoginPage({ searchParams }: LoginPageProps) {
   const { error } = await searchParams;
 
   return (
-    <main className="shell shell-narrow">
+    <main id="contenido" tabIndex={-1} className="shell shell-narrow">
       <p className="eyebrow">Rikuy · panel central</p>
       <h1 className="title title-sm">Iniciar sesión</h1>
       <p className="lead">Te enviaremos un código de acceso a tu correo. No usamos contraseñas.</p>

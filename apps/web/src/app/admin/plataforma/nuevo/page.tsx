@@ -19,7 +19,7 @@ export default async function NewTenantPage() {
   const { hosts, adminOrigin } = platformSettings();
 
   return (
-    <main className="shell shell-narrow">
+    <main id="contenido" tabIndex={-1} className="shell shell-narrow">
       <header className="admin-header">
         <Link href="/plataforma" className="eyebrow">
           ← Plataforma

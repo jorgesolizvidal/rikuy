@@ -7,5 +7,12 @@ export const metadata: Metadata = {
 };
 
 export default function AdminLayout({ children }: Readonly<{ children: ReactNode }>) {
-  return <div className="admin">{children}</div>;
+  return (
+    <div className="admin">
+      <a className="admin-skip" href="#contenido">
+        Saltar al contenido
+      </a>
+      {children}
+    </div>
+  );
 }
