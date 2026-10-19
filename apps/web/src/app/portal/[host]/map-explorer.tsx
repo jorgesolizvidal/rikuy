@@ -64,18 +64,35 @@ export function MapExplorer({
   const timer = useRef<number | undefined>(undefined);
   const { fix } = useVisitorLocation();
   const [follow, setFollow] = useState(false);
-  // Whether the first reading was handled (center on the visitor or say they are far).
+  // Whether the first reading was handled: inside the municipality the map follows the
+  // visitor; farther away it frames both, so the dot is always on screen right away.
   const [placedVisitor, setPlacedVisitor] = useState<"near" | "far" | null>(null);
+  const [reveal, setReveal] = useState<BoundingBox | null>(null);
 
   if (!fix && placedVisitor !== null) {
     setPlacedVisitor(null);
     setFollow(false);
+    setReveal(null);
   }
   if (fix && placedVisitor === null) {
     const near = containsPoint(padBoundingBox(initialArea), fix);
     setPlacedVisitor(near ? "near" : "far");
     if (near) setFollow(true);
+    else setReveal(revealArea(initialArea, fix));
   }
+
+  // On a phone the map sits below the buttons: bring it into view with the first reading.
+  const frame = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const element = frame.current;
+    if (!placedVisitor || !element) return;
+    const box = element.getBoundingClientRect();
+    const visible = Math.min(box.bottom, window.innerHeight) - Math.max(box.top, 0);
+    if (visible < box.height * 0.6) {
+      const smooth = !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      element.scrollIntoView({ behavior: smooth ? "smooth" : "auto", block: "center" });
+    }
+  }, [placedVisitor]);
 
   useEffect(
     () => () => {
@@ -167,7 +184,7 @@ export function MapExplorer({
 
       <div className="portal-map-visitor">
         <LocationButton />
-        {fix && placedVisitor === "near" ? (
+        {fix ? (
           <button
             type="button"
             className="portal-button"
@@ -184,13 +201,14 @@ export function MapExplorer({
             {describeProximity(distanceMeters(fix, centerOf(initialArea)))
               .distance.replace(/^A /u, "a ")
               .replace(" en línea recta", "")}{" "}
-            de esta zona. Las distancias de la lista son en línea recta desde donde estás.
+            de esta zona; el mapa muestra dónde estás tú y dónde están los lugares. Las distancias
+            de la lista son en línea recta desde donde estás.
           </p>
         ) : null}
       </div>
       <NearbyNotice targets={targets} radius={nearbyRadius} />
 
-      <div className="portal-map-frame">
+      <div className="portal-map-frame" ref={frame}>
         {failed ? (
           <p className="portal-map-failed" role="status">
             El mapa no está disponible en este momento. La lista tiene los mismos lugares.
@@ -203,7 +221,7 @@ export function MapExplorer({
             interactive
             onMove={moved}
             onFailure={() => setFailed(true)}
-            visitor={{ fix, follow }}
+            visitor={{ fix, follow, reveal }}
             onStopFollowing={() => setFollow(false)}
           />
         )}
@@ -241,6 +259,21 @@ export function MapExplorer({
       </section>
     </div>
   );
+}
+
+/** Beyond this, framing the visitor and the municipality together would show half a continent. */
+const MAX_REVEAL_DISTANCE = 300_000;
+
+/** The area that shows the visitor at once: with the municipality's places, or on their own. */
+function revealArea(area: BoundingBox, visitor: { lat: number; lng: number }): BoundingBox {
+  const spot = { west: visitor.lng, south: visitor.lat, east: visitor.lng, north: visitor.lat };
+  if (distanceMeters(visitor, centerOf(area)) > MAX_REVEAL_DISTANCE) return padBoundingBox(spot);
+  return {
+    west: Math.min(area.west, visitor.lng),
+    south: Math.min(area.south, visitor.lat),
+    east: Math.max(area.east, visitor.lng),
+    north: Math.max(area.north, visitor.lat),
+  };
 }
 
 function centerOf(box: BoundingBox) {

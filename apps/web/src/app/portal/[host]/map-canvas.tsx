@@ -34,7 +34,14 @@ export interface MapCanvasProps {
    */
   readonly onMove?: ((bounds: BoundingBox, fromVisitor: boolean) => void) | undefined;
   /** The visitor's position (device only) and whether the camera follows it. */
-  readonly visitor?: { readonly fix: PositionFix | null; readonly follow: boolean } | undefined;
+  readonly visitor?:
+    | {
+        readonly fix: PositionFix | null;
+        readonly follow: boolean;
+        /** Frame this area once (it contains the visitor), without asking the server. */
+        readonly reveal?: BoundingBox | null;
+      }
+    | undefined;
   /** The visitor dragged the map: stop following. */
   readonly onStopFollowing?: (() => void) | undefined;
   /** The style or WebGL could not load: the page keeps working without the map. */
@@ -333,6 +340,17 @@ export default function MapCanvas({
       FROM_VISITOR,
     );
   }, [fix, follow]);
+
+  const reveal = visitor?.reveal ?? null;
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !reveal) return;
+    instance.fitBounds(
+      new LngLatBounds([reveal.west, reveal.south], [reveal.east, reveal.north]),
+      { padding: 64, maxZoom: 15, animate: !reducedMotion() },
+      FROM_VISITOR,
+    );
+  }, [reveal]);
 
   // MapLibre styles its own container (position: relative), so it gets a full-size child.
   return (
