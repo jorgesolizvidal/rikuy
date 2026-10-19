@@ -3,8 +3,6 @@ import "server-only";
 import { parsePlatformEnv, type PlatformEnv } from "@rikuy/config/env";
 import {
   createCachedPresentationReader,
-  createCachedPublishedDestinationReader,
-  createCachedPublishedEventReader,
   createCachedPublishedMapReader,
   createCachedTenantDirectory,
   type PlatformHosts,
@@ -62,6 +60,22 @@ export function platformSettings(): PlatformSettings {
   return settings;
 }
 
+let freshDirectory: TenantDirectory | undefined;
+
+/**
+ * The registry without the per-instance cache, for portal pages: they are cached by host
+ * themselves (ADR-024), and a rebuild right after a publication must see the new version.
+ */
+export function freshTenantDirectory(): TenantDirectory {
+  if (freshDirectory) return freshDirectory;
+  const { env } = platformSettings();
+  freshDirectory = createSupabaseTenantDirectory({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return freshDirectory;
+}
+
 export function tenantDirectory(): TenantDirectory {
   if (directory) return directory;
   const { env } = platformSettings();
@@ -88,34 +102,28 @@ export function presentationReader(): PublishedPresentationReader {
 }
 
 /**
- * Anonymous reader of published destinations (only active tenants, sealed revisions),
- * cached per instance for a few seconds by tenant and slug: a publication reaches
- * visitors within that window.
+ * Anonymous reader of published destinations (only active tenants, sealed revisions).
+ * Not cached here: the pages that use it are cached per host (ADR-024), and a rebuild
+ * after a publication must read the new revision.
  */
 export function publishedContentReader(): PublishedDestinationReader {
   if (publishedContent) return publishedContent;
   const { env } = platformSettings();
-  publishedContent = createCachedPublishedDestinationReader(
-    createSupabasePublishedContentReader({
-      url: env.NEXT_PUBLIC_SUPABASE_URL,
-      publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    }),
-    { ttlMs: 30_000 },
-  );
+  publishedContent = createSupabasePublishedContentReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
   return publishedContent;
 }
 
-/** Anonymous agenda reader, cached like destinations (an ended event leaves within 30 s). */
+/** Anonymous agenda reader, read fresh like destinations (pages are cached per host). */
 export function publishedEventReader(): PublishedEventReader {
   if (publishedEvents) return publishedEvents;
   const { env } = platformSettings();
-  publishedEvents = createCachedPublishedEventReader(
-    createSupabasePublishedEventReader({
-      url: env.NEXT_PUBLIC_SUPABASE_URL,
-      publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
-    }),
-    { ttlMs: 30_000 },
-  );
+  publishedEvents = createSupabasePublishedEventReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
   return publishedEvents;
 }
 

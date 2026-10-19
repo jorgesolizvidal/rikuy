@@ -55,6 +55,11 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
         </li>
         <li>Las fotos se sirven desde el almacenamiento de la plataforma.</li>
         <li>
+          Para saber si el portal carga rápido, tu navegador envía métricas anónimas de velocidad
+          (cuánto tarda en mostrarse la página) a Vercel, el servicio que aloja el portal. No usa
+          cookies ni identifica a quien visita.
+        </li>
+        <li>
           Los mapas se dibujan con imágenes de OpenFreeMap, a partir de datos de OpenStreetMap. Al
           ver un mapa, tu navegador se las pide directamente a ese servicio, que recibe tu dirección
           IP como cualquier sitio web; no le enviamos tu ubicación ni otros datos.

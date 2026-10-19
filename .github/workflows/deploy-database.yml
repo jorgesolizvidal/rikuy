@@ -1,0 +1,65 @@
+name: Deploy database
+
+# Applies new migrations to the cloud Supabase project after they reach main (and on
+# demand). Migrations are expand-only (CONTRIBUTING §2), so the app deployed by Vercel at
+# the same time keeps working before and after they run.
+#
+# Repository settings → Secrets and variables → Actions:
+#   secret   SUPABASE_ACCESS_TOKEN   personal access token (supabase.com → Account → Access Tokens)
+#   secret   SUPABASE_DB_PASSWORD    database password of the project
+#   variable SUPABASE_PROJECT_REF    project reference (Project Settings → General)
+
+on:
+  push:
+    branches: [main]
+    paths: ["supabase/migrations/**"]
+  workflow_dispatch:
+    inputs:
+      seed:
+        description: "También cargar supabase/seed.sql (solo en un proyecto recién creado)"
+        type: boolean
+        default: false
+
+concurrency:
+  group: deploy-database
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  migrate:
+    name: Migrations → cloud Supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check configuration
+        run: |
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD PROJECT_REF; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not configured"; exit 1; fi
+          done
+
+      - name: Link the project
+        run: pnpm exec supabase link --project-ref "$PROJECT_REF"
+
+      - name: Pending migrations
+        run: pnpm exec supabase migration list --linked
+
+      - name: Apply
+        run: pnpm exec supabase db push --linked ${{ inputs.seed && '--include-seed' || '' }}

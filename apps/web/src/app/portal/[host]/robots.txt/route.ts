@@ -3,6 +3,9 @@ import { buildRobotsTxt } from "@rikuy/core";
 import { portalOrigin } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
+/** Resolved per request: these small responses carry their own Cache-Control. */
+export const dynamic = "force-dynamic";
+
 interface RobotsContext {
   readonly params: Promise<{ host: string }>;
 }

@@ -9,8 +9,23 @@ import type { CSSProperties, ReactNode } from "react";
 import { platformSettings } from "@/server/platform";
 import { portalView } from "@/server/portal-view";
 
+import { SpeedInsights } from "@vercel/speed-insights/next";
+
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
+
+/**
+ * Portal pages are cached per host and rebuilt at most every 2 minutes (ADR-024): enough
+ * for an event that just ended to leave the agenda, while publishing refreshes the
+ * tenant's pages at once (server/portal-cache.ts). Pages that read the query string
+ * (/mapa) stay dynamic.
+ */
+export const revalidate = 120;
+
+/** No host is known at build time: each portal page is rendered on its first visit, then cached. */
+export function generateStaticParams(): { host: string }[] {
+  return [];
+}
 
 interface PortalLayoutProps {
   readonly children: ReactNode;
@@ -131,6 +146,8 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         </nav>
         <p className="portal-credit">Portal oficial de {identity.siteName}. Funciona con Rikuy.</p>
       </footer>
+      {/* Real-user performance (anonymous, no cookies), only where Vercel serves it. */}
+      {process.env.VERCEL === "1" ? <SpeedInsights /> : null}
     </div>
   );
 }

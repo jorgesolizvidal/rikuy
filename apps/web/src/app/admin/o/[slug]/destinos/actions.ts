@@ -21,6 +21,7 @@ import {
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
 import { imageProcessor, mediaAdmin } from "@/server/media-admin";
+import { refreshPortal } from "@/server/portal-cache";
 
 /*
  * Editorial content Server Actions (destinations and events). Every action re-opens the organization with the CURRENT
@@ -204,6 +205,10 @@ export async function saveDestinationAction(
       case "saved":
         return { status: "saved", editCount: result.editCount, revisionNo: result.revisionNo };
       case "published":
+        await refreshPortal(
+          (tenantId) => session.content.portalHostname(tenantId),
+          membership.tenantId,
+        );
         return { status: "published", editCount: null, revisionNo: result.revisionNo };
       case "invalid":
         return { status: "invalid", ...keep, issues: result.issues };
@@ -245,6 +250,12 @@ export async function restoreRevisionAction(
       formData.get("revisionId"),
       access.session.content,
     );
+    if (result.status === "restored") {
+      await refreshPortal(
+        (tenantId) => access.session.content.portalHostname(tenantId),
+        access.membership.tenantId,
+      );
+    }
     return { status: result.status };
   } catch {
     return { status: "error" };

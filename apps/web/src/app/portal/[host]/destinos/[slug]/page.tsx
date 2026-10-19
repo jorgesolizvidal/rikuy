@@ -68,6 +68,11 @@ export async function generateMetadata({ params }: DestinationPageProps): Promis
   };
 }
 
+/** Rendered on the first visit and cached with the portal (ADR-024). */
+export function generateStaticParams(): { slug: string }[] {
+  return [];
+}
+
 const COVER_SIZES = "(min-width: 72rem) 72rem, 100vw";
 const GALLERY_SIZES = "(min-width: 72rem) 23rem, (min-width: 40rem) 45vw, 100vw";
 

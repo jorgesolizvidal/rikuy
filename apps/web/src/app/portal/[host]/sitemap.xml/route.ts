@@ -3,6 +3,9 @@ import { buildSitemap } from "@rikuy/core";
 import { portalDestinations, portalEvents, portalOrigin } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
+/** Resolved per request: these small responses carry their own Cache-Control. */
+export const dynamic = "force-dynamic";
+
 interface SitemapContext {
   readonly params: Promise<{ host: string }>;
 }

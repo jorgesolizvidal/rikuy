@@ -14,6 +14,9 @@ import { portalView } from "@/server/portal-view";
 
 import { MapExplorer } from "../map-explorer";
 
+/** `?lat=…&lng=…` changes the page, so it is rendered per request (not cached, ADR-024). */
+export const dynamic = "force-dynamic";
+
 interface MapPageProps {
   readonly params: Promise<{ host: string }>;
   readonly searchParams: Promise<Record<string, string | string[] | undefined>>;

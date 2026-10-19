@@ -1,0 +1,58 @@
+name: Lighthouse on production
+
+# After Vercel finishes a production deployment, measures the published demo portals with
+# the same budget as the PR job (apps/web/lighthouse-budget.json). It does not block merges
+# (that is the PR job's role): a red run here flags a regression only visible on the real
+# CDN, region and network path.
+#
+# Repository variable LIGHTHOUSE_ORIGINS, e.g.
+#   demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app
+
+on:
+  deployment_status:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lighthouse:
+    name: Lighthouse budget (production)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      LIGHTHOUSE_ORIGINS: ${{ vars.LIGHTHOUSE_ORIGINS }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lighthouse
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          if [ -z "$LIGHTHOUSE_ORIGINS" ]; then echo "::error::LIGHTHOUSE_ORIGINS is not configured"; exit 1; fi
+          CHROME_PATH="$(command -v google-chrome)" node e2e/lighthouse.mjs 2>&1 | tee ../../lighthouse.log
+
+      - name: Keep the reports
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-production
+          path: apps/web/lighthouse-reports/
+          if-no-files-found: ignore
+          retention-days: 30
