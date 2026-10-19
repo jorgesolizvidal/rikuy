@@ -713,12 +713,17 @@
     grid-template-columns: minmax(0, 1fr) 22rem;
     grid-template-areas:
       "layers layers"
+      "visitor visitor"
       "map list";
     align-items: start;
   }
 
   .portal-map-layers {
     grid-area: layers;
+  }
+
+  .portal-map-visitor {
+    grid-area: visitor;
   }
 
   .portal-map-frame {
@@ -930,10 +935,11 @@
   font-weight: 650;
 }
 
+/* A fixed height (not aspect-ratio + min-height, which widened the box past narrow screens). */
 .portal-mini-map {
-  aspect-ratio: 16 / 7;
-  min-height: 12rem;
+  width: 100%;
   max-width: 48rem;
+  height: clamp(12rem, 44vw, 21rem);
 }
 
 .portal-location p {
@@ -972,4 +978,225 @@
 .portal-mini-map-start .map-marker {
   position: relative;
   pointer-events: none;
+}
+
+/* ── Visitor location (computed on the device, ADR-021) ─────────────────── */
+
+.portal-location-control {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.portal-location-button {
+  gap: 0.5rem;
+}
+
+.portal-location-icon {
+  width: 0.875rem;
+  height: 0.875rem;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  box-shadow:
+    inset 0 0 0 2px var(--bg),
+    inset 0 0 0 6px currentColor;
+}
+
+.portal-location-button[data-active="true"] {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.portal-location-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.portal-location-status {
+  margin: 0;
+  max-width: 40rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-location-status:empty {
+  display: none;
+}
+
+.portal-list-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1.25rem;
+  margin: 1.5rem 0 0;
+}
+
+.portal-proximity-note {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-distance {
+  display: block;
+  margin-top: 0.375rem;
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.portal-distance-travel {
+  display: block;
+  font-weight: 400;
+}
+
+.portal-location-visitor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.portal-location-visitor .portal-distance {
+  margin: 0;
+  color: var(--fg);
+  font-size: 1rem;
+}
+
+.portal-map-visitor {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
+}
+
+.portal-map-visitor .portal-button[aria-pressed="true"] {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.portal-map-far {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-order {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+  margin: 1rem 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.portal-order legend {
+  float: left;
+  margin-right: 0.5rem;
+  font-weight: 650;
+}
+
+.portal-order label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  cursor: pointer;
+}
+
+.portal-order input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--brand);
+}
+
+/* The visitor: a blue dot (the usual convention for "you are here"). */
+.map-visitor {
+  display: block;
+  width: 1.125rem;
+  height: 1.125rem;
+  border-radius: 50%;
+  background: #1a73e8;
+  border: 3px solid #fff;
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 35%),
+    0 1px 4px rgb(0 0 0 / 30%);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .map-visitor {
+    animation: map-visitor-pulse 2.4s ease-out infinite;
+  }
+
+  @keyframes map-visitor-pulse {
+    0% {
+      box-shadow:
+        0 0 0 1px rgb(0 0 0 / 35%),
+        0 0 0 0 rgb(26 115 232 / 45%);
+    }
+    70% {
+      box-shadow:
+        0 0 0 1px rgb(0 0 0 / 35%),
+        0 0 0 14px rgb(26 115 232 / 0%);
+    }
+    100% {
+      box-shadow:
+        0 0 0 1px rgb(0 0 0 / 35%),
+        0 0 0 0 rgb(26 115 232 / 0%);
+    }
+  }
+}
+
+/* «Estás cerca de…»: out of the page flow (no layout shift), above the content. */
+.portal-nearby {
+  position: fixed;
+  inset-inline: 1rem;
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 20;
+  display: flex;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.portal-nearby-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: 30rem;
+  padding: 0.75rem 0.75rem 0.75rem 1.125rem;
+  border-radius: 1rem;
+  background: var(--brand);
+  color: var(--on-brand);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 25%);
+  pointer-events: auto;
+}
+
+.portal-nearby-card p {
+  margin: 0;
+}
+
+.portal .portal-nearby-card a {
+  color: inherit;
+  font-weight: 700;
+}
+
+.portal-nearby-label,
+.portal-nearby-distance {
+  opacity: 0.92;
+}
+
+.portal-nearby-close {
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
 }

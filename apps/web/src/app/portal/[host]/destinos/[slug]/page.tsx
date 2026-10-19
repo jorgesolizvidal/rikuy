@@ -1,4 +1,5 @@
 import {
+  nearbyRadiusOf,
   PORTAL_PATHS,
   destinationJsonLd,
   directionsUrl,
@@ -10,12 +11,18 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { RichTextView } from "@/components/rich-text";
-import { portalDestination, portalOrigin, responsiveImage } from "@/server/portal-content";
+import {
+  portalDestination,
+  portalNearbyTargets,
+  portalOrigin,
+  responsiveImage,
+} from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { MiniMap } from "../../mini-map";
 import { PortalImage } from "../../portal-image";
 import { ShareButton } from "../../share-button";
+import { DistanceText, LocationButton, NearbyNotice } from "../../visitor-location";
 
 interface DestinationPageProps {
   readonly params: Promise<{ host: string; slug: string }>;
@@ -68,6 +75,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const loaded = await load(params);
   if (loaded === null) notFound();
   const { view, destination } = loaded;
+  const targets = await portalNearbyTargets(view);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
   const url = `${portalOrigin(view)}${PORTAL_PATHS.destination(destination.slug)}`;
@@ -164,6 +172,10 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
               lng: destination.location.lng,
             }}
           />
+          <div className="portal-location-visitor">
+            <DistanceText point={destination.location} />
+            <LocationButton label="Ver a qué distancia estoy" />
+          </div>
           <p>
             {formatCoordinates(destination.location)} ·{" "}
             <a
@@ -186,6 +198,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       <footer className="portal-destination-meta">
         <p>Actualizado el {updated}.</p>
       </footer>
+      <NearbyNotice targets={targets} radius={nearbyRadiusOf(view.resolved.presentation)} />
     </article>
   );
 }

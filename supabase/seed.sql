@@ -93,7 +93,8 @@ where d.tenant_id = t.id and d.kind = 'platform'
   and c.tenant_id = t.id and c.state = 'sealed';
 
 -- Destinations (synthetic). Demo Norte: one published destination with two sealed
--- revisions (the second is live) and one never-published draft. Demo Sur: one published.
+-- revisions (the second is live), a second published one ~800 m away (to try «ordenar por
+-- cercanía» and «Estás cerca de…») and one never-published draft. Demo Sur: one published.
 insert into public.content_items (id, tenant_id, kind, slug, created_by)
 values
   ('5eed4100-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 'destination', 'mirador-del-valle',
@@ -101,7 +102,9 @@ values
   ('5eed4100-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000001', 'destination', 'feria-de-los-domingos',
    '5eed0000-0000-4000-8000-000000000003'),
   ('5eed4100-0000-4000-8000-000000000003', '5eed1000-0000-4000-8000-000000000002', 'destination', 'laguna-espejo',
-   '5eed0000-0000-4000-8000-000000000002');
+   '5eed0000-0000-4000-8000-000000000002'),
+  ('5eed4100-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000001', 'destination', 'plaza-principal',
+   '5eed0000-0000-4000-8000-000000000001');
 
 insert into public.content_revisions
   (id, tenant_id, content_id, revision_no, state, title, summary, body, latitude, longitude, created_by, sealed_at, sealed_by)
@@ -124,14 +127,19 @@ values
   ('5eed4200-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000002', '5eed4100-0000-4000-8000-000000000003',
    1, 'sealed', 'Laguna Espejo', 'Una laguna de altura que refleja el cielo nocturno.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Laguna de demostración para el municipio Sur."}]}]',
-   -21.5302, -64.7298, '5eed0000-0000-4000-8000-000000000002', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000002');
+   -21.5302, -64.7298, '5eed0000-0000-4000-8000-000000000002', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000002'),
+  ('5eed4200-0000-4000-8000-000000000005', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000004',
+   1, 'sealed', 'Plaza principal', 'El punto de partida: iglesia, mercado y la salida al mirador.',
+   '[{"type": "paragraph", "children": [{"type": "text", "text": "Plaza de demostración del municipio Norte."}]}]',
+   -17.3953, -66.1556, '5eed0000-0000-4000-8000-000000000001', now() - interval '3 days', '5eed0000-0000-4000-8000-000000000001');
 
 update public.content_items i
 set published_revision_id = v.published, published_at = v.published_at, draft_revision_id = v.draft
 from (values
   ('5eed4100-0000-4000-8000-000000000001'::uuid, '5eed4200-0000-4000-8000-000000000002'::uuid, now() - interval '1 day', null::uuid),
   ('5eed4100-0000-4000-8000-000000000002'::uuid, null::uuid, null::timestamptz, '5eed4200-0000-4000-8000-000000000003'::uuid),
-  ('5eed4100-0000-4000-8000-000000000003'::uuid, '5eed4200-0000-4000-8000-000000000004'::uuid, now() - interval '1 day', null::uuid)
+  ('5eed4100-0000-4000-8000-000000000003'::uuid, '5eed4200-0000-4000-8000-000000000004'::uuid, now() - interval '1 day', null::uuid),
+  ('5eed4100-0000-4000-8000-000000000004'::uuid, '5eed4200-0000-4000-8000-000000000005'::uuid, now() - interval '3 days', null::uuid)
 ) as v (id, published, published_at, draft)
 where i.id = v.id;
 

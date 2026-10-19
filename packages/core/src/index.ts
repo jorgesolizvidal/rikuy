@@ -42,6 +42,7 @@ export * from "./domain/content/markup";
 export * from "./domain/events/schedule";
 export * from "./domain/geo/bounds";
 export * from "./domain/geo/coordinates";
+export * from "./domain/geo/proximity";
 export * from "./application/content/ports";
 export * from "./application/content/destinations";
 export * from "./application/content/editing";

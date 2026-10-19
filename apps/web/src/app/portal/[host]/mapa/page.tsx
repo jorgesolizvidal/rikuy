@@ -1,4 +1,10 @@
-import { MAX_AREA_SPAN_DEGREES, PORTAL_PATHS, padBoundingBox, type BoundingBox } from "@rikuy/core";
+import {
+  MAX_AREA_SPAN_DEGREES,
+  nearbyRadiusOf,
+  PORTAL_PATHS,
+  padBoundingBox,
+  type BoundingBox,
+} from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -84,7 +90,8 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
       <h1 className="portal-page-title">Mapa</h1>
       <p className="portal-lead">
         Destinos y eventos próximos de {siteName}. Mueve el mapa para ver otra zona; la lista
-        muestra los mismos lugares.
+        muestra los mismos lugares. Con «Usar mi ubicación» verás dónde estás y qué tienes cerca; tu
+        ubicación no sale de tu dispositivo.
       </p>
       {area === null ? (
         <p className="portal-empty">Todavía no hay lugares en el mapa.</p>
@@ -92,6 +99,8 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
         <MapExplorer
           initialPoints={places.map(toMapPoint)}
           initialArea={area}
+          complete={places.length >= extent.destinations + extent.events}
+          nearbyRadius={nearbyRadiusOf(view.resolved.presentation)}
           {...(center ? { center } : {})}
         />
       )}
