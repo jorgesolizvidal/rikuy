@@ -47,13 +47,20 @@ async function code(query: PromiseLike<{ error: { code?: string } | null }>) {
 
 describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)", () => {
   const clients = {} as Record<Actor, SupabaseClient>;
+  const userIds = {} as Partial<Record<Actor, string>>;
   let originalPath: string;
 
   beforeAll(async () => {
-    clients.owner = (await signIn(USERS.ownerNorte)).client;
-    clients.editor = (await signIn(USERS.both)).client; // editor in Norte, analyst in Sur
-    clients.revoked = (await signIn(USERS.revoked)).client;
-    clients.otherOwner = (await signIn(USERS.ownerSur)).client;
+    for (const [actor, email] of [
+      ["owner", USERS.ownerNorte],
+      ["editor", USERS.both], // editor in Norte, analyst in Sur
+      ["revoked", USERS.revoked],
+      ["otherOwner", USERS.ownerSur],
+    ] as const) {
+      const session = await signIn(email);
+      clients[actor] = session.client;
+      userIds[actor] = session.actor.userId;
+    }
     clients.visitor = createClient(env.url, env.publishableKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -87,13 +94,8 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
       expect(empty(result[actor]), `${actor}: ${result[actor]}`).toBe(true);
   });
 
-  it("content items, configuration drafts, memberships and audit: nothing for outsiders", async () => {
-    for (const table of [
-      "content_items",
-      "tenant_config_versions",
-      "memberships",
-      "audit_events",
-    ]) {
+  it("content items, configuration drafts and audit: nothing for outsiders", async () => {
+    for (const table of ["content_items", "tenant_config_versions", "audit_events"]) {
       const result = await matrix((client) =>
         rows(client.from(table).select("tenant_id").eq("tenant_id", NORTE)),
       );
@@ -102,6 +104,24 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
         expect(empty(result[actor]), `${table} · ${actor}: ${result[actor]}`).toBe(true);
       }
     }
+  });
+
+  it("memberships: outsiders see nobody else's; a revoked member only their own, revoked", async () => {
+    const others = await matrix((client) => {
+      const actor = ACTORS.find((name) => clients[name] === client);
+      const own = actor ? userIds[actor] : undefined;
+      const query = client.from("memberships").select("user_id").eq("tenant_id", NORTE);
+      return rows(own ? query.neq("user_id", own) : query);
+    });
+    expect(others.owner).not.toBe("rows:0");
+    for (const actor of OUTSIDERS) {
+      expect(empty(others[actor]), `memberships · ${actor}: ${others[actor]}`).toBe(true);
+    }
+    const { data } = await clients.revoked
+      .from("memberships")
+      .select("status")
+      .eq("tenant_id", NORTE);
+    expect(data).toEqual([{ status: "revoked" }]);
   });
 
   it("saving a draft: owner and editor pass authorization, outsiders are refused", async () => {
