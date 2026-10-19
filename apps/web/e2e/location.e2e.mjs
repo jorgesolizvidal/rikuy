@@ -146,7 +146,12 @@ async function assertNoLeak(page, requests, position) {
     await page.getByRole("button", { name: "Ordenar por cercanía" }).click();
     await page.waitForTimeout(500);
     assert.equal(await geoCalls(page), 1);
-    assert.match(await page.locator(".portal-location-status").innerText(), /Buscando/u);
+    // Still waiting for an answer, or — as recent headless Chrome does with an unanswered
+    // prompt — dismissed and reported as refused. Either way the page says so in words.
+    assert.match(
+      await page.locator(".portal-location-status").innerText(),
+      /Buscando tu ubicación|No tenemos permiso/u,
+    );
     assert.deepEqual(await texts(page.locator(".portal-card-title")), order);
     assert.equal(await page.locator(".portal-distance").count(), 0);
   });
