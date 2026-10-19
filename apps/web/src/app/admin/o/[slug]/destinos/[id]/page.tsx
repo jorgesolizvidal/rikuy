@@ -84,7 +84,7 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
   );
 
   return (
-    <main className="shell shell-wide">
+    <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <header className="admin-header">
         <Link href={`/o/${membership.slug}/destinos`} className="eyebrow">
           ← Destinos de {membership.displayName}

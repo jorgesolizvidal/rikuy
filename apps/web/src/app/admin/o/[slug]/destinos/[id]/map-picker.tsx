@@ -110,7 +110,14 @@ export default function MapPicker({ value, center, disabled, onPick }: MapPicker
 
   return (
     <>
-      <div ref={container} className="map-picker" aria-hidden="true" />
+      {/* Leaflet makes the map and its zoom buttons focusable, so it cannot be aria-hidden;
+          the coordinate fields next to it are the text alternative. */}
+      <div
+        ref={container}
+        className="map-picker"
+        role="region"
+        aria-label="Mapa para elegir la ubicación: toca o arrastra el pin. También puedes escribir las coordenadas."
+      />
       {tilesFailing ? (
         <p className="field-error" role="status">
           No se pudieron cargar las imágenes del mapa (sin conexión o bloqueadas por la red o la

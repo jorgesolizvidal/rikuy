@@ -1,0 +1,13 @@
+{
+  "$comment": "Performance budget enforced in CI (docs/performance-budget.md). Mobile, simulated 4G and CPU x4. Each page runs `runs` times and the median run counts.",
+  "runs": 3,
+  "categories": { "accessibility": 95, "best-practices": 95, "seo": 95 },
+  "pages": {
+    "home": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
+    "destinations": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
+    "destination": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
+    "agenda": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
+    "event": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
+    "map": { "performance": null, "lcpMs": null, "cls": 0.1, "scriptKb": null }
+  }
+}

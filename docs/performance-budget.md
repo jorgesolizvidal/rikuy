@@ -4,13 +4,13 @@ La velocidad de carga es un **contrato verificable**, no una intención. Estos o
 
 ## Objetivos (móvil, red 4G, percentil 75 de usuarios reales)
 
-| Métrica                         | Objetivo                       | Dónde se mide                                     |
-| ------------------------------- | ------------------------------ | ------------------------------------------------- |
-| LCP (Largest Contentful Paint)  | ≤ 2,5 s                        | Lighthouse CI en previews · Vercel Speed Insights |
-| INP (Interaction to Next Paint) | ≤ 200 ms                       | Speed Insights                                    |
-| CLS (Cumulative Layout Shift)   | ≤ 0,1                          | Lighthouse CI · Speed Insights                    |
-| TTFB portal (página cacheada)   | ≤ 0,8 s                        | Speed Insights                                    |
-| Lighthouse Performance (mobile) | ≥ 90 en home, destino y evento | Lighthouse CI                                     |
+| Métrica                         | Objetivo                       | Dónde se mide                         |
+| ------------------------------- | ------------------------------ | ------------------------------------- |
+| LCP (Largest Contentful Paint)  | ≤ 2,5 s                        | Lighthouse CI · Vercel Speed Insights |
+| INP (Interaction to Next Paint) | ≤ 200 ms                       | Speed Insights                        |
+| CLS (Cumulative Layout Shift)   | ≤ 0,1                          | Lighthouse CI · Speed Insights        |
+| TTFB portal (página cacheada)   | ≤ 0,8 s                        | Speed Insights                        |
+| Lighthouse Performance (mobile) | ≥ 90 en home, destino y evento | Lighthouse CI                         |
 
 ## Presupuestos de peso
 
@@ -37,6 +37,7 @@ La velocidad de carga es un **contrato verificable**, no una intención. Estos o
 ## Calendario
 
 - **P1:** baseline de bundle registrado en cada PR.
-- **P3:** Lighthouse CI sobre previews de Vercel con los objetivos de esta tabla.
+- **P3 · Paso 7 ✅:** Lighthouse CI en cada PR (job «Contracts · Lighthouse budget»): compilación de producción y base local con el seed, móvil con 4G y CPU ×4 simulados, mediana de 3 corridas por página. Los umbrales viven en [`apps/web/lighthouse-budget.json`](../apps/web/lighthouse-budget.json): rendimiento ≥ 90, LCP ≤ 2,5 s, CLS ≤ 0,1 y JS ≤ 170 KB gzip en inicio, destinos, ficha de destino, agenda y ficha de evento de los dos municipios; accesibilidad, buenas prácticas y SEO ≥ 95 en todas. `/mapa` solo tiene CLS y esas tres categorías hasta medirlo en un celular real. Los informes quedan como artefacto del job.
+- **P3 · Paso 8:** el mismo presupuesto sobre los previews de Vercel, y Speed Insights.
 - **P4:** medición del tour en Android físico de gama media (pendiente desde P0).
 - **Hito demo:** Speed Insights activo en producción.

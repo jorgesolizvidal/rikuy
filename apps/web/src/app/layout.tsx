@@ -7,7 +7,8 @@ export const metadata: Metadata = {
   title: "Rikuy",
   description:
     "Plataforma de turismo inmersivo para municipios: tours 360°, modelos 3D, mapas y guía con IA.",
-  robots: { index: false, follow: false },
+  // No robots here: portals are indexable by default and their 404 page carries only Next's
+  // own noindex. The platform page and the admin set noindex themselves.
 };
 
 export const viewport: Viewport = {

@@ -2,7 +2,8 @@
   --bg: #f6f3ee;
   --fg: #1d1a16;
   --muted: #6b6359;
-  --accent: #b5532b;
+  /* ≥ 4.5:1 on the background and on tinted cards (RC-10); was #b5532b (4.48:1). */
+  --accent: #9e4723;
   --font-sans:
     ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   color-scheme: light dark;
@@ -106,6 +107,26 @@ body {
 
 .title-sm {
   font-size: clamp(2rem, 7vw, 2.75rem);
+}
+
+.admin-skip {
+  position: absolute;
+  left: 1rem;
+  top: -4rem;
+  z-index: 10;
+  padding: 0.5rem 1rem;
+  border-radius: 0.5rem;
+  background: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.admin-skip:focus {
+  top: 0.75rem;
+}
+
+main:focus {
+  outline: none;
 }
 
 .admin-header {
@@ -489,7 +510,12 @@ a.button-quiet {
 
 /* ── Admin · plataforma y miembros ───────────────────────────────────── */
 
+/* Wide tables scroll inside their own box, never the page (RC-09). */
 .table-wrap {
+  /* Positioned, so visually hidden labels inside it are clipped too instead of widening the page. */
+  position: relative;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
 }
 

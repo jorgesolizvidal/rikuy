@@ -90,7 +90,7 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
   const live = record.history.find((entry) => entry.revisionId === record.published?.revisionId);
 
   return (
-    <main className="shell shell-wide">
+    <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <header className="admin-header">
         <Link href={`/o/${membership.slug}/agenda`} className="eyebrow">
           ← Agenda de {membership.displayName}

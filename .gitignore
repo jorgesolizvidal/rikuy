@@ -40,3 +40,6 @@ Thumbs.db
 .vscode/*
 !.vscode/extensions.json
 !.vscode/settings.json
+
+# Lighthouse reports (CI artifact)
+apps/web/lighthouse-reports/

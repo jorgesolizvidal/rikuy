@@ -35,7 +35,7 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
     : null;
 
   return (
-    <main className="shell shell-wide">
+    <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <header className="admin-header">
         <Link href={`/o/${membership.slug}`} className="eyebrow">
           ← {membership.displayName}

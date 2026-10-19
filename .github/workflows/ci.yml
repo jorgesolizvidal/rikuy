@@ -118,7 +118,7 @@ jobs:
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
           } >> "$GITHUB_ENV"
 
-      - name: Sign-in, membership, branding, media and onboarding (ZC-01) tests
+      - name: Sign-in, membership, branding, media, onboarding (ZC-01) and access matrix (RC-15) tests
         run: |
           set -o pipefail
           pnpm --filter @rikuy/db test:integration 2>&1 | tee integration.log
@@ -157,6 +157,85 @@ jobs:
         run: |
           cat e2e.log next.log 2>/dev/null | tail -30 | while IFS= read -r line; do
             echo "::error title=portals e2e::${line//%/%25}"
+          done
+
+  contracts:
+    name: Contracts (RC-09/10/11/12) · Lighthouse budget
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      # A clean stack with only the seed: the same data on every run, so scores compare.
+      - name: Start Supabase
+        run: pnpm exec supabase start -x realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+
+      - name: Export local credentials
+        run: |
+          STATUS="$(pnpm exec supabase status -o json)"
+          SECRET="$(echo "$STATUS" | jq -r '.SECRET_KEY // .SERVICE_ROLE_KEY')"
+          echo "::add-mask::$SECRET"
+          {
+            echo "SUPABASE_URL=$(echo "$STATUS" | jq -r '.API_URL')"
+            echo "SUPABASE_PUBLISHABLE_KEY=$(echo "$STATUS" | jq -r '.PUBLISHABLE_KEY // .ANON_KEY')"
+            echo "SUPABASE_SECRET_KEY=$SECRET"
+            echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
+          } >> "$GITHUB_ENV"
+
+      - name: Build and start the production server
+        env:
+          PLATFORM_ROOT_DOMAIN: localhost
+          PLATFORM_ADMIN_HOST: app.localhost:3000
+        run: |
+          export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL"
+          export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
+          pnpm --filter @rikuy/web build
+          cd apps/web
+          nohup pnpm exec next start -p 3000 > ../../next.log 2>&1 &
+          for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3000 && break; sleep 1; done
+
+      # Widths, accessibility, links and SEO of every portal page and the admin (as an owner).
+      - name: Regression contracts in a real browser
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" node e2e/contracts.e2e.mjs 3000 2>&1 | tee ../../contracts.log
+
+      # Fails the PR when a public page breaks lighthouse-budget.json (median of 3 runs).
+      - name: Lighthouse budget (mobile)
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" node e2e/lighthouse.mjs 3000 2>&1 | tee ../../lighthouse.log
+
+      - name: Keep the Lighthouse reports
+        if: success() || failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lighthouse-reports
+          path: apps/web/lighthouse-reports/
+          if-no-files-found: ignore
+          retention-days: 14
+
+      - name: Report failures
+        if: failure()
+        run: |
+          cat contracts.log lighthouse.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error" | head -40 | while IFS= read -r line; do
+            echo "::error title=contracts or budget::${line//%/%25}"
+          done
+          tail -15 next.log 2>/dev/null | while IFS= read -r line; do
+            echo "::warning title=next log::${line//%/%25}"
           done
 
   secrets:

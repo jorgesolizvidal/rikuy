@@ -33,7 +33,6 @@ export async function generateMetadata({
     ...(description ? { description } : {}),
     applicationName: shortName,
     alternates: { canonical: "/" },
-    robots: { index: true, follow: true },
     manifest: "/manifest.webmanifest",
     icons: {
       icon: [{ url: portalIconPath(32, configId), sizes: "32x32", type: "image/png" }],

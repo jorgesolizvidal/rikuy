@@ -34,7 +34,7 @@ export default async function PlatformPage() {
 
   if (gate.status !== "granted") {
     return (
-      <main className="shell shell-narrow">
+      <main id="contenido" tabIndex={-1} className="shell shell-narrow">
         {header}
         <h1 className="title title-sm">Verificación en dos pasos</h1>
         <p className="lead">
@@ -51,7 +51,7 @@ export default async function PlatformPage() {
   const { portalOrigin } = platformSettings();
 
   return (
-    <main className="shell shell-wide">
+    <main id="contenido" tabIndex={-1} className="shell shell-wide">
       {header}
       <div className="branding-heading">
         <h1 className="title title-sm">Plataforma</h1>

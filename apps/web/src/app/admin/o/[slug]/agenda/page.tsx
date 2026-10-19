@@ -69,7 +69,7 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
   const empty = agenda.upcoming.length + agenda.undated.length + agenda.past.length === 0;
 
   return (
-    <main className="shell shell-wide">
+    <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <header className="admin-header">
         <Link href={`/o/${membership.slug}`} className="eyebrow">
           ← {membership.displayName}

@@ -18,7 +18,7 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
   const membership = await requireOrganization((await params).slug);
 
   return (
-    <main className="shell">
+    <main id="contenido" tabIndex={-1} className="shell">
       <header className="admin-header">
         <Link href="/" className="eyebrow">
           ← Tus municipios

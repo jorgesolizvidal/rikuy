@@ -30,7 +30,7 @@ export default async function MembersPage({ params }: MembersPageProps) {
   const roles = assignableRoles(membership.role);
 
   return (
-    <main className="shell shell-wide">
+    <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <header className="admin-header">
         <Link href={`/o/${membership.slug}`} className="eyebrow">
           ← {membership.displayName}
@@ -53,7 +53,8 @@ export default async function MembersPage({ params }: MembersPageProps) {
         />
       </section>
 
-      <div className="table-wrap">
+      {/* Focusable so the table can be scrolled sideways with the keyboard on a phone. */}
+      <div className="table-wrap" role="region" aria-label="Lista de miembros" tabIndex={0}>
         <table className="data-table">
           <caption className="visually-hidden">Miembros de {membership.displayName}</caption>
           <thead>

@@ -1,3 +1,8 @@
+import type { Metadata } from "next";
+
+/** The platform's own page is not a municipality's portal: never indexed. */
+export const metadata: Metadata = { robots: { index: false, follow: false } };
+
 export default function HomePage() {
   return (
     <main className="shell">
