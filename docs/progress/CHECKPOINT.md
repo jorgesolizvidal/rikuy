@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P3 — Portal y administración del primer vertical (P1 ✅ completa).
-- **Último paso completado:** P3 · Paso 6 — ubicación del visitante en tiempo real (2026-10-18)
-- **Rama del paso:** `feat/p3-step6-visitor-location` → PR hacia `main`
+- **Último paso completado:** P3 · Paso 7 — Lighthouse CI y contratos de regresión (2026-10-19)
+- **Rama del paso:** `feat/p3-step7-lighthouse-ci` → PR hacia `main`
 
 ## Historial
 
@@ -210,38 +210,60 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 
 **Corrección posterior (`fix/visitor-location-reveal`):** al activar la ubicación lejos de los lugares del municipio (por ejemplo, a 33 km), el mapa no se movía y el punto quedaba fuera de la vista. Ahora el mapa encuadra a la vez al visitante y a los lugares (o solo al visitante si está a más de 300 km), «Seguirme» se ofrece también en ese caso y, en el celular, la página baja hasta el mapa. Ese encuadre tampoco pide zonas al servidor. El e2e RC-06 lo comprueba (35 verificaciones: el punto queda dentro del mapa, cerca, lejos y en un celular).
 
+### P3 · Paso 7 — Lighthouse CI y contratos de regresión ✅
+
+- Decisión del usuario: el CI mide en **GitHub Actions** (compilación de producción + Supabase local con el seed), sin costo. Vercel, Supabase en la nube y la caché de CDN pasan al **Paso 8 (despliegue)**: la organización gratuita de Supabase ya tiene sus 2 proyectos activos y Vercel está en el plan Hobby (uso no comercial).
+- Nuevo job de CI **«Contracts (RC-09/10/11/12) · Lighthouse budget»**, en paralelo con los demás, sobre una base limpia con solo el seed:
+  - **Lighthouse** (`e2e/lighthouse.mjs`): inicio, destinos, ficha de destino, agenda, ficha de evento y mapa de los dos municipios, móvil con 4G y CPU ×4 simulados, mediana de 3 corridas. Los umbrales están en `apps/web/lighthouse-budget.json` (rendimiento ≥ 90, LCP ≤ 2,5 s, CLS ≤ 0,1, JS ≤ 170 KB; accesibilidad, buenas prácticas y SEO ≥ 95). El PR falla si una página lo rompe; la tabla sale en el resumen del job y los informes quedan como artefacto 14 días.
+  - **Contratos en un navegador real** (`e2e/contracts.e2e.mjs`, 189 verificaciones), de la auditoría `14-regression-contracts-evals` (leída en modo solo lectura):
+    - RC-09: sin desborde horizontal a 360, 390, 768 y 1280 px en 9 páginas por portal y 8 del panel (como propietario).
+    - RC-10: axe sin hallazgos críticos ni graves (390 y 1280 px), «Saltar al contenido» con el primer Tab y foco visible, nada animado con «reducir movimiento», y en `/mapa` una fila de la lista por cada pin con nombre accesible.
+    - RC-11: rastreo de todos los enlaces internos de cada portal y del panel, sin ninguno roto.
+    - RC-12: título renderizado en el servidor, descripción, canonical en su propio dominio y Open Graph únicos por municipio y página; 404 con `noindex`; el panel con `X-Robots-Tag` y meta `noindex`.
+  - Inicio de sesión del panel en el e2e con el código real que llega a Mailpit.
+- **RC-15** (`rc15-access-matrix.int.test.ts`, en el job de integración): matriz propietario / editor / revocado / propietario de otro municipio / visitante sobre los datos privados de Demo Norte, por la Data API, las RPC y Storage. Las escrituras usan un número de edición viejo: quien tiene permiso choca con la concurrencia (PT409) y quien no, con la autorización (42501), sin cambiar nada del seed.
+- Lo que encontraron las pruebas, ya corregido:
+  - Las páginas del portal cargaban **35 KB de zod** que el navegador no usa (los componentes de ubicación importaban la entrada principal de `@rikuy/core`). Nueva entrada `@rikuy/core/geo` sin esquemas: JS inicial de **177–179 KB a 142–144 KB**.
+  - La tabla de «Miembros» desbordaba celulares (las etiquetas ocultas de la tabla se salían de su caja): ahora se desplaza dentro de su propio recuadro, que también se recorre con el teclado.
+  - El color de acento del panel tenía un contraste de 4,48:1 (mínimo 4,5): ahora `#9e4723` (5,6:1).
+  - El mapa del editor estaba oculto para lectores de pantalla pero recibía el foco: ahora es una región con nombre que remite a los campos de coordenadas.
+  - La página 404 del portal tenía dos etiquetas `robots` contradictorias; el panel no tenía «Saltar al contenido».
+- Lighthouse local (móvil, mediana de 3): inicio 98, destinos 98, fichas 98–100, agenda 98 en los dos municipios, CLS 0. `/mapa` 66–69 (sin umbral de rendimiento hasta medirlo en un celular real).
+
+**Desviaciones:**
+
+- Las mediciones son de laboratorio en el runner de GitHub, no en previews de Vercel ni con usuarios reales: eso llega en el Paso 8 (previews + Speed Insights).
+- La caché de CDN por municipio, idioma y versión queda para el Paso 8: solo tiene sentido con el CDN de Vercel delante.
+- RC-10 es una revisión automática más teclado básico; no equivale a declarar conformidad WCAG completa (como advierte la propia auditoría).
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
 git checkout main
 git pull
-pnpm install       # instala playwright-core (solo para el e2e)
-pnpm db:reset      # trae «Plaza principal» en Demo Norte
-pnpm dev
+pnpm install       # instala lighthouse y axe-core (solo para pruebas)
+pnpm db:reset
 ```
 
-En la PC, `localhost` cuenta como conexión segura, así que la ubicación funciona (el navegador usará la ubicación de tu PC, por Wi-Fi). Para probar como si estuvieras en el municipio de prueba, en Chrome: F12 → menú ⋮ → More tools → **Sensors** → Location → «Other…» con latitud `-17.3905` y longitud `-66.1508` (al lado del Mirador).
+1. En GitHub, abre el PR → pestaña **Checks** → «Contracts (RC-09/10/11/12) · Lighthouse budget» → **Summary**: está la tabla de Lighthouse por página. Abajo, en **Artifacts**, `lighthouse-reports` trae los informes completos (se abren en https://googlechrome.github.io/lighthouse/viewer/ arrastrando el archivo).
+2. Opcional, en tu PC (con `pnpm build` y `pnpm --filter @rikuy/web start` corriendo): `cd apps/web` y `node e2e/lighthouse.mjs 3000` con `$env:CHROME_PATH="C:\Program Files\Google\Chrome\Application\chrome.exe"`.
+3. En el panel: «Miembros» en el celular ya no se sale de la pantalla (la tabla se desliza dentro de su recuadro) y, al pulsar Tab al entrar, aparece «Saltar al contenido».
 
-1. Abre http://demo-norte.localhost:3000/mapa y pulsa **«Usar mi ubicación»**: el navegador pide permiso solo en ese momento. Aparece el punto azul con su círculo, «Siguiéndote», la lista ordenada con «A 80 m en línea recta» y el aviso **«Estás cerca de Mirador del Valle»**.
-2. Arrastra el mapa: «Seguirme» se apaga. Púlsalo y el mapa vuelve a ti.
-3. En Sensors cambia a latitud `-17.3951`, longitud `-66.1555` (la Plaza principal): la lista cambia de orden y aparece «Estás cerca de Plaza principal».
-4. Abre «Destinos»: ya muestra las distancias y la Plaza primero. Abre «Mirador del Valle» y baja a «Ubicación»: distancia y tiempos estimados.
-5. «Agenda» → «Ordenar: Por cercanía».
-6. «Dejar de usar mi ubicación»: desaparecen el punto, las distancias y el aviso.
-7. Bloquea el permiso (candado de la barra de direcciones → Ubicación → Bloquear), recarga y pulsa «Usar mi ubicación»: el portal explica que no tiene permiso y todo sigue funcionando.
-8. Opcional, el radio: panel → municipio → «Marca del portal» → «Visitantes» → por ejemplo `500`, publica, y el aviso aparece desde más lejos.
+## Siguiente paso — P3 · Paso 8 (requiere autorización y decisiones)
 
-## Siguiente paso — P3 · Paso 7 (requiere autorización)
+Rama `feat/p3-step8-deploy`. Antes de empezar:
 
-Rama `feat/p3-step7-lighthouse-ci`:
+- **Supabase en la nube:** liberar un proyecto de la organización gratuita (pausar uno) o pasar al plan Pro. No tocar `ucurena-storage` mientras el sistema anterior siga en uso.
+- **Vercel:** el plan Hobby sirve para previews y pruebas; para municipios reales (uso comercial) hace falta Pro.
+- Permitir `*.vercel.app` y `*.supabase.co` en los dominios de mi entorno.
 
-1. Previews de Vercel por PR (proyecto conectado al repositorio, variables de entorno del preview y base de datos de prueba).
-2. Lighthouse CI sobre el preview con el [presupuesto](../performance-budget.md): el PR falla si una ruta pública lo rompe; `/mapa` con su objetivo propio medido en un celular real.
-3. Caché de CDN por municipio, idioma y versión publicada (pendiente desde el Paso 3).
-4. Contratos RC-06/09/10/11/12/15 como pruebas automáticas (leer primero su definición en la auditoría, solo lectura).
-5. Prueba de la ubicación en un celular con https (el preview).
+Contenido:
 
-Antes de empezar hará falta: conectar Vercel con el repositorio (o autorizarme a hacerlo con el conector) y permitir `*.vercel.app` y `*.supabase.co` en los dominios de mi entorno.
+1. Proyecto Supabase de Rikuy (migraciones, seed sintético de demo, claves en Vercel; nunca en el repo).
+2. Proyecto Vercel conectado al repositorio con previews por PR y dominios `*.vercel.app` por municipio de demo.
+3. Lighthouse CI sobre el preview con el mismo `lighthouse-budget.json`.
+4. Caché de CDN por municipio, idioma y versión publicada, invalidada al publicar.
+5. Speed Insights y prueba de la ubicación en un celular con https.
 
 ## Decisiones pendientes del usuario
 
