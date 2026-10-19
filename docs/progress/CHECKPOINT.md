@@ -208,6 +208,8 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - No hay aviso en segundo plano (ni notificaciones push): solo con la página abierta, como prevé el ADR.
 - En el celular hace falta https para probar la ubicación (los navegadores no la dan en `http://192.168…`). Se podrá probar en los previews de Vercel del Paso 7, o con un túnel https si se quiere antes.
 
+**Corrección posterior (`fix/visitor-location-reveal`):** al activar la ubicación lejos de los lugares del municipio (por ejemplo, a 33 km), el mapa no se movía y el punto quedaba fuera de la vista. Ahora el mapa encuadra a la vez al visitante y a los lugares (o solo al visitante si está a más de 300 km), «Seguirme» se ofrece también en ese caso y, en el celular, la página baja hasta el mapa. Ese encuadre tampoco pide zonas al servidor. El e2e RC-06 lo comprueba (35 verificaciones: el punto queda dentro del mapa, cerca, lejos y en un celular).
+
 ## Cómo verificarlo en tu PC
 
 ```powershell

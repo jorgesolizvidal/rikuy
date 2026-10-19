@@ -89,6 +89,20 @@ async function visitor({ permission, geolocation, noPermissionsApi = false, mobi
   return { context, page, requests, errors };
 }
 
+/** The visitor's dot is inside the visible map (no need to pan or zoom to find it). */
+async function assertDotOnScreen(page) {
+  await page.waitForTimeout(1500); // camera animation
+  const frame = await page.locator(".portal-map-frame").boundingBox();
+  const dot = await page.locator(".map-visitor").boundingBox();
+  assert.ok(frame && dot, "map and dot are rendered");
+  const x = dot.x + dot.width / 2;
+  const y = dot.y + dot.height / 2;
+  assert.ok(
+    x > frame.x && x < frame.x + frame.width && y > frame.y && y < frame.y + frame.height,
+    `dot at ${Math.round(x)},${Math.round(y)} outside the map ${JSON.stringify(frame)}`,
+  );
+}
+
 const geoCalls = (page) => page.evaluate(() => window.__geoCalls);
 
 /** "A 80 m en línea recta" / "A 1,2 km en línea recta" → meters. */
@@ -184,6 +198,7 @@ async function assertNoLeak(page, requests, position) {
   await page.locator(".map-visitor").waitFor({ timeout: 10_000 });
 
   await check("granted · the map shows the visitor and follows them", async () => {
+    await assertDotOnScreen(page);
     assert.equal(
       await page
         .getByRole("button", { name: /Siguiéndote|Seguirme/u })
@@ -300,6 +315,44 @@ async function assertNoLeak(page, requests, position) {
   await context.close();
 }
 
+// ── Granted, ~33 km away from the municipality's places ───────────────────────
+{
+  const FAR = { latitude: -17.58731, longitude: -65.93417, accuracy: 20 };
+  const { context, page, requests, errors } = await visitor({
+    permission: "granted",
+    geolocation: FAR,
+  });
+  await page.goto(`${NORTE}/mapa`);
+  await page.locator(".maplibregl-canvas").waitFor({ timeout: 20_000 });
+  await page.waitForTimeout(1500);
+  await page.waitForLoadState("networkidle");
+  const beforeLocation = requests.length;
+  await page.getByRole("button", { name: "Usar mi ubicación" }).click();
+  await page.locator(".map-visitor").waitFor({ timeout: 10_000 });
+  await check("far · the map frames the visitor right away, with the places", async () => {
+    await assertDotOnScreen(page);
+    assert.match(await page.locator(".portal-map-far").innerText(), /Estás a \d+ km de esta zona/u);
+    assert.ok((await page.locator(".portal-map-list li").count()) >= 3);
+  });
+  await check("far · framing the visitor asks the server for nothing", async () => {
+    const areaRequests = requests
+      .slice(beforeLocation)
+      .filter((request) => request.url.includes("/mapa/lugares"));
+    assert.deepEqual(areaRequests, []);
+  });
+  await check("far · «Seguirme» is offered and centers on the visitor", async () => {
+    await page.getByRole("button", { name: "Seguirme" }).click();
+    await assertDotOnScreen(page);
+    assert.equal(
+      await page.getByRole("button", { name: "Siguiéndote" }).getAttribute("aria-pressed"),
+      "true",
+    );
+  });
+  await check("far · no request carries the position", () => assertNoLeak(page, requests, FAR));
+  await check("far · no page errors", () => assert.deepEqual(errors, []));
+  await context.close();
+}
+
 // ── Denied ─────────────────────────────────────────────────────────────────────
 {
   const { context, page, requests, errors } = await visitor({
@@ -349,6 +402,17 @@ async function assertNoLeak(page, requests, position) {
     await page.goto(`${NORTE}/destinos/plaza-principal`);
     await page.waitForLoadState("networkidle");
     assert.equal(await geoCalls(page), 0);
+  });
+  await check("phone · activating on /mapa brings the map and the dot into view", async () => {
+    await page.goto(`${NORTE}/mapa`);
+    await page.locator(".maplibregl-canvas").waitFor({ timeout: 20_000 });
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await page.getByRole("button", { name: "Usar mi ubicación" }).click();
+    await page.locator(".map-visitor").waitFor({ timeout: 10_000 });
+    await assertDotOnScreen(page);
+    const dot = await page.locator(".map-visitor").boundingBox();
+    const height = await page.evaluate(() => window.innerHeight);
+    assert.ok(dot && dot.y > 0 && dot.y < height, "the dot is within the phone screen");
   });
   await check("no Permissions API · no horizontal overflow on a phone", async () => {
     assert.equal(
