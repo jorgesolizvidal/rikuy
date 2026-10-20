@@ -21,6 +21,13 @@ const securityHeaders = [
   { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(self)" },
 ];
 
+/**
+ * The commit a deployment was built from (Vercel sets it at build time). Lets the
+ * post-deploy Lighthouse job wait until production serves the commit it should measure.
+ */
+const buildVersion = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12);
+const versionHeaders = buildVersion ? [{ key: "X-Rikuy-Version", value: buildVersion }] : [];
+
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["@rikuy/config", "@rikuy/core", "@rikuy/ui"],
@@ -28,7 +35,7 @@ const nextConfig: NextConfig = {
   env: { NEXT_PUBLIC_MAPLIBRE_VERSION: maplibreVersion },
   async headers() {
     return [
-      { source: "/:path*", headers: securityHeaders },
+      { source: "/:path*", headers: [...securityHeaders, ...versionHeaders] },
       {
         source: "/vendor/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
