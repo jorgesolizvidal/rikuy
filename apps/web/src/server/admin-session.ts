@@ -7,6 +7,7 @@ import {
   createMembershipReader,
   createSessionClient,
   createInvitationRepository,
+  createJobAdminRepository,
   createMemberRepository,
   createMfaGateway,
   createPlatformRepository,
@@ -57,6 +58,7 @@ export const adminSession = cache(async () => {
     mfa: createMfaGateway(client),
     media: createMediaRepository(client),
     content: createContentRepository(client),
+    jobs: createJobAdminRepository(client),
   };
 });
 

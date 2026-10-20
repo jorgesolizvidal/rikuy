@@ -56,6 +56,16 @@ Pasos (cada uno requiere autorización):
 
 `background_jobs`/`job_attempts`/`usage_buckets`, runtime en Vercel (ADR-019), pipeline de panoramas (preview + monolítica + tiles > 4096 px), validación y optimización de GLB con verificación de color, cuotas por tenant, suite de durabilidad D-01, logs estructurados y runbook.
 
+Pasos (cada uno requiere autorización):
+
+| Paso | Contenido                                                                                                                                                                                                           | Terminado cuando                                                                                     |
+| ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| 1 ✅ | Ledger de trabajos: `background_jobs`/`job_attempts`, rol `rikuy_worker` con solo `worker_api`, arrendamiento con _fencing_, reintentos con espera, cola de fallidos y reintento auditado en `/plataforma/trabajos` | D-01 en CI: caída a mitad, duplicados, arrendamiento vencido con el ejecutor viejo vivo, equidad A/B |
+| 2    | Ejecutor en Vercel: endpoint protegido que drena la cola, programación (ver decisión pendiente en el checkpoint), primer trabajo real (limpieza de subidas abandonadas), logs estructurados                         | Una prueba pedida en el panel termina sola en producción                                             |
+| 3    | Pipeline de panoramas ([ADR-020](adr/ADR-020-panorama-delivery-by-resolution.md)): vista previa ≤ 40 KB + monolítica ≤ 4096 px y teselas solo si la fuente supera 4096 px                                           | Un panorama subido queda listo sin intervención; el original no cambia                               |
+| 4    | Pipeline de GLB: validación, optimización (Meshopt/Draco + KTX2) conservando los colores, imagen _poster_, límites de 5/15 MB                                                                                       | Un GLB optimizado conserva sus colores (comparación automática)                                      |
+| 5    | Cuotas por municipio (`usage_buckets`: almacenamiento y cómputo) con reserva atómica, visibles en el panel                                                                                                          | Dos subidas concurrentes no superan la cuota                                                         |
+
 ## P4 — Tours 360°, hotspots y GLB
 
 `tours`/`tour_revisions`/`scenes`/`hotspots`, `entry_scene_id` único, editor con las mismas coordenadas que el visor público, navegación, galería, modelo 3D lazy, accesibilidad del tour. Contratos RC-01/02/07/08. Medición en Android físico.

@@ -201,5 +201,40 @@ set published_revision_id = case when r.state = 'sealed' then r.id end,
 from public.content_revisions r
 where r.content_id = i.id and i.kind = 'event';
 
+-- ── Durable jobs (P2 · Paso 1) ──────────────────────────────────────────────
+-- Two probes for /plataforma/trabajos: one that ran fine and one in the dead-letter queue
+-- (three failed attempts). Nothing pending: locally no runner takes work until P2 · Paso 2.
+insert into public.background_jobs (
+  id, tenant_id, kind, logical_key, payload, status, attempts, max_attempts, created_at,
+  available_at, first_started_at, finished_at, result, last_error_code, last_error_message
+) values
+  ('5eed9000-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 'system.probe',
+   'probe:seed-ok', '{"mode": "ok"}', 'succeeded', 1, 3, now() - interval '2 hours',
+   now() - interval '2 hours', now() - interval '2 hours', now() - interval '2 hours' + interval '1 second',
+   '{"mode": "ok", "attemptNo": 1, "workedMs": 0}', null, null),
+  ('5eed9000-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000002', 'system.probe',
+   'probe:seed-failed', '{"mode": "fail_always"}', 'dead_letter', 3, 3, now() - interval '1 hour',
+   now() - interval '50 minutes', now() - interval '1 hour', now() - interval '50 minutes',
+   null, 'probe_failure', 'Probe failure requested (fail_always).');
+
+insert into public.job_attempts (
+  tenant_id, job_id, generation, attempt_no, fencing_token, runner_id, started_at, finished_at,
+  outcome, error_code, error_message, metrics
+)
+select v.tenant_id::uuid, v.job_id::uuid, 1, v.attempt_no, nextval('private.job_fencing_token_seq'),
+       'seed:local', now() - v.started, now() - v.started + interval '1 second', v.outcome::public.job_attempt_outcome,
+       v.error_code, v.error_message, '{"durationMs": 1000}'::jsonb
+from (values
+  ('5eed1000-0000-4000-8000-000000000001', '5eed9000-0000-4000-8000-000000000001', 1, interval '2 hours', 'succeeded', null, null),
+  ('5eed1000-0000-4000-8000-000000000002', '5eed9000-0000-4000-8000-000000000002', 1, interval '60 minutes', 'retry', 'probe_failure', 'Probe failure requested (fail_always).'),
+  ('5eed1000-0000-4000-8000-000000000002', '5eed9000-0000-4000-8000-000000000002', 2, interval '55 minutes', 'retry', 'probe_failure', 'Probe failure requested (fail_always).'),
+  ('5eed1000-0000-4000-8000-000000000002', '5eed9000-0000-4000-8000-000000000002', 3, interval '51 minutes', 'failed', 'probe_failure', 'Probe failure requested (fail_always).')
+) as v (tenant_id, job_id, attempt_no, started, outcome, error_code, error_message)
+order by v.job_id, v.attempt_no;
+
+update public.background_jobs j
+set fencing_token = (select max(a.fencing_token) from public.job_attempts a where a.job_id = j.id)
+where j.id in ('5eed9000-0000-4000-8000-000000000001', '5eed9000-0000-4000-8000-000000000002');
+
 insert into public.audit_events (scope, action, outcome, diff)
-values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3, "events": 4}');
+values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3, "events": 4, "jobs": 2}');

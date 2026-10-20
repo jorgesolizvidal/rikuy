@@ -116,9 +116,10 @@ jobs:
             echo "SUPABASE_PUBLISHABLE_KEY=$(echo "$STATUS" | jq -r '.PUBLISHABLE_KEY // .ANON_KEY')"
             echo "SUPABASE_SECRET_KEY=$SECRET"
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
+            echo "SUPABASE_DB_URL=$(echo "$STATUS" | jq -r '.DB_URL // "postgresql://postgres:postgres@127.0.0.1:54322/postgres"')"
           } >> "$GITHUB_ENV"
 
-      - name: Sign-in, membership, branding, media, onboarding (ZC-01) and access matrix (RC-15) tests
+      - name: Sign-in, membership, branding, media, onboarding (ZC-01), access matrix (RC-15) and durable jobs (D-01) tests
         run: |
           set -o pipefail
           pnpm --filter @rikuy/db test:integration 2>&1 | tee integration.log
@@ -190,6 +191,7 @@ jobs:
             echo "SUPABASE_PUBLISHABLE_KEY=$(echo "$STATUS" | jq -r '.PUBLISHABLE_KEY // .ANON_KEY')"
             echo "SUPABASE_SECRET_KEY=$SECRET"
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
+            echo "SUPABASE_DB_URL=$(echo "$STATUS" | jq -r '.DB_URL // "postgresql://postgres:postgres@127.0.0.1:54322/postgres"')"
           } >> "$GITHUB_ENV"
 
       - name: Build and start the production server

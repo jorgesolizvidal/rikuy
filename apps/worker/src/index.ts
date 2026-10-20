@@ -1,7 +1,14 @@
 /**
  * @rikuy/worker — durable background processing (media pipeline, knowledge ingestion).
  *
- * Starts in roadmap P2. Processors will be plain functions that reuse @rikuy/core use cases;
- * the job runtime (see docs/adr/ADR-019) is an adapter around them, never the other way round.
+ * Processors are plain functions over @rikuy/core use cases; the job runtime (ADR-019) is
+ * an adapter around them, never the other way round. A runtime only claims the kinds
+ * listed here, so a deployment never takes work it cannot do.
  */
-export {};
+import type { JobProcessor } from "@rikuy/core";
+
+import { probeProcessor } from "./processors/probe";
+
+export { probeProcessor };
+
+export const processors: readonly JobProcessor[] = [probeProcessor];

@@ -82,6 +82,14 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Derivados inmutables con caché larga en CDN; despublicar no revoca copias ya descargadas.
 - Ciclo de una imagen (P3 · Paso 1): `create_image_upload` reserva la versión (`uploading`) y la política de Storage solo deja escribir ese `original` exacto → el navegador sube con la URL firmada → el servidor lee los bytes reales (firma PNG/JPEG/WebP, peso, dimensiones), genera derivados sin metadatos con sharp y marca `ready` (o `rejected` y borra el original) → al publicar la marca, el adaptador con clave secreta copia solo los derivados a `media-public`. SVG no se acepta (puede contener scripts).
 
+## 7 bis. Trabajos durables (ADR-014, ADR-019)
+
+- `background_jobs` es outbox y ledger: la transacción que acepta una operación inserta el trabajo (idempotente por municipio + tipo + clave lógica). La base es la fuente de verdad y el reloj.
+- El ejecutor reclama con arrendamiento y número de _fencing_; latidos, puntos de control y resultados solo se aceptan con el número vigente. Reintentos con espera exponencial; agotados o permanentes → cola de fallidos, con reintento auditado por un operador.
+- Concurrencia global por cola y por municipio controlada al reclamar, atendiendo primero a quien tiene menos trabajos en curso.
+- El ejecutor es el rol `rikuy_worker` (conexión directa por el _pooler_): sin permisos sobre tablas, solo `worker_api`. Nunca `service_role` ni la sesión de una persona.
+- Procesadores en `apps/worker` (funciones sobre `@rikuy/core`); el ejecutor de turno es un adaptador. Detalle operativo en el [runbook](jobs.md).
+
 ## 8. Medios: panoramas y 3D (ADR-017, ADR-020)
 
 - **Photo Sphere Viewer** se conserva; los hotspots se guardan en yaw/pitch (radianes), independientes de cómo se entregue la imagen.
