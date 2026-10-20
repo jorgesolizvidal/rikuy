@@ -8,8 +8,8 @@ Cómo está montada la demo en la nube y qué se configura a mano una sola vez. 
 | --------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
 | Base de datos         | Supabase, proyecto `rikuy` (ref `jltzysyxqureudfavgpj`), São Paulo         | Plan gratuito. Las migraciones las aplica el workflow «Deploy database»           |
 | Aplicación            | Vercel, proyecto `rikuy` (raíz `apps/web`), funciones en São Paulo (gru1)  | Plan Hobby: demo y pruebas. Para municipios reales (uso comercial) hace falta Pro |
-| Plataforma            | `https://rikuy.vercel.app`                                                 | `PLATFORM_ROOT_DOMAIN`                                                            |
-| Panel                 | `https://rikuy-admin.vercel.app`                                           | `PLATFORM_ADMIN_HOST`                                                             |
+| Plataforma            | `https://rikuy-app.vercel.app`                                             | `PLATFORM_ROOT_DOMAIN`                                                            |
+| Panel                 | `https://rikuy-app-admin.vercel.app`                                       | `PLATFORM_ADMIN_HOST`                                                             |
 | Portales de demo      | `https://rikuy-demo-norte.vercel.app`, `https://rikuy-demo-sur.vercel.app` | Registrados en `tenant_domains` (`supabase/demo/vercel-demo.sql`)                 |
 | Rendimiento real      | Vercel Speed Insights                                                      | Métricas anónimas, sin cookies (página de privacidad)                             |
 | Lighthouse en la nube | Workflow «Lighthouse on production»                                        | Tras cada despliegue de producción, con `apps/web/lighthouse-budget.json`         |
@@ -24,7 +24,7 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 2. **Token para GitHub:** avatar → Account → Access Tokens → _Generate new token_ (`rikuy-github`).
 3. **Autenticación:**
    - Authentication → Sign In / Providers → _Allow new users to sign up_: **desactivado** (nadie se registra solo). Email: activado, sin confirmación de correo, código de 6 dígitos, vence en 3600 s.
-   - Authentication → URL Configuration → _Site URL_: `https://rikuy-admin.vercel.app`; _Redirect URLs_: `https://rikuy-admin.vercel.app/auth/callback`.
+   - Authentication → URL Configuration → _Site URL_: `https://rikuy-app-admin.vercel.app`; _Redirect URLs_: `https://rikuy-app-admin.vercel.app/auth/callback`.
    - Authentication → Emails → _Magic link_: asunto «Tu código de acceso a Rikuy» y el contenido de `supabase/templates/magic-link.html` (incluye el código `{{ .Token }}` que pide el panel).
 4. **Correo:** el servidor de correo incluido en Supabase solo envía a los miembros del equipo de la organización y pocos mensajes por hora. Para la demo basta; para municipios reales hace falta un proveedor SMTP propio (Authentication → Emails → SMTP).
 
@@ -43,12 +43,12 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
    | `NEXT_PUBLIC_SUPABASE_URL`             | `https://jltzysyxqureudfavgpj.supabase.co`                    |
    | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | la _publishable key_ (Supabase → Project Settings → API Keys) |
    | `SUPABASE_SECRET_KEY`                  | la _secret key_ (misma pantalla), marcada como **Sensitive**  |
-   | `PLATFORM_ROOT_DOMAIN`                 | `rikuy.vercel.app`                                            |
-   | `PLATFORM_ADMIN_HOST`                  | `rikuy-admin.vercel.app`                                      |
+   | `PLATFORM_ROOT_DOMAIN`                 | `rikuy-app.vercel.app`                                        |
+   | `PLATFORM_ADMIN_HOST`                  | `rikuy-app-admin.vercel.app`                                  |
    | `ENABLE_EXPERIMENTAL_COREPACK`         | `1` (usa el pnpm fijado en `package.json`)                    |
 
 3. Settings → Functions → _Function Region_: **São Paulo (gru1)**, junto a la base. Settings → General → Node.js **24.x**.
-4. Settings → Domains: agregar `rikuy-admin.vercel.app`, `rikuy-demo-norte.vercel.app` y `rikuy-demo-sur.vercel.app` (además de `rikuy.vercel.app`).
+4. Settings → Domains: agregar `rikuy-app-admin.vercel.app`, `rikuy-demo-norte.vercel.app` y `rikuy-demo-sur.vercel.app` (además de `rikuy-app.vercel.app`).
 5. Speed Insights → _Enable_.
 
 ## Primer despliegue
@@ -65,9 +65,14 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 
    Con el correo incluido de Supabase, usa un correo que sea miembro del equipo de la organización.
 
-4. Para editar la demo desde el panel, el operador (o quien se agregue) necesita ser miembro de los municipios de demo: se hace una vez por SQL y luego todo sigue por «Miembros».
+4. Para editar la demo desde el panel, el operador necesita ser miembro de los municipios de demo: una sola vez, `supabase/demo/grant-demo-owner.sql` en el SQL Editor (cambiando el correo de la primera línea). Después todo sigue por «Miembros».
+
+## Notas del primer despliegue (2026-10-19)
+
+- `rikuy.vercel.app` y `rikuy-admin.vercel.app` ya estaban tomados en Vercel: la plataforma y el panel quedaron en `rikuy-app.vercel.app` y `rikuy-app-admin.vercel.app` (variables `PLATFORM_ROOT_DOMAIN` y `PLATFORM_ADMIN_HOST` y _Site URL_ de Supabase en consecuencia). Cambiar estas variables exige un _redeploy_ sin caché de compilación.
+- Cada respuesta lleva `X-Rikuy-Version` (los primeros 12 caracteres del commit desplegado): así se sabe qué versión está en producción.
 
 ## Después
 
 - Cada merge a `main` despliega la aplicación (Vercel) y, si trae migraciones, las aplica («Deploy database»). Las migraciones son solo _expand_, así que el orden entre ambos no rompe nada.
-- Tras cada despliegue de producción corre «Lighthouse on production» con el mismo presupuesto que el PR.
+- Tras cada merge a `main`, «Lighthouse on production» espera a que producción sirva ese commit (`X-Rikuy-Version`) y mide la demo con el mismo presupuesto que el PR. También se puede correr a mano (Actions → _Run workflow_).

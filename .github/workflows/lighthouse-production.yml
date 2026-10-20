@@ -1,16 +1,21 @@
 name: Lighthouse on production
 
-# After Vercel finishes a production deployment, measures the published demo portals with
-# the same budget as the PR job (apps/web/lighthouse-budget.json). It does not block merges
-# (that is the PR job's role): a red run here flags a regression only visible on the real
-# CDN, region and network path.
+# After a merge to main, waits until Vercel serves that commit in production (header
+# X-Rikuy-Version) and measures the published demo portals with the same budget as the PR
+# job (apps/web/lighthouse-budget.json). It does not block merges (that is the PR job's
+# role): a red run here flags a regression only visible on the real CDN, region and network.
 #
 # Repository variable LIGHTHOUSE_ORIGINS, e.g.
 #   demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app
 
 on:
-  deployment_status:
+  push:
+    branches: [main]
   workflow_dispatch:
+
+concurrency:
+  group: lighthouse-production
+  cancel-in-progress: true
 
 permissions:
   contents: read
@@ -18,18 +23,12 @@ permissions:
 jobs:
   lighthouse:
     name: Lighthouse budget (production)
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.deployment_status.state == 'success' &&
-       github.event.deployment.environment == 'Production')
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       LIGHTHOUSE_ORIGINS: ${{ vars.LIGHTHOUSE_ORIGINS }}
     steps:
       - uses: actions/checkout@v7
-        with:
-          ref: ${{ github.event.deployment.sha || github.sha }}
 
       - uses: pnpm/action-setup@v6
 
@@ -40,6 +39,21 @@ jobs:
 
       - name: Install
         run: pnpm install --frozen-lockfile
+
+      # Vercel builds in parallel with this job: wait (≤ 15 min) until production serves
+      # this commit, so the scores belong to it. A manual run measures whatever is live.
+      - name: Wait for the deployment
+        if: github.event_name == 'push'
+        run: |
+          origin="$(echo "$LIGHTHOUSE_ORIGINS" | cut -d, -f1 | cut -d= -f2)"
+          expected="${GITHUB_SHA:0:12}"
+          for i in $(seq 1 90); do
+            live="$(curl -s -o /dev/null -D - "$origin/" | tr -d '\r' | awk -F': ' 'tolower($1)=="x-rikuy-version"{print $2}')"
+            if [ "$live" = "$expected" ]; then echo "Production serves $expected"; exit 0; fi
+            sleep 10
+          done
+          echo "::error::Production did not serve $expected within 15 minutes (live: ${live:-unknown})"
+          exit 1
 
       - name: Lighthouse
         working-directory: apps/web
