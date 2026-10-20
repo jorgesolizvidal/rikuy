@@ -48,33 +48,44 @@ const pages = PORTALS.filter((portal) => origins.size === 0 || origins.has(porta
     }),
 );
 
-// One headless Chrome for every run (Lighthouse opens a fresh tab each time).
-const profile = await mkdtemp(join(tmpdir(), "rikuy-lh-"));
-const debugPort = 9300 + Math.floor(Math.random() * 500);
-const chrome = spawn(
-  executablePath,
-  [
-    "--headless=new",
-    `--remote-debugging-port=${debugPort}`,
-    `--user-data-dir=${profile}`,
-    "--no-first-run",
-    "--no-default-browser-check",
-    "--disable-dev-shm-usage",
-    "--disable-background-networking",
-    "--disable-component-update",
-    "--disable-sync",
-    "--no-sandbox",
-  ],
-  { stdio: "ignore" },
-);
-for (let i = 0; ; i += 1) {
-  try {
-    await fetch(`http://127.0.0.1:${debugPort}/json/version`);
-    break;
-  } catch {
-    if (i > 50) throw new Error("Chrome did not start");
-    await new Promise((resolve) => setTimeout(resolve, 200));
+// A fresh headless Chrome (new profile, empty cache) for every run: otherwise scripts cached
+// by the previous page make the next one look lighter and faster than a first visit is.
+async function startChrome() {
+  const profile = await mkdtemp(join(tmpdir(), "rikuy-lh-"));
+  const debugPort = 9300 + Math.floor(Math.random() * 500);
+  const chrome = spawn(
+    executablePath,
+    [
+      "--headless=new",
+      `--remote-debugging-port=${debugPort}`,
+      `--user-data-dir=${profile}`,
+      "--no-first-run",
+      "--no-default-browser-check",
+      "--disable-dev-shm-usage",
+      "--disable-background-networking",
+      "--disable-component-update",
+      "--disable-sync",
+      "--no-sandbox",
+    ],
+    { stdio: "ignore" },
+  );
+  for (let i = 0; ; i += 1) {
+    try {
+      await fetch(`http://127.0.0.1:${debugPort}/json/version`);
+      break;
+    } catch {
+      if (i > 50) throw new Error("Chrome did not start");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
   }
+  return {
+    port: debugPort,
+    async stop() {
+      chrome.kill();
+      await new Promise((resolve) => chrome.once("exit", resolve));
+      await rm(profile, { recursive: true, force: true }).catch(() => {});
+    },
+  };
 }
 
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
@@ -97,16 +108,17 @@ function measure(lhr) {
 await mkdir(OUT, { recursive: true });
 const rows = [];
 const problems = [];
-try {
+{
   for (const page of pages) {
     const runs = [];
     for (let run = 0; run < budget.runs; run += 1) {
+      const chrome = await startChrome();
       const result = await lighthouse(page.url, {
-        port: debugPort,
+        port: chrome.port,
         output: "json",
         logLevel: "error",
         onlyCategories: CATEGORIES,
-      });
+      }).finally(() => chrome.stop());
       if (!result?.lhr || result.lhr.runtimeError) {
         throw new Error(`${page.label}: ${result?.lhr?.runtimeError?.message ?? "no result"}`);
       }
@@ -148,9 +160,6 @@ try {
       } LCP ${chosen.lcpMs} ms TBT ${chosen.tbtMs} ms CLS ${chosen.cls} JS ${chosen.scriptKb} KB`,
     );
   }
-} finally {
-  chrome.kill();
-  await rm(profile, { recursive: true, force: true }).catch(() => {});
 }
 
 const table = [
