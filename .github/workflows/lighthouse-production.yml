@@ -64,7 +64,7 @@ jobs:
 
       - name: Keep the reports
         if: success() || failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: lighthouse-production
           path: apps/web/lighthouse-reports/
