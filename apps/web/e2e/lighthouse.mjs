@@ -13,10 +13,25 @@ import { join } from "node:path";
 import lighthouse from "lighthouse";
 
 const port = Number(process.argv[2] ?? 3000);
-const executablePath = process.env.CHROME_PATH ?? "/usr/bin/google-chrome";
+const executablePath = process.env.CHROME_PATH || "/usr/bin/google-chrome";
 const budget = JSON.parse(await readFile(new URL("../lighthouse-budget.json", import.meta.url)));
 const OUT = new URL("../lighthouse-reports/", import.meta.url);
 const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"];
+
+// In GitHub Actions the reason also goes out as an annotation, readable on the run page
+// and through the API even when the job's log cannot be downloaded.
+const annotate = (message) => {
+  if (process.env.GITHUB_ACTIONS === "true") {
+    console.log(`::error title=Lighthouse::${String(message).replace(/\r?\n/gu, "%0A")}`);
+  }
+};
+for (const event of ["uncaughtException", "unhandledRejection"]) {
+  process.on(event, (error) => {
+    console.error(error);
+    annotate(error?.message ?? error);
+    process.exit(1);
+  });
+}
 
 // The seed's municipalities. Locally (and in the PR job) they are served by `next start`
 // on *.localhost; after a deployment, LIGHTHOUSE_ORIGINS points at the real sites, e.g.
@@ -67,14 +82,30 @@ async function startChrome() {
       "--disable-sync",
       "--no-sandbox",
     ],
-    { stdio: "ignore" },
+    { stdio: ["ignore", "ignore", "pipe"] },
   );
+  // Chrome's own complaints, to explain a failed start.
+  let stderr = "";
+  chrome.stderr.on("data", (chunk) => {
+    stderr = (stderr + chunk).slice(-2000);
+  });
+  let spawnError = null;
+  chrome.once("error", (error) => {
+    spawnError = error;
+  });
   for (let i = 0; ; i += 1) {
     try {
       await fetch(`http://127.0.0.1:${debugPort}/json/version`);
       break;
     } catch {
-      if (i > 50) throw new Error("Chrome did not start");
+      if (spawnError || chrome.exitCode !== null || i > 150) {
+        chrome.kill();
+        await rm(profile, { recursive: true, force: true }).catch(() => {});
+        const reason =
+          spawnError?.message ??
+          (chrome.exitCode !== null ? `exit ${chrome.exitCode}` : "no answer in 30 s");
+        throw new Error(`Chrome (${executablePath}) did not start: ${reason}\n${stderr.trim()}`);
+      }
       await new Promise((resolve) => setTimeout(resolve, 200));
     }
   }
@@ -105,13 +136,12 @@ function measure(lhr) {
   };
 }
 
-await mkdir(OUT, { recursive: true });
-const rows = [];
-const problems = [];
-{
-  for (const page of pages) {
-    const runs = [];
-    for (let run = 0; run < budget.runs; run += 1) {
+/** One Lighthouse run in a fresh Chrome; a failed run (a hiccup right after a deployment,
+ * Chrome not answering) is retried once before giving up. */
+async function runOnce(page) {
+  let lastError;
+  for (let attempt = 1; attempt <= 2; attempt += 1) {
+    try {
       const chrome = await startChrome();
       const result = await lighthouse(page.url, {
         port: chrome.port,
@@ -120,8 +150,37 @@ const problems = [];
         onlyCategories: CATEGORIES,
       }).finally(() => chrome.stop());
       if (!result?.lhr || result.lhr.runtimeError) {
-        throw new Error(`${page.label}: ${result?.lhr?.runtimeError?.message ?? "no result"}`);
+        throw new Error(result?.lhr?.runtimeError?.message ?? "Lighthouse returned no result");
       }
+      return result;
+    } catch (error) {
+      lastError = error;
+      console.warn(`${page.label}: attempt ${attempt} failed: ${error.message}`);
+    }
+  }
+  throw new Error(`${page.label}: ${lastError.message}`);
+}
+
+// After a deployment the CDN still holds the previous pages: one plain visit to each lets
+// it regenerate them, so the runs measure what visitors get, not the regeneration.
+if (origins.size > 0) {
+  for (const page of pages) {
+    const response = await fetch(page.url).catch((error) => ({ status: error.message }));
+    if (response.status !== 200) {
+      throw new Error(`${page.label}: answered ${response.status} before measuring`);
+    }
+  }
+  await new Promise((resolve) => setTimeout(resolve, 5_000));
+}
+
+await mkdir(OUT, { recursive: true });
+const rows = [];
+const problems = [];
+{
+  for (const page of pages) {
+    const runs = [];
+    for (let run = 0; run < budget.runs; run += 1) {
+      const result = await runOnce(page);
       runs.push({ lhr: result.lhr, report: result.report, ...measure(result.lhr) });
     }
     // The run with the median performance score represents the page (as Lighthouse CI does).
@@ -184,6 +243,7 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 
 if (problems.length > 0) {
   console.error(`\nOver budget:\n${problems.map((p) => `  ${p}`).join("\n")}`);
+  annotate(`Over budget:\n${problems.join("\n")}`);
   process.exit(1);
 }
 console.log(`lighthouse: ${rows.length} pages within budget`);
