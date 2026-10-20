@@ -47,7 +47,7 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
    | `PLATFORM_ADMIN_HOST`                  | `rikuy-app-admin.vercel.app`                                  |
    | `ENABLE_EXPERIMENTAL_COREPACK`         | `1` (usa el pnpm fijado en `package.json`)                    |
 
-3. Settings → Functions → _Function Region_: **São Paulo (gru1)**, junto a la base. Settings → General → Node.js **24.x**.
+3. La región de las funciones (**São Paulo, gru1**, junto a la base) la fija `apps/web/vercel.json`; no hace falta elegirla en el panel. Settings → General → Node.js **24.x**.
 4. Settings → Domains: agregar `rikuy-app-admin.vercel.app`, `rikuy-demo-norte.vercel.app` y `rikuy-demo-sur.vercel.app` (además de `rikuy-app.vercel.app`).
 5. Speed Insights → _Enable_.
 
@@ -76,3 +76,4 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 
 - Cada merge a `main` despliega la aplicación (Vercel) y, si trae migraciones, las aplica («Deploy database»). Las migraciones son solo _expand_, así que el orden entre ambos no rompe nada.
 - Tras cada merge a `main`, «Lighthouse on production» espera a que producción sirva ese commit (`X-Rikuy-Version`) y mide la demo con el mismo presupuesto que el PR. También se puede correr a mano (Actions → _Run workflow_).
+- Para saber dónde corre una función, mira `x-vercel-id` en una ruta dinámica (por ejemplo `/mapa`): el segundo código es la región de la función (`…::gru1::…`). Si el job falla, el motivo aparece como anotación en la página del run (no hace falta descargar el log).

@@ -266,6 +266,12 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - Correo: el servidor incluido de Supabase envía códigos solo a miembros del equipo y pocos por hora. Para municipios reales hace falta SMTP propio.
 - Vercel Hobby es para uso no comercial: antes de un municipio real, plan Pro.
 
+**Corrección posterior (`fix/lighthouse-production`):** la primera corrida automática de «Lighthouse on production» tras el merge falló en 11 s sin informes. Al repetirla con el medidor mejorado, el motivo fue que `rikuy-demo-sur.vercel.app/destinos` respondió **503**: las funciones corrían en Washington (`x-vercel-id: iad1::iad1::…`) y no en São Paulo, así que cada consulta al registro de municipios cruzaba el continente y, con la función en frío, superaba el límite de 2 s del proxy.
+
+- `apps/web/vercel.json` fija la región **gru1** (junto a la base) en el código, en vez de depender del panel.
+- El registro de municipios repite **una vez** la consulta si el fallo es transitorio (red, tiempo agotado o 5xx); un 4xx no se repite. 4 tests nuevos.
+- El medidor reintenta una corrida fallida una vez, visita cada página antes de medir (para que la CDN regenere la versión nueva), muestra la salida de Chrome si no arranca y deja el motivo como **anotación** en GitHub, que se puede leer aunque el log no se pueda descargar. El workflow comprueba qué Chrome hay en el runner.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
