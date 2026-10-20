@@ -60,7 +60,10 @@ jobs:
         run: |
           set -o pipefail
           if [ -z "$LIGHTHOUSE_ORIGINS" ]; then echo "::error::LIGHTHOUSE_ORIGINS is not configured"; exit 1; fi
-          CHROME_PATH="$(command -v google-chrome)" node e2e/lighthouse.mjs 2>&1 | tee ../../lighthouse.log
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          if [ -z "$chrome" ]; then echo "::error::No Chrome on this runner"; exit 1; fi
+          "$chrome" --version
+          CHROME_PATH="$chrome" node e2e/lighthouse.mjs 2>&1 | tee ../../lighthouse.log
 
       - name: Keep the reports
         if: success() || failure()

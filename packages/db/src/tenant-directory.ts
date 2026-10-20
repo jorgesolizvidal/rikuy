@@ -57,20 +57,30 @@ export function createSupabaseTenantDirectory(
   });
   const timeoutMs = options.timeoutMs ?? 2_000;
 
+  /** One call; a thrown request comes back as status 0, like supabase-js network errors. */
+  async function lookup(hostname: string) {
+    try {
+      return await client
+        .rpc("resolve_tenant_by_host", { p_host: hostname })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+    } catch (cause) {
+      return { data: null, error: { code: "network", cause }, status: 0 };
+    }
+  }
+
   return {
     async findByHost(hostname) {
-      let response;
-      try {
-        response = await client
-          .rpc("resolve_tenant_by_host", { p_host: hostname })
-          .abortSignal(AbortSignal.timeout(timeoutMs));
-      } catch (cause) {
-        throw new TenantDirectoryUnavailableError("Tenant registry request failed", { cause });
+      // A cold connection (new instance, first TLS handshake) can miss the deadline or drop:
+      // one more attempt. A 4xx answer is not transient and is not repeated.
+      let response = await lookup(hostname);
+      if (response.error && (response.status === 0 || response.status >= 500)) {
+        response = await lookup(hostname);
       }
 
       if (response.error) {
         throw new TenantDirectoryUnavailableError(
           `Tenant registry error: ${response.error.code ?? "unknown"}`,
+          "cause" in response.error ? { cause: response.error.cause } : undefined,
         );
       }
 

@@ -75,6 +75,57 @@ describe("createSupabaseTenantDirectory", () => {
     ).rejects.toBeInstanceOf(TenantDirectoryUnavailableError);
   });
 
+  it("tries once more after a transient failure (network, timeout, 5xx)", async () => {
+    let attempt = 0;
+    const fetch = fakeFetch(() => {
+      attempt += 1;
+      return attempt === 1 ? Promise.reject(new TypeError("fetch failed")) : Response.json([row]);
+    });
+    const tenant = await createSupabaseTenantDirectory({ ...base, fetch }).findByHost(
+      "demo-norte.localhost",
+    );
+    expect(fetch.calls).toHaveLength(2);
+    expect(tenant?.slug).toBe("demo-norte");
+  });
+
+  it("gives up after the second attempt", async () => {
+    const fetch = fakeFetch(() =>
+      Response.json({ code: "PGRST000", message: "boom" }, { status: 503 }),
+    );
+    await expect(
+      createSupabaseTenantDirectory({ ...base, fetch }).findByHost("x.example.test"),
+    ).rejects.toBeInstanceOf(TenantDirectoryUnavailableError);
+    expect(fetch.calls).toHaveLength(2);
+  });
+
+  it("does not repeat a request the registry refused (4xx)", async () => {
+    const fetch = fakeFetch(() =>
+      Response.json({ code: "PGRST202", message: "not found" }, { status: 404 }),
+    );
+    await expect(
+      createSupabaseTenantDirectory({ ...base, fetch }).findByHost("x.example.test"),
+    ).rejects.toBeInstanceOf(TenantDirectoryUnavailableError);
+    expect(fetch.calls).toHaveLength(1);
+  });
+
+  it("retries a timed-out lookup", async () => {
+    let attempt = 0;
+    const fetch = fakeFetch((_url, init) => {
+      attempt += 1;
+      if (attempt > 1) return Response.json([row]);
+      return new Promise<Response>((_resolve, reject) => {
+        init.signal?.addEventListener("abort", () => reject(init.signal?.reason));
+      });
+    });
+    const tenant = await createSupabaseTenantDirectory({
+      ...base,
+      fetch,
+      timeoutMs: 20,
+    }).findByHost("demo-norte.localhost");
+    expect(fetch.calls).toHaveLength(2);
+    expect(tenant?.slug).toBe("demo-norte");
+  });
+
   it("rejects malformed rows instead of trusting them", async () => {
     const fetch = fakeFetch(() => Response.json([{ ...row, tenant_id: "nope" }]));
     await expect(
