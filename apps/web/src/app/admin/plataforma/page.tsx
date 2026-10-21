@@ -62,6 +62,9 @@ export default async function PlatformPage() {
         <p>
           <Link href="/plataforma/nuevo" className="button">
             Dar de alta un municipio
+          </Link>{" "}
+          <Link href="/plataforma/trabajos" className="button button-quiet">
+            Trabajos en segundo plano
           </Link>
         </p>
       </div>

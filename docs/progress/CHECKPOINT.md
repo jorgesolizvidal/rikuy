@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P3 ✅ completa (pasos 1–8). Siguiente fase según el roadmap: **P2** (jobs durables y pipeline de medios).
-- **Último paso completado:** P3 · Paso 8 — despliegue en Vercel y Supabase (2026-10-20)
-- **Rama de cierre:** `chore/p3-step8-close` → PR hacia `main`
+- **Fase:** P2 (jobs durables y pipeline de medios). P1 y P3 ✅.
+- **Último paso completado:** P2 · Paso 1 — ledger de trabajos durables (2026-10-20)
+- **Rama:** `feat/p2-step1-job-ledger` → PR hacia `main`
 
 ## Historial
 
@@ -272,26 +272,52 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - El registro de municipios repite **una vez** la consulta si el fallo es transitorio (red, tiempo agotado o 5xx); un 4xx no se repite. 4 tests nuevos.
 - El medidor reintenta una corrida fallida una vez, visita cada página antes de medir (para que la CDN regenere la versión nueva), muestra la salida de Chrome si no arranca y deja el motivo como **anotación** en GitHub, que se puede leer aunque el log no se pueda descargar. El workflow comprueba qué Chrome hay en el runner.
 
+### P2 · Paso 1 — ledger de trabajos durables ✅
+
+- Pasos de P2 en el [roadmap](../roadmap.md), confirmados por el usuario: 1 ledger, 2 ejecutor en Vercel, 3 panoramas, 4 GLB, 5 cuotas.
+- Base de datos (`20261020000000_p2_job_ledger.sql`, solo expand), según el contrato de ADR-014 con el ajuste de ADR-019:
+  - `background_jobs` (outbox + ledger, idempotente por municipio + tipo + clave lógica, _payload_ ≤ 8 KB), `job_attempts` (historial sin borrado ni cambios en intentos cerrados), `job_kinds` y `job_queues` (intentos, arrendamiento, presupuesto de tiempo, concurrencia global por cola y por municipio). RLS sin políticas: nadie toca las tablas, ni siquiera `service_role`.
+  - Rol **`rikuy_worker`**: sin permisos sobre tablas, solo el esquema `worker_api` (`claim_jobs`, `heartbeat`, `complete_job`, `fail_job`, `reap_expired_jobs`). Se crea **sin permiso de iniciar sesión**; ninguna clave de la API puede convertirse en él.
+  - Reclamo atómico con **arrendamiento y número de _fencing_** creciente; latidos, puntos de control y resultados solo con el número vigente y el arrendamiento vivo. Arrendamientos vencidos → intento registrado como perdido y el trabajo vuelve a la cola (o a fallidos sin intentos). Reintentos con espera exponencial (5 s → 5 min, con variación aleatoria, `Retry-After` hasta 1 h); fallos permanentes y agotados → **cola de fallidos**. Presupuesto de tiempo por intento. Equidad: concurrencia por cola y por municipio al reclamar, atendiendo primero a quien tiene menos en curso. Los mensajes de error se recortan en el `?` (sin URLs firmadas).
+  - Para operadores con segundo factor: resumen (con el reloj de la base), lista sin _payload_, intentos, **reintento** (ronda nueva, auditado) y **sonda** `system.probe` (normal, falla una vez, falla siempre; auditada).
+  - Seed: una sonda terminada (Demo Norte) y una fallida tras 3 intentos (Demo Sur).
+- `@rikuy/core`: contratos de trabajos, `JobFailure` (transitorio / permanente, mensajes sin URLs firmadas), `runClaimedJob` (latido, pérdida del arrendamiento, presupuesto, sin reportar si el ledger no responde) y `drainJobs` (presupuesto de tiempo, concurrencia, solo los tipos que sabe procesar); casos de uso del panel; ledger en memoria para pruebas (`@rikuy/core/testing`).
+- `apps/worker`: procesador `system.probe` y registro de procesadores.
+- `@rikuy/db`: `createJobAdminRepository` (sesión del operador) y, aparte, `@rikuy/db/worker` con `createPostgresJobLedger` (`postgres.js` 3.4.9, conexión directa como `rikuy_worker`, apta para el _pooler_). El panel no carga esa entrada.
+- Panel: **`/plataforma/trabajos`** (enlace desde «Plataforma»): resumen, alarma si hay trabajos listos esperando más de 5 min, filtros por estado, último error, «Reintentar» con confirmación, «Ver intentos» y «Probar el ejecutor». Para quien no es operador no existe (404).
+- [Runbook de trabajos](../jobs.md) y sección en la [arquitectura](../architecture.md).
+- Tests: 367 unitarios (core 249, db 81, web 28, worker 3, config 6) + 416 pgTAP (71 nuevos, con casos negativos) + **D-01** contra PostgreSQL real en el job de integración (6 escenarios, varios ejecutores a la vez): un ejecutor que muere sin avisar, retomar desde el punto de control con el viejo bloqueado, encolar duplicados al mismo tiempo, fallidos y reintento, un municipio que satura la cola sin frenar a otro, límites del rol del ejecutor. 0 hallazgos de `plpgsql_check`.
+- Verificado en el navegador (pila local simulada): operador con segundo factor, resumen, filtro «Fallidos», reintento con confirmación, sonda en la cola, historial de intentos, propietario de municipio → 404, sin desbordes a 360/390 px y axe sin hallazgos críticos ni graves.
+- Lo que encontraron las pruebas, ya corregido: si avisar «terminado» al ledger fallaba por la red, el trabajo se marcaba como fallido y se reintentaba (ahora no se asume nada y el arrendamiento vence solo); la página de intentos daba 404 para un trabajo sin intentos; selectores que desbordaban el celular.
+
+**Desviaciones:**
+
+- `usage_buckets` (cuotas) pasa al Paso 5: su reserva se diseña junto con quien la consume (panoramas, GLB) y con su vista en el panel.
+- Todavía no corre ningún ejecutor: lo que se pida (sondas, reintentos) espera en la cola hasta el Paso 2. Nada encola trabajos solo todavía.
+- El ejecutor usa una conexión directa a PostgreSQL (rol propio) y no la Data API: es lo que permite no darle `service_role` (ADR-014).
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout main
-git pull
+git checkout feat/p2-step1-job-ledger
+pnpm install
+pnpm db:reset
+pnpm db:test
+pnpm --filter @rikuy/db test:integration
+pnpm dev
 ```
 
-1. Abre https://rikuy-demo-norte.vercel.app y, en las herramientas del navegador (F12 → Network → la primera petición), mira `X-Rikuy-Version`: es el commit que está en producción.
-2. Tras el merge de este PR, GitHub → Actions → «Lighthouse on production» corre solo, espera a que Vercel publique y deja la tabla en su **Summary**.
+1. `pnpm db:test` incluye `013_job_ledger` y la integración incluye **D-01** (`job-ledger.int.test.ts`).
+2. Entra al panel como operador → «Plataforma» → «Trabajos en segundo plano»: verás una sonda terminada y una en «Fallidos». «Ver intentos» muestra sus 3 intentos; «Reintentar» → «Sí, reintentar» la pasa a «En espera» (ronda 2).
+3. «Probar el ejecutor» pone una sonda en la cola. Se queda «En espera» hasta que exista el ejecutor (Paso 2); si pasan 5 minutos, aparece la alarma: es lo esperado.
+4. Al hacer merge, «Deploy database» aplica la migración en Supabase. No hay que configurar nada más en este paso: el rol del ejecutor queda sin poder iniciar sesión hasta el Paso 2.
 
-## Siguiente paso — P2 · Paso 1 (requiere autorización)
+## Siguiente paso — P2 · Paso 2 (requiere autorización)
 
-P2 no tiene pasos definidos en el roadmap. Propuesta (a confirmar antes de empezar):
-
-1. **Ledger de trabajos** (ADR-019): `background_jobs`, `job_attempts`, `usage_buckets` con RLS y tests; arrendamiento con _fencing_, reintentos con espera, cola de fallidos visible y la suite de durabilidad D-01 (caída a mitad, duplicados, arrendamiento vencido).
-2. **Ejecutor en Vercel**: endpoint protegido + Cron de Vercel que toma trabajos, logs estructurados sin tokens y runbook.
-3. **Pipeline de panoramas** (ADR-020): original privado → vista previa ≤ 40 KB + monolítica ≤ 4096 px (WebP) y teselas solo si la fuente supera 4096 px.
-4. **Pipeline de GLB**: validación, optimización (Meshopt/Draco + KTX2) conservando los colores al exportar, imagen _poster_ y límites de 5/15 MB.
-5. **Cuotas por municipio** (almacenamiento y trabajos) visibles en el panel.
+**Ejecutor en Vercel:** endpoint protegido que drena la cola con `drainJobs` (`@rikuy/db/worker`, rol `rikuy_worker` por el _pooler_), logs estructurados sin tokens, primer trabajo real (limpieza de subidas abandonadas, pendiente desde P3 · Paso 1) y la sonda pidiéndose y terminando en producción.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros» (invitar el correo real como propietario y quitar el ficticio).
+- **Cómo se despierta el ejecutor (Paso 2).** En el plan Hobby, el cron de Vercel corre como mucho **una vez al día** y con ±59 min de precisión. Opciones: (a) avisar al ejecutor justo después de encolar, más **`pg_cron` + `pg_net` de Supabase** llamando al endpoint cada minuto como respaldo (gratis, la base como reloj; recomendada); (b) GitHub Actions programado cada 5 min (gratis, menos preciso); (c) Vercel Pro (cron cada minuto).
+- Habilitar el inicio de sesión del rol `rikuy_worker` en Supabase (una línea de SQL con una contraseña que generas tú) y guardar su conexión en Vercel: se hace en el Paso 2, con los pasos en el [runbook](../jobs.md).
+- El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».

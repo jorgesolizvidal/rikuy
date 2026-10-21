@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./worker": "./src/worker.ts"
   },
   "scripts": {
     "lint": "eslint .",
@@ -16,6 +17,7 @@
     "@rikuy/core": "workspace:*",
     "@supabase/ssr": "0.12.7",
     "@supabase/supabase-js": "2.117.3",
+    "postgres": "3.4.9",
     "sharp": "0.35.5",
     "zod": "4.6.7"
   }
