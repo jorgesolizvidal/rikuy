@@ -67,6 +67,13 @@ export function createMediaRepository(client: SessionClient): MediaRepository {
         if (code === "42501") return { status: "forbidden" };
         if (code === "23514") return { status: "invalid" };
         if (code === "PT429") return { status: "rate_limited" };
+        if (code === "PT507") {
+          const hint = (error as PostgrestError).hint;
+          return {
+            status: "over_quota",
+            resource: hint === "media_compute_seconds" ? "media_compute_seconds" : "storage_bytes",
+          };
+        }
         throw unexpected("Starting the upload", error);
       }
       const [row] = z

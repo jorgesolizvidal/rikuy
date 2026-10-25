@@ -6,6 +6,7 @@ import { useId, useState, type ChangeEvent } from "react";
 
 import { startPanoramaUploadAction, submitPanoramaAction } from "./actions";
 import { PANORAMA_HINT, PANORAMA_PROBLEMS } from "./labels";
+import { QUOTA_MESSAGES } from "@/lib/quota-messages";
 
 const FAILURES = {
   forbidden: "Tu rol ya no permite subir panoramas en este municipio.",
@@ -65,6 +66,9 @@ export function PanoramaUpload({ slug }: { readonly slug: string }) {
     const start = await startPanoramaUploadAction(slug, { mime: file.type, bytes: file.size });
     if (start.status === "invalid") {
       return setPhase({ kind: "failed", message: PANORAMA_PROBLEMS[start.problem] });
+    }
+    if (start.status === "over_quota") {
+      return setPhase({ kind: "failed", message: QUOTA_MESSAGES[start.resource] });
     }
     if (start.status !== "upload") {
       return setPhase({ kind: "failed", message: FAILURES[start.status] });

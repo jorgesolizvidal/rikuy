@@ -4,6 +4,7 @@ import { checkDeclaredLogo, LOGO_RULES, type LogoProblem } from "@rikuy/core";
 import { useId, useRef, useState, type ChangeEvent } from "react";
 
 import { confirmLogoUploadAction, startLogoUploadAction } from "./actions";
+import { QUOTA_MESSAGES } from "@/lib/quota-messages";
 
 export interface LogoSelection {
   readonly assetId: string;
@@ -80,6 +81,9 @@ export function LogoField({
     const start = await startLogoUploadAction(slug, { mime: file.type, bytes: file.size });
     if (start.status === "invalid") {
       return setPhase({ kind: "failed", message: PROBLEMS[start.problem] });
+    }
+    if (start.status === "over_quota") {
+      return setPhase({ kind: "failed", message: QUOTA_MESSAGES[start.resource] });
     }
     if (start.status !== "upload") {
       return setPhase({ kind: "failed", message: FAILURES[start.status] });

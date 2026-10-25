@@ -1,3 +1,4 @@
+import type { UsageResource } from "../../contracts/usage";
 import type { ImageMime } from "../../domain/media/image";
 
 export type AssetPurpose = "logo" | "content" | "panorama" | "model";
@@ -14,7 +15,9 @@ export type CreateUploadOutcome =
   | { readonly status: "created"; readonly upload: PendingUpload }
   | { readonly status: "forbidden" }
   | { readonly status: "invalid" }
-  | { readonly status: "rate_limited" };
+  | { readonly status: "rate_limited" }
+  /** The municipality's quota cannot hold this upload (storage, or compute for media jobs). */
+  | { readonly status: "over_quota"; readonly resource: UsageResource };
 
 export interface ImageVersionRecord {
   readonly versionId: string;

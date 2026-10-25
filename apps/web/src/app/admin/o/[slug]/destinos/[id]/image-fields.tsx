@@ -9,6 +9,7 @@ import {
 import { useId, useRef, useState } from "react";
 
 import { confirmContentImageUploadAction, startContentImageUploadAction } from "../actions";
+import { QUOTA_MESSAGES } from "@/lib/quota-messages";
 
 export interface EditorImage {
   readonly assetId: string;
@@ -50,6 +51,8 @@ async function uploadPhoto(org: string, file: File): Promise<UploadResult> {
   try {
     const start = await startContentImageUploadAction(org, { mime: file.type, bytes: file.size });
     if (start.status === "invalid") return { ok: false, message: PROBLEMS[start.problem] };
+    if (start.status === "over_quota")
+      return { ok: false, message: QUOTA_MESSAGES[start.resource] };
     if (start.status !== "upload") return { ok: false, message: FAILURES[start.status] };
     const sent = await fetch(start.uploadUrl, {
       method: "PUT",

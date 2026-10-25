@@ -62,3 +62,5 @@ export * from "./contracts/model";
 export * from "./domain/media/model";
 export * from "./domain/media/color";
 export * from "./application/media/models";
+export * from "./contracts/usage";
+export * from "./application/usage/usage";

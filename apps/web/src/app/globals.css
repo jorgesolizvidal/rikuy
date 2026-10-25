@@ -1297,3 +1297,83 @@ a.button-quiet {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* ── Uso del plan y cuotas (P2 · Paso 5) ───────────────────────────────────── */
+.usage-list {
+  display: grid;
+  gap: 1rem;
+  margin: 1.5rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.usage-card {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+  border-radius: 0.75rem;
+  min-width: 0;
+}
+
+.usage-card h2,
+.usage-card h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.usage-card p {
+  margin: 0;
+}
+
+.usage-resource {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+}
+
+.usage-track {
+  display: flex;
+  height: 0.75rem;
+  border-radius: 999px;
+  overflow: hidden;
+  background: color-mix(in srgb, var(--fg) 10%, transparent);
+}
+
+.usage-fill {
+  background: var(--fg);
+}
+
+.usage-reserved {
+  background: repeating-linear-gradient(
+    45deg,
+    color-mix(in srgb, var(--fg) 45%, transparent) 0 4px,
+    transparent 4px 8px
+  );
+}
+
+.usage-bar[data-level="near"] .usage-fill,
+.usage-bar[data-level="full"] .usage-fill {
+  background: var(--accent);
+}
+
+.usage-figures {
+  margin: 0.375rem 0 0;
+  overflow-wrap: anywhere;
+}
+
+.quota-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.quota-form input[name="value"] {
+  width: 7rem;
+}
+
+.quota-form [role="status"] {
+  flex-basis: 100%;
+}

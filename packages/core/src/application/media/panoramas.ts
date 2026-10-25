@@ -1,3 +1,4 @@
+import type { UsageResource } from "../../contracts/usage";
 import type { MembershipRole, OrganizationMembership } from "../../contracts/organization";
 import type { PanoramaManifest } from "../../contracts/panorama";
 import type { JobStatus } from "../../contracts/jobs";
@@ -55,7 +56,8 @@ export type RequestPanoramaUploadResult =
       readonly mime: string;
     }
   | { readonly status: "invalid"; readonly problem: PanoramaProblem }
-  | { readonly status: "forbidden" | "rate_limited" };
+  | { readonly status: "forbidden" | "rate_limited" }
+  | { readonly status: "over_quota"; readonly resource: UsageResource };
 
 /** Step 1: reserve a panorama version and hand the browser a one-time upload URL. */
 export async function requestPanoramaUpload(
@@ -75,6 +77,7 @@ export async function requestPanoramaUpload(
     input.bytes as number,
   );
   if (created.status === "invalid") return { status: "invalid", problem: "too_heavy" };
+  if (created.status === "over_quota") return created;
   if (created.status !== "created") return { status: created.status };
   return {
     status: "upload",
