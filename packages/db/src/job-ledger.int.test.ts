@@ -362,17 +362,19 @@ describe.runIf(reachable)("D-01 · durable job ledger (real PostgreSQL)", () => 
   });
 
   it("completes a panorama only with the current lease (claim → source → expire → resume)", async () => {
+    // Demo Sur: this version is ready without files in Storage, and RC-15 signs a ready
+    // original of Demo Norte.
     const [asset] = await admin`
-      insert into public.assets (tenant_id, purpose) values (${NORTE}::uuid, 'panorama') returning id
+      insert into public.assets (tenant_id, purpose) values (${SUR}::uuid, 'panorama') returning id
     `;
     const [version] = await admin`
       insert into public.asset_versions (tenant_id, asset_id, version, status, declared_mime, declared_bytes)
-      values (${NORTE}::uuid, ${asset?.id}::uuid, 1, 'processing', 'image/jpeg', 9000000)
+      values (${SUR}::uuid, ${asset?.id}::uuid, 1, 'processing', 'image/jpeg', 9000000)
       returning id, original_path
     `;
     const [queued] = await admin`
       select job_id from private.enqueue_job(
-        ${NORTE}::uuid, 'media.process_panorama', ${`asset_version:${String(version?.id)}`},
+        ${SUR}::uuid, 'media.process_panorama', ${`asset_version:${String(version?.id)}`},
         ${admin.json({ versionId: String(version?.id) })}::jsonb, 'asset_version', ${version?.id}::uuid
       )
     `;
@@ -410,7 +412,7 @@ describe.runIf(reachable)("D-01 · durable job ledger (real PostgreSQL)", () => 
     expect(await slow.panoramas.source(stale)).toMatchObject({
       status: "processing",
       originalPath: version?.original_path,
-      prefix: `${NORTE}/${String(asset?.id)}/1/`,
+      prefix: `${SUR}/${String(asset?.id)}/1/`,
     });
     await letTimePass([jobId]);
 
