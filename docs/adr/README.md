@@ -29,3 +29,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 023 | [Mapa del portal: OpenFreeMap con MapLibre](ADR-023-portal-map-provider.md)                               | Aceptada (2026-10-18); concreta ADR-010 para el portal                      |
 | 024 | [Caché de las páginas del portal por municipio (ISR)](ADR-024-portal-page-cache.md)                       | Aceptada (2026-10-19); ajusta cómo la página obtiene su municipio (ADR-015) |
 | 025 | [La base de datos despierta al ejecutor de trabajos](ADR-025-job-runner-wake-up.md)                       | Aceptada (2026-10-24); concreta ADR-019                                     |
+| 026 | [Pipeline de modelos 3D: Meshopt, KTX2 verificado y poster del panel](ADR-026-glb-pipeline.md)            | Aceptada (2026-10-25)                                                       |

@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P2 (jobs durables y pipeline de medios). P1 y P3 ✅.
-- **Último paso completado:** P2 · Paso 3 — pipeline de panoramas (2026-10-25)
-- **Rama:** `feat/p2-step3-panoramas` → PR hacia `main`
+- **Último paso completado:** P2 · Paso 4 — pipeline de modelos 3D (GLB) (2026-10-25)
+- **Rama:** `feat/p2-step4-glb` → PR hacia `main`
 
 ## Historial
 
@@ -345,31 +345,99 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - Un panorama rechazado o con el trabajo fallido se vuelve a subir; no hay botón de «reemplazar» ni de borrar todavía (llega con el editor de tours).
 - Las cuotas por municipio (almacenamiento y cómputo) llegan en el Paso 5.
 
+### P2 · Paso 4 — pipeline de modelos 3D (GLB) ✅
+
+- Decisiones ([ADR-026](../adr/ADR-026-glb-pipeline.md)):
+  - el usuario eligió que **la imagen poster la capture el panel** con el mismo visor que usará el portal (el servidor no tiene GPU) y aportó un modelo real de prueba (`ametralladora-opt.glb`, fuera del repositorio);
+  - tras medirlo, **Meshopt** para la geometría (igual que Draco una vez comprimido y más liviano de decodificar);
+  - **KTX2 verificado** para las texturas: 8 veces menos memoria de video en el celular.
+- Base de datos (`20261025100000_p2_model_enum.sql` y `20261025100100_p2_models.sql`, solo expand):
+  - Propósito `model`; el bucket privado acepta GLB y KTX2. Al reservar se exige tipo GLB, solo para modelos y hasta 50 MB; las imágenes conservan sus tipos.
+  - `media_complete_upload` (camino síncrono de imágenes) ya no puede completar otra cosa que logos y fotos.
+  - Versiones listas sin tamaño en píxeles para los modelos.
+  - `submit_model` encola `media.process_model` en la misma transacción (idempotente, auditado). `list_tenant_models` lo puede usar cualquier miembro; `set_model_poster`, propietarios, administradores y editores, con el modelo listo y un poster válido (auditado).
+  - Para el ejecutor: `worker_api.model_source`, `complete_model` y `reject_model`, solo con el arrendamiento vigente de un trabajo de modelo de ese municipio.
+  - El manifiesto se revalida: hasta 15 MB optimizado, sin rutas fuera de la carpeta, y el pipeline no puede escribir el poster.
+- `@rikuy/core`:
+  - contrato del manifiesto (fuente, modelo, cada textura con su uso, codificación y medición, colores, peso, poster);
+  - reglas (`isGlb`, límites, tolerancias por uso);
+  - cálculo de color ΔE CIELAB;
+  - casos de uso `requestModelUpload`, `submitModel`, `loadModels` y `saveModelPoster`;
+  - los puertos del ejecutor (`ModelStore`, `ModelOptimizer`).
+- `@rikuy/db`: el optimizador, todo en WASM/JS:
+  - glTF Transform 4.5.1, validador de Khronos, Draco y Meshopt, y Basis Universal (`ktx2-encoder`);
+  - lee el JSON antes que nada (archivos externos, extensiones);
+  - separa las texturas usadas como color y como dato, y señala el material sospechoso;
+  - codifica cada textura según su uso (sRGB, lineal, normales) a ≤ 2048 px y la **verifica decodificándola**;
+  - comprueba el modelo escrito contra el subido (materiales por primitiva y colores por vértice por cercanía);
+  - Basis ya no escribe en la salida estándar.
+  - También: el poster recodificado con sharp, el repositorio del panel y el del ejecutor.
+- `apps/worker`: `media.process_model`.
+  - Codifica cada textura con la escalera ETC1S → UASTC → la imagen original.
+  - Guarda un punto de control por textura (el KTX2 espera en `model/work/`) y escribe `model/model.glb`.
+  - Rechaza con motivo y borra el original: no es GLB, inválido, archivos externos, extensión no admitida, demasiado complejo, más de 15 MB optimizado, colores cambiados. De 5 a 15 MB, «pesado».
+- Ejecutor: los modelos son trabajos largos. Los toma el aviso de la base, nunca «Procesar la cola ahora». En el build, los paquetes WASM quedan fuera del bundle y Vercel los incluye en la función (verificado en su traza).
+- Panel, **«Modelos 3D»** en la página del municipio:
+  - subir el `.glb` (directo a Storage, con progreso);
+  - estado, peso original → optimizado, triángulos, texturas en KTX2;
+  - «Colores verificados» con el ΔE máximo, aviso «Pesado para celulares» y **«Revisa sus colores en el programa 3D»** con el material y la textura sospechosos;
+  - visor 3D bajo demanda (three.js 0.186.0; el transcodificador KTX2 se sirve desde `/vendor/three/<versión>/basis/`);
+  - **poster capturado solo** al quedar listo, con «Usar esta vista como imagen», «Restablecer vista» y «Cerrar el visor»;
+  - analistas en solo lectura.
+- **Comparación automática de colores en un navegador real** (`apps/web/e2e/model-colors.e2e.test.ts`, en el job «Contracts»):
+  - el procesador y el optimizador reales optimizan un modelo sintético;
+  - three.js dibuja el original y el optimizado desde la misma cámara, con WebGL por software;
+  - se exige un ΔE de las superficies con media ≤ 2 y p95 ≤ 5 (local: 0,35 y 1,07);
+  - la imagen comparada queda como artefacto.
+- Tests: 427 unitarios (core 269, db 89, web 35, worker 27, config 7) + 526 pgTAP (45 nuevos) + D-01 con 9 escenarios (nuevo: un modelo que completa un segundo ejecutor tras vencer el arrendamiento del primero; el pipeline no puede poner el poster) + la comparación en el navegador. 0 hallazgos de `plpgsql_check`.
+- Verificado en local, en el navegador y con el modelo real:
+  - 0,48 → 1,23 MB, 12 texturas en ETC1S (ΔE de color 0,95–1,4) en ~27 s;
+  - poster capturado solo y cambiado a mano;
+  - el aviso de la pieza dorada;
+  - un PNG renombrado a `.glb` rechazado con su motivo;
+  - un analista sin botones de edición y sin ver otro municipio;
+  - sin desbordes a 360/390 px y axe sin hallazgos críticos ni graves.
+
+Lo que encontraron las pruebas:
+
+- **En el modelo real, la pieza dorada (`Ametralladora_ChrDorado`) tiene como color el mapa de metal/rugosidad de la pieza negra** (una imagen azul y verde), así que se ve azulada en cualquier visor. Ahora el panel lo avisa. Se corrige en Blender conectando la imagen dorada al _Base Color_ de ese material.
+- three.js leía como sRGB la textura que se usaba a la vez como color y como dato, así que la rugosidad de otra pieza se interpretaba mal en el original. Al separarla, la copia optimizada la dibuja bien. Por eso la comparación en el navegador usa un modelo sin ese error.
+- El modelo real también se ve casi negro en el original: sus mapas marcan casi todo como metal (canal azul 148–233 de 255) sobre colores base muy oscuros. Es del archivo, no de la optimización.
+- Sin `prune` conservador se perdían atributos y texturas de un solo color; sin el silencio, Basis llenaba los registros con ~15 líneas por textura; `findVersion` no reconocía el propósito `model` (el poster habría fallado).
+
+**Desviaciones:**
+
+- El modelo real, que ya venía con WebP muy comprimido, **pesa más** optimizado (0,48 → 1,23 MB): se cambia peso de descarga por memoria de video. Sigue dentro de los 5 MB.
+- Las texturas de más de 2048 px se reducen a 2048 en la copia optimizada (límite del codificador KTX2); el original no cambia.
+- El poster depende de que alguien con rol de edición abra «Modelos 3D» con el modelo listo; los tours (P4) lo exigirán al publicar. No hay todavía subida de una foto propia como poster, ni borrar o reemplazar un modelo (llegan con el editor de tours).
+- Codificar una textura bloquea el hilo de la función mientras dura (~14 s a 2048 px). La ruta del ejecutor tiene su propia configuración, así que no comparte instancia con las páginas.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p2-step3-panoramas
+git checkout feat/p2-step4-glb
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `015_panoramas` y la integración, el escenario nuevo de D-01. Para probar el panel, con las tres variables del ejecutor en `apps/web/.env.local` (como en el Paso 2) y `pnpm dev`: entra como propietario, «Panoramas 360°» → «Subir un panorama» con una foto 360° (2:1). En local la base no avisa sola: procesa la cola con
+`pnpm db:test` incluye `016_models`, y la integración el escenario nuevo de D-01. Comparación de colores en el navegador (necesita Chrome; usa `CHROME_PATH` si no está en la ruta por defecto):
 
 ```powershell
-curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain
+$env:RIKUY_MODEL_E2E = "1"; $env:CHROME_PATH = "C:\Program Files\Google\Chrome\Application\chrome.exe"
+pnpm --filter @rikuy/web test:e2e-models
 ```
 
-y en unos segundos la lista muestra «Listo».
+Con `RIKUY_REAL_GLB` apuntando a un `.glb` tuyo, también lo compara y deja `<modelo>.glb.compare.png` al lado. Para el panel, con las variables del ejecutor en `apps/web/.env.local` y `pnpm dev`: «Modelos 3D» → «Subir un modelo 3D» y procesa la cola como en el Paso 3 (`curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain`).
 
 ## Después del merge
 
-Nada que configurar: «Deploy database» aplica las migraciones y el ejecutor ya está activo. Comprobación: sube un panorama en un municipio de demo; pasa a «Listo» solo en menos de un minuto.
+Nada que configurar: «Deploy database» aplica las migraciones y el ejecutor ya está activo. Comprobación: sube `ametralladora-opt.glb` en un municipio de demo. Pasa a «Listo» solo en menos de un minuto, con su imagen y el aviso de la pieza dorada.
 
-## Siguiente paso — P2 · Paso 4 (requiere autorización)
+## Siguiente paso — P2 · Paso 5 (requiere autorización)
 
-**Pipeline de GLB**: validación, optimización (Meshopt/Draco + KTX2) conservando los colores, imagen _poster_ y límites de 5/15 MB; terminado cuando un GLB optimizado conserva sus colores en una comparación automática.
+**Cuotas por municipio** (`usage_buckets`: almacenamiento y cómputo) con reserva atómica, visibles en el panel; terminado cuando dos subidas concurrentes no superan la cuota. Cierra P2.
 
 ## Decisiones pendientes del usuario
 

@@ -14,15 +14,15 @@ La velocidad de carga es un **contrato verificable**, no una intención. Estos o
 
 ## Presupuestos de peso
 
-| Recurso                                | Tope                                           | Regla                                                                        |
-| -------------------------------------- | ---------------------------------------------- | ---------------------------------------------------------------------------- |
-| JavaScript inicial de una ruta pública | ≤ 170 KB gzip                                  | Sin visor 360°, three.js, Leaflet ni SDKs de IA en el bundle inicial         |
-| Visor 360° (PSV + three)               | Chunk aparte                                   | `import()` dinámico; precarga al mostrar intención (hover / tarjeta visible) |
-| Preview de panorama                    | ≤ 40 KB                                        | Visible en < 1 s en 4G; la versión nítida aparece encima                     |
-| Panorama monolítico (≤ 4096 px)        | ≤ 1,5 MB                                       | WebP q≈85–90; > 4096 px se entrega en tiles (ADR-020)                        |
-| Imágenes de contenido                  | Responsive AVIF/WebP                           | `next/image` con `sizes` correcto; hero con `priority`                       |
-| GLB optimizado                         | ≤ 5 MB (aviso), ≤ 15 MB (rechazo sin revisión) | Meshopt/Draco + KTX2; carga solo al abrir el hotspot, con imagen poster      |
-| Fuentes tipográficas                   | ≤ 2 familias, subset latino                    | Autoalojadas, `font-display: swap`                                           |
+| Recurso                                | Tope                                           | Regla                                                                                                                 |
+| -------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| JavaScript inicial de una ruta pública | ≤ 170 KB gzip                                  | Sin visor 360°, three.js, Leaflet ni SDKs de IA en el bundle inicial                                                  |
+| Visor 360° (PSV + three)               | Chunk aparte                                   | `import()` dinámico; precarga al mostrar intención (hover / tarjeta visible)                                          |
+| Preview de panorama                    | ≤ 40 KB                                        | Visible en < 1 s en 4G; la versión nítida aparece encima                                                              |
+| Panorama monolítico (≤ 4096 px)        | ≤ 1,5 MB                                       | WebP q≈85–90; > 4096 px se entrega en tiles (ADR-020)                                                                 |
+| Imágenes de contenido                  | Responsive AVIF/WebP                           | `next/image` con `sizes` correcto; hero con `priority`                                                                |
+| GLB optimizado                         | ≤ 5 MB (aviso), ≤ 15 MB (rechazo sin revisión) | Meshopt + KTX2 verificado ([ADR-026](adr/ADR-026-glb-pipeline.md)); carga solo al abrir el hotspot, con imagen poster |
+| Fuentes tipográficas                   | ≤ 2 familias, subset latino                    | Autoalojadas, `font-display: swap`                                                                                    |
 
 **Mapa (`/mapa`):** MapLibre se carga con `import()` dinámico solo en esta página y, en las fichas, cuando el visitante llega al mapa pequeño (al desplazarse o tocarlo), así que home, destino y evento no pagan su costo. En `/mapa` la lista de lugares es lo primero que se pinta (LCP); el mapa aparece después. En laboratorio (móvil, CPU ×4) `/mapa` queda en torno a 60–70 de rendimiento por el arranque de WebGL: se mide en dispositivos reales con Lighthouse CI y Speed Insights (P3 · Paso 7) antes de fijarle un objetivo propio.
 
