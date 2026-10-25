@@ -10,6 +10,7 @@ import {
   createJobAdminRepository,
   createMemberRepository,
   createMfaGateway,
+  createModelRepository,
   createPanoramaRepository,
   createPlatformRepository,
   createSupabaseAuthGateway,
@@ -60,6 +61,7 @@ export const adminSession = cache(async () => {
     media: createMediaRepository(client),
     content: createContentRepository(client),
     panoramas: createPanoramaRepository(client),
+    models: createModelRepository(client),
     jobs: createJobAdminRepository(client),
   };
 });

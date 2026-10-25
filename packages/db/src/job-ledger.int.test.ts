@@ -21,6 +21,7 @@ import {
   type ClaimedJob,
   type JobLedger,
   type JobProcessor,
+  type ModelManifest,
   type PanoramaManifest,
 } from "@rikuy/core";
 import postgres from "postgres";
@@ -430,6 +431,101 @@ describe.runIf(reachable)("D-01 · durable job ledger (real PostgreSQL)", () => 
       from public.asset_versions where id = ${version?.id}::uuid
     `;
     expect(row).toMatchObject({ status: "ready", width: 8192, dir: "tiles/0" });
+    expect((await attempts(jobId)).map((attempt) => attempt.outcome)).toEqual([
+      "lease_expired",
+      "succeeded",
+    ]);
+  });
+
+  it("settles a model only with the current lease, and refuses a poster from the pipeline", async () => {
+    // Demo Sur: this version is ready without files in Storage, and RC-15 signs a ready
+    // original of Demo Norte.
+    const [asset] = await admin`
+      insert into public.assets (tenant_id, purpose) values (${SUR}::uuid, 'model') returning id
+    `;
+    const [version] = await admin`
+      insert into public.asset_versions (tenant_id, asset_id, version, status, declared_mime, declared_bytes)
+      values (${SUR}::uuid, ${asset?.id}::uuid, 1, 'processing', 'model/gltf-binary', 482828)
+      returning id, original_path
+    `;
+    const [queued] = await admin`
+      select job_id from private.enqueue_job(
+        ${SUR}::uuid, 'media.process_model', ${`asset_version:${String(version?.id)}`},
+        ${admin.json({ versionId: String(version?.id) })}::jsonb, 'asset_version', ${version?.id}::uuid
+      )
+    `;
+    const jobId = String(queued?.job_id);
+    const manifest: ModelManifest = {
+      version: 1,
+      format: "glb",
+      source: {
+        bytes: 482_828,
+        sha256: "c".repeat(64),
+        triangles: 5059,
+        vertices: 4612,
+        materials: 4,
+        textures: 11,
+        generator: "glTF-Transform v4.4.1",
+        extensions: ["KHR_draco_mesh_compression", "EXT_texture_webp"],
+      },
+      model: {
+        file: "model.glb",
+        bytes: 1_231_852,
+        triangles: 5059,
+        geometry: "meshopt",
+        textures: [],
+      },
+      colors: {
+        materials: "unchanged",
+        vertexColors: null,
+        suspects: [
+          {
+            material: "Ametralladora_ChrDorado",
+            texture: "Ametralladora_MNegro_metallicRoughness",
+          },
+        ],
+      },
+      weight: "light",
+      poster: null,
+    };
+    const original = { bytes: 482_828, sha256: "c".repeat(64) };
+
+    const slow = newLedger();
+    const [first] = await slow.claim(`slow-${RUN}`, 1, ["media.process_model"]);
+    const stale = { jobId, fencingToken: (first as ClaimedJob).fencingToken };
+    expect(await slow.models.source(stale)).toMatchObject({
+      status: "processing",
+      originalPath: version?.original_path,
+      declaredMime: "model/gltf-binary",
+      prefix: `${SUR}/${String(asset?.id)}/1/`,
+    });
+    await letTimePass([jobId]);
+
+    const fresh = newLedger();
+    const [second] = await fresh.claim(`fresh-${RUN}`, 1, ["media.process_model"]);
+    const lease = { jobId, fencingToken: (second as ClaimedJob).fencingToken };
+    expect(await slow.models.complete(stale, original, manifest)).toBe("lease_lost");
+    // The pipeline never sets the poster (the panel captures it).
+    await expect(
+      fresh.models.complete(lease, original, {
+        ...manifest,
+        poster: { file: "poster.webp", width: 1280, height: 960, bytes: 1 },
+      }),
+    ).rejects.toMatchObject({ code: "23514" });
+    expect(await fresh.models.complete(lease, original, manifest)).toBe("ready");
+    expect(await fresh.models.reject(lease, "unreadable")).toBe("already_settled");
+    expect(await fresh.complete(lease, { outcome: "ready" }, { durationMs: 1 })).toBe("completed");
+
+    const [row] = await admin`
+      select status, mime, width, manifest -> 'colors' -> 'suspects' -> 0 ->> 'material' as suspect
+      from public.asset_versions where id = ${version?.id}::uuid
+    `;
+    expect(row).toMatchObject({
+      status: "ready",
+      mime: "model/gltf-binary",
+      width: null,
+      suspect: "Ametralladora_ChrDorado",
+    });
     expect((await attempts(jobId)).map((attempt) => attempt.outcome)).toEqual([
       "lease_expired",
       "succeeded",

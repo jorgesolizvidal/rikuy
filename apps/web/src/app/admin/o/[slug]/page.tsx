@@ -56,6 +56,17 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/modelos`} className="org-card">
+            <span>
+              <span className="org-name">Modelos 3D</span>
+              <span className="org-detail">
+                Objetos en 3D para los recorridos, optimizados para celulares
+              </span>
+            </span>
+            <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
               <span className="org-name">Marca del portal</span>
@@ -79,7 +90,8 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
         ) : null}
       </ul>
       <p className="notice">
-        Los recorridos 360° llegarán en una próxima etapa; sus panoramas ya se pueden subir.
+        Los recorridos 360° llegarán en una próxima etapa; sus panoramas y modelos 3D ya se pueden
+        subir.
       </p>
     </main>
   );

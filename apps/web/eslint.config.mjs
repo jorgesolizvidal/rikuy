@@ -86,6 +86,13 @@ const config = [
       "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
     },
   },
+  {
+    // The GLB color check runs the real optimizer (no database, no secrets): test code only.
+    files: ["e2e/model-colors.e2e.test.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
+    },
+  },
 ];
 
 export default config;

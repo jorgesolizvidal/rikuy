@@ -11,25 +11,34 @@ import {
   createExpireAbandonedUploadProcessor,
   type ExpireAbandonedUploadDeps,
 } from "./processors/expire-abandoned-upload";
+import { createProcessModelProcessor, type ProcessModelDeps } from "./processors/process-model";
 import {
   createProcessPanoramaProcessor,
   type ProcessPanoramaDeps,
 } from "./processors/process-panorama";
 import { probeProcessor } from "./processors/probe";
 
-export { createExpireAbandonedUploadProcessor, createProcessPanoramaProcessor, probeProcessor };
-export type { ExpireAbandonedUploadDeps, ProcessPanoramaDeps };
+export {
+  createExpireAbandonedUploadProcessor,
+  createProcessModelProcessor,
+  createProcessPanoramaProcessor,
+  probeProcessor,
+};
+export type { ExpireAbandonedUploadDeps, ProcessModelDeps, ProcessPanoramaDeps };
 
 /** What the processors need from the platform (adapters built by the runtime). */
-export type ProcessorDeps = ExpireAbandonedUploadDeps & ProcessPanoramaDeps;
+export type ProcessorDeps = ExpireAbandonedUploadDeps &
+  ProcessPanoramaDeps &
+  Omit<ProcessModelDeps, "media">;
 
 /** Kinds that can run for minutes: only the database's wake-up runs them, not the panel. */
-export const LONG_JOB_KINDS: readonly string[] = ["media.process_panorama"];
+export const LONG_JOB_KINDS: readonly string[] = ["media.process_panorama", "media.process_model"];
 
 export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
   return [
     probeProcessor,
     createExpireAbandonedUploadProcessor(deps),
     createProcessPanoramaProcessor(deps),
+    createProcessModelProcessor(deps),
   ];
 }

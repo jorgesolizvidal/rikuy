@@ -8,6 +8,8 @@ export const JOB_KINDS = {
   expireAbandonedUpload: "media.expire_abandoned_upload",
   /** Renders the preview, the image and (above 4096 px) the tiles of a panorama. */
   processPanorama: "media.process_panorama",
+  /** Validates and optimizes a GLB (Meshopt + KTX2), checking that colors are kept. */
+  processModel: "media.process_model",
 } as const;
 
 export type JobKind = (typeof JOB_KINDS)[keyof typeof JOB_KINDS];
@@ -26,6 +28,7 @@ export const probePayloadSchema = z
 /** Same shape the database accepts; the job's subject is this version. */
 export const expireAbandonedUploadPayloadSchema = z.object({ versionId: z.uuid() }).strict();
 export const processPanoramaPayloadSchema = expireAbandonedUploadPayloadSchema;
+export const processModelPayloadSchema = expireAbandonedUploadPayloadSchema;
 
 export type JobStatus = "pending" | "running" | "succeeded" | "dead_letter";
 export type JobAttemptOutcome = "running" | "succeeded" | "retry" | "failed" | "lease_expired";

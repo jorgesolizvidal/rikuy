@@ -230,10 +230,31 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
+      # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
+      - name: GLB colors in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" RIKUY_MODEL_E2E_OUT="$RUNNER_TEMP/model-colors.png" \
+            pnpm test:e2e-models 2>&1 | grep -v -E "^(Slice|Encoding|Total slices|Mode:|basis_compressor)" | tee ../../model-colors.log
+
+      - name: Keep the GLB color comparison
+        if: success() || failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: model-colors
+          path: |
+            ${{ runner.temp }}/model-colors.png
+            ${{ runner.temp }}/model-colors.png.json
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

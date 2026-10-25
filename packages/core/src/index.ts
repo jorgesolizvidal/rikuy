@@ -58,3 +58,7 @@ export * from "./application/media/abandoned-uploads";
 export * from "./contracts/panorama";
 export * from "./domain/media/panorama";
 export * from "./application/media/panoramas";
+export * from "./contracts/model";
+export * from "./domain/media/model";
+export * from "./domain/media/color";
+export * from "./application/media/models";
