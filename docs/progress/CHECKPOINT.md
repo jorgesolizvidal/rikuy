@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P2 (jobs durables y pipeline de medios). P1 y P3 ✅.
-- **Último paso completado:** P2 · Paso 2 — ejecutor de trabajos en Vercel (2026-10-24)
-- **Rama:** `feat/p2-step2-job-runner` → PR hacia `main`
+- **Último paso completado:** P2 · Paso 3 — pipeline de panoramas (2026-10-25)
+- **Rama:** `feat/p2-step3-panoramas` → PR hacia `main`
 
 ## Historial
 
@@ -319,33 +319,57 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - Un reintento con espera corta se toma en la siguiente pasada del respaldo (hasta 1 min), no en el segundo en que vence.
 - El ejecutor borra originales con el adaptador de medios de la plataforma (clave secreta, aislado), solo para la ruta exacta que el ledger le dio al trabajo. ADR-014 prevé capacidades de Storage emitidas por un endpoint interno; con ejecutor y web en el mismo despliegue, ese endpoint sería una llamada a sí mismo. Se revisa si el ejecutor sale de Vercel.
 
+**Activación en producción (2026-10-24):** el usuario generó los dos secretos, los guardó en Vault y configuró `WORKER_DATABASE_URL` (_pooler_ en modo transacción, puerto 6543, usuario `rikuy_worker.<ref>`) y `JOB_RUNNER_SECRET` en Vercel (sensibles, solo producción). Comprobado con SQL de solo lectura: los dos nombres existen en Vault, la tarea de cada minuto corre sin errores, el aviso respondió 202 y una prueba pedida en el panel terminó en 1,6 s tomada por `vercel:gru1:kick`.
+
+### P2 · Paso 3 — pipeline de panoramas ✅
+
+- Según [ADR-020](../adr/ADR-020-panorama-delivery-by-resolution.md): el original no cambia; vista previa borrosa ≤ 40 KB, imagen única WebP ≤ 4096 px y, solo si la fuente supera 4096 px, teselas equirectangulares de 512 px en niveles que se duplican desde 2048 px hasta el ancho de la fuente (sin agrandar).
+- Base de datos (`20261025000000_p2_panorama_enums.sql` y `20261025000100_p2_panoramas.sql`, solo expand):
+  - Propósito `panorama` y estado `processing`. Originales hasta **50 MB** solo para panoramas (las fotos siguen en 10 MB, la base lo revalida por propósito).
+  - `asset_versions.manifest`: manifiesto versionado (dimensiones, peso y huella de la fuente, archivos de la vista previa, la imagen y cada nivel); solo en versiones listas, con forma revalidada y sin rutas que salgan de la carpeta de la versión.
+  - `submit_panorama` (propietario, administrador, editor): exige que el original esté subido, pasa a «procesando» y encola `media.process_panorama` **en la misma transacción** (idempotente), con auditoría. `list_tenant_panoramas` para cualquier miembro, con el estado de su trabajo.
+  - Para el ejecutor: `worker_api.panorama_source`, `complete_panorama` y `reject_panorama`, solo con el arrendamiento vigente de un trabajo de panorama de ese municipio; auditan `media.panorama_ready` / `media.panorama_rejected`.
+  - Nuevo tipo de trabajo: 4 intentos, hasta 240 s por intento, uno a la vez por municipio.
+- `@rikuy/core`: contrato del manifiesto, reglas (JPG/PNG/WebP, 2048 × 1024 a 16384 × 8192 px, proporción 2:1 con 1 % de tolerancia), `planPanorama`, casos de uso `requestPanoramaUpload`, `submitPanorama`, `loadPanoramas` y los puertos del ejecutor.
+- `@rikuy/db`: procesador con sharp (vista previa que baja la calidad hasta caber en 40 KB, sin EXIF ni GPS, rechaza archivos dañados), repositorio del panel y del ejecutor; las teselas se suben de a 8.
+- `apps/worker`: `media.process_panorama` revisa los bytes reales y la proporción (si no sirve, borra el original y rechaza con el motivo), genera vista previa, imagen y cada nivel con **punto de control** (un reintento retoma desde el último nivel guardado) y guarda el manifiesto. Los derivados quedan en el bucket privado (`…/{versión}/panorama/`) hasta que un tour publicado los use (P4).
+- Ejecutor: el aviso de la base toma trabajos durante ~40 s y guarda 245 s para un panorama dentro de los 300 s de la función; «Procesar la cola ahora» (20 s) no toma panoramas.
+- Panel: **«Panoramas 360°»** en la página del municipio: subir (directo a Storage, con barra de progreso), lista con estado (Subiendo / Procesando / Listo / Rechazado con el motivo en palabras), dimensiones, peso, cómo se entregará («imagen única» o «teselas en N niveles»), vista previa y «Ver la imagen completa». La lista se actualiza sola mientras algo se procesa. Analistas en solo lectura.
+- Tests: 399 unitarios (core 257, db 84, web 35, worker 16, config 7) + 481 pgTAP (35 nuevos) + D-01 con 8 escenarios (nuevo: un panorama que un segundo ejecutor completa tras vencer el arrendamiento del primero, que ya no puede escribir). 0 hallazgos de `plpgsql_check`.
+- Verificado en local de punta a punta en el navegador: un panorama de 8192 × 4096 px (7,8 MB) quedó «Listo» con 168 teselas en 3 niveles en ~17 s; una foto 4:3 quedó «Rechazado» con «No es una foto 360°…»; sin desbordes a 360/390 px; axe sin hallazgos críticos ni graves; un analista ve la lista sin subir y no ve los de otro municipio.
+- Medición del procesamiento (peor caso, ruido): 4096 px en 1,9 s; 8192 px en 7 s (168 teselas); 16384 px en ~25 s (680 teselas) con 926 MB de memoria, dentro de una función de Vercel.
+
+**Desviaciones:**
+
+- Los panoramas todavía no se ven en el portal: llegan con los tours (P4), que los publican.
+- Un panorama rechazado o con el trabajo fallido se vuelve a subir; no hay botón de «reemplazar» ni de borrar todavía (llega con el editor de tours).
+- Las cuotas por municipio (almacenamiento y cómputo) llegan en el Paso 5.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p2-step2-job-runner
+git checkout feat/p2-step3-panoramas
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `014_job_runner` y la integración, el escenario nuevo de D-01. Para probar el ejecutor en tu PC, agrega a `apps/web/.env.local`:
+`pnpm db:test` incluye `015_panoramas` y la integración, el escenario nuevo de D-01. Para probar el panel, con las tres variables del ejecutor en `apps/web/.env.local` (como en el Paso 2) y `pnpm dev`: entra como propietario, «Panoramas 360°» → «Subir un panorama» con una foto 360° (2:1). En local la base no avisa sola: procesa la cola con
 
-```
-WORKER_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
-WORKER_DATABASE_ROLE=rikuy_worker
-JOB_RUNNER_SECRET=un-secreto-local-de-al-menos-32-caracteres
+```powershell
+curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain
 ```
 
-y con `pnpm dev`, en «Trabajos en segundo plano»: «Probar el ejecutor» y luego «Procesar la cola ahora» → «Terminado». (En local la base no avisa sola: Vault no está configurado.)
+y en unos segundos la lista muestra «Listo».
 
-## Después del merge: activar el ejecutor en producción
+## Después del merge
 
-Pasos en el [runbook → «Activar el ejecutor»](../jobs.md#activar-el-ejecutor-una-sola-vez-por-ambiente): generar dos secretos, tres líneas de SQL en Supabase, dos variables en Vercel y un redeploy. Comprobación: una prueba pedida en el panel pasa a «Terminado» en segundos.
+Nada que configurar: «Deploy database» aplica las migraciones y el ejecutor ya está activo. Comprobación: sube un panorama en un municipio de demo; pasa a «Listo» solo en menos de un minuto.
 
-## Siguiente paso — P2 · Paso 3 (requiere autorización)
+## Siguiente paso — P2 · Paso 4 (requiere autorización)
 
-**Pipeline de panoramas** ([ADR-020](../adr/ADR-020-panorama-delivery-by-resolution.md)): subida del original privado, trabajo que genera la vista previa (≤ 40 KB) y la imagen monolítica (≤ 4096 px, WebP), y teselas solo si la fuente supera 4096 px; el original no cambia.
+**Pipeline de GLB**: validación, optimización (Meshopt/Draco + KTX2) conservando los colores, imagen _poster_ y límites de 5/15 MB; terminado cuando un GLB optimizado conserva sus colores en una comparación automática.
 
 ## Decisiones pendientes del usuario
 
