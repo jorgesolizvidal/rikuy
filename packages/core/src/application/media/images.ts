@@ -1,3 +1,4 @@
+import type { UsageResource } from "../../contracts/usage";
 import type { MembershipRole, OrganizationMembership } from "../../contracts/organization";
 import { inspectImage } from "../../domain/media/image";
 import {
@@ -38,7 +39,8 @@ export type RequestImageUploadResult =
       readonly mime: string;
     }
   | { readonly status: "invalid"; readonly problem: ImageProblem }
-  | { readonly status: "forbidden" | "rate_limited" };
+  | { readonly status: "forbidden" | "rate_limited" }
+  | { readonly status: "over_quota"; readonly resource: UsageResource };
 
 /**
  * Step 1: reserve an image version and hand the browser a one-time upload URL. Only the
@@ -62,6 +64,7 @@ export async function requestImageUpload(
     input.bytes as number,
   );
   if (created.status === "invalid") return { status: "invalid", problem: "unreadable" };
+  if (created.status === "over_quota") return created;
   if (created.status !== "created") return { status: created.status };
 
   return {

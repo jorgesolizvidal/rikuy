@@ -121,6 +121,21 @@ Corrige la causa y luego «Reintentar». Reintentar sin corregir solo vuelve a f
 
 **Quiero comprobar que todo funciona.** «Probar el ejecutor» en modo normal: debe pasar a «Terminado» en segundos. Para ensayar fallas, «falla el primer intento» (termina en el segundo) y «falla siempre» (termina en «Fallidos» tras 3 intentos; desde ahí se puede ensayar «Reintentar»).
 
+## Cuotas y trabajos ([ADR-027](adr/ADR-027-usage-quotas.md))
+
+- Cada panorama o modelo reserva 240 s de procesamiento del mes de su municipio al pedir la subida. Cuando su trabajo termina (bien o en «Fallidos»), se cuenta lo que duraron sus intentos y se libera el resto.
+- «Reintentar» un trabajo en «Fallidos» suma el tiempo de los intentos nuevos, aunque el municipio ya no tenga cuota: es una decisión del operador.
+- Diagnóstico (SQL, solo lectura):
+
+  ```sql
+  select resource, limit_amount, reserved, consumed, period_start
+  from usage_buckets
+  where tenant_id = '<id>'
+  order by period_start desc;
+  ```
+
+  Las reservas de cada versión están en `usage_reservations`.
+
 ## Lo que no se hace
 
 - Editar `background_jobs` o `job_attempts` a mano en producción: todo cambio pasa por las funciones (que validan el _fencing_) o por «Reintentar».

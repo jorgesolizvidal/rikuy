@@ -13,8 +13,10 @@ import {
   createModelRepository,
   createPanoramaRepository,
   createPlatformRepository,
+  createPlatformUsageRepository,
   createSupabaseAuthGateway,
   createTenantConfigRepository,
+  createUsageRepository,
   type SessionCookieToSet,
 } from "@rikuy/db";
 import { cookies } from "next/headers";
@@ -62,6 +64,8 @@ export const adminSession = cache(async () => {
     content: createContentRepository(client),
     panoramas: createPanoramaRepository(client),
     models: createModelRepository(client),
+    usage: createUsageRepository(client),
+    platformUsage: createPlatformUsageRepository(client),
     jobs: createJobAdminRepository(client),
   };
 });

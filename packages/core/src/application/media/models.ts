@@ -1,3 +1,4 @@
+import type { UsageResource } from "../../contracts/usage";
 import type { JobStatus } from "../../contracts/jobs";
 import type {
   ColorCheck,
@@ -71,7 +72,8 @@ export type RequestModelUploadResult =
       readonly mime: typeof MODEL_MIME;
     }
   | { readonly status: "invalid"; readonly problem: ModelProblem }
-  | { readonly status: "forbidden" | "rate_limited" };
+  | { readonly status: "forbidden" | "rate_limited" }
+  | { readonly status: "over_quota"; readonly resource: UsageResource };
 
 /** Step 1: reserve a model version and hand the browser a one-time upload URL. */
 export async function requestModelUpload(
@@ -90,6 +92,7 @@ export async function requestModelUpload(
     input.bytes as number,
   );
   if (created.status === "invalid") return { status: "invalid", problem: "too_heavy" };
+  if (created.status === "over_quota") return created;
   if (created.status !== "created") return { status: created.status };
   return {
     status: "upload",

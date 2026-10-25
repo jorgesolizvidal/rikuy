@@ -65,6 +65,9 @@ export default async function PlatformPage() {
           </Link>{" "}
           <Link href="/plataforma/trabajos" className="button button-quiet">
             Trabajos en segundo plano
+          </Link>{" "}
+          <Link href="/plataforma/cuotas" className="button button-quiet">
+            Cuotas por municipio
           </Link>
         </p>
       </div>

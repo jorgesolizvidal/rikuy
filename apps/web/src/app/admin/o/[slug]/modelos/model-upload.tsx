@@ -6,6 +6,7 @@ import { useId, useState, type ChangeEvent } from "react";
 
 import { startModelUploadAction, submitModelAction } from "./actions";
 import { MODEL_HINT, MODEL_PROBLEMS } from "./labels";
+import { QUOTA_MESSAGES } from "@/lib/quota-messages";
 
 const FAILURES = {
   forbidden: "Tu rol ya no permite subir modelos en este municipio.",
@@ -67,6 +68,9 @@ export function ModelUpload({ slug }: { readonly slug: string }) {
     const start = await startModelUploadAction(slug, { mime, bytes: file.size });
     if (start.status === "invalid") {
       return setPhase({ kind: "failed", message: MODEL_PROBLEMS[start.problem] });
+    }
+    if (start.status === "over_quota") {
+      return setPhase({ kind: "failed", message: QUOTA_MESSAGES[start.resource] });
     }
     if (start.status !== "upload") {
       return setPhase({ kind: "failed", message: FAILURES[start.status] });

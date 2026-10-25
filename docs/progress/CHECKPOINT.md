@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P2 (jobs durables y pipeline de medios). P1 y P3 ✅.
-- **Último paso completado:** P2 · Paso 4 — pipeline de modelos 3D (GLB) (2026-10-25)
-- **Rama:** `feat/p2-step4-glb` → PR hacia `main`
+- **Fase:** P1, P2 y P3 ✅. Sigue P4 (tours 360°, hotspots y GLB).
+- **Último paso completado:** P2 · Paso 5 — cuotas por municipio (2026-10-25)
+- **Rama:** `feat/p2-step5-quotas` → PR hacia `main`
 
 ## Historial
 
@@ -412,33 +412,75 @@ Lo que encontraron las pruebas:
 - El poster depende de que alguien con rol de edición abra «Modelos 3D» con el modelo listo; los tours (P4) lo exigirán al publicar. No hay todavía subida de una foto propia como poster, ni borrar o reemplazar un modelo (llegan con el editor de tours).
 - Codificar una textura bloquea el hilo de la función mientras dura (~14 s a 2048 px). La ruta del ejecutor tiene su propia configuración, así que no comparte instancia con las páginas.
 
+### P2 · Paso 5 — cuotas por municipio ✅
+
+- Decisiones del usuario ([ADR-027](../adr/ADR-027-usage-quotas.md)):
+  - **300 MB** de almacenamiento y **30 min al mes** de procesamiento de medios por municipio, por defecto;
+  - el almacenamiento cuenta **el original y sus derivados**.
+  - Contexto: Supabase gratis tiene 1 GB para todo el proyecto y Vercel Hobby 4 h de CPU al mes para toda la cuenta.
+- Base de datos (`20261025200000_p2_usage_quotas.sql`, solo expand):
+  - `tenant_quotas` (lo que asigna el operador), `usage_buckets` (límite, reservado y consumido por período) y `usage_reservations` (una por recurso y versión). RLS sin permisos para nadie.
+  - **Reserva atómica** al pedir la subida, con un trigger en `asset_versions` y un `UPDATE` condicional sobre la fila del período: ×1,5 lo declarado en fotos y logos, ×2 en panoramas y modelos, más 240 s de cómputo por panorama o modelo. Si no cabe, `PT507` con el recurso y no se crea nada.
+  - **Liquidación:**
+    - al quedar lista, publicarse o recibir su poster, la base mide la versión en `storage.objects` (los dos buckets, sin las texturas intermedias del GLB);
+    - al rechazarse, se libera;
+    - al terminar un trabajo de panorama o modelo, se cuenta la duración de sus intentos.
+  - El mes de cómputo empieza a medianoche del día 1 en la zona horaria del municipio.
+  - `tenant_usage` (cualquier miembro), `platform_tenant_usage` y `platform_set_quota` (operador con segundo factor, auditado `platform.quota_changed`).
+  - Al desplegar, mide los medios que ya existen y abre una reserva vacía para los que están en curso.
+- `@rikuy/core`: contrato de uso, `meter` (aviso desde el 80 %), `loadUsage`, `changeQuota` (MB y minutos), y el resultado `over_quota` en las cuatro subidas (logo, fotos, panoramas, modelos).
+- `@rikuy/db`: `PT507` → `over_quota` con el recurso, y los repositorios del municipio y del operador.
+- Panel:
+  - **«Uso del plan»** en la página del municipio: barras accesibles con lo usado y lo reservado, avisos al 80 % y al 100 %, y «se renueva el día 1».
+  - **«Cuotas por municipio»** en `/plataforma`: uso de cada municipio, límite por defecto o asignado, total del proyecto y cambio del límite en MB o minutos.
+  - Las cuatro subidas explican qué cuota se llenó.
+- Tests:
+  - 436 unitarios (core 275, db 92, web 35, worker 27, config 7) + 564 pgTAP (38 nuevos) + **concurrencia contra PostgreSQL real**: 8 personas piden una subida a la vez con cupo para 3 y entran exactamente 3, el resto con `PT507` y sin pasar el límite; rechazar una subida devuelve su lugar.
+  - D-01 sigue en verde y `plpgsql_check` no tiene hallazgos (también en los triggers).
+- Verificado en el navegador:
+  - un panorama de 7,8 MB reservó 15,7 MB y 4 min, y al terminar quedó en sus 17 MB reales y 21 s;
+  - el operador bajó Demo Norte a 5 MB y la subida de un modelo se rechazó con su mensaje;
+  - el analista ve solo su municipio y `/plataforma/cuotas` da 404 a quien no es operador;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360/1280 px.
+  - La migración sobre medios ya existentes los cuenta (simulado).
+
+**Desviaciones:**
+
+- Una subida pedida y nunca completada retiene su reserva hasta la limpieza diaria (24 h).
+- Lo real se cuenta aunque pase el límite (el trabajo ya se hizo): la siguiente subida se rechaza.
+- El cómputo de antes de este paso no se cuenta, y el de las páginas no entra en ninguna cuota (para eso, el panel de Vercel).
+- La cuota de IA llega con el asistente (P5), como un tercer recurso.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p2-step4-glb
+git checkout feat/p2-step5-quotas
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `016_models`, y la integración el escenario nuevo de D-01. Comparación de colores en el navegador (necesita Chrome; usa `CHROME_PATH` si no está en la ruta por defecto):
-
-```powershell
-$env:RIKUY_MODEL_E2E = "1"; $env:CHROME_PATH = "C:\Program Files\Google\Chrome\Application\chrome.exe"
-pnpm --filter @rikuy/web test:e2e-models
-```
-
-Con `RIKUY_REAL_GLB` apuntando a un `.glb` tuyo, también lo compara y deja `<modelo>.glb.compare.png` al lado. Para el panel, con las variables del ejecutor en `apps/web/.env.local` y `pnpm dev`: «Modelos 3D» → «Subir un modelo 3D» y procesa la cola como en el Paso 3 (`curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain`).
+`pnpm db:test` incluye `017_usage_quotas`; la integración, `quotas.int.test.ts` (las 8 subidas simultáneas). En el panel, con `pnpm dev`: «Uso del plan» en la página de un municipio y, como operador, «Cuotas por municipio» en «Plataforma».
 
 ## Después del merge
 
-Nada que configurar: «Deploy database» aplica las migraciones y el ejecutor ya está activo. Comprobación: sube `ametralladora-opt.glb` en un municipio de demo. Pasa a «Listo» solo en menos de un minuto, con su imagen y el aviso de la pieza dorada.
+Nada que configurar: «Deploy database» aplica la migración, que mide lo que ya hay en Storage. Comprobación: «Uso del plan» de Demo Norte muestra lo ya subido (unos 8 MB) y «Cuotas por municipio» lista los dos municipios con 300 MB y 30 min.
 
-## Siguiente paso — P2 · Paso 5 (requiere autorización)
+## Siguiente paso — P4 · Paso 1 (requiere autorización)
 
-**Cuotas por municipio** (`usage_buckets`: almacenamiento y cómputo) con reserva atómica, visibles en el panel; terminado cuando dos subidas concurrentes no superan la cuota. Cierra P2.
+**Tours 360°**: proponer los pasos de P4 en el roadmap y empezar por el modelo de datos.
+
+- Datos: `tours`, `tour_revisions`, `scenes` y `hotspots`, con `entry_scene_id` único y revisiones selladas como los destinos.
+- Hotspots en yaw/pitch, de información, navegación y modelo 3D.
+- Luego vienen el editor con las mismas coordenadas que el visor, el visor público (Photo Sphere Viewer con las teselas del Paso 3) y el modelo 3D bajo demanda con su poster.
+- Contratos RC-01/02/07/08.
 
 ## Decisiones pendientes del usuario
 
 - Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».
+- **Al final del proyecto, en Blender** (pedido del usuario, 2026-10-25):
+  - corregir la iluminación de la ametralladora: sus mapas marcan casi todo como metal sobre colores muy oscuros;
+  - corregir su material dorado, que tiene la textura equivocada;
+  - ajustar el espacio al girar algunos modelos 3D (centro de giro, distancia de la cámara).
+- Cuotas: al pasar a Supabase Pro o Vercel Pro, subir los valores por defecto (`private.quota_default`) con una migración.
