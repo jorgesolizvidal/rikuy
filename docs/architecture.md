@@ -106,6 +106,19 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
   - escribe `{tenant}/{asset}/{version}/model/model.glb` (privado) y el manifiesto;
   - la imagen poster la captura el panel con el mismo visor three.js del portal.
 
+## 8 bis. Cuotas por municipio (ADR-012, ADR-027)
+
+- Dos recursos en `usage_buckets`:
+  - almacenamiento (original + derivados, sin período);
+  - procesamiento de medios (segundos por mes, en la zona horaria del municipio).
+- Por defecto: 300 MB y 30 min al mes. Los cambia un operador con segundo factor, con auditoría.
+- **Reserva atómica** al pedir una subida (trigger en `asset_versions`, un `UPDATE` condicional sobre la fila del período). Lo que no cabe se rechaza con `PT507` antes de crear nada.
+- **Liquidación:**
+  - al quedar lista, publicarse o recibir su poster, la versión se mide en `storage.objects`;
+  - al rechazarse, se libera;
+  - al terminar un trabajo de medios, el cómputo se liquida con la duración de sus intentos.
+- Panel: «Uso del plan» para los miembros del municipio; `/plataforma/cuotas` para el operador.
+
 ## 9. Mapa y ubicación del visitante (ADR-021, ADR-023)
 
 - Mapa del portal: MapLibre con teselas vectoriales de OpenFreeMap; el estilo es configuración (`NEXT_PUBLIC_MAP_STYLE_URL`). La librería se carga solo donde hay mapa (`/mapa` y, en las fichas, cuando el visitante llega al mapa pequeño); su _worker_ se sirve desde `/vendor/maplibre-gl/<versión>/`. El panel usa Leaflet + OpenStreetMap (uso ligero).
