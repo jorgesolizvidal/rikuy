@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { EnvValidationError, parsePlatformEnv, parsePublicEnv, parseServerEnv } from "./env";
+import {
+  EnvValidationError,
+  parseJobRunnerEnv,
+  parsePlatformEnv,
+  parsePublicEnv,
+  parseServerEnv,
+} from "./env";
 
 const valid = {
   NEXT_PUBLIC_SUPABASE_URL: "http://127.0.0.1:54321",
@@ -51,6 +57,28 @@ describe("environment contract", () => {
 
   it("rejects hosts with uppercase or schemes", () => {
     expect(() => parseServerEnv({ ...valid, PLATFORM_ADMIN_HOST: "https://App.example" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  it("validates the job runner settings without echoing them", () => {
+    const runner = {
+      WORKER_DATABASE_URL: "postgresql://rikuy_worker.ref:pw@pooler.example.test:6543/postgres",
+      JOB_RUNNER_SECRET: "x".repeat(40),
+      WORKER_DATABASE_ROLE: "",
+    };
+    expect(parseJobRunnerEnv(runner)).toEqual({
+      WORKER_DATABASE_URL: runner.WORKER_DATABASE_URL,
+      JOB_RUNNER_SECRET: runner.JOB_RUNNER_SECRET,
+    });
+    try {
+      parseJobRunnerEnv({ ...runner, JOB_RUNNER_SECRET: "short-secret-value" });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as EnvValidationError).invalidKeys).toEqual(["JOB_RUNNER_SECRET"]);
+      expect(String((error as Error).message)).not.toContain("short-secret-value");
+    }
+    expect(() => parseJobRunnerEnv({ ...runner, WORKER_DATABASE_URL: "https://x" })).toThrow(
       EnvValidationError,
     );
   });

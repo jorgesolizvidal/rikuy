@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P2 (jobs durables y pipeline de medios). P1 y P3 ✅.
-- **Último paso completado:** P2 · Paso 1 — ledger de trabajos durables (2026-10-20)
-- **Rama:** `feat/p2-step1-job-ledger` → PR hacia `main`
+- **Último paso completado:** P2 · Paso 2 — ejecutor de trabajos en Vercel (2026-10-24)
+- **Rama:** `feat/p2-step2-job-runner` → PR hacia `main`
 
 ## Historial
 
@@ -296,28 +296,57 @@ Revisión de solo lectura de la auditoría (`auditoria-saas`, 01–14) y del có
 - Todavía no corre ningún ejecutor: lo que se pida (sondas, reintentos) espera en la cola hasta el Paso 2. Nada encola trabajos solo todavía.
 - El ejecutor usa una conexión directa a PostgreSQL (rol propio) y no la Data API: es lo que permite no darle `service_role` (ADR-014).
 
+### P2 · Paso 2 — ejecutor de trabajos en Vercel ✅
+
+- Decisión del usuario (2026-10-24): **la base de datos despierta al ejecutor** ([ADR-025](../adr/ADR-025-job-runner-wake-up.md)), porque en Vercel Hobby el cron corre como mucho una vez al día.
+- Base de datos (`20261024000000_p2_job_runner.sql`, solo expand):
+  - `pg_net` y `pg_cron`. Un trigger en `background_jobs` avisa al ejecutor cuando un trabajo queda listo al escribirse (encolado o reintento a mano); la tarea `rikuy-job-runner` lo hace cada minuto de respaldo, solo si hay trabajo listo o un arrendamiento vencido. A lo sumo un aviso cada 10 s. `pg_net` envía después del `COMMIT`.
+  - Dirección y secreto del aviso en **Supabase Vault** (`rikuy_job_runner_url`, `rikuy_job_runner_secret`); sin ellos no se llama a nadie. El secreto es propio del ejecutor, no la clave secreta de Supabase (la cola de `pg_net` es legible hasta que se envía).
+  - **Primer trabajo real:** `media.expire_abandoned_upload`. La tarea diaria `rikuy-expire-abandoned-uploads` (07:17 UTC) encola una limpieza por cada imagen que sigue «subiendo» después de 24 h; `worker_api.abandoned_upload` y `mark_upload_abandoned` la inspeccionan y la rechazan con el arrendamiento del trabajo, contra el municipio del propio trabajo, y auditan `media.upload_abandoned`. Pendiente desde P3 · Paso 1.
+- `@rikuy/config`: `parseJobRunnerEnv` (`WORKER_DATABASE_URL`, `JOB_RUNNER_SECRET` ≥ 32 caracteres, `WORKER_DATABASE_ROLE` solo local), sin mostrar valores en los errores.
+- `@rikuy/core`: puertos `AbandonedUploadStore` y `OriginalRemover`; contrato del nuevo tipo. `apps/worker`: procesador de la limpieza (Storage solo después de que el ledger confirma, idempotente ante caídas) y `createProcessors`.
+- `@rikuy/db`: el ledger del worker suma la limpieza y exige **TLS** a cualquier base no local; `removeOriginal` en el adaptador de medios.
+- Web:
+  - **`POST /api/jobs/drain`** en el host de la plataforma: 503 sin configurar, 401 con otro secreto (comparación en tiempo constante), 202 y drenaje después de responder (`after()`, hasta ~2,5 min dentro de los 5 min de la función). No existe en el host del panel ni en los portales.
+  - `src/server/job-runner.ts`: el único módulo que abre la conexión del ejecutor (ESLint lo impide en cualquier otro), con registros en JSON, sin datos sensibles.
+  - Panel: **«Procesar la cola ahora»** (operador con segundo factor, unos 20 s, muestra cuántos trabajos tomó y cómo terminaron) y aviso si el ejecutor no está configurado.
+- [Runbook](../jobs.md): cómo se despierta, tipos de trabajo, **activación paso a paso** y diagnóstico (logs de Vercel, `cron.job_run_details`, `net._http_response`). `docs/deploy.md`, `.env.example`, arquitectura y roadmap actualizados.
+- Tests: 380 unitarios (core 249, db 81, web 34, worker 9, config 7) + 446 pgTAP (30 nuevos) + D-01 con 7 escenarios (nuevo: barrido → inspección → marcado con el rol del worker). 0 hallazgos de `plpgsql_check`.
+- Verificado en local de punta a punta (con un `pg_net` simulado que no envía, y su petición reenviada a mano): la base encola el aviso con el secreto, el ejecutor lo recibe y la sonda «falla una vez» termina en su segundo intento; una ráfaga genera un solo aviso; la limpieza reintenta si Storage no responde y luego borra el original, rechaza la versión y audita; «Procesar la cola ahora» en el navegador.
+
+**Desviaciones:**
+
+- Un reintento con espera corta se toma en la siguiente pasada del respaldo (hasta 1 min), no en el segundo en que vence.
+- El ejecutor borra originales con el adaptador de medios de la plataforma (clave secreta, aislado), solo para la ruta exacta que el ledger le dio al trabajo. ADR-014 prevé capacidades de Storage emitidas por un endpoint interno; con ejecutor y web en el mismo despliegue, ese endpoint sería una llamada a sí mismo. Se revisa si el ejecutor sale de Vercel.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p2-step1-job-ledger
+git checkout feat/p2-step2-job-runner
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
-pnpm dev
 ```
 
-1. `pnpm db:test` incluye `013_job_ledger` y la integración incluye **D-01** (`job-ledger.int.test.ts`).
-2. Entra al panel como operador → «Plataforma» → «Trabajos en segundo plano»: verás una sonda terminada y una en «Fallidos». «Ver intentos» muestra sus 3 intentos; «Reintentar» → «Sí, reintentar» la pasa a «En espera» (ronda 2).
-3. «Probar el ejecutor» pone una sonda en la cola. Se queda «En espera» hasta que exista el ejecutor (Paso 2); si pasan 5 minutos, aparece la alarma: es lo esperado.
-4. Al hacer merge, «Deploy database» aplica la migración en Supabase. No hay que configurar nada más en este paso: el rol del ejecutor queda sin poder iniciar sesión hasta el Paso 2.
+`pnpm db:test` incluye `014_job_runner` y la integración, el escenario nuevo de D-01. Para probar el ejecutor en tu PC, agrega a `apps/web/.env.local`:
 
-## Siguiente paso — P2 · Paso 2 (requiere autorización)
+```
+WORKER_DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+WORKER_DATABASE_ROLE=rikuy_worker
+JOB_RUNNER_SECRET=un-secreto-local-de-al-menos-32-caracteres
+```
 
-**Ejecutor en Vercel:** endpoint protegido que drena la cola con `drainJobs` (`@rikuy/db/worker`, rol `rikuy_worker` por el _pooler_), logs estructurados sin tokens, primer trabajo real (limpieza de subidas abandonadas, pendiente desde P3 · Paso 1) y la sonda pidiéndose y terminando en producción.
+y con `pnpm dev`, en «Trabajos en segundo plano»: «Probar el ejecutor» y luego «Procesar la cola ahora» → «Terminado». (En local la base no avisa sola: Vault no está configurado.)
+
+## Después del merge: activar el ejecutor en producción
+
+Pasos en el [runbook → «Activar el ejecutor»](../jobs.md#activar-el-ejecutor-una-sola-vez-por-ambiente): generar dos secretos, tres líneas de SQL en Supabase, dos variables en Vercel y un redeploy. Comprobación: una prueba pedida en el panel pasa a «Terminado» en segundos.
+
+## Siguiente paso — P2 · Paso 3 (requiere autorización)
+
+**Pipeline de panoramas** ([ADR-020](../adr/ADR-020-panorama-delivery-by-resolution.md)): subida del original privado, trabajo que genera la vista previa (≤ 40 KB) y la imagen monolítica (≤ 4096 px, WebP), y teselas solo si la fuente supera 4096 px; el original no cambia.
 
 ## Decisiones pendientes del usuario
 
-- **Cómo se despierta el ejecutor (Paso 2).** En el plan Hobby, el cron de Vercel corre como mucho **una vez al día** y con ±59 min de precisión. Opciones: (a) avisar al ejecutor justo después de encolar, más **`pg_cron` + `pg_net` de Supabase** llamando al endpoint cada minuto como respaldo (gratis, la base como reloj; recomendada); (b) GitHub Actions programado cada 5 min (gratis, menos preciso); (c) Vercel Pro (cron cada minuto).
-- Habilitar el inicio de sesión del rol `rikuy_worker` en Supabase (una línea de SQL con una contraseña que generas tú) y guardar su conexión en Vercel: se hace en el Paso 2, con los pasos en el [runbook](../jobs.md).
-- El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».
+- Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».

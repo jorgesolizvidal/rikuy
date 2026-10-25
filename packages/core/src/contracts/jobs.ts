@@ -4,6 +4,8 @@ import { z } from "zod";
 export const JOB_KINDS = {
   /** «Probar el ejecutor»: changes nothing, leaves a record that it ran. */
   probe: "system.probe",
+  /** Removes the original of an image upload that was never confirmed, and rejects it. */
+  expireAbandonedUpload: "media.expire_abandoned_upload",
 } as const;
 
 export type JobKind = (typeof JOB_KINDS)[keyof typeof JOB_KINDS];
@@ -18,6 +20,9 @@ export const probePayloadSchema = z
     workMs: z.number().int().min(0).max(10_000).default(0),
   })
   .strict();
+
+/** Same shape the database accepts; the job's subject is this version. */
+export const expireAbandonedUploadPayloadSchema = z.object({ versionId: z.uuid() }).strict();
 
 export type JobStatus = "pending" | "running" | "succeeded" | "dead_letter";
 export type JobAttemptOutcome = "running" | "succeeded" | "retry" | "failed" | "lease_expired";

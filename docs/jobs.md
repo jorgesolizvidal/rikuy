@@ -10,7 +10,7 @@ Un **trabajo** es algo que la plataforma hace fuera de una página: procesar un 
 - `job_attempts` guarda cada intento, sin borrar ni modificar los cerrados.
 - `job_kinds` y `job_queues` son la configuración: intentos máximos, arrendamiento, presupuesto de tiempo por intento y concurrencia (global por cola y por municipio).
 
-Un **ejecutor** (desde P2 · Paso 2, una función de Vercel) reclama trabajos, los ejecuta y avisa el resultado. Si el ejecutor cambia (otro proveedor, un CLI), el registro y los procesadores no cambian.
+Un **ejecutor** (una función de Vercel, `apps/web/src/server/job-runner.ts`) reclama trabajos, los ejecuta y avisa el resultado. Si el ejecutor cambia (otro proveedor, un CLI), el registro y los procesadores no cambian.
 
 ## Estados
 
@@ -35,16 +35,51 @@ Un **ejecutor** (desde P2 · Paso 2, una función de Vercel) reclama trabajos, l
 
 El ejecutor se conecta a PostgreSQL como `rikuy_worker`:
 
-- sin permisos sobre ninguna tabla; solo puede ejecutar las funciones del esquema `worker_api` (`claim_jobs`, `heartbeat`, `complete_job`, `fail_job`, `reap_expired_jobs`);
+- sin permisos sobre ninguna tabla; solo puede ejecutar las funciones del esquema `worker_api` (`claim_jobs`, `heartbeat`, `complete_job`, `fail_job`, `reap_expired_jobs` y las de cada tipo de trabajo, como `abandoned_upload` y `mark_upload_abandoned`);
 - no es `service_role` ni la sesión de una persona, y ninguna clave de la API puede convertirse en él;
-- la migración lo crea **sin permiso de iniciar sesión**. Se habilita una sola vez, fuera del repositorio, cuando exista el ejecutor (P2 · Paso 2):
+- la migración lo crea **sin permiso de iniciar sesión**; un operador lo habilita una vez (ver «Activar el ejecutor»);
+- la conexión va cifrada (TLS) a cualquier base que no sea local, por el _pooler_ en modo transacción.
 
-  ```sql
-  -- Supabase → SQL Editor. La contraseña la generas tú; nunca va al repositorio.
-  alter role rikuy_worker with login password '<contraseña larga y aleatoria>';
-  ```
+## Cómo se despierta ([ADR-025](adr/ADR-025-job-runner-wake-up.md))
 
-  La cadena de conexión va en Vercel como variable sensible (`WORKER_DATABASE_URL`), por el _pooler_ en modo transacción: `postgres://rikuy_worker.<ref>:<contraseña>@<host-del-pooler>:6543/postgres`.
+- **Al encolar:** cuando un trabajo queda listo al escribirse (nuevo o reintento a mano), la base llama a `POST https://<host de la plataforma>/api/jobs/drain` con `pg_net`, después del `COMMIT`.
+- **Cada minuto, de respaldo** (`pg_cron`, tarea `rikuy-job-runner`): solo si hay trabajo listo o un arrendamiento vencido (reintentos cuya espera venció, trabajos de un ejecutor caído).
+- **A lo sumo un aviso cada 10 s.** El endpoint responde 202 y drena después de responder, hasta ~2,5 min por llamada dentro de los 5 min de la función. Varias llamadas a la vez no se pisan: la base reparte los trabajos.
+- **A mano:** «Procesar la cola ahora» en el panel (unos 20 s).
+- Sin la configuración en Vault (desarrollo local, CI) la base no llama a nadie.
+
+## Tipos de trabajo
+
+| Tipo                                                                | Qué hace                                                                                                                                                | Cuándo se encola                                                                    |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| `system.probe` — Prueba del ejecutor                                | No cambia ningún dato; ensaya el camino completo                                                                                                        | «Probar el ejecutor» en el panel                                                    |
+| `media.expire_abandoned_upload` — Limpieza de una subida abandonada | Borra el original de una imagen que quedó «subiendo» más de 24 h (si llegó a escribirse) y la marca rechazada, con auditoría (`media.upload_abandoned`) | Cada día a las 07:17 UTC (03:17 en Bolivia), tarea `rikuy-expire-abandoned-uploads` |
+
+## Activar el ejecutor (una sola vez por ambiente)
+
+Hace falta una contraseña para el rol y un secreto para el aviso. Los generas tú y **nunca** van al repositorio ni a un chat. En PowerShell, cada uno así (64 caracteres hexadecimales):
+
+```powershell
+$b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($b); -join ($b | % { $_.ToString("x2") })
+```
+
+1. **Supabase → SQL Editor** (reemplaza los dos valores):
+
+   ```sql
+   alter role rikuy_worker with login password '<CONTRASEÑA_DEL_EJECUTOR>';
+   select vault.create_secret('https://rikuy-app.vercel.app/api/jobs/drain', 'rikuy_job_runner_url');
+   select vault.create_secret('<SECRETO_DEL_AVISO>', 'rikuy_job_runner_secret');
+   ```
+
+2. **Supabase → Connect → Transaction pooler**: copia la cadena de conexión y cambia el usuario `postgres.<ref>` por `rikuy_worker.<ref>` y la contraseña por la del paso 1:
+   `postgresql://rikuy_worker.<ref>:<CONTRASEÑA_DEL_EJECUTOR>@<host-del-pooler>:6543/postgres`
+3. **Vercel → Settings → Environment Variables** (Production, marcadas como **Sensitive**):
+   - `WORKER_DATABASE_URL` = la cadena del paso 2;
+   - `JOB_RUNNER_SECRET` = el mismo secreto del aviso del paso 1.
+4. **Redeploy** de producción.
+5. **Comprobar:** panel → «Trabajos en segundo plano» → «Probar el ejecutor» (normal). En unos segundos pasa a «Terminado». «Procesar la cola ahora» ya no dice «no está configurado».
+
+Para cambiar el secreto: actualízalo en Vault (`select vault.update_secret((select id from vault.secrets where name = 'rikuy_job_runner_secret'), '<NUEVO>');`) y en Vercel, y redespliega. Para cambiar la contraseña: otro `alter role` y la nueva cadena en Vercel.
 
 ## El panel: `/plataforma/trabajos`
 
@@ -54,11 +89,18 @@ Solo para operadores con el segundo factor verificado (para cualquier otra perso
 - **Alarma:** si hay trabajos listos esperando más de 5 minutos, aparece un aviso: ningún ejecutor los está tomando.
 - **Lista** filtrable por estado, con intentos, último error y «Ver intentos» (el historial completo).
 - **Reintentar** (solo fallidos, con confirmación): crea una **ronda nueva** con los intentos en cero; las rondas anteriores quedan en el historial. Queda auditado (`job.replayed`).
+- **Procesar la cola ahora:** corre el ejecutor unos 20 s desde el panel y muestra cuántos trabajos tomó y cómo terminaron.
 - **Probar el ejecutor:** pone en la cola una prueba que no cambia ningún dato (`system.probe`) para un municipio. Tres modos: normal, «falla el primer intento» (ensayo de reintento) y «falla siempre» (ensayo de la cola de fallidos). Queda auditado (`job.probe_requested`).
 
 ## Qué hacer si…
 
-**Aparece la alarma de trabajos esperando.** El ejecutor no está corriendo o no llega a la base. Revisa en Vercel los registros de la función del ejecutor y su programación. Mientras tanto no se pierde nada: los trabajos esperan en la base y salen cuando el ejecutor vuelve.
+**Aparece la alarma de trabajos esperando.** El ejecutor no se despierta o no llega a la base. En orden:
+
+1. «Procesar la cola ahora». Si dice «no está configurado», faltan `WORKER_DATABASE_URL` o `JOB_RUNNER_SECRET` en Vercel (y un redeploy).
+2. Vercel → Logs, filtra `/api/jobs/drain`: un 401 es un secreto distinto en Vault y en Vercel; `drain.failed` con `code` de PostgreSQL es la conexión (contraseña, usuario `rikuy_worker.<ref>`, puerto 6543).
+3. Supabase → SQL: `select * from cron.job_run_details order by start_time desc limit 5;` (¿corre la tarea de cada minuto?) y `select status_code, error_msg from net._http_response order by created desc limit 5;` (¿qué respondió el endpoint?).
+
+Mientras tanto no se pierde nada: los trabajos esperan en la base y salen cuando el ejecutor vuelve.
 
 **Hay trabajos fallidos.** Abre «Ver intentos» y lee el código de error:
 
@@ -72,16 +114,19 @@ Corrige la causa y luego «Reintentar». Reintentar sin corregir solo vuelve a f
 
 **Un trabajo quedó «En curso» mucho tiempo.** No hace falta tocarlo: cuando vence su arrendamiento, la próxima pasada del ejecutor (o del reconciliador) lo devuelve a la cola o, sin intentos, lo manda a fallidos.
 
-**Quiero comprobar que todo funciona.** «Probar el ejecutor» en modo normal: debe pasar a «Terminado» en la próxima pasada. Para ensayar fallas, «falla el primer intento» (termina en el segundo) y «falla siempre» (termina en «Fallidos» tras 3 intentos; desde ahí se puede ensayar «Reintentar»).
+**Quiero comprobar que todo funciona.** «Probar el ejecutor» en modo normal: debe pasar a «Terminado» en segundos. Para ensayar fallas, «falla el primer intento» (termina en el segundo) y «falla siempre» (termina en «Fallidos» tras 3 intentos; desde ahí se puede ensayar «Reintentar»).
 
 ## Lo que no se hace
 
 - Editar `background_jobs` o `job_attempts` a mano en producción: todo cambio pasa por las funciones (que validan el _fencing_) o por «Reintentar».
 - Dar al ejecutor la clave secreta (`service_role`) o la sesión de una persona.
 - Escribir URLs firmadas, tokens o contenido de archivos en mensajes de error o en registros.
+- Usar la clave secreta de Supabase como secreto del aviso: viaja por la cola de `pg_net`.
 
 ## Pruebas
 
 - `supabase/tests/database/013_job_ledger.test.sql` (pgTAP, 71 aserciones): permisos, idempotencia, reclamo con equidad y concurrencia, _fencing_, latido, puntos de control, reintentos, fallidos, presupuesto de tiempo, reintento a mano y auditoría.
 - `packages/db/src/job-ledger.int.test.ts` — **D-01** contra PostgreSQL real, con varios ejecutores a la vez: un ejecutor que muere sin avisar, retomar desde el punto de control con el ejecutor viejo bloqueado, encolar duplicados al mismo tiempo, fallidos y reintento a mano, un municipio que satura la cola sin frenar a otro, y los límites del rol del ejecutor.
-- `packages/core/src/application/jobs/jobs.test.ts` y `apps/worker/src/processors/probe.test.ts`: el ejecutor de un trabajo (latido, pérdida del arrendamiento, presupuesto, errores) y el drenaje.
+- `packages/core/src/application/jobs/jobs.test.ts` y `apps/worker/src/processors/*.test.ts`: el ejecutor de un trabajo (latido, pérdida del arrendamiento, presupuesto, errores), el drenaje, la sonda y la limpieza de subidas (reintento si Storage no responde, idempotencia tras una caída).
+- `supabase/tests/database/014_job_runner.test.sql` (30 aserciones): permisos, tareas programadas, sin configuración no se llama a nadie, el barrido diario, la limpieza con el arrendamiento del trabajo (otro municipio no ve nada), el aviso con su secreto y a lo sumo uno cada 10 s.
+- `apps/web/src/server/job-runner.test.ts`: el endpoint (503 sin configurar, 401 con otro secreto, 202 y drenaje después de responder) y los registros en JSON.

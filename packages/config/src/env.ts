@@ -79,3 +79,33 @@ export function parseServerEnv(
 ): ServerEnv {
   return parseWith(serverEnvSchema, source);
 }
+
+/**
+ * The durable job runner (P2 · Paso 2). Only its endpoint and the operator's «Procesar la
+ * cola ahora» read these: the rest of the app works without them.
+ * - WORKER_DATABASE_URL: PostgreSQL connection of the role rikuy_worker (Supabase pooler).
+ * - JOB_RUNNER_SECRET: what the database sends to wake the runner (also in Supabase Vault).
+ * - WORKER_DATABASE_ROLE: local development only, to act as rikuy_worker when connecting
+ *   as `postgres` to the local stack.
+ */
+export const jobRunnerEnvSchema = z.object({
+  WORKER_DATABASE_URL: z
+    .string()
+    .regex(/^postgres(ql)?:\/\/\S+$/u, "must be a postgres:// connection string"),
+  JOB_RUNNER_SECRET: z.string().min(32, "must be at least 32 characters"),
+  WORKER_DATABASE_ROLE: z
+    .string()
+    .regex(/^[a-z_][a-z0-9_]{0,62}$/u)
+    .optional(),
+});
+
+export type JobRunnerEnv = z.infer<typeof jobRunnerEnvSchema>;
+
+export function parseJobRunnerEnv(
+  source: Record<string, string | undefined> = process.env,
+): JobRunnerEnv {
+  return parseWith(jobRunnerEnvSchema, {
+    ...source,
+    WORKER_DATABASE_ROLE: source.WORKER_DATABASE_ROLE || undefined,
+  });
+}

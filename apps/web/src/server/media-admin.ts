@@ -1,17 +1,18 @@
 import "server-only";
 
 import { parseServerEnv } from "@rikuy/config/env";
-import type { ImageProcessor, MediaAdmin } from "@rikuy/core";
+import type { ImageProcessor, MediaAdmin, OriginalRemover } from "@rikuy/core";
 import { createSharpImageProcessor, createSupabaseMediaAdmin } from "@rikuy/db";
 
-let admin: MediaAdmin | undefined;
+let admin: (MediaAdmin & OriginalRemover) | undefined;
 let processor: ImageProcessor | undefined;
 
 /**
  * Writer of image derivatives and of the public media bucket (secret key, CONTRIBUTING
- * §1.3). Only the logo Server Actions import it, after the use case authorized the caller.
+ * §1.3). The image Server Actions use it after the use case authorized the caller, and the
+ * job runner removes originals with it, only for an exact path the ledger handed a job.
  */
-export function mediaAdmin(): MediaAdmin {
+export function mediaAdmin(): MediaAdmin & OriginalRemover {
   if (admin) return admin;
   const env = parseServerEnv();
   admin = createSupabaseMediaAdmin({

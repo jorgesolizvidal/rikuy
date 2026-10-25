@@ -4,15 +4,16 @@ Cómo está montada la demo en la nube y qué se configura a mano una sola vez. 
 
 ## Piezas
 
-| Pieza                 | Dónde                                                                      | Notas                                                                             |
-| --------------------- | -------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Base de datos         | Supabase, proyecto `rikuy` (ref `jltzysyxqureudfavgpj`), São Paulo         | Plan gratuito. Las migraciones las aplica el workflow «Deploy database»           |
-| Aplicación            | Vercel, proyecto `rikuy` (raíz `apps/web`), funciones en São Paulo (gru1)  | Plan Hobby: demo y pruebas. Para municipios reales (uso comercial) hace falta Pro |
-| Plataforma            | `https://rikuy-app.vercel.app`                                             | `PLATFORM_ROOT_DOMAIN`                                                            |
-| Panel                 | `https://rikuy-app-admin.vercel.app`                                       | `PLATFORM_ADMIN_HOST`                                                             |
-| Portales de demo      | `https://rikuy-demo-norte.vercel.app`, `https://rikuy-demo-sur.vercel.app` | Registrados en `tenant_domains` (`supabase/demo/vercel-demo.sql`)                 |
-| Rendimiento real      | Vercel Speed Insights                                                      | Métricas anónimas, sin cookies (página de privacidad)                             |
-| Lighthouse en la nube | Workflow «Lighthouse on production»                                        | Tras cada despliegue de producción, con `apps/web/lighthouse-budget.json`         |
+| Pieza                 | Dónde                                                                      | Notas                                                                                                    |
+| --------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Base de datos         | Supabase, proyecto `rikuy` (ref `jltzysyxqureudfavgpj`), São Paulo         | Plan gratuito. Las migraciones las aplica el workflow «Deploy database»                                  |
+| Aplicación            | Vercel, proyecto `rikuy` (raíz `apps/web`), funciones en São Paulo (gru1)  | Plan Hobby: demo y pruebas. Para municipios reales (uso comercial) hace falta Pro                        |
+| Plataforma            | `https://rikuy-app.vercel.app`                                             | `PLATFORM_ROOT_DOMAIN`                                                                                   |
+| Panel                 | `https://rikuy-app-admin.vercel.app`                                       | `PLATFORM_ADMIN_HOST`                                                                                    |
+| Portales de demo      | `https://rikuy-demo-norte.vercel.app`, `https://rikuy-demo-sur.vercel.app` | Registrados en `tenant_domains` (`supabase/demo/vercel-demo.sql`)                                        |
+| Rendimiento real      | Vercel Speed Insights                                                      | Métricas anónimas, sin cookies (página de privacidad)                                                    |
+| Lighthouse en la nube | Workflow «Lighthouse on production»                                        | Tras cada despliegue de producción, con `apps/web/lighthouse-budget.json`                                |
+| Ejecutor de trabajos  | `POST https://rikuy-app.vercel.app/api/jobs/drain`, despertado por la base | `pg_cron` + `pg_net` ([ADR-025](adr/ADR-025-job-runner-wake-up.md)); activación en el [runbook](jobs.md) |
 
 Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuevo` con un alias exacto como `rikuy-municipio.vercel.app`, que antes se agrega en Vercel → Settings → Domains. Un dominio propio (por ejemplo `turismo.municipio.gob.bo`) se agrega igual en Vercel y en el alta; no requiere cambios de código.
 
@@ -76,4 +77,5 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 
 - Cada merge a `main` despliega la aplicación (Vercel) y, si trae migraciones, las aplica («Deploy database»). Las migraciones son solo _expand_, así que el orden entre ambos no rompe nada.
 - Tras cada merge a `main`, «Lighthouse on production» espera a que producción sirva ese commit (`X-Rikuy-Version`) y mide la demo con el mismo presupuesto que el PR. También se puede correr a mano (Actions → _Run workflow_).
+- El ejecutor de trabajos necesita `WORKER_DATABASE_URL` y `JOB_RUNNER_SECRET` en Vercel y dos secretos en Supabase Vault: pasos en [«Activar el ejecutor»](jobs.md#activar-el-ejecutor-una-sola-vez-por-ambiente). Sin ellos la aplicación funciona igual y los trabajos esperan en la cola.
 - Para saber dónde corre una función, mira `x-vercel-id` en una ruta dinámica (por ejemplo `/mapa`): el segundo código es la región de la función (`…::gru1::…`). Si el job falla, el motivo aparece como anotación en la página del run (no hace falta descargar el log).

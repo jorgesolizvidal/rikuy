@@ -88,6 +88,7 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - El ejecutor reclama con arrendamiento y número de _fencing_; latidos, puntos de control y resultados solo se aceptan con el número vigente. Reintentos con espera exponencial; agotados o permanentes → cola de fallidos, con reintento auditado por un operador.
 - Concurrencia global por cola y por municipio controlada al reclamar, atendiendo primero a quien tiene menos trabajos en curso.
 - El ejecutor es el rol `rikuy_worker` (conexión directa por el _pooler_): sin permisos sobre tablas, solo `worker_api`. Nunca `service_role` ni la sesión de una persona.
+- La base despierta al ejecutor (`POST /api/jobs/drain` del host de la plataforma) con `pg_net` al encolar y con `pg_cron` cada minuto de respaldo, con un secreto propio guardado en Vault ([ADR-025](adr/ADR-025-job-runner-wake-up.md)). El endpoint responde 202 y drena después de responder.
 - Procesadores en `apps/worker` (funciones sobre `@rikuy/core`); el ejecutor de turno es un adaptador. Detalle operativo en el [runbook](jobs.md).
 
 ## 8. Medios: panoramas y 3D (ADR-017, ADR-020)

@@ -1,9 +1,9 @@
-import type { ClaimedJob, HeartbeatOutcome, JobLedger } from "@rikuy/core";
+import type { AbandonedUploadStore, ClaimedJob, HeartbeatOutcome, JobLedger } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
 
 /**
- * Durable job ledger, WORKLOAD side (migration 20261020000000): a direct PostgreSQL
+ * Durable job ledger, WORKLOAD side (migrations 20261020000000 and 20261024000000): a direct PostgreSQL
  * connection (through the Supabase pooler in the cloud) as the dedicated role
  * rikuy_worker, which can only execute worker_api functions. Never the service role,
  * never a user's session. Imported only from "@rikuy/db/worker".
@@ -21,6 +21,8 @@ export interface PostgresJobLedgerOptions {
 }
 
 export interface PostgresJobLedger extends JobLedger {
+  /** media.expire_abandoned_upload: worker_api.abandoned_upload / mark_upload_abandoned. */
+  readonly uploads: AbandonedUploadStore;
   close(): Promise<void>;
 }
 
@@ -52,7 +54,11 @@ const leaseLost = (error: unknown) => {
 };
 
 export function createPostgresJobLedger(options: PostgresJobLedgerOptions): PostgresJobLedger {
+  // Encrypted to anything but a local database (the Supabase pooler accepts TLS).
+  const host = new URL(options.url.replace(/^postgres(ql)?:/u, "http:")).hostname;
+  const local = host === "localhost" || host === "127.0.0.1" || host === "::1" || host === "";
   const sql = postgres(options.url, {
+    ssl: local ? false : "require",
     max: options.maxConnections ?? 4,
     // The Supabase pooler (transaction mode) does not keep prepared statements.
     prepare: false,
@@ -140,6 +146,34 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
     async reapExpired() {
       const [row] = await sql`select worker_api.reap_expired_jobs() as count`;
       return Number(row?.count ?? 0);
+    },
+
+    uploads: {
+      async inspect(lease) {
+        try {
+          const [row] = await sql`
+            select * from worker_api.abandoned_upload(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          return {
+            abandoned: row?.abandoned === true,
+            originalPath: typeof row?.original_path === "string" ? row.original_path : null,
+          };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async markAbandoned(lease) {
+        try {
+          const [row] = await sql`
+            select worker_api.mark_upload_abandoned(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as outcome
+          `;
+          return z.enum(["marked", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
     },
 
     async close() {
