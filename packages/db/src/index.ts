@@ -42,3 +42,4 @@ export {
 } from "./content";
 export type { SupabasePublishedContentReaderOptions } from "./content";
 export { createJobAdminRepository } from "./job-admin";
+export { createPanoramaRepository, mapPanoramaRow } from "./panoramas";

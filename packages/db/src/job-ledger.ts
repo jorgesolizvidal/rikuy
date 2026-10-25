@@ -1,4 +1,10 @@
-import type { AbandonedUploadStore, ClaimedJob, HeartbeatOutcome, JobLedger } from "@rikuy/core";
+import type {
+  AbandonedUploadStore,
+  ClaimedJob,
+  HeartbeatOutcome,
+  JobLedger,
+  PanoramaStore,
+} from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
 
@@ -23,6 +29,8 @@ export interface PostgresJobLedgerOptions {
 export interface PostgresJobLedger extends JobLedger {
   /** media.expire_abandoned_upload: worker_api.abandoned_upload / mark_upload_abandoned. */
   readonly uploads: AbandonedUploadStore;
+  /** media.process_panorama: worker_api.panorama_source / complete_panorama / reject_panorama. */
+  readonly panoramas: PanoramaStore;
   close(): Promise<void>;
 }
 
@@ -169,6 +177,54 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
             select worker_api.mark_upload_abandoned(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as outcome
           `;
           return z.enum(["marked", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    panoramas: {
+      async source(lease) {
+        try {
+          const [row] = await sql`
+            select * from worker_api.panorama_source(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          if (!row || row.status === "not_found") return "not_found";
+          return {
+            status: z.enum(["uploading", "processing", "ready", "rejected"]).parse(row.status),
+            originalPath: z.string().parse(row.original_path),
+            declaredMime: z.string().parse(row.declared_mime),
+            prefix: z.string().parse(row.prefix),
+          };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async complete(lease, metadata, manifest) {
+        try {
+          const [row] = await sql`
+            select worker_api.complete_panorama(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${metadata.mime},
+              ${metadata.bytes}::integer, ${metadata.width}::integer, ${metadata.height}::integer,
+              ${metadata.sha256}, ${json(manifest)}::jsonb
+            ) as outcome
+          `;
+          return z.enum(["ready", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async reject(lease, problem) {
+        try {
+          const [row] = await sql`
+            select worker_api.reject_panorama(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${problem}
+            ) as outcome
+          `;
+          return z.enum(["rejected", "already_settled", "not_found"]).parse(row?.outcome);
         } catch (error) {
           if (leaseLost(error)) return "lease_lost";
           throw error;

@@ -21,6 +21,7 @@ import {
   type ClaimedJob,
   type JobLedger,
   type JobProcessor,
+  type PanoramaManifest,
 } from "@rikuy/core";
 import postgres from "postgres";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
@@ -358,6 +359,81 @@ describe.runIf(reachable)("D-01 · durable job ledger (real PostgreSQL)", () => 
     const [version] =
       await admin`select status from public.asset_versions where id = ${old?.id}::uuid`;
     expect(version?.status).toBe("rejected");
+  });
+
+  it("completes a panorama only with the current lease (claim → source → expire → resume)", async () => {
+    // Demo Sur: this version is ready without files in Storage, and RC-15 signs a ready
+    // original of Demo Norte.
+    const [asset] = await admin`
+      insert into public.assets (tenant_id, purpose) values (${SUR}::uuid, 'panorama') returning id
+    `;
+    const [version] = await admin`
+      insert into public.asset_versions (tenant_id, asset_id, version, status, declared_mime, declared_bytes)
+      values (${SUR}::uuid, ${asset?.id}::uuid, 1, 'processing', 'image/jpeg', 9000000)
+      returning id, original_path
+    `;
+    const [queued] = await admin`
+      select job_id from private.enqueue_job(
+        ${SUR}::uuid, 'media.process_panorama', ${`asset_version:${String(version?.id)}`},
+        ${admin.json({ versionId: String(version?.id) })}::jsonb, 'asset_version', ${version?.id}::uuid
+      )
+    `;
+    const jobId = String(queued?.job_id);
+    const manifest: PanoramaManifest = {
+      version: 1,
+      projection: "equirectangular",
+      source: {
+        width: 8192,
+        height: 4096,
+        bytes: 9_000_000,
+        mime: "image/jpeg",
+        sha256: "b".repeat(64),
+      },
+      preview: { file: "preview.webp", width: 1024, height: 512, bytes: 20_000 },
+      image: { file: "image.webp", width: 4096, height: 2048, bytes: 1_500_000 },
+      tiles: {
+        tileSize: 512,
+        format: "webp",
+        levels: [{ width: 2048, height: 1024, cols: 4, rows: 2, dir: "tiles/0" }],
+      },
+    };
+    const metadata = {
+      mime: "image/jpeg" as const,
+      bytes: 9_000_000,
+      width: 8192,
+      height: 4096,
+      sha256: "b".repeat(64),
+    };
+
+    // The first runner reads its source, then stalls past its lease.
+    const slow = newLedger();
+    const [first] = await slow.claim(`slow-${RUN}`, 1, ["media.process_panorama"]);
+    const stale = { jobId, fencingToken: (first as ClaimedJob).fencingToken };
+    expect(await slow.panoramas.source(stale)).toMatchObject({
+      status: "processing",
+      originalPath: version?.original_path,
+      prefix: `${SUR}/${String(asset?.id)}/1/`,
+    });
+    await letTimePass([jobId]);
+
+    // Another runner takes it over and finishes; the stalled one can no longer write.
+    const fresh = newLedger();
+    const [second] = await fresh.claim(`fresh-${RUN}`, 1, ["media.process_panorama"]);
+    const lease = { jobId, fencingToken: (second as ClaimedJob).fencingToken };
+    expect(await slow.panoramas.complete(stale, metadata, manifest)).toBe("lease_lost");
+    expect(await fresh.panoramas.complete(lease, metadata, manifest)).toBe("ready");
+    expect(await fresh.panoramas.reject(lease, "unreadable")).toBe("already_settled");
+    expect(await fresh.complete(lease, { outcome: "ready" }, { durationMs: 1 })).toBe("completed");
+
+    const [row] = await admin`
+      select status, width, manifest -> 'tiles' -> 'levels' -> 0 ->> 'dir' as dir
+      from public.asset_versions where id = ${version?.id}::uuid
+    `;
+    expect(row).toMatchObject({ status: "ready", width: 8192, dir: "tiles/0" });
+    expect((await attempts(jobId)).map((attempt) => attempt.outcome)).toEqual([
+      "lease_expired",
+      "succeeded",
+    ]);
   });
 
   it("gives the workload role nothing but worker_api", async () => {

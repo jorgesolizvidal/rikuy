@@ -1,6 +1,6 @@
 import type { ImageMime } from "../../domain/media/image";
 
-export type AssetPurpose = "logo" | "content";
+export type AssetPurpose = "logo" | "content" | "panorama";
 
 export interface PendingUpload {
   readonly assetId: string;
@@ -22,7 +22,7 @@ export interface ImageVersionRecord {
   readonly assetId: string;
   readonly version: number;
   readonly purpose: AssetPurpose;
-  readonly status: "uploading" | "ready" | "rejected";
+  readonly status: "uploading" | "processing" | "ready" | "rejected";
   readonly declaredMime: string;
   readonly originalPath: string;
 }

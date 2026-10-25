@@ -47,6 +47,15 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/panoramas`} className="org-card">
+            <span>
+              <span className="org-name">Panoramas 360°</span>
+              <span className="org-detail">Fotos 360° para los recorridos virtuales</span>
+            </span>
+            <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
               <span className="org-name">Marca del portal</span>
@@ -70,7 +79,7 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
         ) : null}
       </ul>
       <p className="notice">
-        La agenda, el mapa del portal y los recorridos 360° llegarán en las siguientes etapas.
+        Los recorridos 360° llegarán en una próxima etapa; sus panoramas ya se pueden subir.
       </p>
     </main>
   );

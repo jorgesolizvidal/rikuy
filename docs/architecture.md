@@ -98,6 +98,7 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
   - ancho ≤ 4096 px: una imagen WebP de alta calidad;
   - ancho > 4096 px: tiles equirectangulares multirresolución (límite de textura de GPUs móviles).
 - Manifest versionado por `asset_version`; cambiar la entrega nunca mueve hotspots.
+- Implementado en P2 · Paso 3: el navegador sube el original (≤ 50 MB, 2048 × 1024 a 16384 × 8192 px) con URL firmada, `submit_panorama` lo pasa a `processing` y encola `media.process_panorama` en la misma transacción; el ejecutor genera todo bajo `{tenant}/{asset}/{version}/panorama/` (bucket privado, con punto de control por nivel) y guarda el manifiesto en `asset_versions.manifest`. Las versiones quedan privadas hasta que un tour publicado las use (P4).
 - GLB: original intacto + derivado optimizado (Meshopt/Draco, texturas KTX2) con verificación de color; carga solo al abrir el hotspot.
 
 ## 9. Mapa y ubicación del visitante (ADR-021, ADR-023)

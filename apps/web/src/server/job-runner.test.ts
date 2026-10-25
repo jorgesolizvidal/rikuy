@@ -1,3 +1,4 @@
+import type { JobProcessor } from "@rikuy/core";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("server-only", () => ({}));
@@ -30,6 +31,24 @@ describe("job runner", () => {
     expect(runner.isJobRunnerRequest(`Bearer ${SECRET}x`)).toBe(false);
     expect(runner.isJobRunnerRequest(SECRET)).toBe(false);
     expect(runner.isJobRunnerRequest(null)).toBe(false);
+  });
+
+  it("leaves panoramas to the database's wake-up, which keeps room for them", async () => {
+    const runner = await import("./job-runner");
+    const processor = (kind: string): JobProcessor => ({
+      kind,
+      schemaVersions: [1],
+      run: async () => ({}),
+    });
+    const processors = [processor("system.probe"), processor("media.process_panorama")];
+    expect(runner.processorsFor(runner.OPERATOR_RUN, processors).map((p) => p.kind)).toEqual([
+      "system.probe",
+    ]);
+    expect(runner.processorsFor(runner.KICK_RUN, processors)).toHaveLength(2);
+    // A panorama claimed at the last moment still ends inside the 300 s function.
+    expect(runner.KICK_RUN.budgetMs - runner.KICK_RUN.reserveMs + 240_000).toBeLessThanOrEqual(
+      285_000,
+    );
   });
 
   it("logs one JSON line per event", async () => {

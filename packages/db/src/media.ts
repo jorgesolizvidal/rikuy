@@ -27,7 +27,8 @@ import type { SessionClient } from "./session-client";
 export const MEDIA_BUCKETS = { originals: "media-originals", public: "media-public" } as const;
 
 /** Upload originals and derivatives are capped well below the bucket limit. */
-const MAX_ORIGINAL_BYTES = 10 * 1024 * 1024;
+// The largest original any purpose accepts (panoramas: 50 MB; per-purpose rules check the rest).
+const MAX_ORIGINAL_BYTES = 50 * 1024 * 1024;
 const PREVIEW_SECONDS = 600;
 
 function unexpected(
@@ -47,7 +48,7 @@ const versionRowSchema = z.object({
   tenant_id: z.uuid(),
   asset_id: z.uuid(),
   version: z.number().int(),
-  status: z.enum(["uploading", "ready", "rejected"]),
+  status: z.enum(["uploading", "processing", "ready", "rejected"]),
   declared_mime: z.string(),
   original_path: z.string(),
 });
@@ -116,7 +117,9 @@ export function createMediaRepository(client: SessionClient): MediaRepository {
         .maybeSingle();
       if (asset.error) throw unexpected("Reading the image", asset.error);
       if (asset.data === null) return null;
-      const { purpose } = z.object({ purpose: z.enum(["logo", "content"]) }).parse(asset.data);
+      const { purpose } = z
+        .object({ purpose: z.enum(["logo", "content", "panorama"]) })
+        .parse(asset.data);
 
       return {
         versionId: row.id,
@@ -178,12 +181,17 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
     },
 
     async storeDerivatives(prefix, files: readonly DerivedFile[]) {
-      for (const file of files) {
-        const { error } = await originals().upload(`${prefix}${file.name}`, file.bytes, {
-          contentType: file.contentType,
-          upsert: true,
-        });
-        if (error) throw unexpected(`Storing ${file.name}`, error);
+      // A few at a time: a large panorama has hundreds of tiles.
+      for (let start = 0; start < files.length; start += 8) {
+        await Promise.all(
+          files.slice(start, start + 8).map(async (file) => {
+            const { error } = await originals().upload(`${prefix}${file.name}`, file.bytes, {
+              contentType: file.contentType,
+              upsert: true,
+            });
+            if (error) throw unexpected(`Storing ${file.name}`, error);
+          }),
+        );
       }
     },
 

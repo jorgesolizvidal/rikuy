@@ -3,9 +3,15 @@ import "server-only";
 import { createHash, timingSafeEqual } from "node:crypto";
 
 import { EnvValidationError, parseJobRunnerEnv } from "@rikuy/config/env";
-import { drainJobs, newRunnerId, type DrainReport, type JobLogger } from "@rikuy/core";
-import { createPostgresJobLedger } from "@rikuy/db/worker";
-import { createProcessors } from "@rikuy/worker";
+import {
+  drainJobs,
+  newRunnerId,
+  type DrainReport,
+  type JobLogger,
+  type JobProcessor,
+} from "@rikuy/core";
+import { createPostgresJobLedger, createSharpPanoramaRenderer } from "@rikuy/db/worker";
+import { createProcessors, LONG_JOB_KINDS } from "@rikuy/worker";
 
 import { mediaAdmin } from "./media-admin";
 
@@ -54,12 +60,38 @@ export interface JobRunOptions {
   /** Stop claiming with less than this left (room for the longest job). */
   readonly reserveMs: number;
   readonly reason: "kick" | "operator";
+  /** Run the kinds that take minutes (panoramas). Only a wake-up has the time for them. */
+  readonly longJobs: boolean;
 }
 
-/** A wake-up from the database: up to ~2.5 min of claiming inside a 5 min function. */
-export const KICK_RUN: JobRunOptions = { budgetMs: 270_000, reserveMs: 130_000, reason: "kick" };
+/**
+ * A wake-up from the database, inside a 5 min function: it claims during the first ~40 s
+ * and keeps 245 s for the longest job (a panorama may run 240 s, migration 20261025000100).
+ * The next wake-up (at most a minute later) takes whatever arrives after that.
+ */
+export const KICK_RUN: JobRunOptions = {
+  budgetMs: 285_000,
+  reserveMs: 245_000,
+  reason: "kick",
+  longJobs: true,
+};
 /** «Procesar la cola ahora»: short, so the operator sees the result on the page. */
-export const OPERATOR_RUN: JobRunOptions = { budgetMs: 20_000, reserveMs: 0, reason: "operator" };
+export const OPERATOR_RUN: JobRunOptions = {
+  budgetMs: 20_000,
+  reserveMs: 0,
+  reason: "operator",
+  longJobs: false,
+};
+
+/** The processors this run may use: a short run never claims a panorama. */
+export function processorsFor(
+  options: Pick<JobRunOptions, "longJobs">,
+  processors: readonly JobProcessor[],
+): readonly JobProcessor[] {
+  return options.longJobs
+    ? processors
+    : processors.filter((processor) => !LONG_JOB_KINDS.includes(processor.kind));
+}
 
 export async function runJobQueue(options: JobRunOptions): Promise<DrainReport | null> {
   const env = settings();
@@ -73,7 +105,16 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
   try {
     return await drainJobs({
       ledger,
-      processors: createProcessors({ uploads: ledger.uploads, storage: mediaAdmin() }),
+      processors: processorsFor(
+        options,
+        createProcessors({
+          uploads: ledger.uploads,
+          storage: mediaAdmin(),
+          panoramas: ledger.panoramas,
+          renderer: createSharpPanoramaRenderer(),
+          media: mediaAdmin(),
+        }),
+      ),
       runnerId,
       budgetMs: options.budgetMs,
       reserveMs: options.reserveMs,
