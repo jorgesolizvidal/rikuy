@@ -77,6 +77,14 @@ export interface MediaAdmin {
   ): Promise<void>;
 }
 
+/**
+ * Removes an image original from private storage (platform adapter). Idempotent: a missing
+ * object is not an error. Called only by jobs, for an exact path the ledger handed them.
+ */
+export interface OriginalRemover {
+  removeOriginal(originalPath: string): Promise<void>;
+}
+
 /** Re-encodes an image into safe, metadata-free derivatives. Throws on undecodable input. */
 export interface ImageProcessor {
   logoDerivatives(original: Uint8Array): Promise<DerivedFile[]>;

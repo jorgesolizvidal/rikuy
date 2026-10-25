@@ -3,14 +3,18 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { jobRunnerConfigured } from "@/server/job-runner";
 import { operatorContext } from "@/server/operator";
 
 import { SignOutButton } from "../../sign-out-button";
 import { ProbeForm } from "./probe-form";
 import { ReplayButton } from "./replay-button";
+import { RunQueueButton } from "./run-queue-button";
 import { ago, DATE, FILTERS, STATUS_LABELS } from "./labels";
 
 export const metadata: Metadata = { title: "Trabajos en segundo plano" };
+// «Procesar la cola ahora» runs the queue for up to ~20 s inside this page's action.
+export const maxDuration = 60;
 
 /** ADR-014 alarm: due work waiting this long means no runner is taking it. */
 const STUCK_AFTER_MS = 5 * 60_000;
@@ -89,6 +93,8 @@ export default async function JobsPage({ searchParams }: JobsPageProps) {
           está tomando. Revisa el ejecutor siguiendo el runbook de trabajos.
         </p>
       ) : null}
+
+      <RunQueueButton configured={jobRunnerConfigured()} />
 
       <nav aria-label="Filtrar por estado" className="filter-tabs">
         {FILTERS.map((filter) => (

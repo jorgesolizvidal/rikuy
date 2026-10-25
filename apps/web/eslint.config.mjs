@@ -24,13 +24,30 @@ const secretKeyPaths = [
   },
 ];
 
+// The workload's database connection (rikuy_worker) is opened in exactly one module.
+const jobRunnerModule = "src/server/job-runner.ts";
+const jobRunnerPaths = [
+  {
+    name: "@rikuy/db/worker",
+    message: `The job runner's connection lives only in ${jobRunnerModule}.`,
+  },
+  {
+    name: "@rikuy/config/env",
+    importNames: ["parseJobRunnerEnv"],
+    message: `The job runner's settings are read only in ${jobRunnerModule}.`,
+  },
+];
+
 const config = [
   ignores,
   ...nextVitals,
   ...nextTs,
   {
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
+      "no-restricted-imports": [
+        "error",
+        { patterns: [noSupabaseInUi], paths: [...secretKeyPaths, ...jobRunnerPaths] },
+      ],
     },
   },
   {
@@ -45,6 +62,7 @@ const config = [
           patterns: [noSupabaseInUi],
           paths: [
             ...secretKeyPaths,
+            ...jobRunnerPaths,
             {
               name: "next/navigation",
               importNames: ["redirect", "permanentRedirect"],
@@ -58,7 +76,15 @@ const config = [
   },
   {
     files: secretKeyModules,
-    rules: { "no-restricted-imports": ["error", { patterns: [noSupabaseInUi] }] },
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: jobRunnerPaths }],
+    },
+  },
+  {
+    files: [jobRunnerModule],
+    rules: {
+      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
+    },
   },
 ];
 

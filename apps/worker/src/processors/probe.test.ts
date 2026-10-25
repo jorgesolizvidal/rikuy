@@ -2,7 +2,9 @@ import { drainJobs } from "@rikuy/core";
 import { createMemoryJobLedger } from "@rikuy/core/testing";
 import { describe, expect, it } from "vitest";
 
-import { processors } from "../index";
+import { probeProcessor } from "./probe";
+
+const processors = [probeProcessor];
 
 describe("system.probe", () => {
   it("succeeds, checkpoints halfway and reports its result", async () => {

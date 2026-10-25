@@ -326,6 +326,40 @@ describe.runIf(reachable)("D-01 · durable job ledger (real PostgreSQL)", () => 
     }
   });
 
+  it("expires an abandoned upload through the worker's lease (sweep → inspect → mark)", async () => {
+    const [asset] = await admin`
+      insert into public.assets (tenant_id, purpose) values (${SUR}::uuid, 'content') returning id
+    `;
+    const [old] = await admin`
+      insert into public.asset_versions (tenant_id, asset_id, version, status, declared_mime, declared_bytes, created_at)
+      values (${SUR}::uuid, ${asset?.id}::uuid, 1, 'uploading', 'image/png', 100, now() - interval '2 days')
+      returning id, original_path
+    `;
+    const [sweep] = await admin`select private.enqueue_abandoned_upload_jobs() as created`;
+    expect(sweep?.created).toBeGreaterThanOrEqual(1);
+
+    const ledger = newLedger();
+    // Only uploads older than a day are swept, and earlier runs already rejected theirs.
+    const [held] = await ledger.claim(`janitor-${RUN}`, 1, ["media.expire_abandoned_upload"]);
+    const job = held as ClaimedJob;
+    expect(job.payload).toEqual({ versionId: old?.id });
+    const lease = { jobId: job.jobId, fencingToken: job.fencingToken };
+    expect(await ledger.uploads.inspect(lease)).toEqual({
+      abandoned: true,
+      originalPath: old?.original_path,
+    });
+    expect(await ledger.uploads.markAbandoned(lease)).toBe("marked");
+    expect(await ledger.uploads.markAbandoned(lease)).toBe("already_settled");
+    expect(await ledger.complete(lease, { outcome: "marked" }, { durationMs: 1 })).toBe(
+      "completed",
+    );
+    // A lost lease reads nothing.
+    expect(await ledger.uploads.inspect(lease)).toBe("lease_lost");
+    const [version] =
+      await admin`select status from public.asset_versions where id = ${old?.id}::uuid`;
+    expect(version?.status).toBe("rejected");
+  });
+
   it("gives the workload role nothing but worker_api", async () => {
     const worker = postgres(DB_URL, {
       max: 1,

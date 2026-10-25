@@ -17,6 +17,7 @@
     "@rikuy/core": "workspace:*",
     "@rikuy/db": "workspace:*",
     "@rikuy/ui": "workspace:*",
+    "@rikuy/worker": "workspace:*",
     "@vercel/speed-insights": "2.0.0",
     "leaflet": "1.9.4",
     "maplibre-gl": "6.11.2",

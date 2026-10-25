@@ -6,6 +6,7 @@ import {
   type ImageProcessor,
   type ImageVersionRecord,
   type MediaAdmin,
+  type OriginalRemover,
   type MediaRepository,
 } from "@rikuy/core";
 import sharp from "sharp";
@@ -161,7 +162,7 @@ export interface MediaAdminOptions {
   readonly fetch?: typeof fetch;
 }
 
-export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin {
+export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin & OriginalRemover {
   const admin = createClient(options.url, options.secretKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
@@ -205,6 +206,11 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
       });
       if (error) throw unexpected("Rejecting the upload", error);
       await originals().remove([originalPath]);
+    },
+
+    async removeOriginal(originalPath) {
+      const { error } = await originals().remove([originalPath]);
+      if (error) throw new Error(`Removing an original failed (${error.name || "unknown"})`);
     },
 
     async publish(tenantId, assetId, version, files) {
