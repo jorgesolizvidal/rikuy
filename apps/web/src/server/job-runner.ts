@@ -10,7 +10,11 @@ import {
   type JobLogger,
   type JobProcessor,
 } from "@rikuy/core";
-import { createPostgresJobLedger, createSharpPanoramaRenderer } from "@rikuy/db/worker";
+import {
+  createGltfModelOptimizer,
+  createPostgresJobLedger,
+  createSharpPanoramaRenderer,
+} from "@rikuy/db/worker";
 import { createProcessors, LONG_JOB_KINDS } from "@rikuy/worker";
 
 import { mediaAdmin } from "./media-admin";
@@ -66,7 +70,7 @@ export interface JobRunOptions {
 
 /**
  * A wake-up from the database, inside a 5 min function: it claims during the first ~40 s
- * and keeps 245 s for the longest job (a panorama may run 240 s, migration 20261025000100).
+ * and keeps 245 s for the longest job (a panorama or a model may run 240 s).
  * The next wake-up (at most a minute later) takes whatever arrives after that.
  */
 export const KICK_RUN: JobRunOptions = {
@@ -112,6 +116,8 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           storage: mediaAdmin(),
           panoramas: ledger.panoramas,
           renderer: createSharpPanoramaRenderer(),
+          models: ledger.models,
+          optimizer: createGltfModelOptimizer(),
           media: mediaAdmin(),
         }),
       ),

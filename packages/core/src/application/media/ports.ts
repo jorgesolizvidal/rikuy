@@ -1,6 +1,6 @@
 import type { ImageMime } from "../../domain/media/image";
 
-export type AssetPurpose = "logo" | "content" | "panorama";
+export type AssetPurpose = "logo" | "content" | "panorama" | "model";
 
 export interface PendingUpload {
   readonly assetId: string;
@@ -32,7 +32,7 @@ export interface MediaRepository {
   createImageUpload(
     tenantId: string,
     purpose: AssetPurpose,
-    mime: ImageMime,
+    mime: ImageMime | "model/gltf-binary",
     bytes: number,
   ): Promise<CreateUploadOutcome>;
   /** One-time URL the browser PUTs the original to. The bytes never pass through the BFF. */
@@ -47,7 +47,7 @@ export interface MediaRepository {
 
 export interface DerivedFile {
   readonly name: string;
-  readonly contentType: "image/webp" | "image/png";
+  readonly contentType: "image/webp" | "image/png" | "image/ktx2" | "model/gltf-binary";
   readonly bytes: Uint8Array;
 }
 
@@ -90,6 +90,12 @@ export interface ImageProcessor {
   logoDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
   /** WebP at each of CONTENT_IMAGE_WIDTHS (never enlarged). */
   contentDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
+  /** The poster of a 3D model, from the panel's capture: WebP, at most 1280 px wide. */
+  modelPoster(captured: Uint8Array): Promise<{
+    readonly file: DerivedFile;
+    readonly width: number;
+    readonly height: number;
+  }>;
 }
 
 /** {tenant}/{asset}/{version}/ — prefix shared by the original and its derivatives. */

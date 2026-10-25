@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <title>Comparación de colores de modelos 3D</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        background: #fff;
+      }
+      #host {
+        width: 640px;
+        height: 480px;
+      }
+      canvas {
+        display: block;
+      }
+    </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "/three/build/three.module.js",
+          "three/addons/": "/three/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="host"></div>
+    <script type="module">
+      // Same settings as apps/web/src/components/model-viewer/model-canvas.tsx: what is
+      // compared is the original against the optimized file, under the same renderer.
+      import {
+        Box3,
+        NeutralToneMapping,
+        PerspectiveCamera,
+        PMREMGenerator,
+        Scene,
+        SRGBColorSpace,
+        Vector3,
+        WebGLRenderer,
+      } from "three";
+      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+      import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+      import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+      import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+      import { RoomEnvironment } from "three/addons/environments/RoomEnvironment.js";
+
+      const model = new URLSearchParams(location.search).get("model");
+      const renderer = new WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: true,
+      });
+      renderer.outputColorSpace = SRGBColorSpace;
+      renderer.toneMapping = NeutralToneMapping;
+      renderer.toneMappingExposure = 1;
+      renderer.setPixelRatio(1);
+      renderer.setSize(640, 480, false);
+      document.getElementById("host").appendChild(renderer.domElement);
+      const scene = new Scene();
+      const pmrem = new PMREMGenerator(renderer);
+      scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+      const camera = new PerspectiveCamera(40, 640 / 480, 0.01, 1000);
+      const loader = new GLTFLoader()
+        .setKTX2Loader(
+          new KTX2Loader()
+            .setTranscoderPath("/three/examples/jsm/libs/basis/")
+            .detectSupport(renderer),
+        )
+        .setDRACOLoader(new DRACOLoader().setDecoderPath("/three/examples/jsm/libs/draco/gltf/"))
+        .setMeshoptDecoder(MeshoptDecoder);
+      try {
+        const gltf = await loader.loadAsync(`/models/${model}.glb`);
+        scene.add(gltf.scene);
+        const box = new Box3().setFromObject(gltf.scene);
+        const size = box.getSize(new Vector3()).length() || 1;
+        const center = box.getCenter(new Vector3());
+        camera.near = size / 100;
+        camera.far = size * 100;
+        camera.position
+          .copy(center)
+          .add(new Vector3(0.6, 0.35, 0.75).normalize().multiplyScalar(size * 1.1));
+        camera.lookAt(center);
+        camera.updateProjectionMatrix();
+        renderer.render(scene, camera);
+        window.__result = { ok: true, pixels: renderer.domElement.toDataURL("image/png") };
+      } catch (error) {
+        window.__result = { ok: false, error: String(error) };
+      }
+    </script>
+  </body>
+</html>

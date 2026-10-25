@@ -5,3 +5,4 @@
 export { createPostgresJobLedger } from "./job-ledger";
 export type { PostgresJobLedger, PostgresJobLedgerOptions } from "./job-ledger";
 export { createSharpPanoramaRenderer } from "./panorama-renderer";
+export { createGltfModelOptimizer } from "./model-optimizer";

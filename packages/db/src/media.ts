@@ -118,7 +118,7 @@ export function createMediaRepository(client: SessionClient): MediaRepository {
       if (asset.error) throw unexpected("Reading the image", asset.error);
       if (asset.data === null) return null;
       const { purpose } = z
-        .object({ purpose: z.enum(["logo", "content", "panorama"]) })
+        .object({ purpose: z.enum(["logo", "content", "panorama", "model"]) })
         .parse(asset.data);
 
       return {
@@ -283,6 +283,22 @@ export function createSharpImageProcessor(): ImageProcessor {
         { name: "logo.webp", contentType: "image/webp", bytes: new Uint8Array(webp) },
         { name: "logo.png", contentType: "image/png", bytes: new Uint8Array(png) },
       ];
+    },
+
+    async modelPoster(captured) {
+      // The panel's canvas capture: re-encoded (never stored as sent), at most 1280 px wide.
+      const { data, info } = await sharp(captured, {
+        failOn: "error",
+        limitInputPixels: 4096 * 4096,
+      })
+        .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 82, alphaQuality: 90, effort: 4 })
+        .toBuffer({ resolveWithObject: true });
+      return {
+        file: { name: "poster.webp", contentType: "image/webp", bytes: new Uint8Array(data) },
+        width: info.width,
+        height: info.height,
+      };
     },
   };
 }

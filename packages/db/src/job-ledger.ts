@@ -3,6 +3,7 @@ import type {
   ClaimedJob,
   HeartbeatOutcome,
   JobLedger,
+  ModelStore,
   PanoramaStore,
 } from "@rikuy/core";
 import postgres from "postgres";
@@ -31,6 +32,8 @@ export interface PostgresJobLedger extends JobLedger {
   readonly uploads: AbandonedUploadStore;
   /** media.process_panorama: worker_api.panorama_source / complete_panorama / reject_panorama. */
   readonly panoramas: PanoramaStore;
+  /** media.process_model: worker_api.model_source / complete_model / reject_model. */
+  readonly models: ModelStore;
   close(): Promise<void>;
 }
 
@@ -221,6 +224,53 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
         try {
           const [row] = await sql`
             select worker_api.reject_panorama(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${problem}
+            ) as outcome
+          `;
+          return z.enum(["rejected", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    models: {
+      async source(lease) {
+        try {
+          const [row] = await sql`
+            select * from worker_api.model_source(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          if (!row || row.status === "not_found") return "not_found";
+          return {
+            status: z.enum(["uploading", "processing", "ready", "rejected"]).parse(row.status),
+            originalPath: z.string().parse(row.original_path),
+            declaredMime: z.string().parse(row.declared_mime),
+            prefix: z.string().parse(row.prefix),
+          };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async complete(lease, original, manifest) {
+        try {
+          const [row] = await sql`
+            select worker_api.complete_model(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${original.bytes}::integer,
+              ${original.sha256}, ${json(manifest)}::jsonb
+            ) as outcome
+          `;
+          return z.enum(["ready", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async reject(lease, problem) {
+        try {
+          const [row] = await sql`
+            select worker_api.reject_model(
               ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${problem}
             ) as outcome
           `;

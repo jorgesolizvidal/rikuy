@@ -100,6 +100,11 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Manifest versionado por `asset_version`; cambiar la entrega nunca mueve hotspots.
 - Implementado en P2 · Paso 3: el navegador sube el original (≤ 50 MB, 2048 × 1024 a 16384 × 8192 px) con URL firmada, `submit_panorama` lo pasa a `processing` y encola `media.process_panorama` en la misma transacción; el ejecutor genera todo bajo `{tenant}/{asset}/{version}/panorama/` (bucket privado, con punto de control por nivel) y guarda el manifiesto en `asset_versions.manifest`. Las versiones quedan privadas hasta que un tour publicado las use (P4).
 - GLB: original intacto + derivado optimizado (Meshopt/Draco, texturas KTX2) con verificación de color; carga solo al abrir el hotspot.
+- Implementado en P2 · Paso 4 ([ADR-026](adr/ADR-026-glb-pipeline.md)):
+  - el navegador sube el GLB (≤ 50 MB) y `submit_model` encola `media.process_model`;
+  - el ejecutor valida (JSON, validador de Khronos, archivos externos, extensiones, complejidad), codifica cada textura en KTX2 según su uso y la verifica decodificándola (ETC1S → UASTC → original), comprime la geometría con Meshopt y comprueba materiales y colores por vértice;
+  - escribe `{tenant}/{asset}/{version}/model/model.glb` (privado) y el manifiesto;
+  - la imagen poster la captura el panel con el mismo visor three.js del portal.
 
 ## 9. Mapa y ubicación del visitante (ADR-021, ADR-023)
 

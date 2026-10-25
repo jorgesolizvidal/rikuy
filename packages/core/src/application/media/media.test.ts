@@ -205,6 +205,9 @@ function fakes(
     publish: async () => undefined,
   };
   const processor: ImageProcessor = {
+    modelPoster: async () => {
+      throw new Error("not used here");
+    },
     async logoDerivatives() {
       if (options.failProcessing) throw new Error("corrupt");
       return [
