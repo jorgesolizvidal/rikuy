@@ -64,3 +64,6 @@ export * from "./domain/media/color";
 export * from "./application/media/models";
 export * from "./contracts/usage";
 export * from "./application/usage/usage";
+export * from "./contracts/tour";
+export * from "./domain/tours/scene";
+export * from "./application/tours/tours";

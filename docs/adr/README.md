@@ -31,3 +31,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 025 | [La base de datos despierta al ejecutor de trabajos](ADR-025-job-runner-wake-up.md)                                | Aceptada (2026-10-24); concreta ADR-019                                     |
 | 026 | [Pipeline de modelos 3D: Meshopt, KTX2 verificado y poster del panel](ADR-026-glb-pipeline.md)                     | Aceptada (2026-10-25)                                                       |
 | 027 | [Cuotas por municipio: reserva atómica, medición en Storage y cómputo desde los intentos](ADR-027-usage-quotas.md) | Aceptada (2026-10-25); concreta ADR-012                                     |
+| 028 | [Tours 360°: uno por destino o evento, recorrido general derivado y escenas estables](ADR-028-tours-model.md)      | Aceptada (2026-10-26)                                                       |
