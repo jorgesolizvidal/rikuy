@@ -130,6 +130,7 @@ describe("hotspot rules", () => {
             version: 1,
             width: 8192,
             height: 4096,
+            published: true,
             manifest: {
               version: 1,
               projection: "equirectangular",
@@ -159,6 +160,7 @@ describe("hotspot rules", () => {
                 versionId: IMG,
                 assetId: IMG,
                 version: 1,
+                published: true,
                 manifest: poster
                   ? ({
                       poster: { file: "poster.webp", width: 1280, height: 960, bytes: 1 },

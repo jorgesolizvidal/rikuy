@@ -51,6 +51,8 @@ select version_id, tenant, asset, 1, status,
        case when status = 'ready' then now() end,
        case when status <> 'ready' then null when purpose = 'panorama' then :'pano'::jsonb when purpose = 'model' then :'model'::jsonb end
 from media;
+-- Ready media counts as public here: publishing it is the server's job (020_tour_publication).
+update public.asset_versions set published_at = now() where status = 'ready';
 grant select on media to authenticated;
 create temp table ids (name text primary key, id uuid);
 grant select, insert on ids to authenticated;

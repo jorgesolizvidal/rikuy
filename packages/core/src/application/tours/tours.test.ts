@@ -73,6 +73,7 @@ function revision(overrides: Partial<TourRevision> = {}): TourRevision {
           width: 8192,
           height: 4096,
           manifest,
+          published: false,
         },
         hotspots: [],
       },
@@ -221,7 +222,13 @@ describe("tour use cases", () => {
         tours,
       ),
     ).toEqual({ status: "forbidden" });
-    expect(await publishTour(editor, { tourId: TOUR, expectedEdit: 1 }, tours)).toEqual({
+    expect(
+      await publishTour(
+        editor,
+        { tourId: TOUR, expectedEdit: 1 },
+        { tours, media: { publish: vi.fn(), publishFiles: vi.fn() } },
+      ),
+    ).toEqual({
       status: "forbidden",
     });
     expect(tours.addScene).not.toHaveBeenCalled();

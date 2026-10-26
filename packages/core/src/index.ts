@@ -68,3 +68,4 @@ export * from "./contracts/tour";
 export * from "./domain/tours/scene";
 export * from "./domain/tours/hotspot";
 export * from "./application/tours/tours";
+export * from "./application/tours/publication";

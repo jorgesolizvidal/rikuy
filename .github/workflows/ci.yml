@@ -73,8 +73,14 @@ jobs:
             exit 1
           }
 
+      # Job logs are not always reachable: on failure, the failing assertions also go to annotations.
       - name: pgTAP tests
-        run: pnpm db:test
+        run: |
+          set -o pipefail
+          pnpm db:test 2>&1 | tee db-test.log || {
+            grep -E -A6 "not ok|Failed|ERROR|psql:|Parse errors|Bad plan|Looks like" db-test.log | head -60 | while IFS= read -r line; do echo "::error title=pgTAP::${line//%/%25}"; done
+            exit 1
+          }
 
       # Job logs are not always reachable: on failure, the findings also go to annotations.
       - name: SQL lint

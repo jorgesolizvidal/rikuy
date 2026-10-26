@@ -1,8 +1,11 @@
-import type { PostgrestError } from "@supabase/supabase-js";
+import { createClient, type PostgrestError } from "@supabase/supabase-js";
 import {
+  tourManifestSchema,
   tourRecordSchema,
   tourRevisionSchema,
   type ContentStatus,
+  type PublishedTourIndexEntry,
+  type PublishedTourReader,
   type TourEditOutcome,
   type TourListEntry,
   type TourRepository,
@@ -317,6 +320,107 @@ export function createTourRepository(client: SessionClient): TourRepository {
           published: row.published,
           tourPublished: row.tour_published,
         }));
+    },
+  };
+}
+
+export interface SupabasePublishedTourReaderOptions {
+  readonly url: string;
+  readonly publishableKey: string;
+  readonly timeoutMs?: number;
+  readonly fetch?: typeof fetch;
+}
+
+/** Visitors' reads (anonymous): published tours of published content of active tenants. */
+export function createSupabasePublishedTourReader(
+  options: SupabasePublishedTourReaderOptions,
+): PublishedTourReader {
+  const client = createClient(options.url, options.publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
+  });
+  const timeoutMs = options.timeoutMs ?? 3_000;
+  const instant = z.string().transform((value) => new Date(value).toISOString());
+  const kind = z.enum(["destination", "event"]);
+
+  return {
+    async index(tenantId) {
+      const { data, error } = await client
+        .rpc("portal_tour_index", { p_tenant_id: tenantId })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (error) throw unexpected("Listing published tours", error);
+      return z
+        .array(
+          z.object({
+            kind,
+            slug: z.string(),
+            title: z.string(),
+            scenes: z.number().int(),
+            entry_title: z.string(),
+            entry_folder: z.string(),
+            entry_preview: z.object({
+              file: z.string(),
+              width: z.number().int(),
+              height: z.number().int(),
+            }),
+            latitude: z.number().nullable(),
+            longitude: z.number().nullable(),
+            published_at: instant,
+          }),
+        )
+        .parse(data)
+        .map((row): PublishedTourIndexEntry => ({
+          kind: row.kind,
+          slug: row.slug,
+          title: row.title,
+          scenes: row.scenes,
+          entryTitle: row.entry_title,
+          entryFolder: row.entry_folder,
+          entryPreview: {
+            file: row.entry_preview.file,
+            width: row.entry_preview.width,
+            height: row.entry_preview.height,
+          },
+          location:
+            row.latitude === null || row.longitude === null
+              ? null
+              : { lat: row.latitude, lng: row.longitude },
+          publishedAt: row.published_at,
+        }));
+    },
+
+    async find(tenantId, contentKind, slug) {
+      const { data, error } = await client
+        .rpc("portal_tour", { p_tenant_id: tenantId, p_kind: contentKind, p_slug: slug })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (error) throw unexpected("Reading a published tour", error);
+      const [row] = z
+        .array(
+          z.object({
+            kind,
+            slug: z.string(),
+            title: z.string(),
+            revision_no: z.number().int(),
+            published_at: instant,
+            ended: z.boolean(),
+            manifest: tourManifestSchema,
+            targets: z.record(z.string(), z.object({ kind, slug: z.string(), title: z.string() })),
+          }),
+        )
+        .max(1)
+        .parse(data);
+      return row
+        ? {
+            kind: row.kind,
+            slug: row.slug,
+            title: row.title,
+            revisionNo: row.revision_no,
+            publishedAt: row.published_at,
+            ended: row.ended,
+            manifest: row.manifest,
+            targets: row.targets,
+          }
+        : null;
     },
   };
 }

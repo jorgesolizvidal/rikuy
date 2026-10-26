@@ -71,8 +71,23 @@ export interface MediaAdmin {
   storeDerivatives(prefix: string, files: readonly DerivedFile[]): Promise<void>;
   complete(versionId: string, metadata: ReadyImageMetadata): Promise<void>;
   reject(versionId: string, reason: string, originalPath: string): Promise<void>;
-  /** Copies derivatives to the public bucket and marks the version as published. */
+  /**
+   * Copies derivatives to the public bucket, then marks the version as published (so the
+   * storage measured for the quota includes the public copies). Images: re-uploaded with
+   * their type and a long cache.
+   */
   publish(
+    tenantId: string,
+    assetId: string,
+    version: number,
+    files: readonly string[],
+  ): Promise<void>;
+  /**
+   * Same for panoramas and models: many files (tiles), copied inside Storage without
+   * passing through the server; a file already public counts as copied. Paths are
+   * relative to the version prefix ("panorama/tiles/0/0_0.webp", "model/model.glb").
+   */
+  publishFiles(
     tenantId: string,
     assetId: string,
     version: number,

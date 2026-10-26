@@ -108,6 +108,7 @@ export function TourEditor(props: TourEditorProps) {
   const [removing, setRemoving] = useState<string | null>(null);
   const [confirm, setConfirm] = useState<"discard" | string | null>(null);
   const [titles, setTitles] = useState<Record<string, string>>({});
+  const [publishing, setPublishing] = useState(false);
 
   const scene = props.scenes.find((entry) => entry.sceneId === selected) ?? props.scenes[0] ?? null;
   const target = { tourId: props.tourId, expectedEdit: props.editCount };
@@ -464,12 +465,22 @@ export function TourEditor(props: TourEditorProps) {
               type="button"
               className="button"
               disabled={pending || props.issues.length > 0}
-              onClick={() =>
-                void perform(() => publishTourAction(props.org, target), "Se publicó el tour.")
-              }
+              onClick={() => {
+                setPublishing(true);
+                void perform(
+                  () => publishTourAction(props.org, target),
+                  "Se publicó el tour: sus panoramas, fotos y modelos ya son públicos.",
+                ).finally(() => setPublishing(false));
+              }}
             >
-              Publicar
+              {publishing ? "Publicando…" : "Publicar"}
             </button>
+          ) : null}
+          {publishing ? (
+            <span className="field-hint" role="status">
+              Se están copiando los panoramas, las fotos y los modelos al portal. Puede tardar unos
+              segundos.
+            </span>
           ) : null}
           {props.canEdit && props.hasDraft && props.hasPublished ? (
             confirm === "discard" ? (
