@@ -8,3 +8,7 @@ allowBuilds:
 peerDependencyRules:
   allowedVersions:
     eslint: "10"
+# One three.js for the whole app: Photo Sphere Viewer 5.15 declares ^0.185.1 (a 0.x caret,
+# so it would pull a second copy next to the 0.186.0 the model viewer uses).
+overrides:
+  "@photo-sphere-viewer/core>three": "0.186.0"

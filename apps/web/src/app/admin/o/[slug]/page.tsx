@@ -47,6 +47,15 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/tours`} className="org-card">
+            <span>
+              <span className="org-name">Tours 360°</span>
+              <span className="org-detail">Recorridos virtuales de los destinos y eventos</span>
+            </span>
+            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/panoramas`} className="org-card">
             <span>
               <span className="org-name">Panoramas 360°</span>

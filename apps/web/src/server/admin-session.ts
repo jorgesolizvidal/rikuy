@@ -16,6 +16,7 @@ import {
   createPlatformUsageRepository,
   createSupabaseAuthGateway,
   createTenantConfigRepository,
+  createTourRepository,
   createUsageRepository,
   type SessionCookieToSet,
 } from "@rikuy/db";
@@ -66,6 +67,7 @@ export const adminSession = cache(async () => {
     models: createModelRepository(client),
     usage: createUsageRepository(client),
     platformUsage: createPlatformUsageRepository(client),
+    tours: createTourRepository(client),
     jobs: createJobAdminRepository(client),
   };
 });
