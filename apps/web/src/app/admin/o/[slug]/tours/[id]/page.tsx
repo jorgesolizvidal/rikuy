@@ -1,4 +1,4 @@
-import { loadTourEditor } from "@rikuy/core";
+import { loadTourEditor, richTextToMarkup } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -29,6 +29,7 @@ export default async function TourPage({ params }: TourPageProps) {
   const editor = await loadTourEditor(membership, id, {
     tours: session.tours,
     panoramas: session.panoramas,
+    models: session.models,
     media: session.media,
   });
   if (editor === null) notFound();
@@ -87,6 +88,26 @@ export default async function TourPage({ params }: TourPageProps) {
           previewUrl: scene.previewUrl,
           imageUrl: scene.imageUrl,
           size: size(scene.panorama.width, scene.panorama.height),
+          hotspots: scene.hotspots.map((hotspot) => ({
+            hotspotId: hotspot.hotspotId,
+            kind: hotspot.kind,
+            title: hotspot.title,
+            position: hotspot.position,
+            body: richTextToMarkup(hotspot.body),
+            gallery: hotspot.gallery.map((image) => ({ ...image })),
+            targetSceneId: hotspot.targetSceneId,
+            model: hotspot.model
+              ? { versionId: hotspot.model.versionId, posterUrl: hotspot.posterUrl }
+              : null,
+            target: hotspot.target
+              ? {
+                  contentId: hotspot.target.contentId,
+                  kind: hotspot.target.kind,
+                  title: hotspot.target.title,
+                  tourPublished: hotspot.target.tourPublished,
+                }
+              : null,
+          })),
         }))}
         options={editor.options.map((option) => ({
           versionId: option.versionId,
@@ -94,6 +115,15 @@ export default async function TourPage({ params }: TourPageProps) {
           size: size(option.width, option.height),
           uploaded: DAY.format(new Date(option.createdAt)),
         }))}
+        models={editor.models.map((model) => ({
+          versionId: model.versionId,
+          posterUrl: model.posterUrl,
+          hasPoster: model.hasPoster,
+          label: `Modelo subido el ${DAY.format(new Date(model.createdAt))}${
+            model.triangles ? ` · ${model.triangles.toLocaleString("es-BO")} triángulos` : ""
+          }`,
+        }))}
+        targets={editor.targets}
         canEdit={editor.canEdit}
         canPublish={editor.canPublish}
         hasDraft={record.draft !== null}

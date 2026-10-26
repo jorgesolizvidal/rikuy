@@ -32,3 +32,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 026 | [Pipeline de modelos 3D: Meshopt, KTX2 verificado y poster del panel](ADR-026-glb-pipeline.md)                     | Aceptada (2026-10-25)                                                       |
 | 027 | [Cuotas por municipio: reserva atómica, medición en Storage y cómputo desde los intentos](ADR-027-usage-quotas.md) | Aceptada (2026-10-25); concreta ADR-012                                     |
 | 028 | [Tours 360°: uno por destino o evento, recorrido general derivado y escenas estables](ADR-028-tours-model.md)      | Aceptada (2026-10-26)                                                       |
+| 029 | [Puntos de los tours: cuatro tipos, cambios parciales e «ir a otro recorrido»](ADR-029-tour-hotspots.md)           | Aceptada (2026-10-26)                                                       |

@@ -19,6 +19,29 @@ export function normalizeYaw(yaw: number): number {
   return result >= Math.PI ? -Math.PI : result;
 }
 
+/**
+ * Rounded to `digits` decimals, and still inside [min, max] after rounding (π itself is not
+ * a 3-decimal number: 3.142 > π would be refused by the database).
+ */
+export function fitAngle(value: number, min: number, max: number, digits: number): number {
+  const scale = 10 ** digits;
+  const low = Math.ceil(min * scale) / scale;
+  const high = Math.floor(max * scale) / scale;
+  return Math.min(high, Math.max(low, Math.round(value * scale) / scale));
+}
+
+/** A point of the sphere as a viewer reports it → a valid stored position. */
+export function normalizeHotspotPosition(position: {
+  readonly yaw: number;
+  readonly pitch: number;
+}): { yaw: number; pitch: number } | null {
+  if (!Number.isFinite(position.yaw) || !Number.isFinite(position.pitch)) return null;
+  return {
+    yaw: fitAngle(normalizeYaw(position.yaw), -Math.PI, Math.PI, 3),
+    pitch: fitAngle(position.pitch, -Math.PI / 2, Math.PI / 2, 3),
+  };
+}
+
 /** A view as a viewer reports it → a valid stored view (rounded to ~0.001 rad / 0.1°). */
 export function normalizeSceneView(view: {
   readonly yaw: number;
@@ -26,19 +49,11 @@ export function normalizeSceneView(view: {
   readonly fov: number;
 }): SceneView | null {
   if (![view.yaw, view.pitch, view.fov].every(Number.isFinite)) return null;
-  // Rounded to `digits` decimals, and still inside [min, max] after rounding (π itself is
-  // not a 3-decimal number: 3.142 > π would be refused).
-  const fit = (value: number, min: number, max: number, digits: number) => {
-    const scale = 10 ** digits;
-    const low = Math.ceil(min * scale) / scale;
-    const high = Math.floor(max * scale) / scale;
-    return Math.min(high, Math.max(low, Math.round(value * scale) / scale));
-  };
   const halfPi = Math.PI / 2;
   return {
-    yaw: fit(normalizeYaw(view.yaw), -Math.PI, Math.PI, 3),
-    pitch: fit(view.pitch, -halfPi, halfPi, 3),
-    fov: fit(view.fov, TOUR_LIMITS.fov.min, TOUR_LIMITS.fov.max, 1),
+    yaw: fitAngle(normalizeYaw(view.yaw), -Math.PI, Math.PI, 3),
+    pitch: fitAngle(view.pitch, -halfPi, halfPi, 3),
+    fov: fitAngle(view.fov, TOUR_LIMITS.fov.min, TOUR_LIMITS.fov.max, 1),
   };
 }
 
@@ -109,7 +124,7 @@ export function parseSceneChanges(
   return { ok: true, changes };
 }
 
-export type TourPublicationIssue = "no_scenes" | "no_entry" | "panorama_missing";
+export type TourPublicationIssue = "no_scenes" | "no_entry" | "panorama_missing" | "model_poster";
 
 /** What keeps a revision from being published (the database checks it again). */
 export function tourPublicationIssues(revision: TourRevision): TourPublicationIssue[] {
@@ -119,5 +134,15 @@ export function tourPublicationIssues(revision: TourRevision): TourPublicationIs
     issues.push("no_entry");
   if (revision.scenes.some((scene) => scene.panorama.manifest === null))
     issues.push("panorama_missing");
+  // Visitors see the poster while the model loads (ADR-026).
+  if (
+    revision.scenes.some((scene) =>
+      scene.hotspots.some(
+        (hotspot) => hotspot.kind === "model" && !hotspot.model?.manifest?.poster,
+      ),
+    )
+  ) {
+    issues.push("model_poster");
+  }
   return issues;
 }

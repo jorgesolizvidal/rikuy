@@ -46,6 +46,17 @@ function failure(error: PostgrestError, status: number): Failure | null {
   return null;
 }
 
+const INVALID_REASONS = [
+  "title",
+  "panorama",
+  "limit",
+  "target",
+  "model",
+  "body",
+  "gallery",
+  "position",
+] as const;
+
 function editFailure(operation: string, error: PostgrestError, status: number): TourEditOutcome {
   switch (failure(error, status)) {
     case "forbidden":
@@ -57,10 +68,7 @@ function editFailure(operation: string, error: PostgrestError, status: number): 
     case "invalid":
       return {
         status: "invalid",
-        reason:
-          error.hint === "title" || error.hint === "panorama" || error.hint === "limit"
-            ? error.hint
-            : "shape",
+        reason: INVALID_REASONS.find((reason) => reason === error.hint) ?? "shape",
       };
     default:
       throw unexpected(operation, error);
@@ -201,8 +209,10 @@ export function createTourRepository(client: SessionClient): TourRepository {
       if (error) {
         const outcome = failure(error, status);
         if (outcome === "invalid") return { status: "incomplete" };
-        if (outcome === "conflict")
-          return { status: error.hint === "media" ? "media" : "conflict" };
+        if (outcome === "conflict") {
+          if (error.hint === "media" || error.hint === "poster") return { status: error.hint };
+          return { status: "conflict" };
+        }
         if (outcome) return { status: outcome };
         throw unexpected("Publishing the tour", error);
       }
@@ -252,6 +262,61 @@ export function createTourRepository(client: SessionClient): TourRepository {
         throw unexpected("Discarding the tour draft", error);
       }
       return { status: "discarded" };
+    },
+
+    addHotspot(tenantId, tourId, expectedEdit, sceneId, hotspot) {
+      return edit("Adding a point", "add_tour_hotspot", {
+        p_tenant_id: tenantId,
+        p_tour_id: tourId,
+        p_expected_edit: expectedEdit,
+        p_scene_id: sceneId,
+        p_hotspot: hotspot,
+      });
+    },
+
+    updateHotspot(tenantId, tourId, expectedEdit, hotspotId, changes) {
+      return edit("Changing a point", "update_tour_hotspot", {
+        p_tenant_id: tenantId,
+        p_tour_id: tourId,
+        p_expected_edit: expectedEdit,
+        p_hotspot_id: hotspotId,
+        p_changes: changes,
+      });
+    },
+
+    removeHotspot(tenantId, tourId, expectedEdit, hotspotId) {
+      return edit("Removing a point", "remove_tour_hotspot", {
+        p_tenant_id: tenantId,
+        p_tour_id: tourId,
+        p_expected_edit: expectedEdit,
+        p_hotspot_id: hotspotId,
+      });
+    },
+
+    async hotspotTargets(tenantId, tourId) {
+      const { data, error } = await client.rpc("tour_hotspot_targets", {
+        p_tenant_id: tenantId,
+        p_tour_id: tourId,
+      });
+      if (error) throw unexpected("Listing point targets", error);
+      return z
+        .array(
+          z.object({
+            content_id: z.uuid(),
+            kind: z.enum(["destination", "event"]),
+            title: z.string(),
+            published: z.boolean(),
+            tour_published: z.boolean(),
+          }),
+        )
+        .parse(data)
+        .map((row) => ({
+          contentId: row.content_id,
+          kind: row.kind,
+          title: row.title,
+          published: row.published,
+          tourPublished: row.tour_published,
+        }));
     },
   };
 }

@@ -1,11 +1,22 @@
 import type { OrganizationMembership } from "../../contracts/organization";
+import type { ImageReference } from "../../contracts/destination";
 import type {
+  HotspotChanges,
+  HotspotKind,
+  HotspotTargetOption,
+  NewHotspot,
   SceneChanges,
   TourContentKind,
+  TourHotspot,
   TourRecord,
   TourRevision,
   TourScene,
 } from "../../contracts/tour";
+import {
+  parseHotspotChanges,
+  parseNewHotspot,
+  type HotspotIssue,
+} from "../../domain/tours/hotspot";
 import {
   parseSceneChanges,
   parseSceneTitle,
@@ -15,8 +26,10 @@ import {
 } from "../../domain/tours/scene";
 import { canEditContent, canPublishContent } from "../content/editing";
 import type { ContentStatus } from "../content/ports";
+import { contentImagePath } from "../media/content-images";
+import { MODEL_FOLDER, type ModelRepository } from "../media/models";
 import { PANORAMA_FOLDER, type PanoramaRepository } from "../media/panoramas";
-import type { MediaRepository } from "../media/ports";
+import { imageVersionPrefix, type MediaRepository } from "../media/ports";
 
 /**
  * Tours 360° in the panel (P4 · Paso 1, ADR-028). The same people as destinations edit
@@ -40,7 +53,19 @@ export interface TourListEntry {
 /** Result of an edit on the draft. */
 export type TourEditOutcome =
   | { readonly status: "saved"; readonly editCount: number }
-  | { readonly status: "invalid"; readonly reason: "title" | "panorama" | "limit" | "shape" }
+  | {
+      readonly status: "invalid";
+      readonly reason:
+        | "title"
+        | "panorama"
+        | "limit"
+        | "shape"
+        | "target"
+        | "model"
+        | "body"
+        | "gallery"
+        | "position";
+    }
   | { readonly status: "duplicate" | "conflict" | "forbidden" | "not_found" };
 
 export type CreateTourOutcome =
@@ -49,7 +74,9 @@ export type CreateTourOutcome =
 
 export type PublishTourOutcome =
   | { readonly status: "published"; readonly revisionNo: number }
-  | { readonly status: "incomplete" | "media" | "conflict" | "forbidden" | "not_found" };
+  | {
+      readonly status: "incomplete" | "media" | "poster" | "conflict" | "forbidden" | "not_found";
+    };
 
 export type RestoreTourOutcome =
   | { readonly status: "restored"; readonly revisionNo: number }
@@ -102,6 +129,28 @@ export interface TourRepository {
   publish(tenantId: string, tourId: string, expectedEdit: number): Promise<PublishTourOutcome>;
   restore(tenantId: string, tourId: string, revisionId: string): Promise<RestoreTourOutcome>;
   discardDraft(tenantId: string, tourId: string, expectedEdit: number): Promise<DiscardTourOutcome>;
+  addHotspot(
+    tenantId: string,
+    tourId: string,
+    expectedEdit: number | null,
+    sceneId: string,
+    hotspot: NewHotspot,
+  ): Promise<TourEditOutcome>;
+  updateHotspot(
+    tenantId: string,
+    tourId: string,
+    expectedEdit: number | null,
+    hotspotId: string,
+    changes: HotspotChanges,
+  ): Promise<TourEditOutcome>;
+  removeHotspot(
+    tenantId: string,
+    tourId: string,
+    expectedEdit: number | null,
+    hotspotId: string,
+  ): Promise<TourEditOutcome>;
+  /** Destinations and events a "go to another tour" point can lead to (never its own). */
+  hotspotTargets(tenantId: string, tourId: string): Promise<HotspotTargetOption[]>;
 }
 
 /** Content that can get a tour (from the destinations and the agenda). */
@@ -151,10 +200,30 @@ export async function createTour(
   return tours.create(membership.tenantId, contentId);
 }
 
-export interface TourSceneCard extends TourScene {
+export interface HotspotPhotoCard extends ImageReference {
+  readonly previewUrl: string | null;
+}
+
+export interface TourHotspotCard extends Omit<TourHotspot, "gallery"> {
+  readonly gallery: readonly HotspotPhotoCard[];
+  /** Model points: the poster visitors see while it loads. */
+  readonly posterUrl: string | null;
+}
+
+export interface TourSceneCard extends Omit<TourScene, "hotspots"> {
   /** Signed, short-lived URLs (the panoramas stay private until P4 · Paso 3). */
   readonly previewUrl: string | null;
   readonly imageUrl: string | null;
+  readonly hotspots: readonly TourHotspotCard[];
+}
+
+/** A ready 3D model a point can open. */
+export interface TourModelOption {
+  readonly versionId: string;
+  readonly posterUrl: string | null;
+  readonly hasPoster: boolean;
+  readonly triangles: number | null;
+  readonly createdAt: string;
 }
 
 export interface TourPanoramaOption {
@@ -177,14 +246,19 @@ export interface TourEditor {
   readonly publicationIssues: readonly TourPublicationIssue[];
   /** Ready panoramas of the municipality that are not scenes of this revision yet. */
   readonly options: readonly TourPanoramaOption[];
+  /** Ready 3D models of the municipality (for model points). */
+  readonly models: readonly TourModelOption[];
+  /** Where a "go to another tour" point can lead. */
+  readonly targets: readonly HotspotTargetOption[];
 }
 
 export async function loadTourEditor(
   membership: OrganizationMembership,
   tourId: unknown,
   deps: {
-    readonly tours: Pick<TourRepository, "find">;
+    readonly tours: Pick<TourRepository, "find" | "hotspotTargets">;
     readonly panoramas: Pick<PanoramaRepository, "list">;
+    readonly models: Pick<ModelRepository, "list">;
     readonly media: Pick<MediaRepository, "signedPreviewUrls">;
   },
 ): Promise<TourEditor | null> {
@@ -195,11 +269,22 @@ export async function loadTourEditor(
 
   const canEdit = canEditContent(membership.role);
   const used = new Set(revision.scenes.map((scene) => scene.panorama.versionId));
-  const ready = canEdit
-    ? (await deps.panoramas.list(membership.tenantId)).filter(
-        (view) => view.status === "ready" && view.manifest !== null && !used.has(view.versionId),
-      )
-    : [];
+  const [panoramas, models, targets] = canEdit
+    ? await Promise.all([
+        deps.panoramas.list(membership.tenantId),
+        deps.models.list(membership.tenantId),
+        deps.tours.hotspotTargets(membership.tenantId, tourId),
+      ])
+    : [[], [], []];
+  const ready = panoramas.filter(
+    (view) => view.status === "ready" && view.manifest !== null && !used.has(view.versionId),
+  );
+  const readyModels = models.filter((view) => view.status === "ready" && view.manifest !== null);
+  const posterPath = (assetId: string, version: number, file: string) =>
+    imageVersionPrefix(membership.tenantId, assetId, version) + MODEL_FOLDER + file;
+  const photoPath = (image: ImageReference) =>
+    contentImagePath(membership.tenantId, image, "w480.webp");
+  const hotspots = revision.scenes.flatMap((scene) => scene.hotspots);
 
   const folder = (assetId: string, version: number) =>
     `${membership.tenantId}/${assetId}/${version}/${PANORAMA_FOLDER}`;
@@ -216,6 +301,23 @@ export async function loadTourEditor(
     ),
     ...ready.flatMap((view) =>
       view.manifest ? [folder(view.assetId, view.version) + view.manifest.preview.file] : [],
+    ),
+    ...hotspots.flatMap((hotspot) => hotspot.gallery.map(photoPath)),
+    ...hotspots.flatMap((hotspot) =>
+      hotspot.model?.manifest?.poster
+        ? [
+            posterPath(
+              hotspot.model.assetId,
+              hotspot.model.version,
+              hotspot.model.manifest.poster.file,
+            ),
+          ]
+        : [],
+    ),
+    ...readyModels.flatMap((view) =>
+      view.manifest?.poster
+        ? [posterPath(view.assetId, view.version, view.manifest.poster.file)]
+        : [],
     ),
   ];
   const signed =
@@ -234,6 +336,22 @@ export async function loadTourEditor(
         imageUrl: scene.panorama.manifest
           ? (signed.get(base + scene.panorama.manifest.image.file) ?? null)
           : null,
+        hotspots: scene.hotspots.map((hotspot) => ({
+          ...hotspot,
+          gallery: hotspot.gallery.map((image) => ({
+            ...image,
+            previewUrl: signed.get(photoPath(image)) ?? null,
+          })),
+          posterUrl: hotspot.model?.manifest?.poster
+            ? (signed.get(
+                posterPath(
+                  hotspot.model.assetId,
+                  hotspot.model.version,
+                  hotspot.model.manifest.poster.file,
+                ),
+              ) ?? null)
+            : null,
+        })),
       };
     }),
     editCount: record.draft?.editCount ?? null,
@@ -249,6 +367,16 @@ export async function loadTourEditor(
       height: view.height,
       createdAt: view.createdAt,
     })),
+    models: readyModels.map((view) => ({
+      versionId: view.versionId,
+      posterUrl: view.manifest?.poster
+        ? (signed.get(posterPath(view.assetId, view.version, view.manifest.poster.file)) ?? null)
+        : null,
+      hasPoster: Boolean(view.manifest?.poster),
+      triangles: view.manifest?.model.triangles ?? null,
+      createdAt: view.createdAt,
+    })),
+    targets,
   };
 }
 
@@ -379,4 +507,77 @@ export async function discardTourDraft(
     return { status: "not_found" };
   }
   return tours.discardDraft(membership.tenantId, input.tourId, input.expectedEdit);
+}
+
+export type HotspotEditResult =
+  TourEditOutcome | { readonly status: "rejected"; readonly issues: readonly HotspotIssue[] };
+
+/** Adds a point to a scene, with its kind's target (validated here and in the database). */
+export async function addTourHotspot(
+  membership: OrganizationMembership,
+  input: {
+    readonly tourId: unknown;
+    readonly expectedEdit: unknown;
+    readonly sceneId: unknown;
+    readonly hotspot: Readonly<Record<string, unknown>>;
+  },
+  tours: Pick<TourRepository, "addHotspot">,
+): Promise<HotspotEditResult> {
+  if (!canEditContent(membership.role)) return { status: "forbidden" };
+  if (!isId(input.tourId) || !isId(input.sceneId) || !isEdit(input.expectedEdit)) {
+    return { status: "not_found" };
+  }
+  const parsed = parseNewHotspot(input.hotspot ?? {});
+  if (!parsed.ok) return { status: "rejected", issues: parsed.issues };
+  return tours.addHotspot(
+    membership.tenantId,
+    input.tourId,
+    input.expectedEdit,
+    input.sceneId,
+    parsed.hotspot,
+  );
+}
+
+/** Saves only the fields the form touched; the kind never changes (RC-01). */
+export async function updateTourHotspot(
+  membership: OrganizationMembership,
+  input: {
+    readonly tourId: unknown;
+    readonly expectedEdit: unknown;
+    readonly hotspotId: unknown;
+    readonly kind: HotspotKind;
+    readonly changes: Readonly<Record<string, unknown>>;
+  },
+  tours: Pick<TourRepository, "updateHotspot">,
+): Promise<HotspotEditResult> {
+  if (!canEditContent(membership.role)) return { status: "forbidden" };
+  if (!isId(input.tourId) || !isId(input.hotspotId) || !isEdit(input.expectedEdit)) {
+    return { status: "not_found" };
+  }
+  const parsed = parseHotspotChanges(input.kind, input.changes ?? {});
+  if (!parsed.ok) return { status: "rejected", issues: parsed.issues };
+  return tours.updateHotspot(
+    membership.tenantId,
+    input.tourId,
+    input.expectedEdit,
+    input.hotspotId,
+    parsed.changes,
+  );
+}
+
+export async function removeTourHotspot(
+  membership: OrganizationMembership,
+  input: { readonly tourId: unknown; readonly expectedEdit: unknown; readonly hotspotId: unknown },
+  tours: Pick<TourRepository, "removeHotspot">,
+): Promise<TourEditOutcome> {
+  if (!canEditContent(membership.role)) return { status: "forbidden" };
+  if (!isId(input.tourId) || !isId(input.hotspotId) || !isEdit(input.expectedEdit)) {
+    return { status: "not_found" };
+  }
+  return tours.removeHotspot(
+    membership.tenantId,
+    input.tourId,
+    input.expectedEdit,
+    input.hotspotId,
+  );
 }
