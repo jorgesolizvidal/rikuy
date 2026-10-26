@@ -46,6 +46,10 @@ create temp table ids (name text primary key, id uuid);
 grant select, insert on ids to authenticated;
 grant select on ids to anon;
 
+-- ── The public bucket serves models too ─────────────────────────────────────
+select is((select file_size_limit from storage.buckets where id = 'media-public'), 15728640::bigint, 'public files up to 15 MB (optimized models)');
+select ok((select 'model/gltf-binary' = any(allowed_mime_types) from storage.buckets where id = 'media-public'), 'the public bucket accepts GLB');
+
 set local role authenticated;
 set local request.jwt.claims to :'a1c';
 insert into ids select 'museo', content_id from public.create_content_item(:'ta', 'destination', 'museo', 'Museo');
@@ -73,10 +77,6 @@ create function pg_temp.publish_media(p_names text[]) returns void language sql 
 $$;
 
 select plan(30);
-
--- ── The public bucket serves models too ─────────────────────────────────────
-select is((select file_size_limit from storage.buckets where id = 'media-public'), 15728640::bigint, 'public files up to 15 MB (optimized models)');
-select ok((select 'model/gltf-binary' = any(allowed_mime_types) from storage.buckets where id = 'media-public'), 'the public bucket accepts GLB');
 
 -- ── Media must be public before sealing ────────────────────────────────────
 select is((select (public.tour_editor(:'ta', (select id from ids where name = 'tour')) #>> '{draft,scenes,0,panorama,published}')), 'false',
