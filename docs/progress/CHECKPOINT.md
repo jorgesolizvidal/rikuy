@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
-- **Último paso completado:** P4 · Paso 1 — tours y escenas (2026-10-26)
-- **Rama:** `feat/p4-step1-tours` → PR hacia `main`
+- **Último paso completado:** P4 · Paso 2 — editor de puntos (hotspots) (2026-10-26)
+- **Rama:** `feat/p4-step2-hotspots` → PR hacia `main`
 
 ## Historial
 
@@ -508,29 +508,85 @@ Lo que encontraron las pruebas:
 - Los recorridos de referencia del CI serán sintéticos (tus archivos no entran al repositorio). Hay 3 panoramas reales en vez de los 6 de museo + carnaval: dos tours reales para verificar a mano y medir, y el grafo de 4 escenas con sintéticos.
 - No se borra un tour ni se cambia el destino al que pertenece (llegará si hace falta).
 
+### P4 · Paso 2 — editor de puntos (hotspots) ✅
+
+- Decisión del usuario: «ir a otro recorrido» con un acabado propio, no como una flecha más ([ADR-029](../adr/ADR-029-tour-hotspots.md)).
+- Base de datos (`20261027000000_p4_hotspots.sql`, solo expand):
+  - `tour_hotspots` y `tour_hotspot_images` (FK compuestas, RLS de lectura por membresía, sin escrituras directas).
+  - **Cuatro tipos con exactamente su destino** (la base lo revalida):
+    - información: título, texto enriquecido y hasta 12 fotos con descripción;
+    - ir a otra escena del mismo tour, nunca la propia;
+    - modelo 3D listo del municipio;
+    - **ir a otro recorrido**: otro destino o evento del municipio, nunca el propio.
+  - Posición en yaw/pitch (radianes). Hasta 50 puntos por escena.
+  - `add_tour_hotspot`, `update_tour_hotspot` (**solo los campos enviados; el tipo no cambia**, RC-01) y `remove_tour_hotspot`, con el número de edición del borrador. `tour_hotspot_targets` lista a dónde puede llevar un punto.
+  - Un borrador nuevo copia los puntos y sus fotos con el **mismo identificador**. Quitar una escena quita sus puntos y las flechas que llevaban a ella.
+  - Publicar exige las fotos listas y el **poster de cada modelo 3D**. Un «ir a otro recorrido» sin tour publicado no impide publicar: el portal lo ocultará hasta que exista.
+  - El documento del tour incluye los puntos de cada escena, con el destino al que lleva (y si tiene tour publicado) y el modelo.
+- `@rikuy/core`:
+  - contrato de los puntos;
+  - reglas: posición normalizada; texto con el mismo formato que los destinos, con los enlaces http señalados por línea; descripción obligatoria de cada foto; el destino de cada tipo;
+  - casos de uso `addTourHotspot`, `updateTourHotspot` y `removeTourHotspot`;
+  - el editor suma los modelos listos (con su poster), los destinos posibles y las vistas previas de las fotos;
+  - «Falta el poster de un modelo» entre lo que impide publicar.
+- `@rikuy/db`: métodos del repositorio y motivos de rechazo (destino, modelo, texto, fotos, posición, poster).
+- Panel, editor del tour:
+  - **puntos en el visor 360°** con un ícono por tipo (plugin de marcadores de Photo Sphere Viewer 5.15.1); «ir a otro recorrido» es una **píldora con ícono de lugar e «Ir a · {destino}»**, atenuada si el destino aún no tiene tour publicado;
+  - «Agregar un punto»: se elige el tipo y se toca el panorama, o **«Poner en el centro de la vista»** (sin puntero, con el teclado);
+  - formulario por tipo: texto y fotos (la misma galería de los destinos); escena de destino; modelo con su imagen (aviso si le falta); destino con aviso si no tiene tour publicado;
+  - lista de puntos con «Mirar», «Editar», «Mover» y «Quitar»; tocar un punto en el visor abre su formulario; Escape cancela;
+  - la confirmación de quitar una escena dice cuántos puntos se van con ella.
+- El aspecto de los puntos está en `src/components/panorama-viewer/hotspot-markers.ts`, compartido con el portal (Paso 4). Se arma con nodos del DOM y `textContent`: el texto nunca se vuelve HTML.
+- Tests:
+  - 463 unitarios (core 295, db 99, web 35, worker 27, config 7);
+  - 666 pgTAP (43 nuevos, `019_hotspots`): los cuatro tipos, destinos ajenos o inválidos (escena propia o de otro tour, modelo en proceso, de otro municipio o que es un panorama, destino de otro municipio o el propio, foto ajena, texto no permitido), número de edición viejo, analista y otro municipio; RC-01 (el título solo conserva escena, tipo, posición, texto y fotos; mover conserva el modelo); el tipo no cambia; poster exigido; inmutable al sellar; copia con los mismos identificadores; quitar una escena; volver a la versión 1 con sus cinco puntos;
+  - integración contra Supabase real: RC-01 por la Data API, un destino de Demo Norte rechazado como destino de un punto de Demo Sur, y el analista que lee y no cambia;
+  - 0 hallazgos de `plpgsql_check`.
+- Verificado en local, en el navegador, con los **panoramas y modelos reales**:
+  - `horno.glb` 8,7 → 1,86 MB y `monumento.glb` 11,4 → 1,48 MB, colores sin cambios y posters capturados solos;
+  - en «Sala principal» se agregaron: información con texto y foto (la foto sin descripción se rechazó), flecha a «Sala de herramientas», modelo «Horno de barro» e «Ir a la plaza» hacia el tour publicado de la plaza;
+  - después: cambiar solo el título (texto, foto y posición intactos), mover con «Poner en el centro de la vista», abrir el formulario tocando la píldora, publicar con los cuatro puntos y confirmar «quitar escena y 1 punto»;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360, 390 y 1280 px.
+- Lo que encontraron las pruebas, ya corregido:
+  - el plugin de marcadores puede seguir dando por «encima» un punto que el puntero ya dejó, y se tragaba el clic al colocar el siguiente: ahora todo clic cuenta mientras se coloca;
+  - el plugin pone `display: block` en el elemento del punto y la píldora se desarmaba: ahora el punto va dentro de un contenedor propio;
+  - la galería decía «hasta 30 fotos» también en los puntos: ahora usa el límite de cada lugar (12).
+
+**Desviaciones:**
+
+- El portal todavía no muestra puntos: el visor público llega en el Paso 4 y la resolución de «ir a otro recorrido» con el recorrido general en el Paso 5.
+- Cambiar el tipo de un punto exige quitarlo y crear otro.
+- Las fotos de los puntos pasan a medios públicos al publicar en el Paso 3, junto con los panoramas y los modelos.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p4-step1-tours
+git checkout feat/p4-step2-hotspots
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `018_tours` y la integración, `tours.int.test.ts`. En el panel, con `pnpm dev` y el ejecutor configurado: sube tus panoramas en «Panoramas 360°» y procesa la cola (`curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain`). Después, en «Tours 360°», crea un tour para un destino y agrega las escenas. En el visor puedes arrastrar o hacer clic y usar las flechas; «Usar esta vista como inicial» la guarda.
+`pnpm db:test` incluye `019_hotspots` y la integración, el caso RC-01 de `tours.int.test.ts`. En el panel, con `pnpm dev` y el ejecutor configurado:
+
+1. Sube panoramas y modelos y procesa la cola (`curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain`).
+2. Abre «Modelos 3D» una vez para que se capture la imagen de cada modelo.
+3. En el editor del tour, elige «Agregar un punto», luego el tipo, y toca el panorama o usa «Poner en el centro de la vista».
 
 ## Después del merge
 
-Nada que configurar: «Deploy database» aplica la migración. Comprobación: en un municipio de demo, «Tours 360°» → «Nuevo tour» para un destino, agrega un panorama ya listo y publica (como propietario).
+Nada que configurar: «Deploy database» aplica la migración. Comprobación: en un tour de demo, agrega un punto «Ir a otro recorrido» hacia un destino con tour publicado y publica.
 
-## Siguiente paso — P4 · Paso 2 (requiere autorización)
+## Siguiente paso — P4 · Paso 3 (requiere autorización)
 
-**Editor de hotspots** en el mismo visor, en yaw/pitch:
+**Publicación de medios y manifiesto del tour:**
 
-- tipos: información (texto enriquecido y galería), navegación (a otra escena del mismo tour), modelo 3D (GLB listo con poster) e **«ir a otro recorrido»** (a un destino; se resuelve a su entrada al publicar, con ícono y tarjeta propios);
-- se copian con su identificador estable al abrir un borrador;
-- cada formulario guarda solo lo que cambia (RC-01).
+- al publicar, los panoramas (vista previa, imagen y teselas), las fotos de los puntos y los modelos con su poster pasan a medios públicos;
+- un manifiesto del tour por revisión sellada y el índice del recorrido general;
+- invalidar la caché solo de ese municipio;
+- cuotas medidas con los derivados públicos;
+- el portal mostrará siempre la versión sellada correcta.
 
 ## Decisiones pendientes del usuario
 

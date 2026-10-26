@@ -108,6 +108,12 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 
 - Tours (P4 · Paso 1, [ADR-028](adr/ADR-028-tours-model.md)): un tour opcional por destino o evento, con revisiones selladas. `tour_revisions.entry_scene_id` es la única escena de entrada, y una FK compuesta la obliga a ser una escena de la misma revisión. `tour_scenes` usa un `scene_id` estable entre revisiones y guarda la vista inicial en radianes. Las ediciones son RPC por intención con el número de edición del borrador. El recorrido general del portal se forma con los tours publicados; no es un tour aparte.
 
+- Puntos de los tours (P4 · Paso 2, [ADR-029](adr/ADR-029-tour-hotspots.md)): `tour_hotspots` y `tour_hotspot_images`.
+  - Cuatro tipos (información, otra escena, modelo 3D, otro recorrido), cada uno con exactamente su destino, en yaw/pitch.
+  - Ediciones parciales por intención y `hotspot_id` estable entre revisiones.
+  - «Ir a otro recorrido» apunta al contenido y se resuelve al abrirlo.
+  - El aspecto de los puntos es compartido entre panel y portal y se arma sin HTML.
+
 ## 8 bis. Cuotas por municipio (ADR-012, ADR-027)
 
 - Dos recursos en `usage_buckets`:
