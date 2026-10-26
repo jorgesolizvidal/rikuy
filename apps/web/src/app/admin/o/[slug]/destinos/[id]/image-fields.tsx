@@ -212,17 +212,20 @@ export function GalleryField({
   disabled,
   invalidAlts,
   onChange,
+  max = DESTINATION_LIMITS.gallery,
 }: {
   readonly org: string;
   readonly value: readonly EditorImage[];
   readonly disabled: boolean;
   readonly invalidAlts: ReadonlySet<number>;
   readonly onChange: (images: EditorImage[]) => void;
+  /** How many photos fit (a destination's gallery by default). */
+  readonly max?: number;
 }) {
   const id = useId();
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<{ text: string; failed: boolean } | null>(null);
-  const room = DESTINATION_LIMITS.gallery - value.length;
+  const room = max - value.length;
 
   async function add(files: File[]) {
     if (files.length === 0) return;
@@ -238,8 +241,7 @@ export function GalleryField({
     }
     setBusy(false);
     onChange([...value, ...added]);
-    if (files.length > accepted.length)
-      failures.push(`La galería admite hasta ${DESTINATION_LIMITS.gallery} fotos.`);
+    if (files.length > accepted.length) failures.push(`La galería admite hasta ${max} fotos.`);
     setMessage(
       failures.length > 0
         ? { text: failures.join(" "), failed: true }
@@ -333,8 +335,7 @@ export function GalleryField({
         role="status"
         aria-live="polite"
       >
-        {message?.text ??
-          `Hasta ${DESTINATION_LIMITS.gallery} fotos; puedes elegir varias a la vez.`}
+        {message?.text ?? `Hasta ${max} fotos; puedes elegir varias a la vez.`}
       </span>
     </fieldset>
   );

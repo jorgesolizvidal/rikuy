@@ -1,0 +1,107 @@
+/* Points of a scene in the 360° viewer (panel and portal). */
+.hotspot-marker {
+  --hotspot-ink: #fff;
+  --hotspot-fill: rgb(26 22 20 / 72%);
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 6px rgb(0 0 0 / 45%));
+  transition: transform 160ms ease-out;
+}
+
+.hotspot-marker:hover {
+  transform: scale(1.08);
+}
+
+.hotspot-marker-badge {
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 2px solid rgb(255 255 255 / 92%);
+  background: var(--hotspot-fill);
+  color: var(--hotspot-ink);
+  backdrop-filter: blur(4px);
+}
+
+.hotspot-marker-badge svg {
+  width: 1.375rem;
+  height: 1.375rem;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.hotspot-marker[data-kind="scene"] .hotspot-marker-badge {
+  width: 3rem;
+  height: 3rem;
+}
+
+.hotspot-marker[data-kind="model"] .hotspot-marker-badge {
+  border-radius: 0.75rem;
+}
+
+/* "Go to another tour": a labelled pill in a warm accent, never just another arrow. */
+.hotspot-marker[data-kind="tour"] {
+  --hotspot-fill: rgb(158 71 35 / 90%);
+  padding: 0.25rem 0.875rem 0.25rem 0.25rem;
+  border-radius: 999px;
+  border: 2px solid rgb(255 255 255 / 92%);
+  background: var(--hotspot-fill);
+  color: #fff;
+}
+
+.hotspot-marker[data-kind="tour"] .hotspot-marker-badge {
+  width: 2.125rem;
+  height: 2.125rem;
+  border: 0;
+  background: rgb(255 255 255 / 18%);
+}
+
+.hotspot-marker-label {
+  display: grid;
+  line-height: 1.15;
+  max-width: 13rem;
+  font:
+    600 0.875rem/1.2 system-ui,
+    sans-serif;
+  white-space: nowrap;
+}
+
+.hotspot-marker-label span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.hotspot-marker-label small {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  opacity: 0.85;
+}
+
+.hotspot-marker[data-muted="true"] {
+  opacity: 0.55;
+}
+
+.hotspot-marker[data-selected="true"] .hotspot-marker-badge,
+.hotspot-marker[data-kind="tour"][data-selected="true"] {
+  outline: 3px solid #f6c35b;
+  outline-offset: 2px;
+}
+
+.panorama-canvas[data-picking="true"] .psv-canvas-container,
+.panorama-canvas[data-picking="true"] canvas {
+  cursor: crosshair;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hotspot-marker {
+    transition: none;
+  }
+}

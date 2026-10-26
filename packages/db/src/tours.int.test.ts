@@ -171,4 +171,114 @@ describe.runIf(stackAvailable)("tours against local Supabase", () => {
       .eq("tenant_id", SUR);
     expect(direct.data ?? []).toEqual([]);
   });
+
+  it("keeps a point's relations when only its title changes (RC-01)", async () => {
+    // A ready photo of Demo Sur for the information point's gallery.
+    const photoAsset = randomUUID();
+    const photo = randomUUID();
+    await admin`insert into public.assets (id, tenant_id, purpose) values (${photoAsset}, ${SUR}, 'content')`;
+    await admin`
+      insert into public.asset_versions (id, tenant_id, asset_id, version, status, declared_mime, declared_bytes,
+                                         mime, bytes, width, height, sha256, ready_at)
+      values (${photo}, ${SUR}, ${photoAsset}, 1, 'ready', 'image/jpeg', 1000, 'image/jpeg', 1000, 2048, 1536,
+              ${"c".repeat(64)}, now())
+    `;
+    const content = createContentRepository(owner.client);
+    const created = await content.createDestination(
+      SUR,
+      `puntos-${randomUUID().slice(0, 8)}`,
+      "Puntos",
+    );
+    if (created.status !== "created") throw new Error(created.status);
+    const tours = createTourRepository(owner.client);
+    const tour = await tours.create(SUR, created.contentId);
+    if (tour.status !== "created") throw new Error(tour.status);
+    let edit = (await tours.find(SUR, tour.tourId))?.draft?.editCount ?? 0;
+    const step = async (outcome: Promise<{ status: string; editCount?: number }>) => {
+      const result = await outcome;
+      if (result.status !== "saved" || result.editCount === undefined)
+        throw new Error(result.status);
+      edit = result.editCount;
+    };
+    await step(tours.addScene(SUR, tour.tourId, edit, pano(0), "Entrada"));
+    await step(tours.addScene(SUR, tour.tourId, edit, pano(1), "Sala"));
+    const [entry, hall] = (await tours.find(SUR, tour.tourId))?.draft?.scenes ?? [];
+    if (!entry || !hall) throw new Error("scenes missing");
+
+    const at = { yaw: 0.5, pitch: -0.2 };
+    await step(
+      tours.addHotspot(SUR, tour.tourId, edit, entry.sceneId, {
+        kind: "info",
+        title: "Arado",
+        position: at,
+        body: [{ type: "paragraph", children: [{ type: "text", text: "Usado hasta 1953." }] }],
+        gallery: [{ assetId: photoAsset, version: 1, alt: "El arado de cerca" }],
+      }),
+    );
+    await step(
+      tours.addHotspot(SUR, tour.tourId, edit, entry.sceneId, {
+        kind: "scene",
+        title: "A la sala",
+        position: { yaw: -1, pitch: 0 },
+        targetSceneId: hall.sceneId,
+      }),
+    );
+    await step(
+      tours.addHotspot(SUR, tour.tourId, edit, entry.sceneId, {
+        kind: "tour",
+        title: "Ir al recorrido",
+        position: { yaw: 2, pitch: 0 },
+        targetContentId: contentId,
+      }),
+    );
+    const before = (await tours.find(SUR, tour.tourId))?.draft?.scenes[0]?.hotspots ?? [];
+    const info = before.find((hotspot) => hotspot.kind === "info");
+    if (!info) throw new Error("info point missing");
+
+    // Only the title: the rest stays exactly as it was.
+    await step(
+      tours.updateHotspot(SUR, tour.tourId, edit, info.hotspotId, { title: "Arado de madera" }),
+    );
+    const after = (await tours.find(SUR, tour.tourId))?.draft?.scenes[0]?.hotspots ?? [];
+    expect(after.find((hotspot) => hotspot.hotspotId === info.hotspotId)).toEqual({
+      ...info,
+      title: "Arado de madera",
+    });
+    expect(after.filter((hotspot) => hotspot.hotspotId !== info.hotspotId)).toEqual(
+      before.filter((hotspot) => hotspot.hotspotId !== info.hotspotId),
+    );
+    expect(after.find((hotspot) => hotspot.kind === "tour")?.target).toMatchObject({
+      contentId,
+      tourPublished: true,
+    });
+
+    // No foreign selections: Demo Norte's content as a target is refused.
+    const norte = await stranger.client.from("content_items").select("id").limit(1).single();
+    const foreign = norte.data?.id;
+    if (typeof foreign !== "string") throw new Error("no Demo Norte content");
+    expect(
+      await tours.addHotspot(SUR, tour.tourId, edit, entry.sceneId, {
+        kind: "tour",
+        title: "Ajeno",
+        position: at,
+        targetContentId: foreign,
+      }),
+    ).toEqual({ status: "invalid", reason: "target" });
+
+    // The analyst reads the points and cannot change them.
+    expect(
+      await createTourRepository(analyst.client).updateHotspot(
+        SUR,
+        tour.tourId,
+        edit,
+        info.hotspotId,
+        { title: "X" },
+      ),
+    ).toEqual({
+      status: "forbidden",
+    });
+    expect(
+      (await createTourRepository(analyst.client).hotspotTargets(SUR, tour.tourId)).length,
+    ).toBeGreaterThan(0);
+  });
 });

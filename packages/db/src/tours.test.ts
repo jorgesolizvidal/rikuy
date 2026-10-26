@@ -107,3 +107,65 @@ describe("tour repository", () => {
     ).toBeNull();
   });
 });
+
+describe("tour repository: points", () => {
+  it("sends a new point and maps the reasons a point is refused", async () => {
+    const { session, calls } = client({
+      data: [{ revision_id: TOUR, edit_count: 3, hotspot_id: SCENE }],
+    });
+    const hotspot = {
+      kind: "scene" as const,
+      title: "A la sala",
+      position: { yaw: 0, pitch: 0 },
+      targetSceneId: SCENE,
+    };
+    expect(await createTourRepository(session).addHotspot(T, TOUR, 2, SCENE, hotspot)).toEqual({
+      status: "saved",
+      editCount: 3,
+    });
+    expect(calls[0]).toMatchObject({
+      fn: "add_tour_hotspot",
+      args: { p_scene_id: SCENE, p_hotspot: hotspot },
+    });
+    for (const hint of ["target", "model", "body", "gallery", "position"] as const) {
+      expect(
+        await createTourRepository(
+          client({ error: { code: "23514", hint } }).session,
+        ).updateHotspot(T, TOUR, 2, SCENE, { title: "X" }),
+      ).toEqual({ status: "invalid", reason: hint });
+    }
+  });
+
+  it("tells a missing poster apart when publishing", async () => {
+    expect(
+      await createTourRepository(
+        client({ error: { code: "PT409", hint: "poster" } }).session,
+      ).publish(T, TOUR, 2),
+    ).toEqual({
+      status: "poster",
+    });
+  });
+
+  it("lists what a point can lead to", async () => {
+    const rows = [
+      {
+        content_id: SCENE,
+        kind: "destination",
+        title: "Plaza",
+        published: true,
+        tour_published: false,
+      },
+    ];
+    expect(
+      await createTourRepository(client({ data: rows }).session).hotspotTargets(T, TOUR),
+    ).toEqual([
+      {
+        contentId: SCENE,
+        kind: "destination",
+        title: "Plaza",
+        published: true,
+        tourPublished: false,
+      },
+    ]);
+  });
+});

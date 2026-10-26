@@ -74,6 +74,7 @@ function revision(overrides: Partial<TourRevision> = {}): TourRevision {
           height: 4096,
           manifest,
         },
+        hotspots: [],
       },
     ],
     ...overrides,
@@ -111,6 +112,10 @@ function repository(overrides: Partial<TourRepository> = {}): TourRepository {
     publish: vi.fn(async () => ({ status: "published" as const, revisionNo: 1 })),
     restore: vi.fn(async () => ({ status: "restored" as const, revisionNo: 1 })),
     discardDraft: vi.fn(async () => ({ status: "discarded" as const })),
+    addHotspot: vi.fn(async () => saved),
+    updateHotspot: vi.fn(async () => saved),
+    removeHotspot: vi.fn(async () => saved),
+    hotspotTargets: vi.fn(async () => []),
     ...overrides,
   };
 }
@@ -298,6 +303,7 @@ describe("tour use cases", () => {
     const editorView = await loadTourEditor(editor, TOUR, {
       tours,
       panoramas: { list: async () => [ready, used, processing] },
+      models: { list: async () => [] },
       media: { signedPreviewUrls },
     });
     expect(editorView?.editCount).toBe(3);
@@ -310,6 +316,7 @@ describe("tour use cases", () => {
     const readOnly = await loadTourEditor(analyst, TOUR, {
       tours,
       panoramas: { list: vi.fn(async () => [ready]) },
+      models: { list: vi.fn(async () => []) },
       media: { signedPreviewUrls },
     });
     expect(readOnly?.options).toEqual([]);
@@ -321,6 +328,7 @@ describe("tour use cases", () => {
     const view = await loadTourEditor(owner, TOUR, {
       tours,
       panoramas: { list: async () => [] },
+      models: { list: async () => [] },
       media: { signedPreviewUrls: async () => new Map() },
     });
     expect(view?.revision.state).toBe("sealed");

@@ -1,9 +1,14 @@
 "use client";
 
 import "@photo-sphere-viewer/core/index.css";
+import "@photo-sphere-viewer/markers-plugin/index.css";
+import "./hotspot-markers.css";
 
 import { Viewer } from "@photo-sphere-viewer/core";
+import { MarkersPlugin, type MarkerConfig } from "@photo-sphere-viewer/markers-plugin";
 import { useEffect, useRef } from "react";
+
+import { hotspotElement, hotspotKindLabel, type HotspotMarker } from "./hotspot-markers";
 
 /**
  * The 360° viewer (Photo Sphere Viewer 5, on the app's single three.js). Always loaded
@@ -23,6 +28,8 @@ export interface PanoramaView {
 export interface PanoramaCanvasHandle {
   currentView(): PanoramaView;
   goTo(view: PanoramaView): void;
+  /** Turns the view to a point (yaw/pitch) without changing the zoom. */
+  lookAt(point: { readonly yaw: number; readonly pitch: number }): void;
 }
 
 export interface PanoramaCanvasProps {
@@ -35,6 +42,12 @@ export interface PanoramaCanvasProps {
   readonly onReady?: ((handle: PanoramaCanvasHandle) => void) | undefined;
   /** WebGL or the image could not load: the page says so and keeps working. */
   readonly onFailure?: (() => void) | undefined;
+  /** The scene's points. */
+  readonly markers?: readonly HotspotMarker[] | undefined;
+  readonly onMarkerSelect?: ((id: string) => void) | undefined;
+  /** While true, a click on the panorama reports where (to place or move a point). */
+  readonly picking?: boolean | undefined;
+  readonly onPick?: ((point: { yaw: number; pitch: number }) => void) | undefined;
 }
 
 const MIN_FOV = 30;
@@ -69,6 +82,29 @@ const LANG = {
   webglError: "Este navegador no puede mostrar la vista 360°",
 };
 
+function markerConfig(marker: HotspotMarker): MarkerConfig {
+  const config: MarkerConfig = {
+    id: marker.id,
+    position: { yaw: marker.yaw, pitch: marker.pitch },
+    element: hotspotElement(marker),
+    anchor: "center center",
+    data: { kind: marker.kind },
+  };
+  // "Go to another tour" already shows its destination on the pill.
+  if (marker.kind !== "tour") {
+    config.tooltip = {
+      content: escapeText(`${hotspotKindLabel(marker.kind)}: ${marker.title}`),
+      position: "top center",
+    };
+  }
+  return config;
+}
+
+/** The tooltip content is HTML: the title is escaped. */
+function escapeText(text: string): string {
+  return text.replace(/[&<>"']/gu, (char) => `&#${char.charCodeAt(0)};`);
+}
+
 export default function PanoramaCanvas({
   url,
   previewUrl,
@@ -76,13 +112,29 @@ export default function PanoramaCanvas({
   label,
   onReady,
   onFailure,
+  markers,
+  onMarkerSelect,
+  picking,
+  onPick,
 }: PanoramaCanvasProps) {
   const host = useRef<HTMLDivElement>(null);
-  const callbacks = useRef({ onReady, onFailure });
+  const callbacks = useRef({ onReady, onFailure, onMarkerSelect, onPick });
   const start = useRef(initialView);
+  const plugin = useRef<MarkersPlugin | null>(null);
+  const pickingRef = useRef(picking ?? false);
+  const markersRef = useRef(markers ?? []);
   useEffect(() => {
-    callbacks.current = { onReady, onFailure };
-  }, [onReady, onFailure]);
+    callbacks.current = { onReady, onFailure, onMarkerSelect, onPick };
+    pickingRef.current = picking ?? false;
+  }, [onReady, onFailure, onMarkerSelect, onPick, picking]);
+
+  // The points follow the props (a cheap key: they change only after an edit).
+  const markersKey = JSON.stringify(markers ?? []);
+  useEffect(() => {
+    markersRef.current = markers ?? [];
+    plugin.current?.setMarkers(markersRef.current.map(markerConfig));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- keyed on their content
+  }, [markersKey]);
 
   useEffect(() => {
     const element = host.current;
@@ -103,7 +155,9 @@ export default function PanoramaCanvas({
         touchmoveTwoFingers: false,
         loadingTxt: LANG.loading,
         lang: LANG,
+        plugins: [[MarkersPlugin, { markers: markersRef.current.map(markerConfig) }]],
       });
+      plugin.current = viewer.getPlugin(MarkersPlugin);
     } catch {
       callbacks.current.onFailure?.();
       return;
@@ -147,16 +201,28 @@ export default function PanoramaCanvas({
             viewer.rotate({ yaw: view.yaw, pitch: view.pitch });
             viewer.zoom(zoomLevelOf(view.fov));
           },
+          lookAt: (point) => viewer.rotate({ yaw: point.yaw, pitch: point.pitch }),
         });
       },
       { once: true },
     );
     viewer.addEventListener("panorama-error", () => callbacks.current.onFailure?.());
+    viewer.addEventListener("click", ({ data }) => {
+      // While placing, any click counts, also over a point: the markers plugin can keep a
+      // point as "hovered" after the pointer left it, which would swallow the click.
+      if (!pickingRef.current || data.rightclick) return;
+      callbacks.current.onPick?.({ yaw: data.yaw, pitch: data.pitch });
+    });
+    plugin.current?.addEventListener("select-marker", ({ marker }) => {
+      if (pickingRef.current) return;
+      callbacks.current.onMarkerSelect?.(marker.id);
+    });
 
     return () => {
       buttons.disconnect();
       container.removeEventListener("focusin", focusIn);
       container.removeEventListener("focusout", focusOut);
+      plugin.current = null;
       viewer.destroy();
     };
   }, [url, label]);
@@ -165,6 +231,7 @@ export default function PanoramaCanvas({
     <div
       ref={host}
       className="panorama-canvas"
+      data-picking={picking ? "true" : undefined}
       style={previewUrl ? { backgroundImage: `url("${previewUrl}")` } : undefined}
     />
   );

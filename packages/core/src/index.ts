@@ -66,4 +66,5 @@ export * from "./contracts/usage";
 export * from "./application/usage/usage";
 export * from "./contracts/tour";
 export * from "./domain/tours/scene";
+export * from "./domain/tours/hotspot";
 export * from "./application/tours/tours";

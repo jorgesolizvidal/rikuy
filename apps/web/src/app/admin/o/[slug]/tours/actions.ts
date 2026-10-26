@@ -1,15 +1,20 @@
 "use server";
 
 import {
+  addTourHotspot,
   addTourScene,
   changeTourScene,
   createTour,
   discardTourDraft,
   openOrganization,
   publishTour,
+  removeTourHotspot,
   restoreTourRevision,
+  updateTourHotspot,
   updateTourScene,
   type CreateTourOutcome,
+  type HotspotEditResult,
+  type HotspotKind,
   type DiscardTourOutcome,
   type OrganizationMembership,
   type PublishTourOutcome,
@@ -142,5 +147,40 @@ export async function discardTourDraftAction(
 ): Promise<DiscardTourState> {
   return run(slug, async (membership) =>
     discardTourDraft(membership, target, (await adminSession()).tours),
+  );
+}
+
+export type HotspotEditState = HotspotEditResult | SessionProblem;
+
+export async function addHotspotAction(
+  slug: string,
+  target: SceneTarget & { readonly sceneId: string },
+  hotspot: Readonly<Record<string, unknown>>,
+): Promise<HotspotEditState> {
+  return run(slug, async (membership) =>
+    addTourHotspot(membership, { ...target, hotspot: hotspot ?? {} }, (await adminSession()).tours),
+  );
+}
+
+export async function updateHotspotAction(
+  slug: string,
+  target: SceneTarget & { readonly hotspotId: string; readonly kind: HotspotKind },
+  changes: Readonly<Record<string, unknown>>,
+): Promise<HotspotEditState> {
+  return run(slug, async (membership) =>
+    updateTourHotspot(
+      membership,
+      { ...target, changes: changes ?? {} },
+      (await adminSession()).tours,
+    ),
+  );
+}
+
+export async function removeHotspotAction(
+  slug: string,
+  target: SceneTarget & { readonly hotspotId: string },
+): Promise<HotspotEditState> {
+  return run(slug, async (membership) =>
+    removeTourHotspot(membership, target, (await adminSession()).tours),
   );
 }

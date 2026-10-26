@@ -15,6 +15,7 @@
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
     "@photo-sphere-viewer/core": "5.15.1",
+    "@photo-sphere-viewer/markers-plugin": "5.15.1",
     "@rikuy/config": "workspace:*",
     "@rikuy/core": "workspace:*",
     "@rikuy/db": "workspace:*",
