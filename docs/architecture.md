@@ -69,7 +69,7 @@ flowchart TD
 | P1                      | `tenants`, `tenant_domains`, `memberships`, `tenant_config_versions`, `audit_events`, `platform_operators` |
 | P3 (con assets básicos) | `content_items`, `content_revisions`, `assets`, `asset_versions`, `media_references`                       |
 | P2                      | `background_jobs`, `job_attempts`, `usage_buckets`                                                         |
-| P4                      | `tours`, `tour_revisions`, `scenes`, `hotspots`                                                            |
+| P4                      | `tours`, `tour_revisions`, `tour_scenes`, `hotspots`                                                       |
 | P5                      | `knowledge_chunks`, `ai_requests`, `ai_executions`, `copilot_proposals`                                    |
 
 Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma separado y con MFA. Las tablas del modelo maduro (gastronomía, transporte, campañas, billing, analytics detallada) quedan diferidas a las expansiones E1–E4.
@@ -105,6 +105,8 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
   - el ejecutor valida (JSON, validador de Khronos, archivos externos, extensiones, complejidad), codifica cada textura en KTX2 según su uso y la verifica decodificándola (ETC1S → UASTC → original), comprime la geometría con Meshopt y comprueba materiales y colores por vértice;
   - escribe `{tenant}/{asset}/{version}/model/model.glb` (privado) y el manifiesto;
   - la imagen poster la captura el panel con el mismo visor three.js del portal.
+
+- Tours (P4 · Paso 1, [ADR-028](adr/ADR-028-tours-model.md)): un tour opcional por destino o evento, con revisiones selladas. `tour_revisions.entry_scene_id` es la única escena de entrada, y una FK compuesta la obliga a ser una escena de la misma revisión. `tour_scenes` usa un `scene_id` estable entre revisiones y guarda la vista inicial en radianes. Las ediciones son RPC por intención con el número de edición del borrador. El recorrido general del portal se forma con los tours publicados; no es un tour aparte.
 
 ## 8 bis. Cuotas por municipio (ADR-012, ADR-027)
 

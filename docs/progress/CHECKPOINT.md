@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P1, P2 y P3 ✅. Sigue P4 (tours 360°, hotspots y GLB).
-- **Último paso completado:** P2 · Paso 5 — cuotas por municipio (2026-10-25)
-- **Rama:** `feat/p2-step5-quotas` → PR hacia `main`
+- **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
+- **Último paso completado:** P4 · Paso 1 — tours y escenas (2026-10-26)
+- **Rama:** `feat/p4-step1-tours` → PR hacia `main`
 
 ## Historial
 
@@ -451,30 +451,86 @@ Lo que encontraron las pruebas:
 - El cómputo de antes de este paso no se cuenta, y el de las páginas no entra en ninguna cuota (para eso, el panel de Vercel).
 - La cuota de IA llega con el asistente (P5), como un tercer recurso.
 
+### P4 · Paso 1 — tours y escenas ✅
+
+- Pasos de P4 en el [roadmap](../roadmap.md), confirmados por el usuario (2026-10-26). Son 7, incluido el **recorrido general**.
+- Decisiones del usuario ([ADR-028](../adr/ADR-028-tours-model.md)):
+  - cada destino o evento tiene **un tour como máximo**, y es opcional;
+  - un **recorrido general** se forma solo con los tours publicados: el visitante salta entre tours sin salir del visor (Paso 5);
+  - para «ir a otro recorrido» (Paso 2) quiere un acabado propio, no una flecha más;
+  - las pruebas usan sus panoramas reales (`material-panoramas`, fuera del repositorio) y él mide en su Android cuando yo le avise (Pasos 4 y 7).
+- Base de datos (`20261026000000_p4_tours.sql`, solo expand):
+  - `tours` (único por municipio y contenido, con punteros a borrador y versión publicada), `tour_revisions` (numeradas, selladas al publicar, inmutables) y `tour_scenes`.
+  - **Una sola escena de entrada**: `entry_scene_id` es una columna de la revisión, con una FK compuesta `(tenant_id, revisión, escena)` hacia una escena de la misma revisión. Un borrador puede no tenerla; sellar la exige. La primera escena agregada pasa a ser la entrada; si se quita la entrada, la toma la primera que queda.
+  - `scene_id` es **estable entre revisiones**: un borrador nuevo copia las escenas con sus mismos identificadores (para los hotspots del Paso 2).
+  - Cada escena es un panorama **listo** del mismo municipio (una vez por tour), con orden, nombre, descripción y vista inicial (yaw en [-π, π) y pitch en [-π/2, π/2], en radianes; campo de visión de 30–90°). Hasta 60 escenas.
+  - RPC por intención, cada una con el número de edición del borrador: `create_tour`, `add_tour_scene`, `update_tour_scene` (**solo los campos enviados**, RC-01), `move_tour_scene`, `remove_tour_scene`, `set_tour_entry_scene`, `publish_tour`, `restore_tour_revision` y `discard_tour_draft`.
+  - Lecturas para miembros: `list_tenant_tours`, `tour_editor` y `tour_revision_document`.
+  - Editores crean y editan; solo propietarios y administradores publican y vuelven a versiones anteriores. Auditoría `tour.created`, `tour.published` y `tour.restored`.
+- `@rikuy/core`:
+  - contrato del tour y sus revisiones;
+  - reglas de la escena (nombre, descripción, vista normalizada que nunca queda fuera de los límites al redondear);
+  - qué falta para publicar;
+  - casos de uso `loadTours`, `createTour`, `loadTourEditor` (con URLs firmadas de la vista previa y la imagen, y los panoramas listos que todavía no están en el tour), `addTourScene`, `updateTourScene`, `changeTourScene`, `publishTour`, `restoreTourRevision` y `discardTourDraft`.
+- `@rikuy/db`: `createTourRepository`, que traduce los códigos de la base a resultados (conflicto, repetido, incompleto…).
+- Panel:
+  - **«Tours 360°»** en la página del municipio: lista con estado y escenas; «Nuevo tour» con los destinos y eventos próximos que todavía no tienen uno.
+  - El editor del tour tiene:
+    - escenas en orden, con «Subir», «Bajar», «Usar como entrada» y «Quitar» (con confirmación);
+    - un **visor 360°** de la escena elegida, con «Usar esta vista como inicial» e «Ir a la vista inicial», y la vista inicial descrita en palabras;
+    - nombre y descripción;
+    - «Agregar escenas» con los panoramas listos;
+    - la publicación con lo que falta;
+    - «Descartar cambios»;
+    - las versiones publicadas con «Volver a esta versión».
+  - Analistas en solo lectura; editores sin «Publicar».
+  - **Photo Sphere Viewer 5.15.1** (`src/components/panorama-viewer`), cargado bajo demanda, sobre el mismo three.js 0.186.0 del visor de modelos: un _override_ de pnpm evita una segunda copia. Las flechas y +/- solo mueven la vista con el visor enfocado; sus controles se anuncian como botones con nombre en español.
+- Tests:
+  - 452 unitarios (core 287, db 96, web 35, worker 27, config 7);
+  - 623 pgTAP (59 nuevos, `018_tours`: aislamiento, roles, panorama en proceso, foto, de otro municipio o repetido, número de edición viejo, cambios parciales, orden sin cambiar la entrada, entrada de otro tour, sellado inmutable, volver a la versión 1 con su grafo, quitar la entrada, descartar);
+  - integración contra Supabase real en Demo Sur (`tours.int.test.ts`): dos escenas → cuatro → volver a dos con su entrada, el analista solo lee y el propietario de otro municipio no ve nada.
+  - 0 hallazgos de `plpgsql_check`.
+- Verificado en local, en el navegador, con los **tres panoramas reales** de 8192 × 4096 px (listos en 3 niveles de teselas en ~78 s):
+  - «Museo histórico» con «Sala de herramientas» y «Sala principal»: vista inicial guardada arrastrando el visor y con el teclado, descripción sin tocar la vista, orden, entrada, publicar, quitar una escena, publicar la versión 2 y volver a la 1;
+  - «Plaza principal» con «Plaza y monumento»;
+  - un editor sin «Publicar», un analista de Demo Sur sin crear y el tour de Demo Norte con 404 bajo Demo Sur;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360, 390 y 1280 px.
+- Lo que encontraron las pruebas, ya corregido:
+  - redondear la vista a 3 decimales podía dar 1,571 > π/2 o −3,142 < −π, y la base la habría rechazado;
+  - el contenedor del visor no recibía el foco, así que las flechas no se podían usar;
+  - los controles del visor eran `<div>` sin nombre para lectores de pantalla.
+
+**Desviaciones:**
+
+- La publicación del tour tiene su propio puntero en vez de ir dentro de la revisión del destino, como proponía el esquema piloto (ADR-028). El portal lo mostrará cuando **ambos** estén publicados.
+- Publicar todavía solo sella y apunta. Los derivados pasan a medios públicos con el manifiesto del tour en el Paso 3, y el portal no muestra tours hasta el Paso 4.
+- El panel usa la imagen única de 4096 px del panorama, no las teselas, que llegan con el visor público.
+- Los recorridos de referencia del CI serán sintéticos (tus archivos no entran al repositorio). Hay 3 panoramas reales en vez de los 6 de museo + carnaval: dos tours reales para verificar a mano y medir, y el grafo de 4 escenas con sintéticos.
+- No se borra un tour ni se cambia el destino al que pertenece (llegará si hace falta).
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p2-step5-quotas
+git checkout feat/p4-step1-tours
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `017_usage_quotas`; la integración, `quotas.int.test.ts` (las 8 subidas simultáneas). En el panel, con `pnpm dev`: «Uso del plan» en la página de un municipio y, como operador, «Cuotas por municipio» en «Plataforma».
+`pnpm db:test` incluye `018_tours` y la integración, `tours.int.test.ts`. En el panel, con `pnpm dev` y el ejecutor configurado: sube tus panoramas en «Panoramas 360°» y procesa la cola (`curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain`). Después, en «Tours 360°», crea un tour para un destino y agrega las escenas. En el visor puedes arrastrar o hacer clic y usar las flechas; «Usar esta vista como inicial» la guarda.
 
 ## Después del merge
 
-Nada que configurar: «Deploy database» aplica la migración, que mide lo que ya hay en Storage. Comprobación: «Uso del plan» de Demo Norte muestra lo ya subido (unos 8 MB) y «Cuotas por municipio» lista los dos municipios con 300 MB y 30 min.
+Nada que configurar: «Deploy database» aplica la migración. Comprobación: en un municipio de demo, «Tours 360°» → «Nuevo tour» para un destino, agrega un panorama ya listo y publica (como propietario).
 
-## Siguiente paso — P4 · Paso 1 (requiere autorización)
+## Siguiente paso — P4 · Paso 2 (requiere autorización)
 
-**Tours 360°**: proponer los pasos de P4 en el roadmap y empezar por el modelo de datos.
+**Editor de hotspots** en el mismo visor, en yaw/pitch:
 
-- Datos: `tours`, `tour_revisions`, `scenes` y `hotspots`, con `entry_scene_id` único y revisiones selladas como los destinos.
-- Hotspots en yaw/pitch, de información, navegación y modelo 3D.
-- Luego vienen el editor con las mismas coordenadas que el visor, el visor público (Photo Sphere Viewer con las teselas del Paso 3) y el modelo 3D bajo demanda con su poster.
-- Contratos RC-01/02/07/08.
+- tipos: información (texto enriquecido y galería), navegación (a otra escena del mismo tour), modelo 3D (GLB listo con poster) e **«ir a otro recorrido»** (a un destino; se resuelve a su entrada al publicar, con ícono y tarjeta propios);
+- se copian con su identificador estable al abrir un borrador;
+- cada formulario guarda solo lo que cambia (RC-01).
 
 ## Decisiones pendientes del usuario
 
