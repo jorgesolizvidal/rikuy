@@ -207,12 +207,29 @@ export default function PanoramaCanvas({
       { once: true },
     );
     viewer.addEventListener("panorama-error", () => callbacks.current.onFailure?.());
-    viewer.addEventListener("click", ({ data }) => {
-      // While placing, any click counts, also over a point: the markers plugin can keep a
-      // point as "hovered" after the pointer left it, which would swallow the click.
-      if (!pickingRef.current || data.rightclick) return;
-      callbacks.current.onPick?.({ yaw: data.yaw, pitch: data.pitch });
-    });
+    // Placing a point: our own pointer handling, not the viewer's "click" (that one waits to
+    // rule out a double click, and the markers plugin swallows it when it believes the
+    // pointer is still over a point). A press that does not move counts as a pick.
+    let pressed: { x: number; y: number } | null = null;
+    const pointerDown = (event: PointerEvent) => {
+      pressed = event.button === 0 ? { x: event.clientX, y: event.clientY } : null;
+    };
+    const pointerUp = (event: PointerEvent) => {
+      const start = pressed;
+      pressed = null;
+      if (!pickingRef.current || !start) return;
+      // The navbar's buttons (zoom, arrows) keep working while placing.
+      if (event.target instanceof Element && event.target.closest(".psv-navbar")) return;
+      if (Math.hypot(event.clientX - start.x, event.clientY - start.y) > 6) return; // a drag
+      const box = container.getBoundingClientRect();
+      const point = viewer.dataHelper.viewerCoordsToSphericalCoords({
+        x: event.clientX - box.left,
+        y: event.clientY - box.top,
+      });
+      callbacks.current.onPick?.({ yaw: point.yaw, pitch: point.pitch });
+    };
+    container.addEventListener("pointerdown", pointerDown, true);
+    container.addEventListener("pointerup", pointerUp, true);
     plugin.current?.addEventListener("select-marker", ({ marker }) => {
       if (pickingRef.current) return;
       callbacks.current.onMarkerSelect?.(marker.id);
@@ -220,6 +237,8 @@ export default function PanoramaCanvas({
 
     return () => {
       buttons.disconnect();
+      container.removeEventListener("pointerdown", pointerDown, true);
+      container.removeEventListener("pointerup", pointerUp, true);
       container.removeEventListener("focusin", focusIn);
       container.removeEventListener("focusout", focusOut);
       plugin.current = null;

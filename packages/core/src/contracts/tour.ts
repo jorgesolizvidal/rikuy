@@ -75,6 +75,8 @@ export const tourHotspotSchema = z.object({
       assetId: z.uuid(),
       version: z.number().int().min(1),
       manifest: modelManifestSchema.nullable().catch(null),
+      /** Already copied to the public bucket (P4 · Paso 3). */
+      published: z.boolean().default(false),
     })
     .nullable(),
   target: z
@@ -105,6 +107,8 @@ export const tourSceneSchema = z.object({
     height: z.number().int().nullable(),
     /** null if the manifest cannot be read (never for a ready panorama). */
     manifest: panoramaManifestSchema.nullable().catch(null),
+    /** Already copied to the public bucket (P4 · Paso 3). */
+    published: z.boolean().default(false),
   }),
   hotspots: z.array(tourHotspotSchema).default([]),
 });
@@ -206,4 +210,104 @@ export interface HotspotTargetOption {
   readonly title: string;
   readonly published: boolean;
   readonly tourPublished: boolean;
+}
+
+// ── What visitors read (P4 · Paso 3, ADR-030) ───────────────────────────────
+
+const publicFile = z.object({
+  file: z.string(),
+  width: z.number().int(),
+  height: z.number().int(),
+  bytes: z.number().int(),
+});
+
+/** The public snapshot a sealed revision keeps: only what visitors need, never the editor's. */
+export const tourManifestSchema = z.object({
+  version: z.literal(1),
+  revisionNo: z.number().int().min(1),
+  entrySceneId: z.uuid(),
+  scenes: z.array(
+    z.object({
+      sceneId: z.uuid(),
+      title: z.string(),
+      description: z.string(),
+      initialView: sceneViewSchema,
+      panorama: z.object({
+        /** {tenant}/{asset}/{version}/panorama/ in the public bucket. */
+        folder: z.string(),
+        width: z.number().int(),
+        height: z.number().int(),
+        preview: publicFile,
+        image: publicFile,
+        tiles: panoramaManifestSchema.shape.tiles,
+      }),
+      hotspots: z.array(
+        z.object({
+          hotspotId: z.uuid(),
+          kind: z.enum(HOTSPOT_KINDS),
+          position: hotspotPositionSchema,
+          title: z.string(),
+          body: richTextSchema.catch([]),
+          gallery: z.array(
+            z.object({
+              assetId: z.uuid(),
+              version: z.number().int(),
+              alt: z.string(),
+              width: z.number().int(),
+              height: z.number().int(),
+            }),
+          ),
+          targetSceneId: z.uuid().nullable(),
+          model: z
+            .object({
+              folder: z.string(),
+              file: z.string(),
+              bytes: z.number().int(),
+              weight: z.enum(["light", "heavy"]),
+              poster: publicFile,
+            })
+            .nullable(),
+          targetContentId: z.uuid().nullable(),
+        }),
+      ),
+    }),
+  ),
+});
+
+export type TourManifest = z.infer<typeof tourManifestSchema>;
+export type TourManifestScene = TourManifest["scenes"][number];
+export type TourManifestHotspot = TourManifestScene["hotspots"][number];
+
+/** Where a "go to another tour" point leads, resolved when the tour is read. */
+export interface PublishedTourTarget {
+  readonly kind: TourContentKind;
+  readonly slug: string;
+  readonly title: string;
+}
+
+export interface PublishedTour {
+  readonly kind: TourContentKind;
+  readonly slug: string;
+  readonly title: string;
+  readonly revisionNo: number;
+  readonly publishedAt: string;
+  /** Events: already over (the tour page stays, like the event's). */
+  readonly ended: boolean;
+  readonly manifest: TourManifest;
+  /** By content id; a "go to" point whose target is missing here is hidden. */
+  readonly targets: Readonly<Record<string, PublishedTourTarget>>;
+}
+
+/** One row of the general tour's index (only the entry's preview, never the whole tour). */
+export interface PublishedTourIndexEntry {
+  readonly kind: TourContentKind;
+  readonly slug: string;
+  readonly title: string;
+  readonly scenes: number;
+  readonly entryTitle: string;
+  /** {tenant}/{asset}/{version}/panorama/ and the preview file inside it. */
+  readonly entryFolder: string;
+  readonly entryPreview: { readonly file: string; readonly width: number; readonly height: number };
+  readonly location: { readonly lat: number; readonly lng: number } | null;
+  readonly publishedAt: string;
 }

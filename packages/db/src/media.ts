@@ -178,6 +178,15 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
     ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
   });
   const originals = () => admin.storage.from(MEDIA_BUCKETS.originals);
+  // The database checks the version is ready and belongs to the tenant (idempotent).
+  const markPublished = async (tenantId: string, assetId: string, version: number) => {
+    const { error } = await admin.rpc("media_publish_version", {
+      p_tenant_id: tenantId,
+      p_asset_id: assetId,
+      p_version: version,
+    });
+    if (error) throw unexpected("Publishing the media version", error);
+  };
 
   return {
     async readOriginal(originalPath) {
@@ -195,6 +204,8 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
             const { error } = await originals().upload(`${prefix}${file.name}`, file.bytes, {
               contentType: file.contentType,
               upsert: true,
+              // Versioned paths never change: the public copies keep this cache too.
+              cacheControl: "31536000",
             });
             if (error) throw unexpected(`Storing ${file.name}`, error);
           }),
@@ -229,14 +240,6 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
     },
 
     async publish(tenantId, assetId, version, files) {
-      // The database checks the version is ready and belongs to the tenant (idempotent).
-      const { error } = await admin.rpc("media_publish_version", {
-        p_tenant_id: tenantId,
-        p_asset_id: assetId,
-        p_version: version,
-      });
-      if (error) throw unexpected("Publishing the image", error);
-
       const prefix = `${tenantId}/${assetId}/${version}/`;
       for (const name of files) {
         const source = await originals().download(`${prefix}${name}`);
@@ -251,6 +254,25 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
           });
         if (uploadError) throw unexpected(`Publishing ${name}`, uploadError);
       }
+      // Marked published only once its files are public: the quota then measures them too.
+      await markPublished(tenantId, assetId, version);
+    },
+
+    async publishFiles(tenantId, assetId, version, files) {
+      const prefix = `${tenantId}/${assetId}/${version}/`;
+      // Copied inside Storage, a few at a time (an 8K panorama has ~170 tiles).
+      for (let start = 0; start < files.length; start += 16) {
+        await Promise.all(
+          files.slice(start, start + 16).map(async (name) => {
+            const { error } = await originals().copy(`${prefix}${name}`, `${prefix}${name}`, {
+              destinationBucket: MEDIA_BUCKETS.public,
+            });
+            // Already public (an earlier publication or another tour): nothing to do.
+            if (error && !isAlreadyThere(error)) throw unexpected(`Publishing ${name}`, error);
+          }),
+        );
+      }
+      await markPublished(tenantId, assetId, version);
     },
   };
 }
@@ -308,4 +330,10 @@ export function createSharpImageProcessor(): ImageProcessor {
       };
     },
   };
+}
+
+/** Storage's answer when the destination of a copy already exists. */
+function isAlreadyThere(error: { readonly message: string }): boolean {
+  const status = String((error as { statusCode?: unknown }).statusCode ?? "");
+  return status === "409" || /already exists|duplicate/iu.test(error.message);
 }

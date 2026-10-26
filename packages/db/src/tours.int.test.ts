@@ -3,8 +3,8 @@
  * person's session: a tour of two scenes is published, a new draft of four keeps the
  * scene ids, rolling back brings the two-scene graph back with its own entry (RC-02), the
  * analyst only reads and another municipality's owner sees nothing. Demo Sur only (Demo
- * Norte stays as the seed left it, for RC-15). The panoramas are inserted ready by the
- * test: the pipeline has its own suite.
+ * Norte stays as the seed left it, for RC-15). The panoramas are inserted ready and public
+ * by the test: the pipeline and the publication of files have their own suites.
  */
 import { randomUUID } from "node:crypto";
 
@@ -53,9 +53,9 @@ describe.runIf(stackAvailable)("tours against local Supabase", () => {
       await admin`insert into public.assets (id, tenant_id, purpose) values (${asset}, ${SUR}, 'panorama')`;
       await admin`
         insert into public.asset_versions (id, tenant_id, asset_id, version, status, declared_mime, declared_bytes,
-                                           mime, bytes, width, height, sha256, ready_at, manifest)
+                                           mime, bytes, width, height, sha256, ready_at, manifest, published_at)
         values (${version}, ${SUR}, ${asset}, 1, 'ready', 'image/jpeg', 1000, 'image/jpeg', 1000, 8192, 4096,
-                ${"b".repeat(64)}, now(), ${admin.json(MANIFEST)})
+                ${"b".repeat(64)}, now(), ${admin.json(MANIFEST)}, now())
       `;
       // Inserted already ready: nothing is reserved against the quotas.
       panoramas.push(version);
@@ -179,9 +179,9 @@ describe.runIf(stackAvailable)("tours against local Supabase", () => {
     await admin`insert into public.assets (id, tenant_id, purpose) values (${photoAsset}, ${SUR}, 'content')`;
     await admin`
       insert into public.asset_versions (id, tenant_id, asset_id, version, status, declared_mime, declared_bytes,
-                                         mime, bytes, width, height, sha256, ready_at)
+                                         mime, bytes, width, height, sha256, ready_at, published_at)
       values (${photo}, ${SUR}, ${photoAsset}, 1, 'ready', 'image/jpeg', 1000, 'image/jpeg', 1000, 2048, 1536,
-              ${"c".repeat(64)}, now())
+              ${"c".repeat(64)}, now(), now())
     `;
     const content = createContentRepository(owner.client);
     const created = await content.createDestination(

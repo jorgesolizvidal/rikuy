@@ -50,6 +50,8 @@ select version_id, tenant, asset, 1, status, 'image/jpeg', 1000,
        case when status = 'ready' then now() end,
        case when status = 'ready' and purpose = 'panorama' then :'manifest'::jsonb end
 from media;
+-- Ready media counts as public here: publishing it is the server's job (020_tour_publication).
+update public.asset_versions set published_at = now() where status = 'ready';
 grant select on media to authenticated;
 
 create temp table ids (name text primary key, id uuid);

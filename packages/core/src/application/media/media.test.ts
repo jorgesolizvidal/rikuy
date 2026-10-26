@@ -192,6 +192,7 @@ function fakes(
       new Map(paths.map((path) => [path, `https://storage.test/sign/${path}`])),
   };
   const admin: MediaAdmin = {
+    publishFiles: async () => undefined,
     readOriginal: async () => (options.original === undefined ? png(512, 512) : options.original),
     async storeDerivatives(prefix, files) {
       calls.push(`store:${prefix}:${files.map((f) => f.name).join(",")}`);

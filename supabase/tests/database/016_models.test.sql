@@ -43,8 +43,8 @@ select ok(
   'the private bucket accepts GLB files and the KTX2 textures of the pipeline'
 );
 select ok(
-  (select not ('model/gltf-binary' = any(allowed_mime_types)) from storage.buckets where id = 'media-public'),
-  'nothing public accepts GLB files yet (tours publish them, P4)'
+  (select 'model/gltf-binary' = any(allowed_mime_types) from storage.buckets where id = 'media-public'),
+  'only the public bucket for published tours accepts GLB files besides the originals (P4 · Paso 3)'
 );
 set local role authenticated;
 set local request.jwt.claims to :'a3c';

@@ -23,6 +23,8 @@ import {
 } from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
+import { mediaAdmin } from "@/server/media-admin";
+import { refreshPortal } from "@/server/portal-cache";
 
 /**
  * Tour editing (P4 · Paso 1). Each action is one intent with the draft's edit number;
@@ -123,9 +125,21 @@ export async function publishTourAction(
   slug: string,
   target: { readonly tourId: string; readonly expectedEdit: number | null },
 ): Promise<PublishTourState> {
-  return run(slug, async (membership) =>
-    publishTour(membership, target, (await adminSession()).tours),
-  );
+  return run(slug, async (membership) => {
+    const session = await adminSession();
+    // Copies the tour's media to the public bucket, then seals it (ADR-030).
+    const result = await publishTour(membership, target, {
+      tours: session.tours,
+      media: mediaAdmin(),
+    });
+    if (result.status === "published") {
+      await refreshPortal(
+        (tenantId) => session.content.portalHostname(tenantId),
+        membership.tenantId,
+      );
+    }
+    return result;
+  });
 }
 
 export type RestoreTourState = RestoreTourOutcome | SessionProblem;
@@ -134,9 +148,17 @@ export async function restoreTourAction(
   slug: string,
   target: { readonly tourId: string; readonly revisionId: string },
 ): Promise<RestoreTourState> {
-  return run(slug, async (membership) =>
-    restoreTourRevision(membership, target, (await adminSession()).tours),
-  );
+  return run(slug, async (membership) => {
+    const session = await adminSession();
+    const result = await restoreTourRevision(membership, target, session.tours);
+    if (result.status === "restored") {
+      await refreshPortal(
+        (tenantId) => session.content.portalHostname(tenantId),
+        membership.tenantId,
+      );
+    }
+    return result;
+  });
 }
 
 export type DiscardTourState = DiscardTourOutcome | SessionProblem;

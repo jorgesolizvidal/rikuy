@@ -29,7 +29,8 @@ import type { ContentStatus } from "../content/ports";
 import { contentImagePath } from "../media/content-images";
 import { MODEL_FOLDER, type ModelRepository } from "../media/models";
 import { PANORAMA_FOLDER, type PanoramaRepository } from "../media/panoramas";
-import { imageVersionPrefix, type MediaRepository } from "../media/ports";
+import { imageVersionPrefix, type MediaAdmin, type MediaRepository } from "../media/ports";
+import { publishTourMedia, tourMediaPlan } from "./publication";
 
 /**
  * Tours 360° in the panel (P4 · Paso 1, ADR-028). The same people as destinations edit
@@ -467,10 +468,18 @@ export async function changeTourScene(
   }
 }
 
+/**
+ * Publishes the open draft: checks it is complete, copies its media to the public bucket
+ * (panoramas with their tiles, models with their poster, photos) and then seals it with its
+ * public manifest, in one transaction (ADR-030). An old edit number stops before copying.
+ */
 export async function publishTour(
   membership: OrganizationMembership,
   input: { readonly tourId: unknown; readonly expectedEdit: unknown },
-  tours: Pick<TourRepository, "publish">,
+  deps: {
+    readonly tours: Pick<TourRepository, "find" | "publish">;
+    readonly media: Pick<MediaAdmin, "publish" | "publishFiles">;
+  },
 ): Promise<PublishTourOutcome> {
   if (!canPublishContent(membership.role)) return { status: "forbidden" };
   if (
@@ -480,7 +489,16 @@ export async function publishTour(
   ) {
     return { status: "not_found" };
   }
-  return tours.publish(membership.tenantId, input.tourId, input.expectedEdit);
+  const record = await deps.tours.find(membership.tenantId, input.tourId);
+  if (!record) return { status: "not_found" };
+  const draft = record.draft;
+  if (!draft || draft.editCount !== input.expectedEdit) return { status: "conflict" };
+  const issues = tourPublicationIssues(draft);
+  if (issues.includes("model_poster")) return { status: "poster" };
+  if (issues.length > 0) return { status: "incomplete" };
+
+  await publishTourMedia(membership.tenantId, tourMediaPlan(draft), deps.media);
+  return deps.tours.publish(membership.tenantId, input.tourId, input.expectedEdit);
 }
 
 export async function restoreTourRevision(
