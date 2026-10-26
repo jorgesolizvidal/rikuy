@@ -114,6 +114,12 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
   - «Ir a otro recorrido» apunta al contenido y se resuelve al abrirlo.
   - El aspecto de los puntos es compartido entre panel y portal y se arma sin HTML.
 
+- Publicación de tours (P4 · Paso 3, [ADR-030](adr/ADR-030-tour-publication.md)):
+  - los medios del tour (teselas incluidas) se copian dentro de Storage al bucket público **antes** de sellar;
+  - la revisión sellada guarda un manifiesto público inmutable;
+  - `portal_tour` y `portal_tour_index` son las únicas lecturas del visitante;
+  - una versión se marca publicada después de copiar sus archivos, así la cuota cuenta las copias.
+
 ## 8 bis. Cuotas por municipio (ADR-012, ADR-027)
 
 - Dos recursos en `usage_buckets`:

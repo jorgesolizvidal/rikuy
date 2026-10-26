@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
-- **Último paso completado:** P4 · Paso 2 — editor de puntos (hotspots) (2026-10-26)
-- **Rama:** `feat/p4-step2-hotspots` → PR hacia `main`
+- **Último paso completado:** P4 · Paso 3 — publicación de medios y manifiesto del tour (2026-10-26)
+- **Rama:** `feat/p4-step3-tour-publication` → PR hacia `main`
 
 ## Historial
 
@@ -558,35 +558,79 @@ Lo que encontraron las pruebas:
 - Cambiar el tipo de un punto exige quitarlo y crear otro.
 - Las fotos de los puntos pasan a medios públicos al publicar en el Paso 3, junto con los panoramas y los modelos.
 
+### P4 · Paso 3 — publicación de medios y manifiesto del tour ✅
+
+- Decisión ([ADR-030](../adr/ADR-030-tour-publication.md)): al publicar, **primero se copian los medios al bucket público y después se sella**. Si la copia falla, no se sella nada.
+- Base de datos (`20261027100000_p4_tour_publication.sql`, solo expand):
+  - `media-public` acepta modelos GLB, hasta 15 MB (el límite del optimizado).
+  - `tour_revisions.manifest`: el **manifiesto público** de cada revisión sellada (≤ 1 MB).
+    - Contiene las escenas con la carpeta pública del panorama, su vista previa, imagen y teselas, los puntos con su texto, las fotos con su tamaño, el modelo con su poster, las flechas y el destino de cada «ir a otro recorrido».
+    - No lleva nada del editor.
+    - Es inmutable como la revisión; una revisión sellada sin manifiesto no puede existir.
+    - Las revisiones ya selladas reciben el suyo al migrar.
+  - `publish_tour` exige además que los panoramas, las fotos y los modelos sean **públicos**, no solo estén listos.
+  - Lecturas anónimas, solo de municipios activos con contenido y tour publicados:
+    - `portal_tour` (un tour por tipo y dirección, con los «ir a otro recorrido» resueltos; los que no tienen tour visible se omiten);
+    - `portal_tour_index` (los tours visibles para el recorrido general, con la vista previa de su entrada y la ubicación). Un evento terminado conserva la página de su tour, pero sale del índice.
+- `@rikuy/core`:
+  - contrato `tourManifestSchema`, `PublishedTour` y `PublishedTourIndexEntry`;
+  - `tourMediaPlan` lista los archivos de cada panorama que todavía no es público (vista previa, imagen y **todas las teselas**), de cada modelo (`.glb` y poster) y las fotos de los puntos; lo que ya es público no se vuelve a copiar;
+  - `publishTour` revisa el número de edición, el poster y lo que falta **antes** de copiar nada, copia los medios y después sella.
+- `@rikuy/db`:
+  - `publishFiles` copia dentro de Storage de un bucket al otro (de a 16; los bytes no pasan por el servidor) y un archivo que ya existe cuenta como copiado;
+  - una versión se marca publicada **después** de copiar sus archivos, así la cuota cuenta las copias públicas. Las fotos de destinos y eventos siguen ahora el mismo orden;
+  - los derivados se guardan con `Cache-Control` de un año (rutas versionadas);
+  - `createSupabasePublishedTourReader` lee `portal_tour` y `portal_tour_index` con la clave pública.
+- Panel:
+  - «Publicar» muestra «Publicando…» mientras se copian los medios y después «Se publicó el tour: sus panoramas, fotos y modelos ya son públicos.»;
+  - publicar o volver a una versión invalida la caché del portal **solo de ese municipio**.
+- Tests:
+  - 471 unitarios (core 300, db 102, web 35, worker 27, config 7);
+  - 696 pgTAP (30 nuevos, `020_tour_publication`): límites del bucket público; publicar con medios listos pero privados → rechazado; contenido e inmutabilidad del manifiesto; visibilidad anónima (borrador, tour sin publicar, contenido sin publicar, municipio suspendido); destino de «ir a otro recorrido» resuelto u omitido; índice sin el evento terminado; volver a la versión 1 sirve su propio manifiesto;
+  - integración contra Supabase real (`tour-publication.int.test.ts`): publicar copia al bucket público, la URL pública responde con la imagen, el lector anónimo encuentra el tour y el índice, y la versión 2 se publica sobre la 1;
+  - 0 hallazgos de `plpgsql_check`.
+- Verificado en local, en el navegador, con los panoramas y modelos reales:
+  - publicar la plaza hizo públicos los 170 archivos de su panorama;
+  - publicar el museo con sus cuatro puntos hizo públicos **solo** los medios usados: sus panoramas (170 archivos cada uno), el modelo usado (2 archivos) y la foto usada (3 tamaños). El otro modelo y las otras fotos siguen privados;
+  - el índice lista el museo y la plaza, y en el museo «Ir a la plaza» se resuelve a `plaza-principal`;
+  - las teselas y el `.glb` públicos responden 200 con caché de un año; un archivo privado por la URL pública no responde;
+  - la cuota del municipio cuenta las copias públicas;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360, 390 y 1280 px.
+- Lo que encontraron las pruebas, ya corregido:
+  - el plugin de marcadores volvía a tragarse a veces el toque al colocar un punto: ahora el editor detecta él mismo el toque (sin arrastre) y calcula la posición;
+  - las fotos se marcaban publicadas antes de subir sus copias, así que la cuota no las contaba.
+
+**Desviaciones:**
+
+- El portal todavía no muestra tours: el visor público llega en el Paso 4 (este paso deja listas las lecturas y su prueba).
+- La copia se hace dentro de la acción de publicar. En local, con Storage simulado, el museo tardó 30 s; en Supabase la copia es interna y debería tardar segundos. Si con tours más grandes se acerca al límite de la función, pasará a un trabajo de la cola.
+- El orden del recorrido general es por tipo y nombre hasta el Paso 5, donde lo elige el municipio.
+- Un medio que dejó de usarse sigue público; retirarlo llegará con la limpieza de medios huérfanos.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p4-step2-hotspots
+git checkout feat/p4-step3-tour-publication
 pnpm install
 pnpm db:reset
 pnpm db:test
 pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `019_hotspots` y la integración, el caso RC-01 de `tours.int.test.ts`. En el panel, con `pnpm dev` y el ejecutor configurado:
-
-1. Sube panoramas y modelos y procesa la cola (`curl.exe -X POST -H "Authorization: Bearer <tu JOB_RUNNER_SECRET local>" http://localhost:3000/api/jobs/drain`).
-2. Abre «Modelos 3D» una vez para que se capture la imagen de cada modelo.
-3. En el editor del tour, elige «Agregar un punto», luego el tipo, y toca el panorama o usa «Poner en el centro de la vista».
+`pnpm db:test` incluye `020_tour_publication`, y la integración, `tour-publication.int.test.ts`. En el panel, con `pnpm dev`, publica un tour: el botón dice «Publicando…» y al terminar, en Supabase Studio (`media-public`), aparece la carpeta `panorama/` de cada escena con sus teselas.
 
 ## Después del merge
 
-Nada que configurar: «Deploy database» aplica la migración. Comprobación: en un tour de demo, agrega un punto «Ir a otro recorrido» hacia un destino con tour publicado y publica.
+«Deploy database» aplica la migración y da su manifiesto a los tours ya publicados. Si publicaste un tour en producción antes de este paso, sus medios siguen privados: cambia algo pequeño (una descripción) y vuelve a publicarlo para que pasen al portal.
 
-## Siguiente paso — P4 · Paso 3 (requiere autorización)
+## Siguiente paso — P4 · Paso 4 (requiere autorización)
 
-**Publicación de medios y manifiesto del tour:**
+**Visor público del tour en el portal:**
 
-- al publicar, los panoramas (vista previa, imagen y teselas), las fotos de los puntos y los modelos con su poster pasan a medios públicos;
-- un manifiesto del tour por revisión sellada y el índice del recorrido general;
-- invalidar la caché solo de ese municipio;
-- cuotas medidas con los derivados públicos;
-- el portal mostrará siempre la versión sellada correcta.
+- página del tour en cada destino o evento con tour publicado, con la vista previa al instante y teselas por nivel según el zoom;
+- los cuatro tipos de puntos (información con fotos, flecha, modelo 3D con su poster, «ir a otro recorrido»);
+- visor cargado bajo demanda (fuera del bundle inicial), teclado, alternativa en texto y «reducir movimiento»;
+- **primera medición en tu Android** cuando esté en producción (te aviso).
 
 ## Decisiones pendientes del usuario
 
