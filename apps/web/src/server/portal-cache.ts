@@ -33,6 +33,7 @@ export async function refreshPortal(
       PORTAL_PATHS.terms,
       ...destinations.map((destination) => PORTAL_PATHS.destination(destination.slug)),
       ...events.map((event) => PORTAL_PATHS.event(event.slug)),
+      PORTAL_PATHS.generalTour,
       ...tours.map((tour) => tourPath(tour.kind, tour.slug)),
     ];
     for (const path of paths) revalidatePath(`${base}${path}`);

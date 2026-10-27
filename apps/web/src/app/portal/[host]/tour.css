@@ -55,8 +55,7 @@
 }
 
 .tour-bar {
-  display: grid;
-  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  display: flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.5rem 0.75rem;
@@ -99,6 +98,8 @@
 }
 
 .tour-bar-title {
+  flex: 1;
+  min-width: 0;
   display: grid;
   margin: 0;
   text-align: center;
@@ -369,4 +370,144 @@
 
 .tour-gallery-controls .portal-button:disabled {
   opacity: 0.45;
+}
+
+/* ── The general tour's menu (P4 · Paso 5) ───────────────────────────────── */
+.tour-menu {
+  position: absolute;
+  inset: 0 auto 0 0;
+  z-index: 120; /* above the viewer's canvas, markers and navbar */
+  display: flex;
+  flex-direction: column;
+  width: min(22rem, 88%);
+  background: rgb(22 20 18 / 94%);
+  color: var(--tour-chrome-fg);
+  box-shadow: 4px 0 24px rgb(0 0 0 / 35%);
+  overflow: hidden;
+}
+
+.tour-menu[hidden] {
+  display: none;
+}
+
+.tour-menu-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  padding: 0.75rem 0.75rem 0.25rem 1rem;
+}
+
+.tour-menu-header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+}
+
+.tour-menu-close {
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid rgb(247 243 238 / 35%);
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  font-size: 1.375rem;
+  cursor: pointer;
+}
+
+.tour-menu-near {
+  padding: 0.25rem 1rem 0.5rem;
+}
+
+.tour-menu-near .portal-button {
+  border-color: rgb(247 243 238 / 60%);
+  color: inherit;
+  min-height: 2.5rem;
+  font-size: 0.9375rem;
+}
+
+.tour-menu-near .portal-location-status,
+.tour-menu-note {
+  margin: 0.375rem 0 0;
+  font-size: 0.8125rem;
+  opacity: 0.85;
+}
+
+.tour-menu-list {
+  flex: 1;
+  margin: 0;
+  padding: 0.25rem 0.5rem 0.75rem;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.tour-menu-entry {
+  display: grid;
+  grid-template-columns: 4.5rem minmax(0, 1fr);
+  align-items: center;
+  gap: 0.75rem;
+  min-height: 3.25rem;
+  padding: 0.375rem 0.5rem;
+  border-radius: 0.625rem;
+  color: inherit !important;
+  text-decoration: none;
+}
+
+.tour-menu-entry:hover {
+  background: rgb(247 243 238 / 10%);
+}
+
+.tour-menu-entry[aria-current="page"] {
+  background: rgb(247 243 238 / 18%);
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.tour-menu-entry img {
+  width: 4.5rem;
+  height: 2.25rem;
+  object-fit: cover;
+  border-radius: 0.375rem;
+  background: rgb(247 243 238 / 12%);
+}
+
+.tour-menu-text {
+  display: grid;
+  min-width: 0;
+  line-height: 1.25;
+}
+
+.tour-menu-text strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tour-menu-text span {
+  font-size: 0.8125rem;
+  opacity: 0.8;
+}
+
+.tour-menu-loading {
+  font-weight: 600;
+  opacity: 1 !important;
+}
+
+.tour-guide-others {
+  grid-column: 1 / -1;
+}
+
+.tour-guide-others ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tour-guide-others a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.75rem;
+  font-weight: 600;
 }

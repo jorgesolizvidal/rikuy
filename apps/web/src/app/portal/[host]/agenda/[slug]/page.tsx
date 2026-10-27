@@ -17,7 +17,7 @@ import {
   portalEvent,
   portalNearbyTargets,
   portalOrigin,
-  portalTour,
+  portalHasTour,
   responsiveImage,
 } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
@@ -86,7 +86,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const { view, event } = loaded;
   const [targets, tour] = await Promise.all([
     portalNearbyTargets(view),
-    portalTour(view, "event", event.slug),
+    portalHasTour(view, "event", event.slug, event.ended),
   ]);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;

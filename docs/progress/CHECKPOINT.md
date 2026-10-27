@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
-- **Último paso completado:** P4 · Paso 4 — visor público del tour (2026-10-26)
-- **Rama:** `feat/p4-step4-public-viewer` → PR hacia `main`
+- **Último paso completado:** P4 · Paso 5 — recorrido general (2026-10-26)
+- **Rama:** `feat/p4-step5-general-tour` → PR hacia `main`
 
 ## Historial
 
@@ -661,45 +661,107 @@ Lo que encontraron las pruebas:
 - «Ir a otro recorrido» abre la página del otro tour; saltar sin salir del visor llega con el recorrido general (Paso 5).
 - La página del tour no tiene umbral de rendimiento en Lighthouse, igual que `/mapa`: se fija tras medirla en tu Android.
 
+**Primera medición en Android (2026-10-26):** el usuario probó el tour en producción en su celular y funciona bien.
+
+### P4 · Paso 5 — recorrido general ✅
+
+- Decisiones ([ADR-032](../adr/ADR-032-general-tour.md)): el recorrido general lo forman los tours visibles; el municipio elige solo el orden y el tour de inicio, y el visitante salta entre tours sin salir del visor.
+- Base de datos (`20261028000000_p4_general_tour.sql`, solo expand):
+  - `general_tours` (tour de inicio y número de edición, una fila por municipio) y `general_tour_entries` (posición de cada tour, con FK compuestas). RLS de lectura por membresía; sin escrituras directas.
+  - `save_general_tour` (propietarios y administradores, con el número de edición):
+    - cada tour una sola vez, todos tours publicados del mismo municipio;
+    - el tour de inicio, también del municipio;
+    - auditoría `tour.general_saved`.
+  - `general_tour_editor` lista para cualquier miembro todos los tours publicados, en orden, y dice si se ven o por qué no (evento terminado, contenido sin publicar).
+  - `portal_tour_index` ahora viene en el orden del municipio (los que no tienen lugar, después, por tipo y nombre) y marca el tour de inicio. Si el elegido no se ve, empieza el primero.
+- `@rikuy/core`:
+  - `loadGeneralTour` y `saveGeneralTour` (rol, ids, repetidos);
+  - `PORTAL_PATHS.generalTour` (`/recorrido`) y `tourData` (`/recorrido/datos`);
+  - el índice suma `position` y `start`, y el sitemap incluye `/recorrido`.
+- Portal:
+  - **«Tours 360°» en la cabecera** cuando hay tours. El índice se lee junto con la marca, en paralelo; si falla, la página sigue sin el enlace.
+  - **`/recorrido`** abre el tour de inicio.
+  - **Menú lateral «Tours»** sobre el visor, también en pantalla completa:
+    - cada tour con la vista previa de su entrada (cargada solo al abrir el menú), su tipo y sus escenas;
+    - el actual, marcado;
+    - Escape lo cierra y devuelve el foco; cerrado queda `hidden`.
+  - **«Cerca de ti»**: «Ver los más cercanos» ordena el menú por distancia, en el dispositivo.
+  - **Saltar sin salir del visor** desde el menú, la píldora «ir a otro recorrido» o «Más tours del municipio»:
+    - se piden **solo los datos de ese tour** (`/recorrido/datos`, caché corta en la CDN);
+    - el mismo visor cambia de panorama;
+    - la dirección pasa a la página de ese tour y «atrás» vuelve;
+    - un tour ya visto no se vuelve a pedir, y una respuesta tardía nunca gana.
+  - Título, ruta de navegación y «Volver a…» siguen al tour actual.
+- Panel, «Tours 360°»:
+  - sección **«Recorrido general»** con «Subir», «Bajar» y «Empezar aquí», cada tour con «Se ve en el recorrido» o el motivo por el que no, y «Guardar el orden»;
+  - el enlace y el **QR del recorrido general**;
+  - editores y analistas lo ven sin controles;
+  - el texto de la página ya no dice que los tours no se ven en el portal.
+- Rendimiento: con este paso, el LCP de las fichas en el CI quedó en 2,53–2,59 s, sobre el límite de 2,5 s. El medidor ahora deja los números de cada página y las partes de su LCP como **anotación** del job, y así se vio que el retraso estaba en lo que bloquea la primera pintura, no en el servidor (TTFB de 3–8 ms). Correcciones:
+  - los estilos del panel salen de `globals.css` (que también carga el portal) a `admin/admin.css`: el CSS del portal baja de 9 a 5 KB;
+  - la fuente de títulos del portal se sirve con `next/font/local` y se precarga con la página (antes se descubría después del CSS);
+  - la cabecera lee el índice de tours solo en las páginas, no en los íconos ni en el manifiesto, y las fichas saben si tienen tour por ese mismo índice, sin otra consulta.
+  - Resultado en el CI: fichas en 2,44–2,46 s, inicio y listados en 1,8–2,4 s, CLS 0; accesibilidad, buenas prácticas y SEO 100.
+- Corrección del Paso 4: el nombre accesible del visor cambiaba con cada escena y eso **reconstruía el visor entero** (WebGL incluido). Terminaba en la escena correcta, pero con trabajo de más. Ahora el nombre se actualiza sin rehacerlo, y RC-07 comprueba que el visor es el mismo de principio a fin.
+- Tests:
+  - 482 unitarios (core 311, db 102, web 35, worker 27, config 7);
+  - 720 pgTAP (24 nuevos, `021_general_tour`):
+    - orden por defecto y tour de inicio;
+    - el analista lee, y el editor, el analista y otro municipio no guardan;
+    - número de edición viejo, repetidos, huecos, tour de otro municipio o nunca publicado;
+    - un evento terminado elegido como inicio se salta;
+    - auditoría, visitantes sin acceso a las tablas y aislamiento;
+  - 0 hallazgos de `plpgsql_check`;
+  - integración contra Supabase real: guardar el orden pone el tour primero y como inicio; un número viejo da conflicto;
+  - **RC-07 ampliado** (4 casos en el navegador):
+    - el recorrido completo ahora comprueba que es la misma página y el mismo visor de principio a fin, y que la píldora salta pidiendo solo los datos de la plaza;
+    - **recorrido general**:
+      - la cabecera lleva a `/recorrido` y empieza en el tour elegido;
+      - no se descarga nada del otro tour, ni su vista previa, hasta abrir el menú;
+      - el menú sigue el orden del municipio y, con la ubicación junto al museo, «Ver los más cercanos» lo pone primero;
+      - el salto pide solo los datos y la entrada del museo, nada de sus otras escenas;
+      - «atrás» vuelve sin recargar;
+      - con los datos del museo llegando 2,5 s tarde, volver a la plaza gana.
+- Verificado en local, en el navegador, con los panoramas y modelos reales:
+  - `/recorrido` empieza en el museo; el menú y el salto a la plaza usan la misma página y el mismo visor, con una petición de datos y 9 teselas;
+  - «atrás», la píldora, «Más tours», el menú con el teclado y Escape;
+  - axe con el menú abierto sin hallazgos críticos ni graves y sin desbordes a 360 y 390 px;
+  - en el panel, poner la plaza primero y como inicio cambia `/recorrido` al momento (la caché del municipio se invalida);
+  - un editor ve el orden sin botones;
+  - contratos RC-09/10/11/12 en verde (189), ahora también rastreando `/recorrido`.
+
+**Desviaciones:**
+
+- Las fichas quedan a ~50 ms del límite de LCP del CI: es el margen que hay que cuidar en los próximos pasos.
+- El orden no tiene versiones (sí auditoría): volver a uno anterior es reordenar.
+- En el celular, el menú cubre el visor mientras está abierto; se cierra al elegir un tour.
+- El modelo 3D dentro del tour sigue con su poster hasta el Paso 6.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p4-step4-public-viewer
+git checkout feat/p4-step5-general-tour
 pnpm install
 pnpm db:reset
-pnpm --filter @rikuy/web build
+pnpm db:test
+pnpm --filter @rikuy/db test:integration
 ```
 
-Con `pnpm dev` (o `next start`) y un tour publicado de un destino publicado, abre la ficha en el portal y pulsa «Ver el tour 360°». Para la prueba RC-07, con la pila local de Supabase y el servidor en el puerto 3000:
-
-```powershell
-$env:SUPABASE_URL="http://127.0.0.1:54321"; $env:SUPABASE_SECRET_KEY="<clave secreta local>"
-pnpm --filter @rikuy/web test:e2e-tour
-```
+`pnpm db:test` incluye `021_general_tour`. En el panel, «Tours 360°» → «Recorrido general»: cambia el orden, elige «Empezar aquí» y guarda. En el portal, «Tours 360°» en la cabecera abre `/recorrido`; el botón «Tours» del visor abre el menú.
 
 ## Después del merge
 
-Nada que configurar. **Primera medición en tu Android** (cuando producción sirva este paso):
+«Deploy database» aplica la migración. Comprobación: con dos tours publicados en un municipio de demo, ordénalos en el panel y abre «Tours 360°» en el portal desde el celular.
 
-1. En el panel de Demo Norte, sube 2 o 3 panoramas, crea el tour de un destino publicado, agrega puntos y publícalo.
-2. En el editor del tour, «Para visitantes»: escanea el QR con el celular.
-3. Anota:
-   - cuánto tarda en verse la vista previa y cuánto el panorama nítido;
-   - si mirar alrededor y acercar va fluido;
-   - si al acercar se ve más nítido (teselas);
-   - si cambiar de escena rápido termina en la última;
-   - si el celular se calienta o la pestaña se recarga sola.
-4. Si puedes, pasa la dirección por PageSpeed Insights. Speed Insights de Vercel junta además los datos reales.
+## Siguiente paso — P4 · Paso 6 (requiere autorización)
 
-## Siguiente paso — P4 · Paso 5 (requiere autorización)
+**Modelos 3D dentro del tour (RC-08):**
 
-**Recorrido general:**
-
-- menú lateral con los destinos y eventos que tienen tour;
-- el orden y el tour de inicio los elige el municipio;
-- «cerca de ti» (en el dispositivo, como ADR-021);
-- los eventos terminados quedan fuera del menú;
-- saltar entre tours sin salir del visor, descargando solo el tour elegido.
+- el punto de modelo abre el visor 3D (three.js, KTX2) bajo demanda, sobre su poster;
+- ninguna petición del GLB antes de abrirlo;
+- pérdida del contexto WebGL con aviso y vuelta al poster;
+- teclado, «reducir movimiento» y descripción en texto;
+- medir la memoria en tu Android.
 
 ## Decisiones pendientes del usuario
 

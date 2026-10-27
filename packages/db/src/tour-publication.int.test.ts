@@ -14,7 +14,11 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { createContentRepository } from "./content";
 import { env, signIn, stackAvailable, USERS } from "./integration/local-stack";
 import { createSupabaseMediaAdmin, publicMediaUrl } from "./media";
-import { createSupabasePublishedTourReader, createTourRepository } from "./tours";
+import {
+  createGeneralTourRepository,
+  createSupabasePublishedTourReader,
+  createTourRepository,
+} from "./tours";
 
 const DB_URL =
   process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
@@ -134,6 +138,22 @@ describe.runIf(stackAvailable)("tour publication against local Supabase", () => 
       expect(response.headers.get("content-type")).toContain("image/webp");
     }
     expect((await visitors.index(SUR)).some((entry) => entry.slug === slug)).toBe(true);
+
+    // The general tour (P4 · Paso 5): the owner puts it first and starts with it.
+    const general = createGeneralTourRepository(owner.client);
+    const document = await general.load(SUR);
+    expect(document.tours.find((entry) => entry.tourId === tour.tourId)).toMatchObject({
+      visible: true,
+    });
+    expect(await general.save(SUR, document.editCount, [tour.tourId], tour.tourId)).toEqual({
+      status: "saved",
+      editCount: document.editCount + 1,
+    });
+    expect((await visitors.index(SUR)).find((entry) => entry.slug === slug)).toMatchObject({
+      position: 0,
+      start: true,
+    });
+    expect(await general.save(SUR, document.editCount, [], null)).toEqual({ status: "conflict" });
 
     // Publishing again (a new version) copies nothing new and still works.
     const again = await tours.updateScene(SUR, tour.tourId, null, scene?.sceneId ?? "", {

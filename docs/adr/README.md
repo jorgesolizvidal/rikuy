@@ -35,3 +35,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 029 | [Puntos de los tours: cuatro tipos, cambios parciales e «ir a otro recorrido»](ADR-029-tour-hotspots.md)                          | Aceptada (2026-10-26)                                                       |
 | 030 | [Publicar un tour: medios públicos antes de sellar y un manifiesto por revisión](ADR-030-tour-publication.md)                     | Aceptada (2026-10-26)                                                       |
 | 031 | [Visor público del tour: una página por tour, un visor por recorrido y el tour también como texto](ADR-031-public-tour-viewer.md) | Aceptada (2026-10-26)                                                       |
+| 032 | [Recorrido general: el orden lo elige el municipio y se salta entre tours sin salir del visor](ADR-032-general-tour.md)           | Aceptada (2026-10-26)                                                       |

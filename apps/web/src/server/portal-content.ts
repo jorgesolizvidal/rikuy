@@ -128,7 +128,28 @@ export const portalTour = cache(
     publishedTourReader().find(view.context.tenant.tenantId, kind, slug),
 );
 
-/** The tours a visitor can browse (ended events left out), for the sitemap and Paso 5. */
+/**
+ * The tours a visitor can browse, in the general tour's order (memoized per request: the
+ * layout's header link and the tour pages share it). Pages only, never the icons or the
+ * manifest. Without it a page still works: no general tour link, that is all.
+ */
 export const portalTourIndex = cache(async (view: PortalView) =>
-  publishedTourReader().index(view.context.tenant.tenantId),
+  publishedTourReader()
+    .index(view.context.tenant.tenantId)
+    .catch(() => []),
 );
+
+/**
+ * Whether a destination or event has a tour visitors can open, for its page's link. From the
+ * index the layout already reads (no extra query); an ended event is not in the index, so
+ * only then its tour is looked up.
+ */
+export async function portalHasTour(
+  view: PortalView,
+  kind: "destination" | "event",
+  slug: string,
+  ended = false,
+): Promise<boolean> {
+  if (ended) return (await portalTour(view, kind, slug)) !== null;
+  return (await portalTourIndex(view)).some((entry) => entry.kind === kind && entry.slug === slug);
+}

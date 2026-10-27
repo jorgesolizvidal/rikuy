@@ -16,7 +16,7 @@ import {
   portalDestination,
   portalNearbyTargets,
   portalOrigin,
-  portalTour,
+  portalHasTour,
   responsiveImage,
 } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
@@ -84,7 +84,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const { view, destination } = loaded;
   const [targets, tour] = await Promise.all([
     portalNearbyTargets(view),
-    portalTour(view, "destination", destination.slug),
+    portalHasTour(view, "destination", destination.slug),
   ]);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;

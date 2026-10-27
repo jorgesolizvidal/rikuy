@@ -1,11 +1,14 @@
-import { loadTours } from "@rikuy/core";
+import { loadGeneralTour, loadTours, PORTAL_PATHS } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
+import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../../../sign-out-button";
+import { PortalShare } from "../destinos/[id]/portal-share";
+import { GeneralTourForm } from "./general-tour-form";
 import { KIND, scenesLabel, TOUR_STATUS } from "./labels";
 import { NewTourForm } from "./new-tour-form";
 
@@ -25,29 +28,34 @@ interface ToursPageProps {
 export default async function ToursPage({ params }: ToursPageProps) {
   const membership = await requireOrganization((await params).slug);
   const session = await adminSession();
-  const { tours, candidates, canEdit } = await loadTours(membership, {
-    tours: session.tours,
-    candidates: async () => {
-      const [destinations, events] = await Promise.all([
-        session.content.listDestinations(membership.tenantId),
-        session.content.listEvents(membership.tenantId),
-      ]);
-      return [
-        ...destinations.map((entry) => ({
-          contentId: entry.contentId,
-          kind: "destination" as const,
-          title: entry.title,
-        })),
-        ...events
-          .filter((entry) => !entry.ended)
-          .map((entry) => ({
+  const [{ tours, candidates, canEdit }, general, hostname] = await Promise.all([
+    loadTours(membership, {
+      tours: session.tours,
+      candidates: async () => {
+        const [destinations, events] = await Promise.all([
+          session.content.listDestinations(membership.tenantId),
+          session.content.listEvents(membership.tenantId),
+        ]);
+        return [
+          ...destinations.map((entry) => ({
             contentId: entry.contentId,
-            kind: "event" as const,
+            kind: "destination" as const,
             title: entry.title,
           })),
-      ];
-    },
-  });
+          ...events
+            .filter((entry) => !entry.ended)
+            .map((entry) => ({
+              contentId: entry.contentId,
+              kind: "event" as const,
+              title: entry.title,
+            })),
+        ];
+      },
+    }),
+    loadGeneralTour(membership, { general: session.general }),
+    session.content.portalHostname(membership.tenantId),
+  ]);
+  const visible = general.document.tours.some((tour) => tour.visible);
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
@@ -62,8 +70,8 @@ export default async function ToursPage({ params }: ToursPageProps) {
         <p className="lead">
           Recorridos virtuales de los destinos y eventos de {membership.displayName}: cada uno puede
           tener uno, armado con sus{" "}
-          <Link href={`/o/${membership.slug}/panoramas`}>panoramas 360°</Link>. Todavía no se
-          muestran en el portal: el visor para visitantes llega en los próximos pasos.
+          <Link href={`/o/${membership.slug}/panoramas`}>panoramas 360°</Link>. Al publicarse, cada
+          tour tiene su página en el portal y todos forman el recorrido general.
         </p>
       </div>
 
@@ -122,6 +130,34 @@ export default async function ToursPage({ params }: ToursPageProps) {
           </table>
         </div>
       )}
+
+      <section aria-labelledby="recorrido-general" className="members-invite">
+        <h2 id="recorrido-general">Recorrido general</h2>
+        <p className="field-hint">
+          Los tours publicados forman un solo recorrido: el visitante salta de uno a otro sin salir
+          del visor. Elige su orden y el tour con el que empieza. Se aplica al guardar.
+        </p>
+        {general.document.tours.length === 0 ? (
+          <p className="notice">Cuando publiques un tour, aparecerá aquí.</p>
+        ) : (
+          <GeneralTourForm
+            org={membership.slug}
+            editCount={general.document.editCount}
+            startTourId={general.document.startTourId}
+            tours={general.document.tours}
+            canEdit={general.canEdit}
+          />
+        )}
+      </section>
+      {visible && hostname ? (
+        <PortalShare
+          url={`${platformSettings().portalOrigin(hostname)}${PORTAL_PATHS.generalTour}`}
+          slug="recorrido-general"
+          title="Recorrido general"
+          portalOnline={membership.tenantStatus === "active"}
+          opens="el recorrido general"
+        />
+      ) : null}
     </main>
   );
 }

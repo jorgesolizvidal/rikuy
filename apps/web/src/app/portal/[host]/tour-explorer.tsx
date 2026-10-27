@@ -1,70 +1,48 @@
 "use client";
 
-import type { RichText } from "@rikuy/core";
 import { neighbourScenes, startingScene, TOUR_SCENE_QUERY } from "@rikuy/core/tour-viewer";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { HotspotMarker } from "@/components/panorama-viewer/hotspot-markers";
-import { RichTextView } from "@/components/rich-text";
 import {
   TourViewer,
   type TourCanvasHandle,
   type TourCanvasScene,
 } from "@/components/panorama-viewer/tour-viewer";
-import type { ResponsiveImage } from "@/server/portal-content";
 
-import { PortalImage } from "./portal-image";
+import {
+  tourKey,
+  type TourDataDto,
+  type TourKind,
+  type TourMenuEntryDto,
+  type TourPointDto,
+} from "./tour-dto";
+import { TourMenu } from "./tour-menu";
+import { PointDialog, type OpenPoint } from "./tour-point-dialog";
+
+export type { TourDataDto, TourMenuEntryDto, TourPointDto, TourSceneDto } from "./tour-dto";
 
 /**
- * A tour in the portal (P4 · Paso 4): the 360° viewer and, next to it, the same tour as
- * text — the current scene, its points as buttons and every scene in order. The text works
+ * A tour in the portal (P4 · Paso 4 and 5): the 360° viewer and, next to it, the same tour
+ * as text — the current scene, its points as buttons and every scene in order. The text works
  * without WebGL (the viewer then says so and shows a flat image), with a keyboard and with a
  * screen reader; it is rendered on the server, so it is also what search engines read.
  *
- * The scene asked for changes at once (title, points, address); the viewer follows and
- * always ends on the last one asked for.
+ * The general tour: the menu (and every "go to another tour" point) jumps to another tour
+ * without leaving the viewer. Only that tour's data is downloaded; the address becomes that
+ * tour's page, so "back" returns and a shared link opens it.
+ *
+ * Whatever is asked last wins: a scene, or a tour whose data arrives late, never replaces a
+ * later choice.
  */
-interface PointBase {
-  readonly id: string;
-  readonly title: string;
-  readonly yaw: number;
-  readonly pitch: number;
-}
-
-export type TourPointDto =
-  | (PointBase & {
-      readonly kind: "info";
-      readonly body: RichText;
-      readonly gallery: readonly ResponsiveImage[];
-    })
-  | (PointBase & {
-      readonly kind: "scene";
-      readonly targetSceneId: string;
-      readonly targetTitle: string;
-    })
-  | (PointBase & {
-      readonly kind: "model";
-      readonly poster: { readonly url: string; readonly width: number; readonly height: number };
-    })
-  | (PointBase & { readonly kind: "tour"; readonly href: string; readonly targetTitle: string });
-
-export interface TourSceneDto {
-  readonly id: string;
-  readonly title: string;
-  readonly description: string;
-  readonly initialView: { readonly yaw: number; readonly pitch: number; readonly fov: number };
-  readonly previewUrl: string;
-  readonly image: { readonly url: string; readonly width: number; readonly height: number };
-  readonly tiles: TourCanvasScene["tiles"];
-  readonly points: readonly TourPointDto[];
-}
-
 export interface TourExplorerProps {
-  readonly title: string;
-  readonly entrySceneId: string;
-  readonly scenes: readonly TourSceneDto[];
-  readonly backHref: string;
-  readonly backLabel: string;
+  readonly tour: TourDataDto;
+  /** The general tour's menu (the visible tours, in the municipality's order). */
+  readonly menu: readonly TourMenuEntryDto[];
+  /** Where one tour's data is read (JSON): `{dataPath}?tipo=…&direccion=…`. */
+  readonly dataPath: string;
+  /** For the page title after a jump: "Tour 360° de X | {siteName}". */
+  readonly siteName: string;
 }
 
 /** What only the browser knows; null while rendering on the server and hydrating. */
@@ -94,7 +72,14 @@ function browserFacts(): BrowserFacts {
 
 const noChanges = () => () => undefined;
 
-const GALLERY_SIZES = "(min-width: 48rem) 44rem, 92vw";
+/** What the history keeps for each tour the visitor jumped to. */
+interface HistoryTour {
+  readonly rikuyTour: { readonly kind: TourKind; readonly slug: string };
+}
+
+function isHistoryTour(state: unknown): state is HistoryTour {
+  return typeof state === "object" && state !== null && "rikuyTour" in state;
+}
 
 function markerOf(point: TourPointDto): HotspotMarker {
   return {
@@ -127,117 +112,14 @@ const POINT_ICON: Record<TourPointDto["kind"], string> = {
   tour: "⌖",
 };
 
-type OpenPoint = Extract<TourPointDto, { kind: "info" | "model" }>;
-
-function PointDialog({
-  point,
-  onClose,
-}: {
-  readonly point: OpenPoint | null;
-  readonly onClose: () => void;
-}) {
-  const dialog = useRef<HTMLDialogElement>(null);
-  const [photo, setPhoto] = useState(0);
-  useEffect(() => {
-    const element = dialog.current;
-    if (!element) return;
-    if (point && !element.open) {
-      setPhoto(0);
-      element.showModal();
-    } else if (!point && element.open) {
-      element.close();
-    }
-  }, [point]);
-
-  const gallery = point?.kind === "info" ? point.gallery : [];
-  const image = gallery[Math.min(photo, gallery.length - 1)];
-  return (
-    <dialog
-      ref={dialog}
-      className="tour-dialog"
-      aria-labelledby="tour-dialog-title"
-      onClose={onClose}
-      onClick={(event) => {
-        // A click on the backdrop (outside the box) closes it.
-        if (event.target === event.currentTarget) event.currentTarget.close();
-      }}
-    >
-      {point ? (
-        <div className="tour-dialog-box">
-          <header className="tour-dialog-header">
-            <p className="tour-dialog-kind">
-              {point.kind === "model" ? "Modelo 3D" : "Información"}
-            </p>
-            <h2 id="tour-dialog-title">{point.title}</h2>
-            <button
-              type="button"
-              className="tour-dialog-close"
-              onClick={() => dialog.current?.close()}
-            >
-              <span aria-hidden="true">×</span>
-              <span className="visually-hidden">Cerrar</span>
-            </button>
-          </header>
-          {point.kind === "info" ? (
-            <>
-              {point.body.length > 0 ? (
-                <div className="portal-prose tour-dialog-body">
-                  <RichTextView blocks={point.body} />
-                </div>
-              ) : null}
-              {image ? (
-                <figure className="tour-gallery" aria-roledescription="galería">
-                  <PortalImage image={image} sizes={GALLERY_SIZES} priority />
-                  {gallery.length > 1 ? (
-                    <figcaption className="tour-gallery-controls">
-                      <button
-                        type="button"
-                        className="portal-button"
-                        disabled={photo === 0}
-                        onClick={() => setPhoto((index) => Math.max(0, index - 1))}
-                      >
-                        Anterior
-                      </button>
-                      <span aria-live="polite">
-                        Foto {photo + 1} de {gallery.length}
-                      </span>
-                      <button
-                        type="button"
-                        className="portal-button"
-                        disabled={photo >= gallery.length - 1}
-                        onClick={() => setPhoto((index) => Math.min(gallery.length - 1, index + 1))}
-                      >
-                        Siguiente
-                      </button>
-                    </figcaption>
-                  ) : null}
-                </figure>
-              ) : null}
-            </>
-          ) : (
-            <figure className="tour-model-poster">
-              {/* eslint-disable-next-line @next/next/no-img-element -- published, versioned derivative */}
-              <img
-                src={point.poster.url}
-                width={point.poster.width}
-                height={point.poster.height}
-                alt={`Imagen del modelo 3D «${point.title}»`}
-              />
-            </figure>
-          )}
-        </div>
-      ) : null}
-    </dialog>
-  );
+/** A plain left click on a link (not a new tab or window). */
+function plainClick(event: React.MouseEvent): boolean {
+  return !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
 }
 
-export function TourExplorer({
-  title,
-  entrySceneId,
-  scenes,
-  backHref,
-  backLabel,
-}: TourExplorerProps) {
+export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourExplorerProps) {
+  const [tour, setTour] = useState(initial);
+  const { scenes, entrySceneId, title } = tour;
   const model = useMemo(() => ({ entrySceneId, scenes }), [entrySceneId, scenes]);
   const browser = useSyncExternalStore(noChanges, browserFacts, () => null);
   // The viewer (three.js and Photo Sphere Viewer, ~200 KB) starts once the page has loaded
@@ -277,12 +159,24 @@ export function TourExplorer({
   const fullscreen = fullscreenState ?? (browser?.fullscreen ? "off" : "unsupported");
   const reducedMotion = browser?.reducedMotion ?? false;
   const [attempt, setAttempt] = useState(0);
+  const [menuOpen, setMenuOpen] = useState(false);
+  /** The tour being fetched, and one that could not be. */
+  const [loadingTour, setLoadingTour] = useState<string | null>(null);
+  const [tourError, setTourError] = useState<TourMenuEntryDto | null>(null);
   const handle = useRef<TourCanvasHandle | null>(null);
   const stage = useRef<HTMLElement>(null);
+  const menuToggle = useRef<HTMLButtonElement>(null);
+  /** Increases on every tour asked for: only the latest one may land. */
+  const tourTicket = useRef(0);
+  const tourRequest = useRef<AbortController | null>(null);
+  /** Tours already read in this visit: going back to one is instant. */
+  const loaded = useRef(new Map<string, TourDataDto>([[tourKey(initial), initial]]));
 
   const scene = scenes.find((item) => item.id === current) ?? entry;
   const { previous, next } = neighbourScenes(model, scene.id);
   const position = scenes.findIndex((item) => item.id === scene.id) + 1;
+  const currentKey = tourKey(tour);
+  const others = menu.filter((item) => tourKey(item) !== currentKey);
 
   // The address names the scene, so a shared link opens it.
   useEffect(() => {
@@ -290,7 +184,9 @@ export function TourExplorer({
     const url = new URL(window.location.href);
     if (current === entrySceneId) url.searchParams.delete(TOUR_SCENE_QUERY);
     else url.searchParams.set(TOUR_SCENE_QUERY, current);
-    if (url.href !== window.location.href) window.history.replaceState(null, "", url);
+    if (url.href !== window.location.href) {
+      window.history.replaceState(window.history.state, "", url);
+    }
   }, [chosen, current, entrySceneId]);
 
   useEffect(() => {
@@ -304,6 +200,78 @@ export function TourExplorer({
     setChosen(sceneId);
   }, []);
 
+  /** Jumps to another tour without leaving the viewer (push: a new history entry). */
+  const openTour = useCallback(
+    async (
+      target: { readonly kind: TourKind; readonly slug: string; readonly href: string },
+      options: { readonly push: boolean; readonly sceneId?: string | null },
+    ) => {
+      const key = tourKey(target);
+      const ticket = ++tourTicket.current;
+      tourRequest.current?.abort();
+      setMenuOpen(false);
+      setTourError(null);
+      if (key === currentKey) {
+        tourRequest.current = null;
+        setLoadingTour(null);
+        if (options.sceneId !== undefined) goTo(options.sceneId ?? entrySceneId);
+        return;
+      }
+      const request = new AbortController();
+      tourRequest.current = request;
+      setLoadingTour(key);
+      try {
+        let data = loaded.current.get(key);
+        if (!data) {
+          const query = new URLSearchParams({ tipo: target.kind, direccion: target.slug });
+          const response = await fetch(`${dataPath}?${query}`, { signal: request.signal });
+          if (!response.ok) throw new Error(`tour data: ${response.status}`);
+          data = (await response.json()) as TourDataDto;
+          loaded.current.set(key, data);
+        }
+        if (ticket !== tourTicket.current) return; // a later choice won
+        const sceneId = data.scenes.some((item) => item.id === options.sceneId)
+          ? (options.sceneId as string)
+          : data.entrySceneId;
+        setTour(data);
+        setChosen(sceneId);
+        setShown(null);
+        setOpen(null);
+        setSceneError(null);
+        setLoadingTour(null);
+        if (options.push) {
+          const url = new URL(data.href, window.location.origin);
+          if (sceneId !== data.entrySceneId) url.searchParams.set(TOUR_SCENE_QUERY, sceneId);
+          const state: HistoryTour = { rikuyTour: { kind: data.kind, slug: data.slug } };
+          window.history.pushState(state, "", url);
+        }
+        document.title = `Tour 360° de ${data.title} | ${siteName}`;
+      } catch (error) {
+        if (ticket !== tourTicket.current) return;
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        setLoadingTour(null);
+        setTourError(menu.find((item) => tourKey(item) === key) ?? { ...emptyEntry, ...target });
+      }
+    },
+    [currentKey, dataPath, entrySceneId, goTo, menu, siteName],
+  );
+
+  // "Back" and "forward" between tours the visitor jumped to.
+  useEffect(() => {
+    const onPop = (event: PopStateEvent) => {
+      const target = isHistoryTour(event.state)
+        ? event.state.rikuyTour
+        : { kind: initial.kind, slug: initial.slug };
+      const href = menu.find((item) => tourKey(item) === tourKey(target))?.href ?? initial.href;
+      const sceneId = new URLSearchParams(window.location.search).get(TOUR_SCENE_QUERY);
+      void openTour({ ...target, href }, { push: false, sceneId });
+    };
+    window.addEventListener("popstate", onPop);
+    return () => window.removeEventListener("popstate", onPop);
+  }, [initial, menu, openTour]);
+
+  useEffect(() => () => tourRequest.current?.abort(), []);
+
   const activate = useCallback(
     (point: TourPointDto) => {
       switch (point.kind) {
@@ -316,11 +284,14 @@ export function TourExplorer({
           goTo(point.targetSceneId);
           return;
         case "tour":
-          window.location.assign(point.href);
+          void openTour(
+            { kind: point.targetKind, slug: point.targetSlug, href: point.href },
+            { push: true },
+          );
           return;
       }
     },
-    [goTo],
+    [goTo, openTour],
   );
 
   const canvasScenes = useMemo<TourCanvasScene[]>(
@@ -356,6 +327,11 @@ export function TourExplorer({
   const onReady = useCallback((ready: TourCanvasHandle) => {
     handle.current = ready;
   }, []);
+  const closeMenu = useCallback(() => setMenuOpen(false), []);
+  const chooseTour = useCallback(
+    (item: TourMenuEntryDto) => void openTour(item, { push: true }),
+    [openTour],
+  );
 
   const toggleFullscreen = () => {
     if (document.fullscreenElement) void document.exitFullscreen();
@@ -363,7 +339,31 @@ export function TourExplorer({
   };
 
   return (
-    <div className="tour-explorer">
+    <div className="tour-explorer" data-tour={currentKey}>
+      <nav aria-label="Ruta de navegación" className="portal-breadcrumb">
+        <ol>
+          <li>
+            <a href="/">Inicio</a>
+          </li>
+          <li>
+            <a href={tour.section.href}>{tour.section.label}</a>
+          </li>
+          <li>
+            <a href={tour.contentHref}>{title}</a>
+          </li>
+          <li aria-current="page">Tour 360°</li>
+        </ol>
+      </nav>
+      <header className="portal-tour-header">
+        <p className="portal-tour-eyebrow">Tour 360°</p>
+        <h1 className="portal-page-title">{title}</h1>
+        {tour.ended ? (
+          <p className="portal-ended" role="status">
+            Este evento ya terminó. El tour sigue disponible.
+          </p>
+        ) : null}
+      </header>
+
       <section
         ref={stage}
         className="tour-stage"
@@ -404,8 +404,34 @@ export function TourExplorer({
               />
             </div>
           )}
+          {others.length > 0 ? (
+            <TourMenu
+              id="tour-menu"
+              entries={menu}
+              current={currentKey}
+              loading={loadingTour}
+              open={menuOpen}
+              onClose={closeMenu}
+              onChoose={chooseTour}
+              toggle={menuToggle}
+            />
+          ) : null}
         </div>
-        <div className="tour-bar">
+        <div className="tour-bar" data-menu={others.length > 0 ? "true" : undefined}>
+          {others.length > 0 ? (
+            <button
+              ref={menuToggle}
+              type="button"
+              className="tour-bar-button"
+              aria-expanded={menuOpen}
+              aria-controls="tour-menu"
+              onClick={() => setMenuOpen((value) => !value)}
+            >
+              <span aria-hidden="true">☰</span>
+              <span className="tour-bar-label">Tours</span>
+              <span className="visually-hidden"> del municipio</span>
+            </button>
+          ) : null}
           <button
             type="button"
             className="tour-bar-button"
@@ -419,7 +445,7 @@ export function TourExplorer({
           <p className="tour-bar-title" aria-live="polite">
             <strong>{scene.title}</strong>
             <span>
-              Escena {position} de {scenes.length}
+              {loadingTour ? "Abriendo el tour…" : `Escena ${position} de ${scenes.length}`}
             </span>
           </p>
           <button
@@ -459,6 +485,14 @@ export function TourExplorer({
             </button>
           </p>
         ) : null}
+        {tourError ? (
+          <p className="tour-error" role="alert">
+            No se pudo abrir el tour de {tourError.title || "ese lugar"}.{" "}
+            <a className="portal-button" href={tourError.href}>
+              Abrir su página
+            </a>
+          </p>
+        ) : null}
         <PointDialog point={open} onClose={() => setOpen(null)} />
       </section>
 
@@ -476,7 +510,16 @@ export function TourExplorer({
                       {POINT_ICON[point.kind]}
                     </span>
                     {point.kind === "tour" ? (
-                      <a href={point.href}>{pointLabel(point)}</a>
+                      <a
+                        href={point.href}
+                        onClick={(event) => {
+                          if (!plainClick(event)) return;
+                          event.preventDefault();
+                          activate(point);
+                        }}
+                      >
+                        {pointLabel(point)}
+                      </a>
                     ) : (
                       <button type="button" className="tour-point" onClick={() => activate(point)}>
                         {pointLabel(point)}
@@ -506,10 +549,43 @@ export function TourExplorer({
             ))}
           </ol>
           <p>
-            <a href={backHref}>← Volver a {backLabel}</a>
+            <a href={tour.contentHref}>← Volver a {title}</a>
           </p>
         </nav>
+
+        {others.length > 0 ? (
+          <nav aria-labelledby="tour-otros" className="tour-guide-others">
+            <h2 id="tour-otros">Más tours del municipio</h2>
+            <ul>
+              {others.map((item) => (
+                <li key={tourKey(item)}>
+                  <a
+                    href={item.href}
+                    onClick={(event) => {
+                      if (!plainClick(event)) return;
+                      event.preventDefault();
+                      chooseTour(item);
+                    }}
+                  >
+                    {item.title}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          </nav>
+        ) : null}
       </div>
     </div>
   );
 }
+
+const emptyEntry: TourMenuEntryDto = {
+  kind: "destination",
+  slug: "",
+  title: "",
+  href: "/",
+  scenes: 0,
+  preview: { url: "", width: 0, height: 0 },
+  location: null,
+  start: false,
+};

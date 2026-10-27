@@ -1,18 +1,32 @@
-import "@fontsource-variable/bricolage-grotesque";
 import "./portal.css";
 
 import { PORTAL_PATHS, monogram, portalIconPath, themeCssVariables } from "@rikuy/core";
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 
 import { platformSettings } from "@/server/platform";
+import { portalTourIndex } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
+
+/**
+ * The portal's display face (titles), self-hosted and preloaded with the page: as a plain
+ * stylesheet font it was found only after the CSS, one more round trip before the first
+ * paint of every page. Latin covers Spanish; other characters use the fallback face.
+ */
+const display = localFont({
+  src: "../../../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2",
+  weight: "200 800",
+  display: "swap",
+  variable: "--font-portal-display",
+  fallback: ["system-ui", "sans-serif"],
+});
 
 /**
  * Portal pages are cached per host and rebuilt at most every 2 minutes (ADR-024): enough
@@ -76,13 +90,14 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
+  const tours = await portalTourIndex(view);
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
 
   return (
     <div
-      className="portal"
+      className={`portal ${display.variable}`}
       data-mode={palette.mode}
       lang={view.context.tenant.defaultLocale}
       // Validated #rrggbb values only (see themeCssVariables).
@@ -109,6 +124,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           <a href={PORTAL_PATHS.destinations}>Destinos</a>
           <a href={PORTAL_PATHS.agenda}>Agenda</a>
           <a href={PORTAL_PATHS.map}>Mapa</a>
+          {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
           <InstallButton siteName={identity.siteName} />
         </nav>
       </header>
