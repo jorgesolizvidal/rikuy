@@ -2,7 +2,7 @@
    so this stylesheet is shared by all municipalities without a single tenant literal. */
 
 .portal {
-  --font-display: "Bricolage Grotesque Variable", var(--font-sans);
+  --font-display: var(--font-portal-display), var(--font-sans);
   --gutter: clamp(1rem, 5vw, 3.5rem);
   min-height: 100dvh;
   display: flex;

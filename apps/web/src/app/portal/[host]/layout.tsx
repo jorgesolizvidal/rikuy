@@ -1,8 +1,8 @@
-import "@fontsource-variable/bricolage-grotesque";
 import "./portal.css";
 
 import { PORTAL_PATHS, monogram, portalIconPath, themeCssVariables } from "@rikuy/core";
 import type { Metadata, Viewport } from "next";
+import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 
@@ -14,6 +14,19 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
+
+/**
+ * The portal's display face (titles), self-hosted and preloaded with the page: as a plain
+ * stylesheet font it was found only after the CSS, one more round trip before the first
+ * paint of every page. Latin covers Spanish; other characters use the fallback face.
+ */
+const display = localFont({
+  src: "../../../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2",
+  weight: "200 800",
+  display: "swap",
+  variable: "--font-portal-display",
+  fallback: ["system-ui", "sans-serif"],
+});
 
 /**
  * Portal pages are cached per host and rebuilt at most every 2 minutes (ADR-024): enough
@@ -84,7 +97,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
 
   return (
     <div
-      className="portal"
+      className={`portal ${display.variable}`}
       data-mode={palette.mode}
       lang={view.context.tenant.defaultLocale}
       // Validated #rrggbb values only (see themeCssVariables).
