@@ -590,8 +590,10 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     const requests: string[] = [];
     page.on("request", (request) => requests.push(request.url()));
 
-    // The header links the general tour; it starts where the municipality chose.
-    await page.goto(`${PORTAL}/`);
+    // The header links the general tour; it starts where the municipality chose. (A page
+    // first rendered after the fixture: the home page may still be the cached one from
+    // before, without tours, until it revalidates.)
+    await page.goto(`${PORTAL}/destinos/${ids.otherSlug}`);
     const header = page.getByRole("navigation", { name: "Principal" });
     expect(await header.getByRole("link", { name: "Tours 360°" }).getAttribute("href")).toBe(
       "/recorrido",
