@@ -9,7 +9,7 @@
     "agenda": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
     "event": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },
     "map": { "performance": null, "lcpMs": null, "cls": 0.1, "scriptKb": null },
-    "tour": { "performance": null, "lcpMs": null, "cls": 0.1, "scriptKb": null },
-    "generalTour": { "performance": null, "lcpMs": null, "cls": 0.1, "scriptKb": null }
+    "tour": { "performance": 70, "lcpMs": 2500, "cls": 0.1, "scriptKb": 380 },
+    "generalTour": { "performance": 70, "lcpMs": 2500, "cls": 0.1, "scriptKb": 380 }
   }
 }
