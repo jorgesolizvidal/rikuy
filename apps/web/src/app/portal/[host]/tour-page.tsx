@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { preload } from "react-dom";
 
-import { portalTour } from "@/server/portal-content";
+import { portalTour, portalTourIndex } from "@/server/portal-content";
 import { tourData, tourMenu } from "@/server/portal-tours";
 import type { PortalView } from "@/server/portal-view";
 import { portalView } from "@/server/portal-view";
@@ -56,7 +56,7 @@ export async function tourMetadata(
 }
 
 /** The explorer with one tour and the general tour's menu. */
-export function TourArticle({
+export async function TourArticle({
   view,
   tour,
 }: {
@@ -70,7 +70,7 @@ export function TourArticle({
     <article className="portal-page portal-tour">
       <TourExplorer
         tour={tour}
-        menu={tourMenu(view)}
+        menu={tourMenu(await portalTourIndex(view))}
         dataPath={PORTAL_PATHS.tourData}
         siteName={view.resolved.presentation.identity.siteName}
       />

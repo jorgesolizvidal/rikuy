@@ -128,7 +128,13 @@ export const portalTour = cache(
     publishedTourReader().find(view.context.tenant.tenantId, kind, slug),
 );
 
-/** The tours a visitor can browse, in the general tour's order (read with the view). */
-export function portalTourIndex(view: PortalView) {
-  return view.tours;
-}
+/**
+ * The tours a visitor can browse, in the general tour's order (memoized per request: the
+ * layout's header link and the tour pages share it). Pages only, never the icons or the
+ * manifest. Without it a page still works: no general tour link, that is all.
+ */
+export const portalTourIndex = cache(async (view: PortalView) =>
+  publishedTourReader()
+    .index(view.context.tenant.tenantId)
+    .catch(() => []),
+);

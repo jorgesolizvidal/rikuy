@@ -2,7 +2,7 @@ import { PORTAL_PATHS } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { portalTour } from "@/server/portal-content";
+import { portalTour, portalTourIndex } from "@/server/portal-content";
 import { tourData } from "@/server/portal-tours";
 import { portalView } from "@/server/portal-view";
 
@@ -20,17 +20,18 @@ interface GeneralTourPageProps {
 async function load(params: GeneralTourPageProps["params"]) {
   const view = await portalView((await params).host);
   if (view === null) return null;
-  const start = view.tours.find((entry) => entry.start) ?? view.tours[0];
+  const index = await portalTourIndex(view);
+  const start = index.find((entry) => entry.start) ?? index[0];
   if (!start) return null;
   const tour = await portalTour(view, start.kind, start.slug);
-  return tour ? { view, tour } : null;
+  return tour ? { view, tour, count: index.length } : null;
 }
 
 export async function generateMetadata({ params }: GeneralTourPageProps): Promise<Metadata> {
   const loaded = await load(params);
   if (loaded === null) return {};
   const { siteName } = loaded.view.resolved.presentation.identity;
-  const count = loaded.view.tours.length;
+  const { count } = loaded;
   const description = `Recorre en 360° ${count === 1 ? "un lugar" : `${count} lugares`} de ${siteName}, sin salir del visor.`;
   return {
     title: "Tours 360°",

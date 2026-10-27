@@ -5,6 +5,7 @@ import {
   tourPath,
   tourViewerModel,
   type PublishedTour,
+  type PublishedTourIndexEntry,
   type TourViewerPoint,
 } from "@rikuy/core";
 import { publicMediaUrl } from "@rikuy/db";
@@ -103,8 +104,8 @@ export function tourData(view: PortalView, tour: PublishedTour): TourDataDto {
 }
 
 /** The general tour's menu: every visible tour, in the municipality's order. */
-export function tourMenu(view: PortalView): TourMenuEntryDto[] {
-  return view.tours.map((entry) => ({
+export function tourMenu(index: readonly PublishedTourIndexEntry[]): TourMenuEntryDto[] {
+  return index.map((entry) => ({
     kind: entry.kind,
     slug: entry.slug,
     title: entry.title,

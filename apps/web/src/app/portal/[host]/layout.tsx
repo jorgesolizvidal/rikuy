@@ -7,6 +7,7 @@ import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 
 import { platformSettings } from "@/server/platform";
+import { portalTourIndex } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -76,6 +77,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
+  const tours = await portalTourIndex(view);
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
@@ -109,7 +111,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           <a href={PORTAL_PATHS.destinations}>Destinos</a>
           <a href={PORTAL_PATHS.agenda}>Agenda</a>
           <a href={PORTAL_PATHS.map}>Mapa</a>
-          {view.tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
+          {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
           <InstallButton siteName={identity.siteName} />
         </nav>
       </header>
