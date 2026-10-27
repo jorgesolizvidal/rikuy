@@ -1,0 +1,372 @@
+/* Tour 360° page (P4 · Paso 4). Its own stylesheet: only the tour page loads it, so the rest
+   of the portal does not pay for it before its first paint. Colors come from the tenant's
+   palette (CSS variables on .portal), never from a tenant literal. */
+.portal-tour-header {
+  margin-bottom: 1.25rem;
+}
+
+.portal-tour-eyebrow {
+  margin: 0 0 0.375rem;
+  color: var(--brand);
+  font-size: 0.875rem;
+  font-weight: 650;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.tour-stage {
+  --tour-chrome: #161412;
+  --tour-chrome-fg: #f7f3ee;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border-radius: 1rem;
+  overflow: hidden;
+  background: var(--tour-chrome);
+  color: var(--tour-chrome-fg);
+}
+
+.tour-viewport {
+  position: relative;
+  height: clamp(18rem, 62vh, 40rem);
+  background-size: cover;
+  background-position: center;
+}
+
+.tour-stage .tour-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  border: 0;
+  border-radius: 0;
+  background-color: transparent;
+  background-size: cover;
+  background-position: center;
+}
+
+.tour-stage:fullscreen {
+  border-radius: 0;
+}
+
+.tour-stage:fullscreen .tour-viewport {
+  flex: 1;
+  height: auto;
+}
+
+.tour-bar {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--tour-chrome);
+}
+
+.tour-bar-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  padding: 0.25rem 0.875rem;
+  border: 1px solid rgb(247 243 238 / 35%);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.tour-bar-button span[aria-hidden="true"] {
+  font-size: 1.375rem;
+  line-height: 1;
+}
+
+.tour-bar-button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.tour-bar-button:not(:disabled):hover {
+  background: rgb(247 243 238 / 12%);
+}
+
+.tour-bar-button[aria-pressed="true"] {
+  background: rgb(247 243 238 / 18%);
+}
+
+.tour-bar-title {
+  display: grid;
+  margin: 0;
+  text-align: center;
+  line-height: 1.25;
+}
+
+.tour-bar-title strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tour-bar-title span {
+  font-size: 0.8125rem;
+  opacity: 0.75;
+}
+
+@media (max-width: 34rem) {
+  .tour-bar {
+    padding-inline: 0.5rem;
+  }
+
+  .tour-bar-button {
+    padding-inline: 0.5rem;
+  }
+
+  /* Only the arrows on narrow phones; the label stays for screen readers. */
+  .tour-bar-label {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+}
+
+.tour-error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0.75rem;
+  background: #5c1d12;
+  color: #fff;
+}
+
+.tour-error .portal-button {
+  border-color: #fff;
+  color: #fff;
+}
+
+.tour-flat {
+  position: relative;
+  height: 100%;
+}
+
+.tour-flat img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tour-flat-notice {
+  position: absolute;
+  inset: auto 0.75rem 0.75rem;
+  margin: 0;
+  padding: 0.75rem 1rem;
+  border-radius: 0.75rem;
+  background: rgb(22 20 18 / 88%);
+}
+
+.tour-guide {
+  display: grid;
+  gap: 2rem;
+  margin-top: 2rem;
+}
+
+@media (min-width: 52rem) {
+  .tour-guide {
+    grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  }
+}
+
+.tour-guide h2 {
+  margin: 0 0 0.75rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+
+.tour-guide h3 {
+  margin: 1.5rem 0 0.5rem;
+  font-size: 1rem;
+}
+
+.tour-guide-scene p {
+  margin: 0;
+  max-width: 65ch;
+}
+
+.tour-points,
+.tour-scene-list {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tour-points li {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+
+.tour-point-icon {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--brand);
+  font-weight: 700;
+}
+
+.tour-points li[data-kind="model"] .tour-point-icon {
+  border-radius: 0.5rem;
+}
+
+.tour-point,
+.tour-points a {
+  min-height: 2.75rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brand);
+  font: inherit;
+  font-weight: 600;
+  text-align: start;
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+}
+
+.tour-points a {
+  display: inline-flex;
+  align-items: center;
+}
+
+.tour-scene-button {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 18%, transparent);
+  border-radius: 0.75rem;
+  background: transparent;
+  color: var(--fg);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.tour-scene-button[aria-current="true"] {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 650;
+}
+
+.tour-guide-scenes > p {
+  margin: 1.25rem 0 0;
+}
+
+.tour-dialog {
+  width: min(46rem, calc(100% - 2rem));
+  max-height: calc(100dvh - 2rem);
+  padding: 0;
+  border: 0;
+  border-radius: 1rem;
+  background: var(--bg);
+  color: var(--fg);
+  overflow: auto;
+}
+
+.tour-dialog::backdrop {
+  background: rgb(0 0 0 / 62%);
+}
+
+.tour-dialog-box {
+  display: grid;
+  gap: 1rem;
+  padding: 1.25rem;
+}
+
+.tour-dialog-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 1rem;
+}
+
+.tour-dialog-kind {
+  grid-column: 1;
+  margin: 0;
+  color: var(--brand);
+  font-size: 0.8125rem;
+  font-weight: 650;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.tour-dialog-header h2 {
+  grid-column: 1;
+  margin: 0.25rem 0 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 4vw, 1.875rem);
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
+.tour-dialog-close {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg);
+  font-size: 1.5rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.tour-dialog-body > :first-child {
+  margin-top: 0;
+}
+
+.tour-gallery,
+.tour-model-poster {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+}
+
+.tour-gallery img,
+.tour-model-poster img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 0.75rem;
+  background: var(--surface);
+}
+
+.tour-gallery-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.tour-gallery-controls .portal-button:disabled {
+  opacity: 0.45;
+}
