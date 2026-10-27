@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
-- **Último paso completado:** Hito · Paso 1 — Ucureña lista para cargar (2026-10-27): código y guía; el alta en producción la hace el usuario después del merge
-- **Rama:** `feat/hito-step1-ucurena` → PR hacia `main`
+- **Último paso completado:** Hito · Paso 1 — Ucureña lista para cargar (2026-10-27), con Ucureña en línea en producción
+- **Rama:** `docs/hito-step1-done` → PR hacia `main`
 
 ## Historial
 
@@ -848,7 +848,7 @@ Lo que encontraron las pruebas:
 - Repetido en laboratorio con memoria precisa y recolección forzada (80 cambios): tras el calentamiento, +5 %, con nodos y listeners estables. No hay fuga.
 - «Lighthouse on production» midió por primera vez las páginas de tour. Dio LCP simulado de 2,5–2,9 s, sobre el umbral de 2,5 s fijado con el CI. Con el LCP real de 0,68 s en el celular, el umbral de LCP del tour pasa a 3 s (`lighthouse-budget.json`); el de las demás páginas no cambia.
 
-### ★ Hito · Paso 1 — Ucureña lista para cargar
+### ★ Hito · Paso 1 — Ucureña lista para cargar ✅
 
 - Pasos del Hito acordados con el usuario (2026-10-27):
   1. Ucureña lista para cargar;
@@ -892,20 +892,21 @@ Lo que encontraron las pruebas:
 - El paso no carga contenido de Ucureña (decisión del usuario) ni crea el municipio desde el código: el alta la hace el usuario en producción con la guía. El paso queda ✅ en el roadmap cuando el portal responde en su dirección.
 - `robots.txt` no cambia: si bloqueara las páginas, los buscadores no verían la etiqueta `noindex`.
 
+**Puesta en marcha (2026-10-27):** el usuario siguió la guía en producción:
+
+- agregó `rikuy-ucurena.vercel.app` en Vercel;
+- dio de alta Ucureña desde `/plataforma/nuevo`, con él como propietario, y aceptó la invitación;
+- publicó la marca («Explora Ucureña») y la puso en línea.
+
+Comprobado desde fuera:
+
+- inicio, destinos, agenda y mapa responden 200, con `noindex, follow` y «Muy pronto en este portal», desde la caché de Vercel (`x-vercel-cache: HIT`);
+- `sitemap.xml` y `robots.txt` responden;
+- sirve la versión `4679c204f5db` (el merge de este paso).
+
 ## Cómo verificarlo
 
-```powershell
-git checkout feat/hito-step1-ucurena
-pnpm install
-pnpm db:reset
-pnpm dev
-```
-
-En `http://demo-norte.localhost:3000` el código fuente no tiene `<meta name="robots">`. Un municipio nuevo en línea sin nada publicado sí la tiene (`noindex, follow`). Si Demo Sur tiene un tour publicado, su inicio muestra «Recorridos 360°».
-
-## Después del merge — alta de Ucureña
-
-Sigue [«Alta de un municipio real»](../deploy.md#alta-de-un-municipio-real-por-ejemplo-ucureña) en `docs/deploy.md`. Cuando el portal responda en su dirección, avísame y marco el paso como terminado.
+Abre `https://rikuy-ucurena.vercel.app`: muestra la marca de Ucureña y «Muy pronto en este portal». En el código fuente de la página, `<meta name="robots" content="noindex, follow">` sigue ahí hasta que publiques el primer destino o un evento próximo.
 
 ## Siguiente paso — ★ Hito · Paso 2 (requiere autorización)
 
