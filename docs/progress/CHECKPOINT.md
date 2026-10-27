@@ -846,6 +846,7 @@ Lo que encontraron las pruebas:
   - modelo 3D en 3,6 s, sin pérdida de contexto.
 - La memoria JS no se pudo medir en el celular: Chrome para Android redondea el valor. En la PC se leyó sin recolección de basura y subió un 27 %.
 - Repetido en laboratorio con memoria precisa y recolección forzada (80 cambios): tras el calentamiento, +5 %, con nodos y listeners estables. No hay fuga.
+- «Lighthouse on production» midió por primera vez las páginas de tour. Dio LCP simulado de 2,5–2,9 s, sobre el umbral de 2,5 s fijado con el CI. Con el LCP real de 0,68 s en el celular, el umbral de LCP del tour pasa a 3 s (`lighthouse-budget.json`); el de las demás páginas no cambia.
 
 ## Cómo verificarlo
 

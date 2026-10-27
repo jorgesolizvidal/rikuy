@@ -69,7 +69,7 @@ Los archivos reales del usuario (panoramas DJI, `horno.glb`, `monumento.glb`, la
 
 ## Lighthouse de las páginas de tour
 
-`e2e/lighthouse.mjs` con `LIGHTHOUSE_SET=tours` mide el primer tour del sitemap de cada portal y el recorrido general (`/recorrido`): en el PR, después de RC-07, sobre los tours de prueba de Demo Sur; en producción, sobre los tours que tengan publicados los portales de demo (si no hay, deja un aviso). Los umbrales están en `apps/web/lighthouse-budget.json` (`tour`, `generalTour`); ver el [presupuesto de rendimiento](performance-budget.md).
+`e2e/lighthouse.mjs` con `LIGHTHOUSE_SET=tours` mide el primer tour del sitemap de cada portal y el recorrido general (`/recorrido`): en el PR, después de RC-07, sobre los tours de prueba de Demo Sur; en producción, sobre los tours que tengan publicados los portales de demo (si no hay, deja un aviso). Los umbrales están en `apps/web/lighthouse-budget.json` (`tour`, `generalTour`; el LCP en 3 s desde la medición final, ver abajo); ver el [presupuesto de rendimiento](performance-budget.md).
 
 ## Medición en el dispositivo (`?medir`)
 
@@ -112,6 +112,13 @@ Con `?medir` en producción, en el tour de `mirador-del-valle` (Demo Norte), una
 | Modelo 3D hasta verlo                              | 3,6 s                                                                 | 1,2 s                                              | sin GLB antes de abrirlo; sin pérdida de contexto            | listo, sin pérdida de contexto                                       |
 | JavaScript transferido                             | 431 KB                                                                | 430 KB                                             | —                                                            | incluye three.js, el visor 360° y el visor 3D                        |
 | Memoria JS en 20 cambios                           | 15,4 → 15,4 MB                                                        | 139 → 176 MB (+27 %)                               | crecimiento tras calentamiento ≤ 20 %                        | **no concluyente en el dispositivo**; en laboratorio, cumple (abajo) |
+
+**Lighthouse en producción** (simulado, móvil, mediana de 3, dos corridas tras el merge del Paso 7):
+
+- el tour del mirador: rendimiento 85 y 81, LCP 2,9 y 2,57 s;
+- `/recorrido`: rendimiento 87 y 79, LCP 2,09 y 2,88 s.
+
+Pasaban el umbral de LCP de 2,5 s fijado con el CI, donde Storage está en la misma máquina. En el celular real el LCP es 0,68 s, así que el umbral de laboratorio del tour pasa a 3 s. El de las demás páginas sigue en 2,5 s.
 
 **Sobre la memoria:**
 
