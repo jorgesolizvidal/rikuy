@@ -69,7 +69,7 @@ Los archivos reales del usuario (panoramas DJI, `horno.glb`, `monumento.glb`, la
 
 ## Lighthouse de las páginas de tour
 
-`e2e/lighthouse.mjs` con `LIGHTHOUSE_SET=tours` mide el primer tour del sitemap de cada portal y el recorrido general (`/recorrido`): en el PR, después de RC-07, sobre los tours de prueba de Demo Sur; en producción, sobre los tours que tengan publicados los portales de demo (si no hay, deja un aviso). Los umbrales están en `apps/web/lighthouse-budget.json` (`tour`, `generalTour`); ver el [presupuesto de rendimiento](performance-budget.md).
+`e2e/lighthouse.mjs` con `LIGHTHOUSE_SET=tours` mide el primer tour del sitemap de cada portal y el recorrido general (`/recorrido`): en el PR, después de RC-07, sobre los tours de prueba de Demo Sur; en producción, sobre los tours que tengan publicados los portales de demo (si no hay, deja un aviso). Los umbrales están en `apps/web/lighthouse-budget.json` (`tour`, `generalTour`; el LCP en 3 s desde la medición final, ver abajo); ver el [presupuesto de rendimiento](performance-budget.md).
 
 ## Medición en el dispositivo (`?medir`)
 
@@ -95,4 +95,47 @@ Agregar `?medir` a la dirección de un tour abre un panel de medición, cargado 
 
 Lighthouse del tour en el CI (móvil, mediana de 3), en el tour de una escena y en `/recorrido`: rendimiento 79 y 88 en las dos primeras corridas (el runner varía), LCP 2,4 s y TBT 0,4–0,76 s.
 
-**En Android:** el usuario probó los tours en su celular, en producción, tras los Pasos 4, 5 y 6: funcionan bien. La medición con números (`?medir`) se hace en producción después del merge de este paso y se anota aquí.
+**En Android:** el usuario probó los tours en su celular, en producción, tras los Pasos 4, 5 y 6: funcionan bien.
+
+### Medición final en el dispositivo (2026-10-27)
+
+Con `?medir` en producción, en el tour de `mirador-del-valle` (Demo Norte), una corrida por equipo. Los objetivos son los que propone la auditoría (§4).
+
+| Métrica                                            | Android                                                               | PC                                                 | Objetivo de la auditoría                                     | Resultado                                                            |
+| -------------------------------------------------- | --------------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------ | -------------------------------------------------------------------- |
+| Equipo                                             | CRT-NX3, Android 15, Mali-G57 MC2, ≥ 8 GB, 8 núcleos, 360 × 796 px ×3 | Windows, AMD Radeon (integrada), 16 GB, 16 núcleos | Android de gama media identificado por modelo, sistema y GPU | identificado                                                         |
+| Red (informada por el navegador)                   | 4G, ~3,3 Mbps, ~150 ms                                                | ~8,6 Mbps, ~200 ms                                 | rápida 20 Mbps / 40 ms y lenta 1,5 Mbps / 150 ms             | entre los dos perfiles; no es una red controlada                     |
+| Primer contenido / LCP                             | 0,68 s / 0,68 s                                                       | 0,94 s / 0,99 s                                    | —                                                            | bien                                                                 |
+| Primera escena en pantalla                         | 1,46 s                                                                | 2,17 s                                             | vista previa ≤ 2 s (red lenta); utilizable ≤ 2,5 s (rápida)  | cumple                                                               |
+| 20 cambios de escena: mediana / p95 / el más lento | 0,93 / 0,95 / 0,96 s                                                  | 0,80 / 0,85 / 0,87 s                               | p95 ≤ 2 s; ninguno sin terminar                              | cumple (0 sin terminar)                                              |
+| Fluidez al girar 5 s                               | 87 cuadros/s (pantalla de 120 Hz), p95 16 ms, 0 de más de 50 ms       | 60 cuadros/s, p95 17 ms, 0 de más de 50 ms         | ≥ 30 cuadros/s sostenidos                                    | cumple (cuadros del navegador, no medición de GPU)                   |
+| Modelo 3D hasta verlo                              | 3,6 s                                                                 | 1,2 s                                              | sin GLB antes de abrirlo; sin pérdida de contexto            | listo, sin pérdida de contexto                                       |
+| JavaScript transferido                             | 431 KB                                                                | 430 KB                                             | —                                                            | incluye three.js, el visor 360° y el visor 3D                        |
+| Memoria JS en 20 cambios                           | 15,4 → 15,4 MB                                                        | 139 → 176 MB (+27 %)                               | crecimiento tras calentamiento ≤ 20 %                        | **no concluyente en el dispositivo**; en laboratorio, cumple (abajo) |
+
+**Lighthouse en producción** (simulado, móvil, mediana de 3, dos corridas tras el merge del Paso 7):
+
+- el tour del mirador: rendimiento 85 y 81, LCP 2,9 y 2,57 s;
+- `/recorrido`: rendimiento 87 y 79, LCP 2,09 y 2,88 s.
+
+Pasaban el umbral de LCP de 2,5 s fijado con el CI, donde Storage está en la misma máquina. En el celular real el LCP es 0,68 s, así que el umbral de laboratorio del tour pasa a 3 s. El de las demás páginas sigue en 2,5 s.
+
+**Sobre la memoria:**
+
+- Chrome para Android redondea `performance.memory` y lo actualiza muy de vez en cuando, por eso sale igual antes y después: no mide nada.
+- En la PC se leyó sin recolección de basura, justo después de los cambios. La cifra de partida (138 MB) incluye lo que cargan las extensiones del navegador en la misma página.
+- Para separar una fuga real del ruido, se repitió en laboratorio con memoria precisa y recolección forzada antes de cada lectura (Chromium con SwiftShader, tours de prueba del CI, 80 cambios):
+
+| Tour                              | Al empezar | Tras 20 (calentamiento) | Tras 40 | Tras 60 | Tras 80 | Nodos y listeners    |
+| --------------------------------- | ---------- | ----------------------- | ------- | ------- | ------- | -------------------- |
+| Carnaval (4 escenas)              | 7,5 MB     | 9,3 MB                  | 9,5 MB  | 9,7 MB  | 9,8 MB  | estables (397 / 478) |
+| Museo (3 escenas, una en teselas) | 7,6 MB     | 9,4 MB                  | 9,6 MB  | 9,8 MB  | 9,9 MB  | estables (423 / 481) |
+
+Después del calentamiento, 60 cambios más suman un 5 %, sin crecer los nodos ni los listeners: no hay fuga, y está dentro del 20 %.
+
+**Límites de esta medición:**
+
+- una sola corrida por equipo, no las 20 en frío y 20 en caliente del protocolo de la auditoría;
+- red real, no controlada;
+- el tamaño de los panoramas y del GLB no se ve, porque Storage está en otro dominio y no envía `Timing-Allow-Origin`;
+- la memoria de la GPU no se puede medir desde la página.
