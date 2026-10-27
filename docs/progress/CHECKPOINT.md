@@ -653,6 +653,7 @@ Lo que encontraron las pruebas:
   - sin WebGL 2, Photo Sphere Viewer no lanza un error y deja un visor a medio construir, así que la página fallaba. Ahora los dos visores lo comprueban antes;
   - una fuente de 5760 px da un nivel de 5120 px con 10 columnas, que el visor rechaza. Ese nivel se omite;
   - el visor arrancaba junto con la página y retrasaba su primera imagen; ahora espera a `load`.
+  - en el CI, los estilos del tour dentro de la hoja común del portal llevaban el LCP de tres fichas a 2,57 s (límite 2,5 s). Ahora tienen su propia hoja, `tour.css`, que solo carga la página del tour.
 
 **Desviaciones:**
 
