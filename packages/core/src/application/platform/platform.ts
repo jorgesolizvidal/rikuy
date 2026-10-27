@@ -95,6 +95,8 @@ export async function provisionTenant(
     readonly slug: unknown;
     readonly hostname: unknown;
     readonly ownerEmail: unknown;
+    /** "on" (a checkbox) or true: a commercial demo. */
+    readonly demo?: unknown;
   },
   deps: ProvisionTenantDeps,
 ): Promise<ProvisionTenantResult> {
@@ -129,6 +131,7 @@ export async function provisionTenant(
     ownerUserId: owner.userId,
     defaultLocale: "es",
     timezone: "America/La_Paz",
+    demo: input.demo === true || input.demo === "on",
   });
 }
 

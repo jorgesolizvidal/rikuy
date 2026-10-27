@@ -106,6 +106,7 @@ export default async function PlatformPage() {
                   <span className="status-pill" data-status={tenant.status}>
                     {STATUS_LABELS[tenant.status]}
                   </span>
+                  {tenant.demo ? <span className="org-detail">Demo comercial</span> : null}
                 </td>
                 <td>
                   {tenant.ownerEmail ?? "Sin propietario"}

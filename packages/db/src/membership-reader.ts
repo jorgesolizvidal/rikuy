@@ -10,6 +10,7 @@ const rowSchema = z.object({
     slug: z.string(),
     display_name: z.string(),
     status: z.enum(["provisioning", "active", "suspended"]),
+    is_demo: z.boolean(),
   }),
 });
 
@@ -23,7 +24,7 @@ export function createMembershipReader(client: SessionClient): MembershipReader 
     async listActiveMemberships(userId): Promise<OrganizationMembership[]> {
       const { data, error } = await client
         .from("memberships")
-        .select("role, tenant:tenants!inner(id, slug, display_name, status)")
+        .select("role, tenant:tenants!inner(id, slug, display_name, status, is_demo)")
         .eq("user_id", userId)
         .eq("status", "active");
 
@@ -42,6 +43,7 @@ export function createMembershipReader(client: SessionClient): MembershipReader 
           displayName: row.tenant.display_name,
           role: row.role,
           tenantStatus: row.tenantStatus,
+          ...(row.tenant.is_demo ? { demo: true } : {}),
         }));
     },
   };

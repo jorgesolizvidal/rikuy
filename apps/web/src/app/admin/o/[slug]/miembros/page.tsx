@@ -4,6 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
+import { invitationMailConfigured } from "@/server/mail-settings";
 import { requireOrganization } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
@@ -28,6 +29,7 @@ export default async function MembersPage({ params }: MembersPageProps) {
   if (members === null) notFound();
 
   const roles = assignableRoles(membership.role);
+  const mail = invitationMailConfigured();
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
@@ -49,6 +51,7 @@ export default async function MembersPage({ params }: MembersPageProps) {
         <h2 id="invitar">Invitar a una persona</h2>
         <InviteMemberForm
           slug={membership.slug}
+          mail={mail}
           roles={roles.map((role) => ({ value: role, label: ROLE_LABELS[role] }))}
         />
       </section>
@@ -75,7 +78,18 @@ export default async function MembersPage({ params }: MembersPageProps) {
                 <tr key={member.membershipId} data-status={member.status}>
                   <td>{member.email}</td>
                   <td>{ROLE_LABELS[member.role]}</td>
-                  <td>{STATUS_LABELS[member.status]}</td>
+                  <td>
+                    {STATUS_LABELS[member.status]}
+                    {member.status === "invited" ? (
+                      <span className="org-detail">
+                        {member.invitationMailedAt
+                          ? "Se le envió un correo"
+                          : mail
+                            ? "Correo en camino"
+                            : "Sin correo: avísale tú"}
+                      </span>
+                    ) : null}
+                  </td>
                   <td className="cell-actions">
                     {manageable ? (
                       <MemberRowActions

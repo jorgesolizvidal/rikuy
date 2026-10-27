@@ -6,6 +6,7 @@
 // Reads NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SECRET_KEY from apps/web/.env.local (or from
 // the environment). The JSON file lives in seed-assets/ (ignored by git), e.g.
 //   { "displayName": "…", "slug": "…", "hostname": "….localhost", "ownerEmail": "…" }
+// with "demo": true for a commercial demo (never indexed, offers sample content; ADR-034).
 // The owner is created as an invited member; they accept after signing in, and the operator
 // puts the municipality online from /plataforma — the same path as the panel.
 import { readFileSync } from "node:fs";
@@ -58,6 +59,7 @@ async function provision(file) {
     p_owner_user_id: owner.id,
     p_default_locale: spec.defaultLocale ?? "es",
     p_timezone: spec.timezone ?? "America/La_Paz",
+    ...(spec.demo === true ? { p_demo: true } : {}),
   });
   if (error) {
     const reason = error.hint ? ` (${error.hint})` : "";

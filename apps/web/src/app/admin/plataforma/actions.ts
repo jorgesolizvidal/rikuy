@@ -100,6 +100,7 @@ export interface ProvisionState {
   readonly fields?: readonly ProvisionField[];
   readonly ownerEmail?: string;
   readonly portalUrl?: string;
+  readonly demo?: boolean;
 }
 
 export async function provisionTenantAction(
@@ -115,6 +116,7 @@ export async function provisionTenantAction(
       slug: formData.get("slug"),
       hostname: formData.get("hostname"),
       ownerEmail: formData.get("ownerEmail"),
+      demo: formData.get("demo"),
     };
     const result = await provisionTenant(input, {
       platform,
@@ -130,6 +132,7 @@ export async function provisionTenantAction(
       status: "provisioned",
       ownerEmail: String(input.ownerEmail).trim().toLowerCase(),
       portalUrl: settings.portalOrigin(hostname),
+      demo: input.demo === "on",
     };
   } catch {
     return { status: "error" };

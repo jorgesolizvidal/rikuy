@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   EnvValidationError,
   parseJobRunnerEnv,
+  parseMailEnv,
   parsePlatformEnv,
   parsePublicEnv,
   parseServerEnv,
@@ -79,6 +80,36 @@ describe("environment contract", () => {
       expect(String((error as Error).message)).not.toContain("short-secret-value");
     }
     expect(() => parseJobRunnerEnv({ ...runner, WORKER_DATABASE_URL: "https://x" })).toThrow(
+      EnvValidationError,
+    );
+  });
+
+  it("takes the SMTP settings all or nothing, without echoing the password", () => {
+    expect(parseMailEnv({})).toBeNull();
+    const gmail = {
+      SMTP_HOST: "smtp.gmail.com",
+      SMTP_PORT: "465",
+      SMTP_USER: "avisos@example.test",
+      SMTP_PASSWORD: "abcd efgh ijkl mnop",
+      MAIL_FROM: "Rikuy <avisos@example.test>",
+    };
+    expect(parseMailEnv(gmail)).toEqual({ ...gmail, SMTP_PORT: 465 });
+    expect(
+      parseMailEnv({ SMTP_HOST: "127.0.0.1", SMTP_PORT: "54325", MAIL_FROM: "a@b.test" }),
+    ).toEqual({ SMTP_HOST: "127.0.0.1", SMTP_PORT: 54325, MAIL_FROM: "a@b.test" });
+    try {
+      parseMailEnv({ ...gmail, SMTP_PASSWORD: "" });
+      expect.unreachable();
+    } catch (error) {
+      expect((error as EnvValidationError).invalidKeys).toEqual(["SMTP_PASSWORD"]);
+    }
+    try {
+      parseMailEnv({ SMTP_PASSWORD: gmail.SMTP_PASSWORD });
+      expect.unreachable();
+    } catch (error) {
+      expect(String((error as Error).message)).not.toContain("abcd");
+    }
+    expect(() => parseMailEnv({ ...gmail, MAIL_FROM: "Rikuy <x@y.test>\nBcc: z@y.test" })).toThrow(
       EnvValidationError,
     );
   });

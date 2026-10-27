@@ -15,6 +15,8 @@ export interface PlatformTenantSummary {
   readonly ownerEmail: string | null;
   readonly ownerStatus: MembershipStatus | null;
   readonly createdAt: string;
+  /** A commercial demo (ADR-034). */
+  readonly demo: boolean;
 }
 
 export interface ProvisionRequest {
@@ -24,6 +26,8 @@ export interface ProvisionRequest {
   readonly ownerUserId: string;
   readonly defaultLocale: string;
   readonly timezone: string;
+  /** A commercial demo: never indexed, offers sample content (ADR-034). */
+  readonly demo: boolean;
 }
 
 export type ProvisionOutcome =
@@ -79,6 +83,8 @@ export interface TenantMember {
   readonly status: MembershipStatus;
   readonly invitedAt: string;
   readonly acceptedAt: string | null;
+  /** When the email of the current invitation went out (null: not sent, or no SMTP). */
+  readonly invitationMailedAt: string | null;
 }
 
 export type MemberChangeOutcome =

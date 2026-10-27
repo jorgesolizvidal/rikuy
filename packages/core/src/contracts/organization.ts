@@ -11,6 +11,8 @@ export const organizationMembershipSchema = z.object({
   role: membershipRoleSchema,
   /** Owners can prepare a provisioning tenant before it goes live; suspended ones are hidden. */
   tenantStatus: z.enum(["provisioning", "active"]),
+  /** A commercial demo (ADR-034): offers the sample content. Absent means a real one. */
+  demo: z.boolean().optional(),
 });
 export type OrganizationMembership = z.infer<typeof organizationMembershipSchema>;
 

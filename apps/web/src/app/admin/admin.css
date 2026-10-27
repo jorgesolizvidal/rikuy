@@ -1617,3 +1617,14 @@ a.button-quiet {
   height: 100%;
   object-fit: cover;
 }
+
+/* ── Demo: sample content (ADR-034) ──────────────────────────────────── */
+
+.sample-panel {
+  display: grid;
+  gap: 1.5rem;
+}
+
+.sample-panel .members-invite {
+  margin: 0;
+}

@@ -1,8 +1,12 @@
 import "server-only";
 
 import { parseServerEnv } from "@rikuy/config/env";
-import type { ImageProcessor, MediaAdmin, OriginalRemover } from "@rikuy/core";
-import { createSharpImageProcessor, createSupabaseMediaAdmin } from "@rikuy/db";
+import type { ImageProcessor, MediaAdmin, OriginalRemover, SampleImageRenderer } from "@rikuy/core";
+import {
+  createSharpImageProcessor,
+  createSharpSampleImageRenderer,
+  createSupabaseMediaAdmin,
+} from "@rikuy/db";
 
 let admin: (MediaAdmin & OriginalRemover) | undefined;
 let processor: ImageProcessor | undefined;
@@ -25,4 +29,12 @@ export function mediaAdmin(): MediaAdmin & OriginalRemover {
 export function imageProcessor(): ImageProcessor {
   processor ??= createSharpImageProcessor();
   return processor;
+}
+
+let renderer: SampleImageRenderer | undefined;
+
+/** Illustrations of a demo's sample content (ADR-034). */
+export function sampleImageRenderer(): SampleImageRenderer {
+  renderer ??= createSharpSampleImageRenderer();
+  return renderer;
 }

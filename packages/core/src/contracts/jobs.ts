@@ -10,6 +10,8 @@ export const JOB_KINDS = {
   processPanorama: "media.process_panorama",
   /** Validates and optimizes a GLB (Meshopt + KTX2), checking that colors are kept. */
   processModel: "media.process_model",
+  /** Emails an invitation to administer a municipality (ADR-034). */
+  membershipInvitationMail: "mail.membership_invitation",
 } as const;
 
 export type JobKind = (typeof JOB_KINDS)[keyof typeof JOB_KINDS];
@@ -29,6 +31,8 @@ export const probePayloadSchema = z
 export const expireAbandonedUploadPayloadSchema = z.object({ versionId: z.uuid() }).strict();
 export const processPanoramaPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const processModelPayloadSchema = expireAbandonedUploadPayloadSchema;
+/** The membership only: the runner reads the address under the job's lease. */
+export const membershipInvitationMailPayloadSchema = z.object({ membershipId: z.uuid() }).strict();
 
 export type JobStatus = "pending" | "running" | "succeeded" | "dead_letter";
 export type JobAttemptOutcome = "running" | "succeeded" | "retry" | "failed" | "lease_expired";

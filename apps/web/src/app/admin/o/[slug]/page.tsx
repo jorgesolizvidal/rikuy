@@ -97,6 +97,19 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             <span className="org-role">Ver</span>
           </Link>
         </li>
+        {membership.demo && (membership.role === "owner" || membership.role === "admin") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/muestra`} className="org-card">
+              <span>
+                <span className="org-name">Contenido de muestra</span>
+                <span className="org-detail">
+                  Destinos, eventos y un tour de ejemplo para la demostración
+                </span>
+              </span>
+              <span className="org-role">Cargar</span>
+            </Link>
+          </li>
+        ) : null}
         {canManageMembers(membership.role) ? (
           <li>
             <Link href={`/o/${membership.slug}/miembros`} className="org-card">
@@ -109,10 +122,12 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </li>
         ) : null}
       </ul>
-      <p className="notice">
-        Los recorridos 360° llegarán en una próxima etapa; sus panoramas y modelos 3D ya se pueden
-        subir.
-      </p>
+      {membership.demo ? (
+        <p className="notice">
+          Es una demo comercial: su portal no aparece en buscadores y avisa a los visitantes que es
+          una demostración.
+        </p>
+      ) : null}
     </main>
   );
 }

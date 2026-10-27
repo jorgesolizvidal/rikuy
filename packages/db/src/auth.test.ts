@@ -160,6 +160,7 @@ describe("membership reader", () => {
               slug: "norte",
               display_name: "Norte",
               status: "active",
+              is_demo: false,
             },
           },
           {
@@ -169,6 +170,7 @@ describe("membership reader", () => {
               slug: "x",
               display_name: "X",
               status: "suspended",
+              is_demo: false,
             },
           },
           {
@@ -178,6 +180,7 @@ describe("membership reader", () => {
               slug: "nuevo",
               display_name: "Nuevo",
               status: "provisioning",
+              is_demo: true,
             },
           },
         ]);
@@ -189,6 +192,7 @@ describe("membership reader", () => {
     const call = h.requests.find((r) => r.url.pathname === "/rest/v1/memberships");
     expect(call?.url.searchParams.get("user_id")).toBe(`eq.${USER_ID}`);
     expect(call?.url.searchParams.get("status")).toBe("eq.active");
+    expect(call?.url.searchParams.get("select")).toContain("is_demo");
     expect(result).toEqual([
       {
         tenantId: "5eed1000-0000-4000-8000-000000000001",
@@ -203,6 +207,7 @@ describe("membership reader", () => {
         displayName: "Nuevo",
         role: "owner",
         tenantStatus: "provisioning",
+        demo: true,
       },
     ]);
   });
