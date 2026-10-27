@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P4 ✅ (tours 360°, hotspots y GLB). P1, P2 y P3 ✅. Siguiente: ★ Hito Demo / Portafolio.
-- **Último paso completado:** P4 · Paso 7 — contratos de los tours y medición (2026-10-27)
-- **Rama:** `feat/p4-step7-tour-contracts` → PR hacia `main`
+- **Último paso completado:** P4 · Paso 7 — contratos de los tours y medición (2026-10-27), con la medición final en Android
+- **Rama:** `docs/p4-android-measurement` → PR hacia `main`
 
 ## Historial
 
@@ -836,28 +836,20 @@ Lo que encontraron las pruebas:
 - El tamaño de los panoramas no se ve en el panel de medición: Storage está en otro dominio y no envía `Timing-Allow-Origin`. Se informan cuántos archivos fueron.
 - En la medición local de Lighthouse, la página del tour tuvo CLS 0,042 (el contenido baja una vez al cargar); está dentro del umbral y en el navegador real no aparece. Se revisa con la medición de producción.
 
-## Cómo verificarlo en tu PC
+**Medición final en Android (2026-10-27, `docs/p4-android-measurement`):** el usuario midió con `?medir` en producción, en su celular y en su PC, el tour de `mirador-del-valle`. Resultados en [contratos de los tours](../contratos-tours.md).
 
-```powershell
-git checkout feat/p4-step7-tour-contracts
-pnpm install
-pnpm db:reset
-pnpm dev
-```
+- Celular: CRT-NX3, Android 15, Mali-G57 MC2.
+- Cumplen los objetivos de la auditoría:
+  - primera escena en 1,46 s;
+  - 20 cambios de escena con p95 de 0,95 s y ninguno sin terminar;
+  - 87 cuadros/s al girar, sin cuadros largos;
+  - modelo 3D en 3,6 s, sin pérdida de contexto.
+- La memoria JS no se pudo medir en el celular: Chrome para Android redondea el valor. En la PC se leyó sin recolección de basura y subió un 27 %.
+- Repetido en laboratorio con memoria precisa y recolección forzada (80 cambios): tras el calentamiento, +5 %, con nodos y listeners estables. No hay fuga.
 
-Los contratos del tour (e2e) y el Lighthouse de tours corren en el CI. En local, con un tour publicado, abre su página y agrega `?medir` a la dirección: aparece el panel de medición; sin el parámetro, no.
+## Cómo verificarlo
 
-## Después del merge — medición en tu Android
-
-En tu celular, con Chrome y en producción (con datos móviles si puedes):
-
-1. abre un tour de la demo («Ver el tour 360°» en un destino) y agrega `?medir` al final de la dirección (`…/tour?medir`);
-2. espera unos segundos y pulsa «1. Medir 20 cambios de escena» (no toques nada mientras corre);
-3. pulsa «2. Medir la fluidez (5 s)» y gira el panorama con el dedo durante esos 5 segundos;
-4. abre el punto del modelo 3D y pulsa «Ver en 3D»;
-5. «Copiar resultados» y pégamelos en el chat, con el modelo de tu celular si no aparece.
-
-Con eso anoto la medición final y, si hace falta, ajusto los umbrales.
+Solo documentación: `docs/contratos-tours.md` (sección «Medición final en el dispositivo»), `docs/performance-budget.md` y este checkpoint. Para repetir la medición, abre un tour en producción con `?medir` al final de la dirección.
 
 ## Siguiente paso — ★ Hito Demo / Portafolio (requiere autorización)
 
