@@ -65,6 +65,16 @@ jobs:
           "$chrome" --version
           CHROME_PATH="$chrome" node e2e/lighthouse.mjs 2>&1 | tee ../../lighthouse.log
 
+      # The tour pages the demo portals have published (from their sitemaps): the first tour
+      # and the general tour. None published: a warning, not a failure.
+      - name: Lighthouse (tour pages)
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          chrome="$(command -v google-chrome || command -v google-chrome-stable || command -v chromium || true)"
+          LIGHTHOUSE_SET=tours CHROME_PATH="$chrome" node e2e/lighthouse.mjs 2>&1 | tee ../../lighthouse-tours.log
+
       - name: Keep the reports
         if: success() || failure()
         uses: actions/upload-artifact@v5

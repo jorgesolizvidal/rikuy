@@ -1,6 +1,7 @@
 "use client";
 
 import { neighbourScenes, startingScene, TOUR_SCENE_QUERY } from "@rikuy/core/tour-viewer";
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
 import type { HotspotMarker } from "@/components/panorama-viewer/hotspot-markers";
@@ -21,6 +22,9 @@ import { TourMenu } from "./tour-menu";
 import { PointDialog, type OpenPoint } from "./tour-point-dialog";
 
 export type { TourDataDto, TourMenuEntryDto, TourPointDto, TourSceneDto } from "./tour-dto";
+
+/** The measurement panel (`?medir`, P4 · Paso 7): never in the page's bundle. */
+const TourMeasure = dynamic(() => import("./tour-measure"), { ssr: false });
 
 /**
  * A tour in the portal (P4 · Paso 4 and 5): the 360° viewer and, next to it, the same tour
@@ -51,17 +55,23 @@ interface BrowserFacts {
   readonly requested: string | null;
   readonly reducedMotion: boolean;
   readonly fullscreen: boolean;
+  /** `?medir` was in the address at some point of this visit (jumps between tours drop it). */
+  readonly measure: boolean;
 }
 
+let measureRequested = false;
 let facts: { readonly href: string; readonly value: BrowserFacts } | null = null;
 
 function browserFacts(): BrowserFacts {
   const href = window.location.href;
   if (facts?.href !== href) {
+    const query = new URLSearchParams(window.location.search);
+    measureRequested ||= query.has("medir");
     facts = {
       href,
       value: {
-        requested: new URLSearchParams(window.location.search).get(TOUR_SCENE_QUERY),
+        measure: measureRequested,
+        requested: query.get(TOUR_SCENE_QUERY),
         reducedMotion: window.matchMedia("(prefers-reduced-motion: reduce)").matches,
         fullscreen: document.fullscreenEnabled,
       },
@@ -127,7 +137,10 @@ export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourEx
   const [idle, setIdle] = useState(false);
   useEffect(() => {
     let cancel: (() => void) | undefined;
-    const start = () => setIdle(true);
+    const start = () => {
+      performance.mark("rikuy:tour-viewer-start");
+      setIdle(true);
+    };
     const later = () => {
       if (typeof window.requestIdleCallback === "function") {
         const handle = window.requestIdleCallback(start, { timeout: 1500 });
@@ -319,7 +332,11 @@ export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourEx
     },
     [scenes, activate],
   );
-  const onShown = useCallback((sceneId: string) => setShown(sceneId), []);
+  const onShown = useCallback((sceneId: string) => {
+    // For the measurement panel (the first one is "Primera escena en pantalla").
+    performance.mark("rikuy:tour-shown", { detail: sceneId });
+    setShown(sceneId);
+  }, []);
   const onFailure = useCallback((failure: "webgl" | "scene", sceneId: string) => {
     if (failure === "webgl") setWebgl(false);
     else setSceneError(sceneId);
@@ -575,6 +592,7 @@ export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourEx
           </nav>
         ) : null}
       </div>
+      {browser?.measure ? <TourMeasure /> : null}
     </div>
   );
 }

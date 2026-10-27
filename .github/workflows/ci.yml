@@ -236,16 +236,36 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-      # RC-07 (P4 · Paso 4): a published tour walked in a real browser — entry, information and
-      # gallery, arrow, next/previous, model, another tour, back; fast taps and a late answer
-      # never bring an old scene back; the tour works as text without WebGL. It adds its own
-      # tour to Demo Sur, so it runs after the Lighthouse budget (which measures the seed).
-      - name: Tour viewer in a real browser (RC-07)
+      # RC-01/07/08 (P4): the reference tours (a museum and a four-scene carnival) walked in a
+      # real browser — entry, information and gallery, every scene forward and back, arrows,
+      # the 3D model loaded only on demand, another tour, out; fast taps and late answers never
+      # bring an old scene back; the tour works as text without WebGL; the panel's point
+      # editor keeps every relation it was not asked to change. It adds its own tours to Demo
+      # Sur, so it runs after the Lighthouse budget (which measures the seed).
+      - name: Tour viewer in a real browser (RC-01/07/08)
         if: success() || failure()
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-tour 2>&1 | tee ../../tour.log
+
+      # The tour pages those tours left in Demo Sur (found in its sitemap), against their own
+      # lines of lighthouse-budget.json.
+      - name: Lighthouse budget of the tour pages (mobile)
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          LIGHTHOUSE_SET=tours LIGHTHOUSE_REQUIRE_TOURS=1 CHROME_PATH="$(command -v google-chrome)" node e2e/lighthouse.mjs 3000 2>&1 | tee ../../lighthouse-tours.log
+
+      - name: Keep the Lighthouse reports of the tour pages
+        if: success() || failure()
+        uses: actions/upload-artifact@v5
+        with:
+          name: lighthouse-tour-reports
+          path: apps/web/lighthouse-reports/
+          if-no-files-found: ignore
+          retention-days: 14
 
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
@@ -271,7 +291,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do
