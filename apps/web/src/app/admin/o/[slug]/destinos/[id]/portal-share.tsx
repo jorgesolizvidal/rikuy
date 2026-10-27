@@ -10,11 +10,14 @@ export async function PortalShare({
   slug,
   title,
   portalOnline,
+  opens = "esta ficha",
 }: {
   readonly url: string;
   readonly slug: string;
   readonly title: string;
   readonly portalOnline: boolean;
+  /** What the code opens, for the hint ("esta ficha", "este tour"). */
+  readonly opens?: string;
 }) {
   const options = { errorCorrectionLevel: "M", margin: 4 } as const;
   const [svg, png] = await Promise.all([
@@ -39,9 +42,7 @@ export async function PortalShare({
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="qr" src={svgUrl} width={160} height={160} alt={`Código QR de «${title}»`} />
-      <p className="field-hint">
-        Imprímelo en carteles del lugar: al escanearlo se abre esta ficha.
-      </p>
+      <p className="field-hint">Imprímelo en carteles del lugar: al escanearlo se abre {opens}.</p>
       <p className="qr-downloads">
         <a href={png} download={`qr-${slug}.png`}>
           Descargar PNG

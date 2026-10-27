@@ -4,9 +4,11 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
+import { platformSettings } from "@/server/platform";
 import { requireOrganization } from "@/server/organization";
 
 import { SignOutButton } from "../../../../sign-out-button";
+import { PortalShare } from "../../destinos/[id]/portal-share";
 import { KIND, TOUR_STATUS } from "../labels";
 import { TourEditor } from "./tour-editor";
 
@@ -31,6 +33,7 @@ export default async function TourPage({ params }: TourPageProps) {
     panoramas: session.panoramas,
     models: session.models,
     media: session.media,
+    content: session.content,
   });
   if (editor === null) notFound();
 
@@ -134,6 +137,17 @@ export default async function TourPage({ params }: TourPageProps) {
           current: entry.revisionId === record.published?.revisionId,
         }))}
       />
+      {editor.portalPath ? (
+        <div className="tour-portal-share">
+          <PortalShare
+            url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}
+            slug={`tour-${record.content.slug}`}
+            title={`Tour de ${record.content.title}`}
+            portalOnline={membership.tenantStatus === "active"}
+            opens="este tour"
+          />
+        </div>
+      ) : null}
     </main>
   );
 }

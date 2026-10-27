@@ -10,6 +10,7 @@ import {
   type PublishedEventReader,
   type PublishedMapReader,
   type PublishedPresentationReader,
+  type PublishedTourReader,
   type TenantDirectory,
 } from "@rikuy/core";
 import {
@@ -17,6 +18,7 @@ import {
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
   createSupabasePublishedMapReader,
+  createSupabasePublishedTourReader,
   createSupabaseTenantDirectory,
 } from "@rikuy/db";
 
@@ -128,6 +130,19 @@ export function publishedEventReader(): PublishedEventReader {
 }
 
 /** Anonymous map reader: places by area (snapped to a ~1 km grid) cached for 30 s. */
+let publishedTours: PublishedTourReader | undefined;
+
+/** Anonymous tour reader (sealed manifests), read fresh: tour pages are cached per host. */
+export function publishedTourReader(): PublishedTourReader {
+  if (publishedTours) return publishedTours;
+  const { env } = platformSettings();
+  publishedTours = createSupabasePublishedTourReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedTours;
+}
+
 export function publishedMapReader(): PublishedMapReader {
   if (publishedMap) return publishedMap;
   const { env } = platformSettings();

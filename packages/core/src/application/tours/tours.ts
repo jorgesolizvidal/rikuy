@@ -25,7 +25,8 @@ import {
   type TourPublicationIssue,
 } from "../../domain/tours/scene";
 import { canEditContent, canPublishContent } from "../content/editing";
-import type { ContentStatus } from "../content/ports";
+import { tourPath } from "../content/portal";
+import type { ContentRepository, ContentStatus } from "../content/ports";
 import { contentImagePath } from "../media/content-images";
 import { MODEL_FOLDER, type ModelRepository } from "../media/models";
 import { PANORAMA_FOLDER, type PanoramaRepository } from "../media/panoramas";
@@ -251,6 +252,8 @@ export interface TourEditor {
   readonly models: readonly TourModelOption[];
   /** Where a "go to another tour" point can lead. */
   readonly targets: readonly HotspotTargetOption[];
+  /** The tour's page in the portal, once the tour and its destination or event are public. */
+  readonly portalPath: { readonly hostname: string; readonly path: string } | null;
 }
 
 export async function loadTourEditor(
@@ -261,6 +264,7 @@ export async function loadTourEditor(
     readonly panoramas: Pick<PanoramaRepository, "list">;
     readonly models: Pick<ModelRepository, "list">;
     readonly media: Pick<MediaRepository, "signedPreviewUrls">;
+    readonly content: Pick<ContentRepository, "portalHostname">;
   },
 ): Promise<TourEditor | null> {
   if (!isId(tourId)) return null;
@@ -270,13 +274,17 @@ export async function loadTourEditor(
 
   const canEdit = canEditContent(membership.role);
   const used = new Set(revision.scenes.map((scene) => scene.panorama.versionId));
-  const [panoramas, models, targets] = canEdit
-    ? await Promise.all([
-        deps.panoramas.list(membership.tenantId),
-        deps.models.list(membership.tenantId),
-        deps.tours.hotspotTargets(membership.tenantId, tourId),
-      ])
-    : [[], [], []];
+  const isPublic = record.published !== null && record.content.published;
+  const [[panoramas, models, targets], hostname] = await Promise.all([
+    canEdit
+      ? Promise.all([
+          deps.panoramas.list(membership.tenantId),
+          deps.models.list(membership.tenantId),
+          deps.tours.hotspotTargets(membership.tenantId, tourId),
+        ])
+      : Promise.resolve([[], [], []] as const),
+    isPublic ? deps.content.portalHostname(membership.tenantId) : Promise.resolve(null),
+  ]);
   const ready = panoramas.filter(
     (view) => view.status === "ready" && view.manifest !== null && !used.has(view.versionId),
   );
@@ -378,6 +386,10 @@ export async function loadTourEditor(
       createdAt: view.createdAt,
     })),
     targets,
+    portalPath:
+      isPublic && hostname
+        ? { hostname, path: tourPath(record.content.kind, record.content.slug) }
+        : null,
   };
 }
 

@@ -236,6 +236,17 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+      # RC-07 (P4 · Paso 4): a published tour walked in a real browser — entry, information and
+      # gallery, arrow, next/previous, model, another tour, back; fast taps and a late answer
+      # never bring an old scene back; the tour works as text without WebGL. It adds its own
+      # tour to Demo Sur, so it runs after the Lighthouse budget (which measures the seed).
+      - name: Tour viewer in a real browser (RC-07)
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-tour 2>&1 | tee ../../tour.log
+
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
       - name: GLB colors in a real browser
@@ -260,7 +271,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

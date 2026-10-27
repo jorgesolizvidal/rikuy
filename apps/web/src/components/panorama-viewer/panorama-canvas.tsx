@@ -5,16 +5,26 @@ import "@photo-sphere-viewer/markers-plugin/index.css";
 import "./hotspot-markers.css";
 
 import { Viewer } from "@photo-sphere-viewer/core";
-import { MarkersPlugin, type MarkerConfig } from "@photo-sphere-viewer/markers-plugin";
+import { MarkersPlugin } from "@photo-sphere-viewer/markers-plugin";
 import { useEffect, useRef } from "react";
 
-import { hotspotElement, hotspotKindLabel, type HotspotMarker } from "./hotspot-markers";
+import type { HotspotMarker } from "./hotspot-markers";
+import {
+  accessibleViewer,
+  fovOf,
+  markerConfig,
+  MAX_FOV,
+  MIN_FOV,
+  VIEWER_LANG,
+  webglAvailable,
+  zoomLevelOf,
+} from "./viewer-shared";
 
 /**
  * The 360° viewer (Photo Sphere Viewer 5, on the app's single three.js). Always loaded
- * with next/dynamic (ssr: false), so it never enters a page's initial bundle. The panel and,
- * from P4 · Paso 4, the portal use the same angles: yaw/pitch in radians and the field of
- * view in degrees, whatever the delivery (one image here, tiles in the portal).
+ * with next/dynamic (ssr: false), so it never enters a page's initial bundle. The panel's
+ * editor (one image per scene); the portal has its own (tour-canvas.tsx) with the same
+ * angles: yaw/pitch in radians and the field of view in degrees.
  *
  * Keyboard: the arrows and +/- move the view only while the viewer has focus (the page's
  * own keys keep working elsewhere).
@@ -48,61 +58,6 @@ export interface PanoramaCanvasProps {
   /** While true, a click on the panorama reports where (to place or move a point). */
   readonly picking?: boolean | undefined;
   readonly onPick?: ((point: { yaw: number; pitch: number }) => void) | undefined;
-}
-
-const MIN_FOV = 30;
-const MAX_FOV = 90;
-
-/** Photo Sphere Viewer zooms from 0 (MAX_FOV) to 100 (MIN_FOV). */
-function zoomLevelOf(fov: number): number {
-  return Math.min(100, Math.max(0, ((MAX_FOV - fov) / (MAX_FOV - MIN_FOV)) * 100));
-}
-
-function fovOf(zoomLevel: number): number {
-  return MAX_FOV - (zoomLevel / 100) * (MAX_FOV - MIN_FOV);
-}
-
-const LANG = {
-  zoom: "Acercar o alejar",
-  zoomOut: "Alejar",
-  zoomIn: "Acercar",
-  moveUp: "Mirar arriba",
-  moveDown: "Mirar abajo",
-  moveLeft: "Girar a la izquierda",
-  moveRight: "Girar a la derecha",
-  description: "Descripción",
-  download: "Descargar",
-  fullscreen: "Pantalla completa",
-  loading: "Cargando…",
-  menu: "Menú",
-  close: "Cerrar",
-  twoFingers: "Usa dos dedos para mover la vista",
-  ctrlZoom: "Usa Ctrl + rueda para acercar",
-  loadError: "No se pudo cargar el panorama",
-  webglError: "Este navegador no puede mostrar la vista 360°",
-};
-
-function markerConfig(marker: HotspotMarker): MarkerConfig {
-  const config: MarkerConfig = {
-    id: marker.id,
-    position: { yaw: marker.yaw, pitch: marker.pitch },
-    element: hotspotElement(marker),
-    anchor: "center center",
-    data: { kind: marker.kind },
-  };
-  // "Go to another tour" already shows its destination on the pill.
-  if (marker.kind !== "tour") {
-    config.tooltip = {
-      content: escapeText(`${hotspotKindLabel(marker.kind)}: ${marker.title}`),
-      position: "top center",
-    };
-  }
-  return config;
-}
-
-/** The tooltip content is HTML: the title is escaped. */
-function escapeText(text: string): string {
-  return text.replace(/[&<>"']/gu, (char) => `&#${char.charCodeAt(0)};`);
 }
 
 export default function PanoramaCanvas({
@@ -139,6 +94,10 @@ export default function PanoramaCanvas({
   useEffect(() => {
     const element = host.current;
     if (!element) return;
+    if (!webglAvailable()) {
+      callbacks.current.onFailure?.();
+      return;
+    }
     let viewer: Viewer;
     try {
       viewer = new Viewer({
@@ -153,8 +112,8 @@ export default function PanoramaCanvas({
         keyboard: false,
         mousewheelCtrlKey: true,
         touchmoveTwoFingers: false,
-        loadingTxt: LANG.loading,
-        lang: LANG,
+        loadingTxt: VIEWER_LANG.loading,
+        lang: VIEWER_LANG,
         plugins: [[MarkersPlugin, { markers: markersRef.current.map(markerConfig) }]],
       });
       plugin.current = viewer.getPlugin(MarkersPlugin);
@@ -163,35 +122,11 @@ export default function PanoramaCanvas({
       return;
     }
     const container = viewer.container;
-    // Focusable, so the arrows and +/- turn and zoom (only while it has focus).
-    container.tabIndex = 0;
-    container.setAttribute("role", "application");
-    container.setAttribute("aria-label", label);
-    container.setAttribute("aria-roledescription", "vista 360°");
-    const focusIn = () => viewer.startKeyboardControl();
-    const focusOut = () => viewer.stopKeyboardControl();
-    container.addEventListener("focusin", focusIn);
-    container.addEventListener("focusout", focusOut);
-
-    // The navbar's controls are <div>s with a title, rebuilt when the size changes: name them
-    // as buttons every time.
-    const nameButtons = () => {
-      for (const button of container.querySelectorAll<HTMLElement>(".psv-button")) {
-        // (The zoom slider has no title and is not a button.)
-        const title = button.getAttribute("title");
-        if (!title) continue;
-        if (button.getAttribute("role") !== "button") button.setAttribute("role", "button");
-        if (button.getAttribute("aria-label") !== title) button.setAttribute("aria-label", title);
-      }
-    };
-    const buttons = new MutationObserver(nameButtons);
-    buttons.observe(container, { subtree: true, childList: true, attributeFilter: ["title"] });
-    nameButtons();
+    const releaseAccessibility = accessibleViewer(viewer, label);
 
     viewer.addEventListener(
       "ready",
       () => {
-        nameButtons();
         callbacks.current.onReady?.({
           currentView: () => {
             const position = viewer.getPosition();
@@ -236,11 +171,9 @@ export default function PanoramaCanvas({
     });
 
     return () => {
-      buttons.disconnect();
+      releaseAccessibility();
       container.removeEventListener("pointerdown", pointerDown, true);
       container.removeEventListener("pointerup", pointerUp, true);
-      container.removeEventListener("focusin", focusIn);
-      container.removeEventListener("focusout", focusOut);
       plugin.current = null;
       viewer.destroy();
     };

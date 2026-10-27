@@ -16,6 +16,7 @@ import {
   publishedContentReader,
   publishedEventReader,
   publishedMapReader,
+  publishedTourReader,
 } from "./platform";
 import type { NearbyTargetDto } from "@/app/portal/[host]/visitor-location";
 
@@ -119,4 +120,15 @@ export function toMapPoint(place: PortalMapPlace): MapPointDto {
 
 export const portalMapExtent = cache(async (view: PortalView) =>
   publishedMapReader().extent(view.context.tenant.tenantId),
+);
+
+/** The published tour of a destination or event (also of an ended event), or null. */
+export const portalTour = cache(
+  async (view: PortalView, kind: "destination" | "event", slug: string) =>
+    publishedTourReader().find(view.context.tenant.tenantId, kind, slug),
+);
+
+/** The tours a visitor can browse (ended events left out), for the sitemap and Paso 5. */
+export const portalTourIndex = cache(async (view: PortalView) =>
+  publishedTourReader().index(view.context.tenant.tenantId),
 );
