@@ -15,9 +15,9 @@ Cada fase se divide en **pasos**; un paso = una rama = un PR con CI en verde y c
 ```
 P0 ✅ benchmarks (cerrado con límites)
 P1 ✅ Fundación · tenancy · identidad · white-label
-P3  Portal y admin: destinos, evento, mapa, ubicación del visitante, publicación (+ imágenes básicas)
-P2  Jobs durables · pipeline de panoramas y GLB · observabilidad
-P4  Tours 360° · hotspots · GLB lazy
+P3 ✅ Portal y admin: destinos, evento, mapa, ubicación del visitante, publicación (+ imágenes básicas)
+P2 ✅ Jobs durables · pipeline de panoramas y GLB · observabilidad
+P4 ✅ Tours 360° · hotspots · GLB lazy
 ★   Hito Demo / Portafolio
 P5  Asistente turístico (una conversación, guía en tours, voz) · Copilot V1/V2
 P6  Gate Early SaaS Pilot
@@ -80,7 +80,7 @@ Pasos confirmados por el usuario (2026-10-26), cada uno requiere autorización. 
 | 4 ✅ | Visor público de un tour: vista previa → imagen o teselas, navegación que cancela la escena anterior, información y galería, lista textual sin WebGL, QR; primera medición en un Android | RC-07: recorrido completo; tocar rápido no devuelve una escena vieja                                                                               |
 | 5 ✅ | Recorrido general: menú lateral (destinos y eventos), orden y tour de inicio elegidos por el municipio, «cerca de ti», eventos terminados fuera del menú                                 | Saltar entre tours sin salir del visor; solo se descarga el tour elegido                                                                           |
 | 6 ✅ | Modelo 3D en el tour: GLB solo al abrir su hotspot, poster, abrir/cerrar/reabrir, reintentar, foco y alternativa textual                                                                 | RC-08: cero descargas del GLB antes de abrirlo                                                                                                     |
-| 7    | Contratos RC-01/02/07/08 en CI con recorridos de referencia, Lighthouse del tour y medición final en Android                                                                             | Contratos en verde y la medición del celular anotada                                                                                               |
+| 7 ✅ | Contratos RC-01/02/07/08 en CI con recorridos de referencia, Lighthouse del tour y medición final en Android                                                                             | Contratos en verde y la medición del celular anotada                                                                                               |
 
 ## ★ Hito Demo / Portafolio
 

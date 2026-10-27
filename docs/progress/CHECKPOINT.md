@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
-- **Último paso completado:** P4 · Paso 6 — modelo 3D en el tour (2026-10-27)
-- **Rama:** `feat/p4-step6-tour-models` → PR hacia `main`
+- **Fase:** P4 ✅ (tours 360°, hotspots y GLB). P1, P2 y P3 ✅. Siguiente: ★ Hito Demo / Portafolio.
+- **Último paso completado:** P4 · Paso 7 — contratos de los tours y medición (2026-10-27)
+- **Rama:** `feat/p4-step7-tour-contracts` → PR hacia `main`
 
 ## Historial
 
@@ -790,33 +790,84 @@ Lo que encontraron las pruebas:
 - La descripción del modelo es opcional para no invalidar tours ya publicados; el panel la pide con su explicación.
 - El visor no tiene giro automático ni animaciones de entrada: es lo que hace innecesario un modo aparte para «reducir movimiento».
 
+### P4 · Paso 7 — contratos de los tours y medición ✅
+
+- Registro de los contratos en [contratos de los tours](../contratos-tours.md), con las reglas de evidencia de la auditoría (fuente, datos de prueba, entorno, actor, acción, resultado y limitaciones). La auditoría se leyó en modo solo lectura.
+- **Tours de referencia** en el e2e del CI (Demo Sur, datos sintéticos generados en cada corrida):
+  - el museo (3 escenas, una en teselas, con los cuatro tipos de puntos);
+  - **nuevo: el carnaval**, 4 escenas en fila, con flechas hacia adelante y atrás, e información con galería en la entrada;
+  - la plaza.
+  - El modelo 3D es un GLB sintético pasado por el optimizador real (desde el Paso 6).
+- **RC-07** («walks each reference tour…»): en el museo y el carnaval, información y galería, «Siguiente» hasta la última escena y «Anterior» hasta la entrada, comprobando en cada paso el color en pantalla, «Escena n de N» y el nombre; al final, «Volver a…». Se suma a los casos de los Pasos 4 y 5 (respuesta tardía, toques rápidos, recorrido general y sin WebGL).
+- **RC-01 en el panel, en un navegador** (nuevo):
+  - el propietario de Demo Sur entra con su código y abre el editor del museo;
+  - el modelo y su descripción aparecen elegidos; cambia solo el nombre, guarda y recarga: siguen elegidos;
+  - en la base, el punto del borrador es igual al publicado salvo el nombre; lo mismo con el punto de información y sus dos fotos;
+  - cambiar de un punto a otro con un cambio sin guardar nunca lleva la selección de uno al otro;
+  - al final descarta el borrador.
+- **RC-02** queda cubierto en la base y la API (`018_tours`, `tours.int.test.ts`); **RC-08**, por el caso del Paso 6.
+- **Lighthouse de las páginas de tour:**
+  - `e2e/lighthouse.mjs` con `LIGHTHOUSE_SET=tours` mide el primer tour del sitemap de cada portal y `/recorrido`;
+  - en el PR corre después de RC-07 (nuevo paso del job «Contracts», con sus informes como artefacto);
+  - en producción, en «Lighthouse on production», sobre los tours publicados (sin tours: un aviso);
+  - umbral propio en `lighthouse-budget.json`: rendimiento ≥ 70, LCP ≤ 2,5 s, CLS ≤ 0,1, JS ≤ 380 KB;
+  - CI (dos corridas): rendimiento 79 y 88, LCP 2,4 s, TBT 0,4–0,76 s.
+  - Las direcciones `*.localhost` se piden a 127.0.0.1 con su `Host` (no todos los sistemas las resuelven).
+- **Panel de medición `?medir`** en las páginas de tour (`tour-measure.tsx`), cargado solo con ese parámetro y sin enviar nada:
+  - dispositivo (modelo y sistema si el navegador los informa, memoria, núcleos, GPU, pantalla, red);
+  - carga (primer byte, primer contenido, LCP, arranque del visor, primera escena en pantalla);
+  - datos descargados por tipo;
+  - 20 cambios de escena (mediana, p95, el más lento, sin terminar, memoria JS antes y después);
+  - fluidez durante 5 s de giro;
+  - el modelo 3D (hasta verlo, tamaño, memoria);
+  - «Copiar resultados».
+  - El visor deja dos marcas de tiempo (`rikuy:tour-viewer-start`, `rikuy:tour-shown`) para medirlo.
+- Tests:
+  - 482 unitarios y 731 pgTAP (sin cambios);
+  - e2e del tour: 8 casos (nuevos: recorrido de referencia, RC-01 en el panel y el panel de medición, que hace 20 cambios sin ninguno sin terminar y solo pide GET al portal y a Storage).
+- Verificado en local: los 8 casos en verde sobre un seed limpio; Lighthouse de tours 72–74 (LCP 2,3–2,5 s); en el panel de medición, 20 cambios con p95 de 1,4 s y 9 % de crecimiento de la memoria JS (SwiftShader).
+- `docs/roadmap.md`: P2, P3 y P4 marcados como terminados en la secuencia.
+
+**Desviaciones:**
+
+- **La medición con números en Android queda para después del merge:** el panel `?medir` solo existe en producción cuando este PR se despliega (los previews no identifican un municipio). El usuario ya probó los tours en su celular tras los Pasos 4, 5 y 6 (funcionan bien); los números se anotan en `docs/contratos-tours.md`.
+- El museo de referencia tiene 3 escenas (la auditoría dice 2): la tercera cubre las teselas.
+- RC-01: las opciones y el punto llegan en la misma respuesta del servidor, así que la carrera «opciones antes o después del objeto» no puede ocurrir; la prueba cubre la recarga.
+- El tamaño de los panoramas no se ve en el panel de medición: Storage está en otro dominio y no envía `Timing-Allow-Origin`. Se informan cuántos archivos fueron.
+- En la medición local de Lighthouse, la página del tour tuvo CLS 0,042 (el contenido baja una vez al cargar); está dentro del umbral y en el navegador real no aparece. Se revisa con la medición de producción.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p4-step6-tour-models
+git checkout feat/p4-step7-tour-contracts
 pnpm install
 pnpm db:reset
-pnpm db:test
+pnpm dev
 ```
 
-`pnpm db:test` incluye `022_model_descriptions`. En el panel, edita un punto de modelo de un tour y escribe su «Descripción del modelo»; publica. En el portal, abre el tour, toca el punto del modelo: verás la imagen, el peso y la descripción; «Ver en 3D» lo carga, «Volver a la imagen» lo cierra.
+Los contratos del tour (e2e) y el Lighthouse de tours corren en el CI. En local, con un tour publicado, abre su página y agrega `?medir` a la dirección: aparece el panel de medición; sin el parámetro, no.
 
-## Después del merge
+## Después del merge — medición en tu Android
 
-«Deploy database» aplica la migración. Comprobación en tu Android (producción, con datos móviles si puedes):
+En tu celular, con Chrome y en producción (con datos móviles si puedes):
 
-1. abre un tour con un modelo, toca el punto y fíjate en que la imagen aparece sin esperar;
-2. «Ver en 3D»: anota cuánto tarda y si el teléfono se calienta o se pone lento;
-3. gíralo, ciérralo con «Volver a la imagen», ábrelo y ciérralo unas cinco veces seguidas, y después cambia de escena: el tour debe seguir fluido (si el visor se cerrara solo, verás el aviso de memoria);
-4. si puedes, en Chrome de escritorio con el celular conectado (`chrome://inspect`), mira la memoria de la pestaña antes de abrir, con el modelo abierto y después de cerrarlo.
+1. abre un tour de la demo («Ver el tour 360°» en un destino) y agrega `?medir` al final de la dirección (`…/tour?medir`);
+2. espera unos segundos y pulsa «1. Medir 20 cambios de escena» (no toques nada mientras corre);
+3. pulsa «2. Medir la fluidez (5 s)» y gira el panorama con el dedo durante esos 5 segundos;
+4. abre el punto del modelo 3D y pulsa «Ver en 3D»;
+5. «Copiar resultados» y pégamelos en el chat, con el modelo de tu celular si no aparece.
 
-## Siguiente paso — P4 · Paso 7 (requiere autorización)
+Con eso anoto la medición final y, si hace falta, ajusto los umbrales.
 
-**Contratos RC-01/02/07/08 en CI y medición final en Android:**
+## Siguiente paso — ★ Hito Demo / Portafolio (requiere autorización)
 
-- recorridos de referencia en CI revisados contra la auditoría: RC-01 (cambios parciales), RC-02 (escena de entrada y grafo al volver a una versión), RC-07 (recorrido) y RC-08 (modelo);
-- Lighthouse de la página del tour con su umbral propio, fijado con la medición del celular;
-- medición final en tu Android anotada en el presupuesto de rendimiento.
+Según el roadmap:
+
+- Ucureña en vivo (`rikuy-ucurena.vercel.app`) junto a un municipio demo, desde el mismo despliegue;
+- una cuenta de demostración del panel sobre un municipio de prueba que se reinicia periódicamente;
+- README con capturas y métricas de Speed Insights.
+
+Antes de empezarlo conviene acordar los pasos (como en P2 y P4).
 
 ## Decisiones pendientes del usuario
 

@@ -5,7 +5,13 @@
 //
 // Usage: CHROME_PATH=/path/to/chrome node e2e/lighthouse.mjs [port]
 //   Writes lighthouse-reports/<page>.json and a summary table (also to $GITHUB_STEP_SUMMARY).
+//
+// LIGHTHOUSE_SET=tours measures the tour pages instead (P4 · Paso 7): the first tour page in
+// each portal's sitemap and the general tour (/recorrido). Tours are data, not seed, so they
+// are found where they are published; a portal without tours is skipped, and with
+// LIGHTHOUSE_REQUIRE_TOURS=1 finding none fails the step.
 import { spawn } from "node:child_process";
+import { request as httpRequest } from "node:http";
 import { appendFile, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -48,20 +54,76 @@ const origins = new Map(
 );
 const originOf = (slug) =>
   (origins.get(slug) ?? `http://${slug}.localhost:${port}`).replace(/\/$/u, "");
-const pages = PORTALS.filter((portal) => origins.size === 0 || origins.has(portal.slug)).flatMap(
-  (portal) =>
-    Object.entries({
-      home: "/",
-      destinations: "/destinos",
-      destination: `/destinos/${portal.destination}`,
-      agenda: "/agenda",
-      event: `/agenda/${portal.event}`,
-      map: "/mapa",
-    }).map(([kind, path]) => {
-      const url = `${originOf(portal.slug)}${path}`;
-      return { kind, label: url.replace(/^https?:\/\//u, ""), url };
-    }),
-);
+const SET = process.env.LIGHTHOUSE_SET === "tours" ? "tours" : "portal";
+const measured = PORTALS.filter((portal) => origins.size === 0 || origins.has(portal.slug));
+const pageOf = (slug, kind, path) => {
+  const url = `${originOf(slug)}${path}`;
+  return { kind, label: url.replace(/^https?:\/\//u, ""), url };
+};
+
+/**
+ * GET a page as text. `*.localhost` is not resolved by every system's DNS (Chrome resolves it
+ * itself): those go to 127.0.0.1 with their Host header.
+ */
+async function get(url) {
+  const target = new URL(url);
+  if (!target.hostname.endsWith(".localhost")) {
+    const response = await fetch(url);
+    return { status: response.status, text: await response.text() };
+  }
+  return new Promise((resolve, reject) => {
+    const call = httpRequest(
+      {
+        host: "127.0.0.1",
+        port: target.port || 80,
+        path: target.pathname + target.search,
+        headers: { host: target.host },
+      },
+      (response) => {
+        let text = "";
+        response.setEncoding("utf8");
+        response.on("data", (chunk) => (text += chunk));
+        response.on("end", () => resolve({ status: response.statusCode, text }));
+      },
+    );
+    call.on("error", reject);
+    call.end();
+  });
+}
+
+/** A portal's tour pages, from its sitemap: the first tour and the general tour. */
+async function tourPages(slug) {
+  const response = await get(`${originOf(slug)}/sitemap.xml`);
+  if (response.status !== 200) throw new Error(`${slug}: sitemap answered ${response.status}`);
+  const paths = [...response.text.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(
+    ([, loc]) => new URL(loc).pathname,
+  );
+  const tour = paths.find((path) => /^\/(destinos|agenda)\/[^/]+\/tour$/u.test(path));
+  return tour && paths.includes("/recorrido")
+    ? [pageOf(slug, "tour", tour), pageOf(slug, "generalTour", "/recorrido")]
+    : [];
+}
+
+const pages =
+  SET === "tours"
+    ? (await Promise.all(measured.map((portal) => tourPages(portal.slug)))).flat()
+    : measured.flatMap((portal) =>
+        Object.entries({
+          home: "/",
+          destinations: "/destinos",
+          destination: `/destinos/${portal.destination}`,
+          agenda: "/agenda",
+          event: `/agenda/${portal.event}`,
+          map: "/mapa",
+        }).map(([kind, path]) => pageOf(portal.slug, kind, path)),
+      );
+if (pages.length === 0) {
+  const message = "no tour pages in the sitemaps: nothing to measure";
+  if (process.env.LIGHTHOUSE_REQUIRE_TOURS === "1") throw new Error(message);
+  console.log(`lighthouse: ${message}`);
+  annotate(message, "warning");
+  process.exit(0);
+}
 
 // A fresh headless Chrome (new profile, empty cache) for every run: otherwise scripts cached
 // by the previous page make the next one look lighter and faster than a first visit is.
@@ -167,10 +229,11 @@ async function runOnce(page) {
 }
 
 // After a deployment the CDN still holds the previous pages: one plain visit to each lets
-// it regenerate them, so the runs measure what visitors get, not the regeneration.
-if (origins.size > 0) {
+// it regenerate them, so the runs measure what visitors get, not the regeneration. Tour pages
+// were published after the build, so the first visit generates them: warm them too.
+if (origins.size > 0 || SET === "tours") {
   for (const page of pages) {
-    const response = await fetch(page.url).catch((error) => ({ status: error.message }));
+    const response = await get(page.url).catch((error) => ({ status: error.message }));
     if (response.status !== 200) {
       throw new Error(`${page.label}: answered ${response.status} before measuring`);
     }
@@ -240,9 +303,10 @@ const table = [
 ].join("\n");
 if (process.env.GITHUB_STEP_SUMMARY) {
   const where = origins.size > 0 ? "sitio publicado" : "compilación del PR";
+  const what = SET === "tours" ? "tours 360°" : "portal";
   await appendFile(
     process.env.GITHUB_STEP_SUMMARY,
-    `## Lighthouse (móvil, ${where})\n\n${table}\n`,
+    `## Lighthouse (móvil, ${what}, ${where})\n\n${table}\n`,
   );
 }
 

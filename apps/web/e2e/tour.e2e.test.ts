@@ -107,6 +107,30 @@ const points: Record<string, string> = {};
 /** About 9 km apart: «cerca de ti» puts the museum first for a visitor next to it. */
 const MUSEUM_AT = { lat: -17.41, lng: -66.12 };
 const PLAZA_AT = { lat: -17.45, lng: -66.2 };
+/** Between the two: by distance from the museum, it comes second. */
+const CARNIVAL_AT = { lat: -17.43, lng: -66.16 };
+
+/**
+ * The reference tours of the audit (RC-07): a museum and a carnival. The carnival has four
+ * scenes (the same synthetic panoramas in another order); the museum, three (the audit's has
+ * two: the third is the large one, served as tiles).
+ */
+interface ReferenceTour {
+  slug: string;
+  title: string;
+  tourId: string;
+  /** In their published order; the first is the entry. Key: the panorama on screen. */
+  scenes: { key: string; title: string; sceneId: string }[];
+  /** A point with text and two photos, in the entry scene. */
+  info: string;
+}
+const carnival: ReferenceTour = {
+  slug: "",
+  title: "Carnaval de prueba",
+  tourId: "",
+  scenes: [],
+  info: "Comparsas y trajes",
+};
 
 /** A published panorama version: renditions (tiles too) in the public bucket and its row. */
 async function publishPanorama(scene: Scene) {
@@ -362,6 +386,70 @@ async function buildTours(photos: { assetId: string }[], model: string) {
     ids.tour = tourId;
   });
 
+  // The carnival: four scenes in a row, arrows forward and back, text and photos at the entry.
+  carnival.slug = `carnaval-e2e-${RUN}`;
+  const carnivalId = await publishedDestination(carnival.slug, carnival.title, CARNIVAL_AT);
+  await asOwner(async (tx) => {
+    const [tour] = await tx`select * from public.create_tour(${SUR}, ${carnivalId})`;
+    let edit = tour?.edit_count as number;
+    const tourId = tour?.tour_id as string;
+    const titles = [
+      "Entrada de las comparsas",
+      "Plaza de los trajes",
+      "Calle de la música",
+      "Final del desfile",
+    ];
+    for (const [index, scene] of [d, a, c, b].entries()) {
+      const [added] =
+        await tx`select * from public.add_tour_scene(${SUR}, ${tourId}, ${edit}, ${need(scene.versionId)}, ${titles[index] ?? ""})`;
+      edit = added?.edit_count;
+      carnival.scenes.push({
+        key: scene.key,
+        title: titles[index] ?? "",
+        sceneId: added?.scene_id,
+      });
+    }
+    const point = async (sceneId: string, body: Record<string, unknown>) => {
+      const [added] =
+        await tx`select * from public.add_tour_hotspot(${SUR}, ${tourId}, ${edit}, ${sceneId}, ${tx.json(body as never)})`;
+      edit = added?.edit_count;
+    };
+    const first = carnival.scenes[0]?.sceneId ?? "";
+    await point(first, {
+      kind: "info",
+      title: carnival.info,
+      position: { yaw: -0.45, pitch: -0.05 },
+      body: [
+        { type: "paragraph", children: [{ type: "text", text: "Más de cuarenta comparsas." }] },
+      ],
+      gallery: photos.map((photo, index) => ({
+        assetId: photo.assetId,
+        version: 1,
+        alt: `Traje ${index + 1}`,
+      })),
+    });
+    for (const [index, scene] of carnival.scenes.entries()) {
+      const next = carnival.scenes[index + 1];
+      const previous = carnival.scenes[index - 1];
+      if (next)
+        await point(scene.sceneId, {
+          kind: "scene",
+          title: `Hacia ${next.title}`,
+          position: { yaw: 0.25, pitch: 0 },
+          targetSceneId: next.sceneId,
+        });
+      if (previous)
+        await point(scene.sceneId, {
+          kind: "scene",
+          title: `Volver a ${previous.title}`,
+          position: { yaw: -0.3, pitch: 0 },
+          targetSceneId: previous.sceneId,
+        });
+    }
+    await tx`select * from public.publish_tour(${SUR}, ${tourId}, ${edit})`;
+    carnival.tourId = tourId;
+  });
+
   // The general tour (P4 · Paso 5): the plaza first, and it starts there.
   await asOwner(async (tx) => {
     const [settings] =
@@ -402,6 +490,10 @@ async function sceneOnScreen(page: Page): Promise<string> {
   const distance = (scene: Scene) =>
     Math.hypot(color[0] - scene.color[0], color[1] - scene.color[1], color[2] - scene.color[2]);
   return Object.values(SCENES).sort((x, y) => distance(x) - distance(y))[0]?.key ?? "";
+}
+
+async function settledOn(page: Page, sceneId: string) {
+  await settled(page, { sceneId } as Scene);
 }
 
 async function settled(page: Page, scene: Scene) {
@@ -471,6 +563,57 @@ async function sameImage(a: Buffer, b: Buffer): Promise<boolean> {
       different += 1;
   }
   return different / (x.length / 3) < 0.005;
+}
+
+// ── The panel (RC-01): sign-in with the code from Mailpit, as in CI, or a fixed local one ──
+const ADMIN = `http://app.localhost:${PORT}`;
+
+async function emailCode(email: string, since: number): Promise<string> {
+  if (process.env.E2E_EMAIL_CODE) return process.env.E2E_EMAIL_CODE;
+  const mailpit = process.env.MAILPIT_URL ?? "http://127.0.0.1:54324";
+  const deadline = Date.now() + 20_000;
+  while (Date.now() < deadline) {
+    const search = (await (
+      await fetch(`${mailpit}/api/v1/search?query=${encodeURIComponent(`to:"${email}"`)}`)
+    ).json()) as { messages?: { ID: string; Created: string }[] };
+    const id = search.messages?.find((m) => Date.parse(m.Created) >= since - 1000)?.ID;
+    if (id) {
+      const message = (await (await fetch(`${mailpit}/api/v1/message/${id}`)).json()) as {
+        Text?: string;
+        HTML?: string;
+      };
+      const code = /\b(\d{6})\b/u.exec(`${message.Text ?? ""} ${message.HTML ?? ""}`)?.[1];
+      if (code) return code;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error(`no sign-in email for ${email}`);
+}
+
+async function signIn(page: Page, email: string) {
+  await page.goto(`${ADMIN}/login`);
+  await page.getByLabel("Correo electrónico").fill(email);
+  const since = Date.now();
+  await page.getByRole("button", { name: "Recibir código" }).click();
+  await page.getByLabel("Código de acceso").waitFor();
+  await page.getByLabel("Código de acceso").fill(await emailCode(email, since));
+  await page.getByRole("button", { name: "Entrar" }).click();
+  await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+}
+
+/** A point of a revision, with everything an edit must keep (RC-01). */
+async function pointRow(revision: "draft" | "published", hotspotId: string) {
+  const column = revision === "draft" ? "draft_revision_id" : "published_revision_id";
+  const [row] = await db`
+    select h.scene_id, h.kind::text as kind, h.title, h.yaw, h.pitch, h.body,
+           h.target_scene_id, h.model_version_id, h.target_content_id,
+           coalesce((select jsonb_agg(jsonb_build_object('version', i.asset_version_id, 'alt', i.alt_text) order by i.position)
+                     from public.tour_hotspot_images i
+                     where i.tour_revision_id = h.tour_revision_id and i.hotspot_id = h.hotspot_id), '[]') as gallery
+    from public.tour_hotspots h
+    join public.tours t on t.${db(column)} = h.tour_revision_id
+    where t.id = ${ids.tour} and h.hotspot_id = ${hotspotId}`;
+  return row;
 }
 
 const ready = SUPABASE_URL !== "" && SECRET !== "";
@@ -590,6 +733,102 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     await page.waitForURL(`${PORTAL}/destinos/${ids.otherSlug}`);
     expect(errors).toEqual([]);
   });
+
+  it("RC-07: walks each reference tour, scene by scene: entry, information, gallery, next to the end, previous back, out", async () => {
+    const { a, b, c } = SCENES as Required<Record<"a" | "b" | "c", Scene>>;
+    const museum: ReferenceTour = {
+      slug: ids.slug,
+      title: "Museo de prueba",
+      tourId: ids.tour,
+      scenes: [a, b, c].map((scene) => ({
+        key: scene.key,
+        title: scene.title,
+        sceneId: need(scene.sceneId),
+      })),
+      info: "Arados antiguos",
+    };
+    for (const reference of [museum, carnival]) {
+      const page = await (
+        await browser.newContext({ viewport: { width: 1280, height: 900 } })
+      ).newPage();
+      const errors: string[] = [];
+      page.on("pageerror", (error) => errors.push(String(error)));
+      await page.goto(`${PORTAL}/destinos/${reference.slug}/tour`);
+      const [entry] = reference.scenes;
+      await settledOn(page, need(entry?.sceneId));
+      const total = reference.scenes.length;
+
+      // Information and its gallery, from the list (the same control as the point).
+      await page.locator(".tour-points").getByRole("button", { name: reference.info }).click();
+      const dialog = page.locator("dialog.tour-dialog[open]");
+      await dialog.waitFor();
+      expect(await dialog.getByText("Foto 1 de 2").count()).toBe(1);
+      await dialog.getByRole("button", { name: "Siguiente" }).click();
+      expect(await dialog.getByText("Foto 2 de 2").count()).toBe(1);
+      await page.keyboard.press("Escape");
+      await dialog.waitFor({ state: "detached" });
+
+      // Next to the last scene, then previous back to the entry: each one on screen.
+      const next = page.getByRole("button", { name: /^Siguiente/u });
+      const previous = page.getByRole("button", { name: /^Anterior/u });
+      const visit = async (index: number) => {
+        const scene = reference.scenes[index];
+        await settledOn(page, need(scene?.sceneId));
+        expect(await sceneOnScreen(page), `${reference.title} · ${scene?.title}`).toBe(scene?.key);
+        expect(await page.locator(".tour-bar-title").textContent()).toContain(
+          `Escena ${index + 1} de ${total}`,
+        );
+        expect(await page.locator("#tour-escena").textContent()).toBe(scene?.title);
+      };
+      expect(await previous.isDisabled()).toBe(true);
+      for (let index = 1; index < total; index += 1) {
+        await next.click();
+        await visit(index);
+      }
+      expect(await next.isDisabled()).toBe(true);
+      for (let index = total - 2; index >= 0; index -= 1) {
+        await previous.click();
+        await visit(index);
+      }
+
+      // Out: back to the destination.
+      await page.getByRole("link", { name: `← Volver a ${reference.title}` }).click();
+      await page.waitForURL(`${PORTAL}/destinos/${reference.slug}`);
+      expect(errors).toEqual([]);
+      await page.context().close();
+    }
+  });
+
+  it("measures a visit with ?medir, on the device only, and never shows up without it", async () => {
+    const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await page.goto(`${PORTAL}/destinos/${ids.slug}/tour`);
+    await settled(page, SCENES.a as Scene);
+    expect(await page.locator(".tour-measure").count()).toBe(0);
+
+    const requests: string[] = [];
+    page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+    await page.goto(`${PORTAL}/destinos/${ids.slug}/tour?medir=1`);
+    const panel = page.getByRole("complementary", { name: "Medición del tour" });
+    await panel.waitFor();
+    const report = panel.locator(".tour-measure-report");
+    await report.filter({ hasText: "Primera escena en pantalla: " }).waitFor({ timeout: 30_000 });
+    await panel.getByRole("button", { name: "1. Medir 20 cambios de escena" }).click();
+    await report.filter({ hasText: "Cambios: 20" }).waitFor({ timeout: 240_000 });
+    const text = (await report.textContent()) ?? "";
+    expect(text).toContain("Sin terminar en 30 s: 0");
+    expect(text).toMatch(/Primera escena en pantalla: \d+ ms/u);
+    expect(text).toMatch(/Hasta ver la escena \(p95\): \d+ ms/u);
+    // Nothing leaves the device: only GETs to the portal and to Storage.
+    expect(requests.filter((line) => !line.startsWith("GET "))).toEqual([]);
+    expect(
+      new Set(requests.map((line) => new URL(line.slice(line.indexOf(" ") + 1)).origin)),
+    ).toEqual(new Set([new URL(PORTAL).origin, new URL(SUPABASE_URL).origin]));
+    expect(errors).toEqual([]);
+    await context.close();
+  }, 300_000);
 
   it("RC-08: the model loads only when asked for, closes, reopens, retries and frees its memory", async () => {
     const context = await browser.newContext({
@@ -891,5 +1130,90 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     expect(
       await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth),
     ).toBe(0);
+  });
+
+  it("RC-01: the panel's point editor saves only what changed and never mixes two points", async () => {
+    const { b } = SCENES as Required<Record<"b", Scene>>;
+    const page = await (
+      await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    ).newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    await signIn(page, "owner@demo-sur.example.test");
+    const editor = `${ADMIN}/o/demo-sur/tours/${ids.tour}`;
+    await page.goto(editor);
+    const form = page.locator("form.hotspot-form");
+    const status = (text: string) =>
+      page.getByRole("status").filter({ hasText: text }).waitFor({ timeout: 20_000 });
+
+    // The model point: its options and its own values come in the same server response.
+    const before = await pointRow("published", need(points.model));
+    await page.getByRole("button", { name: "Editar «Horno de barro»" }).click();
+    const chosenModel = form.locator(".hotspot-model input:checked");
+    expect(await chosenModel.getAttribute("value")).toBe(before?.model_version_id);
+    expect(await form.getByLabel("Descripción del modelo").inputValue()).toContain(
+      "Horno de adobe",
+    );
+    // Only the name: saved, then the page reloaded.
+    await form.getByLabel("Nombre del punto").fill("Horno de barro del patio");
+    await form.getByRole("button", { name: "Guardar el punto" }).click();
+    await status("Se guardó «Horno de barro»");
+    await page.reload();
+    await page.getByRole("button", { name: "Editar «Horno de barro del patio»" }).click();
+    expect(await form.locator(".hotspot-model input:checked").getAttribute("value")).toBe(
+      before?.model_version_id,
+    );
+    expect(await form.getByLabel("Descripción del modelo").inputValue()).toContain(
+      "Horno de adobe",
+    );
+    await form.getByRole("button", { name: "Cancelar" }).click();
+    // Scene, kind, model, description and position, as they were; only the name changed.
+    expect(await pointRow("draft", need(points.model))).toEqual({
+      ...before,
+      title: "Horno de barro del patio",
+    });
+
+    // The information point: a new name keeps its text and its photos, in their order.
+    const info = await pointRow("published", need(points.info));
+    await page.getByRole("button", { name: "Editar «Arados antiguos»" }).click();
+    await form.getByLabel("Nombre del punto").fill("Arados y yugos");
+    await form.getByRole("button", { name: "Guardar el punto" }).click();
+    await status("Se guardó «Arados antiguos»");
+    expect(await pointRow("draft", need(points.info))).toEqual({
+      ...info,
+      title: "Arados y yugos",
+    });
+    expect((info?.gallery as unknown[]).length).toBe(2);
+
+    // A, then B: B's form shows B's own target; an unsaved change to A does not travel.
+    await page.getByRole("button", { name: "Editar «Ir a la plaza»" }).click();
+    const tourTarget = form.getByLabel("Lleva al tour de");
+    expect(await tourTarget.inputValue()).toBe(ids.other);
+    const others = await tourTarget
+      .locator("option:not([disabled])")
+      .evaluateAll((options) => options.map((option) => (option as HTMLOptionElement).value));
+    await tourTarget.selectOption(others.find((value) => value !== ids.other) ?? "");
+    expect(await tourTarget.inputValue()).not.toBe(ids.other);
+    await page.getByRole("button", { name: "Editar «A la sala»" }).click();
+    expect(await form.getByLabel("Lleva al tour de").count()).toBe(0);
+    expect(await form.getByLabel("Lleva a la escena").inputValue()).toBe(b.sceneId);
+    await page.getByRole("button", { name: "Editar «Ir a la plaza»" }).click();
+    expect(await form.getByLabel("Lleva al tour de").inputValue()).toBe(ids.other);
+    await page.getByRole("button", { name: "Editar «Horno de barro del patio»" }).click();
+    expect(await form.locator(".hotspot-model input:checked").getAttribute("value")).toBe(
+      before?.model_version_id,
+    );
+    await form.getByRole("button", { name: "Cancelar" }).click();
+    // Nothing of that was saved.
+    expect(await pointRow("draft", need(points.jump))).toEqual(
+      await pointRow("published", need(points.jump)),
+    );
+
+    // The published tour never changed; the draft is discarded.
+    expect((await pointRow("published", need(points.model)))?.title).toBe("Horno de barro");
+    await page.getByRole("button", { name: "Descartar cambios" }).click();
+    await page.getByRole("button", { name: "Confirmar: descartar los cambios" }).click();
+    await status("Se descartaron los cambios");
+    expect(errors).toEqual([]);
   });
 });
