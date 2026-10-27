@@ -138,3 +138,18 @@ export const portalTourIndex = cache(async (view: PortalView) =>
     .index(view.context.tenant.tenantId)
     .catch(() => []),
 );
+
+/**
+ * Whether a destination or event has a tour visitors can open, for its page's link. From the
+ * index the layout already reads (no extra query); an ended event is not in the index, so
+ * only then its tour is looked up.
+ */
+export async function portalHasTour(
+  view: PortalView,
+  kind: "destination" | "event",
+  slug: string,
+  ended = false,
+): Promise<boolean> {
+  if (ended) return (await portalTour(view, kind, slug)) !== null;
+  return (await portalTourIndex(view)).some((entry) => entry.kind === kind && entry.slug === slug);
+}
