@@ -1,5 +1,7 @@
 "use client";
 
+import "./general-tour.css";
+
 import type { GeneralTourEntry } from "@rikuy/core";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
