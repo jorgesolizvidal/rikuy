@@ -120,6 +120,12 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
   - `portal_tour` y `portal_tour_index` son las únicas lecturas del visitante;
   - una versión se marca publicada después de copiar sus archivos, así la cuota cuenta las copias.
 
+- Visor público del tour (P4 · Paso 4, [ADR-031](adr/ADR-031-public-tour-viewer.md)):
+  - una página por tour, cacheada por municipio;
+  - un solo Photo Sphere Viewer con teselas, cargado bajo demanda;
+  - siempre gana la última escena pedida;
+  - el mismo tour como texto renderizado en el servidor, que funciona sin WebGL.
+
 ## 8 bis. Cuotas por municipio (ADR-012, ADR-027)
 
 - Dos recursos en `usage_buckets`:

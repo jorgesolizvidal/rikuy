@@ -312,6 +312,7 @@ describe("tour use cases", () => {
       panoramas: { list: async () => [ready, used, processing] },
       models: { list: async () => [] },
       media: { signedPreviewUrls },
+      content: { portalHostname: async () => "demo-norte.localhost" },
     });
     expect(editorView?.editCount).toBe(3);
     expect(editorView?.scenes[0]?.imageUrl).toBe(
@@ -319,12 +320,14 @@ describe("tour use cases", () => {
     );
     expect(editorView?.options.map((option) => option.versionId)).toEqual([ready.versionId]);
     expect(editorView?.canPublish).toBe(false);
+    expect(editorView?.portalPath).toBeNull(); // never published
 
     const readOnly = await loadTourEditor(analyst, TOUR, {
       tours,
       panoramas: { list: vi.fn(async () => [ready]) },
       models: { list: vi.fn(async () => []) },
       media: { signedPreviewUrls },
+      content: { portalHostname: async () => "demo-norte.localhost" },
     });
     expect(readOnly?.options).toEqual([]);
   });
@@ -337,9 +340,15 @@ describe("tour use cases", () => {
       panoramas: { list: async () => [] },
       models: { list: async () => [] },
       media: { signedPreviewUrls: async () => new Map() },
+      content: { portalHostname: async () => "demo-norte.localhost" },
     });
     expect(view?.revision.state).toBe("sealed");
     expect(view?.editCount).toBeNull();
+    // Published tour of a published destination: its page in the portal (for the QR code).
+    expect(view?.portalPath).toEqual({
+      hostname: "demo-norte.localhost",
+      path: "/destinos/museo/tour",
+    });
   });
 
   it("parses the editor document the database returns", () => {

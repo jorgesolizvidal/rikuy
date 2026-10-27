@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
-- **Último paso completado:** P4 · Paso 3 — publicación de medios y manifiesto del tour (2026-10-26)
-- **Rama:** `feat/p4-step3-tour-publication` → PR hacia `main`
+- **Último paso completado:** P4 · Paso 4 — visor público del tour (2026-10-26)
+- **Rama:** `feat/p4-step4-public-viewer` → PR hacia `main`
 
 ## Historial
 
@@ -607,30 +607,99 @@ Lo que encontraron las pruebas:
 - El orden del recorrido general es por tipo y nombre hasta el Paso 5, donde lo elige el municipio.
 - Un medio que dejó de usarse sigue público; retirarlo llegará con la limpieza de medios huérfanos.
 
+### P4 · Paso 4 — visor público del tour ✅
+
+- Decisiones ([ADR-031](../adr/ADR-031-public-tour-viewer.md)): una página por tour, un solo visor por recorrido y el tour también como texto. Sin cambios en la base de datos: el portal lee el manifiesto sellado del Paso 3.
+- `@rikuy/core`:
+  - `PORTAL_PATHS.destinationTour` / `eventTour` y `tourPath`; el sitemap suma los tours;
+  - `tourViewerModel`, que convierte el manifiesto en escenas en orden y deja solo los puntos que el visitante puede usar. Omite un «ir a otro recorrido» sin tour visible, una flecha a una escena que no está y los niveles de teselas que el visor no admite (columnas que no son potencia de 2);
+  - nueva entrada **`@rikuy/core/tour-viewer`**, sin esquemas, con `startingScene` (la escena de `?escena=` o la entrada), `neighbourScenes` y `TOUR_SCENE_QUERY`, para el navegador;
+  - `loadTourEditor` devuelve la dirección pública del tour cuando el tour y su destino o evento están publicados.
+- Portal:
+  - **`/destinos/{dirección}/tour`** y **`/agenda/{dirección}/tour`**, cacheadas con el resto del portal. Publicar o volver a una versión las invalida (`refreshPortal` suma los tours).
+  - El escenario tiene:
+    - el **visor 360°** (Photo Sphere Viewer 5.15.1 con su adaptador de teselas): vista previa al instante y luego la imagen, o solo las teselas del nivel que la pantalla necesita;
+    - una barra con el nombre de la escena, «Escena n de N», «Anterior», «Siguiente» y pantalla completa (la del escenario: los diálogos siguen visibles).
+  - **Siempre gana la última escena pedida**: el visor cancela la carga anterior y una secuencia propia descarta respuestas tardías.
+  - Los cuatro tipos de puntos en el panorama:
+    - información: diálogo con su texto y su galería («Foto 1 de 3», Anterior / Siguiente);
+    - flecha: va a la otra escena;
+    - modelo 3D: diálogo con su poster;
+    - «ir a otro recorrido»: la píldora abre el otro tour.
+  - **El mismo tour como texto**, renderizado en el servidor: la escena con su descripción, «En esta escena» (cada punto es un botón o enlace) y «Escenas del tour». Funciona con el teclado y con un lector de pantalla. Sin WebGL 2, el visor avisa y muestra la imagen plana de la escena.
+  - La dirección guarda la escena (`?escena=`), así que un enlace compartido la abre. La entrada no lleva parámetro.
+  - «Ver el tour 360°» en la ficha del destino y del evento. El tour de un evento terminado sigue disponible, con su aviso y fuera de buscadores.
+  - three.js y el visor (~200 KB) se cargan con import dinámico después de `load`, cuando el navegador queda libre. La vista previa de la entrada se precarga. La ficha del destino no pide ningún archivo del panorama.
+- Panel: el editor del tour muestra **«Para visitantes»** con «Ver en el portal» y el **código QR** del tour (PNG y SVG) cuando el tour y su destino o evento están publicados.
+- Los dos visores (panel y portal) comparten idioma, ángulos, puntos y accesibilidad (`viewer-shared.ts`).
+- Tests:
+  - 477 unitarios (core 306, db 102, web 35, worker 27, config 7);
+  - 696 pgTAP sin cambios;
+  - **RC-07 en un navegador real** (`apps/web/e2e/tour.e2e.test.ts`, en el job «Contracts», después de Lighthouse). Crea en Demo Sur, con las mismas RPC que el panel, un tour de tres panoramas sintéticos de colores distintos (uno con teselas), los cuatro tipos de puntos, dos fotos, un modelo y un segundo tour, y comprueba:
+    - el recorrido completo: ficha → tour → entrada → información y galería → flecha → siguiente → anterior → modelo → otro tour → volver. Por el color en pantalla, se verifica que cada paso muestra la escena correcta;
+    - la ficha no pide panoramas; la escena grande usa teselas y no su imagen;
+    - con el taller respondiendo 2,5 s tarde, pedir el taller y enseguida el patio termina en el patio, también después de que el taller responde. Cuatro toques seguidos terminan en el último;
+    - un enlace con `?escena=` abre esa escena;
+    - sin WebGL: aviso, imagen plana, puntos y escenas desde la lista con el teclado, el foco vuelve al cerrar el diálogo y no hay desborde a 390 px.
+- Verificado en local, en el navegador, con los panoramas y modelos reales:
+  - la sala principal aparece en ~1,6 s, con 4–9 teselas del nivel de 4096 px;
+  - los cuatro puntos, el diálogo con la foto, el poster del horno, la flecha a la sala de herramientas y la píldora «Ir a · Plaza principal»;
+  - pantalla completa con un diálogo encima;
+  - el QR del tour en el panel;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360, 390 y 1280 px;
+  - contratos RC-09/10/11/12 en verde (189 verificaciones, ahora también sobre las páginas de tour).
+- Lighthouse local (móvil, CPU ×4) de la página del tour: rendimiento 60–69, LCP 2,6–4,1 s, CLS 0,002; accesibilidad, buenas prácticas y SEO 100.
+- Lo que encontraron las pruebas, ya corregido:
+  - sin WebGL 2, Photo Sphere Viewer no lanza un error y deja un visor a medio construir, así que la página fallaba. Ahora los dos visores lo comprueban antes;
+  - una fuente de 5760 px da un nivel de 5120 px con 10 columnas, que el visor rechaza. Ese nivel se omite;
+  - el visor arrancaba junto con la página y retrasaba su primera imagen; ahora espera a `load`.
+  - en el CI, los estilos del tour dentro de la hoja común del portal llevaban el LCP de tres fichas a 2,57 s (límite 2,5 s). Ahora tienen su propia hoja, `tour.css`, que solo carga la página del tour.
+
+**Desviaciones:**
+
+- El modelo 3D muestra su poster; verlo en 3D dentro del tour llega en el Paso 6 (RC-08).
+- «Ir a otro recorrido» abre la página del otro tour; saltar sin salir del visor llega con el recorrido general (Paso 5).
+- La página del tour no tiene umbral de rendimiento en Lighthouse, igual que `/mapa`: se fija tras medirla en tu Android.
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p4-step3-tour-publication
+git checkout feat/p4-step4-public-viewer
 pnpm install
 pnpm db:reset
-pnpm db:test
-pnpm --filter @rikuy/db test:integration
+pnpm --filter @rikuy/web build
 ```
 
-`pnpm db:test` incluye `020_tour_publication`, y la integración, `tour-publication.int.test.ts`. En el panel, con `pnpm dev`, publica un tour: el botón dice «Publicando…» y al terminar, en Supabase Studio (`media-public`), aparece la carpeta `panorama/` de cada escena con sus teselas.
+Con `pnpm dev` (o `next start`) y un tour publicado de un destino publicado, abre la ficha en el portal y pulsa «Ver el tour 360°». Para la prueba RC-07, con la pila local de Supabase y el servidor en el puerto 3000:
+
+```powershell
+$env:SUPABASE_URL="http://127.0.0.1:54321"; $env:SUPABASE_SECRET_KEY="<clave secreta local>"
+pnpm --filter @rikuy/web test:e2e-tour
+```
 
 ## Después del merge
 
-«Deploy database» aplica la migración y da su manifiesto a los tours ya publicados. Si publicaste un tour en producción antes de este paso, sus medios siguen privados: cambia algo pequeño (una descripción) y vuelve a publicarlo para que pasen al portal.
+Nada que configurar. **Primera medición en tu Android** (cuando producción sirva este paso):
 
-## Siguiente paso — P4 · Paso 4 (requiere autorización)
+1. En el panel de Demo Norte, sube 2 o 3 panoramas, crea el tour de un destino publicado, agrega puntos y publícalo.
+2. En el editor del tour, «Para visitantes»: escanea el QR con el celular.
+3. Anota:
+   - cuánto tarda en verse la vista previa y cuánto el panorama nítido;
+   - si mirar alrededor y acercar va fluido;
+   - si al acercar se ve más nítido (teselas);
+   - si cambiar de escena rápido termina en la última;
+   - si el celular se calienta o la pestaña se recarga sola.
+4. Si puedes, pasa la dirección por PageSpeed Insights. Speed Insights de Vercel junta además los datos reales.
 
-**Visor público del tour en el portal:**
+## Siguiente paso — P4 · Paso 5 (requiere autorización)
 
-- página del tour en cada destino o evento con tour publicado, con la vista previa al instante y teselas por nivel según el zoom;
-- los cuatro tipos de puntos (información con fotos, flecha, modelo 3D con su poster, «ir a otro recorrido»);
-- visor cargado bajo demanda (fuera del bundle inicial), teclado, alternativa en texto y «reducir movimiento»;
-- **primera medición en tu Android** cuando esté en producción (te aviso).
+**Recorrido general:**
+
+- menú lateral con los destinos y eventos que tienen tour;
+- el orden y el tour de inicio los elige el municipio;
+- «cerca de ti» (en el dispositivo, como ADR-021);
+- los eventos terminados quedan fuera del menú;
+- saltar entre tours sin salir del visor, descargando solo el tour elegido.
 
 ## Decisiones pendientes del usuario
 

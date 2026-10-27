@@ -69,3 +69,5 @@ export * from "./domain/tours/scene";
 export * from "./domain/tours/hotspot";
 export * from "./application/tours/tours";
 export * from "./application/tours/publication";
+export * from "./application/tours/portal-view";
+export * from "./domain/tours/viewer";

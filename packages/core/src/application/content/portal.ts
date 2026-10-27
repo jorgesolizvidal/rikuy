@@ -23,11 +23,18 @@ export const PORTAL_PATHS = {
   agenda: "/agenda",
   event: (slug: string) => `/agenda/${encodeURIComponent(slug)}`,
   eventCalendar: (slug: string) => `/agenda/${encodeURIComponent(slug)}/calendario.ics`,
+  destinationTour: (slug: string) => `/destinos/${encodeURIComponent(slug)}/tour`,
+  eventTour: (slug: string) => `/agenda/${encodeURIComponent(slug)}/tour`,
   map: "/mapa",
   mapPlaces: "/mapa/lugares",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
+
+/** The 360° tour page of a destination or an event. */
+export function tourPath(kind: "destination" | "event", slug: string): string {
+  return kind === "destination" ? PORTAL_PATHS.destinationTour(slug) : PORTAL_PATHS.eventTour(slug);
+}
 
 export interface ImageCandidate {
   readonly path: string;
@@ -105,6 +112,11 @@ export function buildSitemap(
   origin: string,
   destinations: readonly PublishedDestinationSummary[],
   events: readonly PublishedEventSummary[] = [],
+  tours: readonly {
+    readonly kind: "destination" | "event";
+    readonly slug: string;
+    readonly publishedAt: string;
+  }[] = [],
 ): string {
   const entry = (path: string, lastModified?: string) =>
     `<url><loc>${escapeXml(`${origin}${path}`)}</loc>${
@@ -124,6 +136,7 @@ export function buildSitemap(
     entry(PORTAL_PATHS.agenda, latest(events)),
     entry(PORTAL_PATHS.map, latest([...destinations, ...events])),
     ...events.map((e) => entry(PORTAL_PATHS.event(e.slug), e.updatedAt)),
+    ...tours.map((t) => entry(tourPath(t.kind, t.slug), t.publishedAt)),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),
     "</urlset>",

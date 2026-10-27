@@ -87,8 +87,9 @@ const config = [
     },
   },
   {
-    // The GLB color check runs the real optimizer (no database, no secrets): test code only.
-    files: ["e2e/model-colors.e2e.test.ts"],
+    // Browser checks with the real pipelines: the GLB color check runs the real optimizer
+    // (no database, no secrets) and RC-07 renders its panoramas with the real tiler. Test code.
+    files: ["e2e/model-colors.e2e.test.ts", "e2e/tour.e2e.test.ts"],
     rules: {
       "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
     },

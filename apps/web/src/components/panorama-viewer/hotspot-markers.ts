@@ -1,6 +1,5 @@
 /**
- * How the points of a scene look in the 360° viewer, for the panel and (from P4 · Paso 4)
- * the portal. Built with DOM nodes and textContent: titles are the municipality's text and
+ * How the points of a scene look in the 360° viewer, in the panel and in the portal. Built with DOM nodes and textContent: titles are the municipality's text and
  * never become HTML. Each kind has its own icon; "go to another tour" is a labelled pill
  * with a place icon, so it never reads as just another arrow.
  */
@@ -66,6 +65,7 @@ export function hotspotElement(marker: HotspotMarker): HTMLElement {
   const element = document.createElement("div");
   element.className = "hotspot-marker";
   element.dataset.kind = marker.kind;
+  element.dataset.hotspot = marker.id;
   if (marker.muted) element.dataset.muted = "true";
   if (marker.selected) element.dataset.selected = "true";
   const badge = document.createElement("span");

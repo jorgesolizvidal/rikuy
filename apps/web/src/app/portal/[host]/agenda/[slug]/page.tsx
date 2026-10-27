@@ -7,6 +7,7 @@ import {
   formatEventSchedule,
   openStreetMapUrl,
   serializeJsonLd,
+  tourPath,
 } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
@@ -16,6 +17,7 @@ import {
   portalEvent,
   portalNearbyTargets,
   portalOrigin,
+  portalTour,
   responsiveImage,
 } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
@@ -82,7 +84,10 @@ export default async function EventPage({ params }: EventPageProps) {
   const loaded = await load(params);
   if (loaded === null) notFound();
   const { view, event } = loaded;
-  const targets = await portalNearbyTargets(view);
+  const [targets, tour] = await Promise.all([
+    portalNearbyTargets(view),
+    portalTour(view, "event", event.slug),
+  ]);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
   const origin = portalOrigin(view);
@@ -145,6 +150,11 @@ export default async function EventPage({ params }: EventPageProps) {
 
       {event.ended ? null : (
         <div className="portal-actions">
+          {tour ? (
+            <a className="portal-button portal-tour-link" href={tourPath("event", event.slug)}>
+              Ver el tour 360°
+            </a>
+          ) : null}
           {event.location ? (
             <a
               className="portal-button portal-button-primary"
