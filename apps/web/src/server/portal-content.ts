@@ -128,7 +128,7 @@ export const portalTour = cache(
     publishedTourReader().find(view.context.tenant.tenantId, kind, slug),
 );
 
-/** The tours a visitor can browse (ended events left out), for the sitemap and Paso 5. */
-export const portalTourIndex = cache(async (view: PortalView) =>
-  publishedTourReader().index(view.context.tenant.tenantId),
-);
+/** The tours a visitor can browse, in the general tour's order (read with the view). */
+export function portalTourIndex(view: PortalView) {
+  return view.tours;
+}

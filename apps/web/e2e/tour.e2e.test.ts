@@ -101,6 +101,9 @@ function need(value: string | undefined): string {
 const db = postgres(DB_URL, { max: 1, prepare: false, onnotice: () => undefined });
 const ids = { destination: "", other: "", tour: "", otherTour: "", slug: "", otherSlug: "" };
 const points: Record<string, string> = {};
+/** About 9 km apart: «cerca de ti» puts the museum first for a visitor next to it. */
+const MUSEUM_AT = { lat: -17.41, lng: -66.12 };
+const PLAZA_AT = { lat: -17.45, lng: -66.2 };
 
 /** A published panorama version: renditions (tiles too) in the public bucket and its row. */
 async function publishPanorama(scene: Scene) {
@@ -236,7 +239,11 @@ async function asOwner<T>(work: (tx: postgres.TransactionSql) => Promise<T>): Pr
   })) as T;
 }
 
-async function publishedDestination(slug: string, title: string): Promise<string> {
+async function publishedDestination(
+  slug: string,
+  title: string,
+  location: { readonly lat: number; readonly lng: number },
+): Promise<string> {
   return asOwner(async (tx) => {
     const [created] =
       await tx`select * from public.create_content_item(${SUR}, 'destination', ${slug}, ${title})`;
@@ -244,7 +251,7 @@ async function publishedDestination(slug: string, title: string): Promise<string
       title,
       summary: `${title} en 360°`,
       body: [],
-      location: { lat: -17.41, lng: -66.12 },
+      location,
       cover: null,
       gallery: [],
     };
@@ -258,8 +265,8 @@ async function publishedDestination(slug: string, title: string): Promise<string
 async function buildTours(photos: { assetId: string }[], model: string) {
   ids.slug = `museo-e2e-${RUN}`;
   ids.otherSlug = `plaza-e2e-${RUN}`;
-  ids.destination = await publishedDestination(ids.slug, "Museo de prueba");
-  ids.other = await publishedDestination(ids.otherSlug, "Plaza de prueba");
+  ids.destination = await publishedDestination(ids.slug, "Museo de prueba", MUSEUM_AT);
+  ids.other = await publishedDestination(ids.otherSlug, "Plaza de prueba", PLAZA_AT);
   const { a, b, c, d } = SCENES as Required<Record<"a" | "b" | "c" | "d", Scene>>;
 
   // The second tour (one scene), the target of "go to another tour".
@@ -343,6 +350,13 @@ async function buildTours(photos: { assetId: string }[], model: string) {
     await tx`select * from public.publish_tour(${SUR}, ${tourId}, ${edit})`;
     ids.tour = tourId;
   });
+
+  // The general tour (P4 · Paso 5): the plaza first, and it starts there.
+  await asOwner(async (tx) => {
+    const [settings] =
+      await tx`select coalesce((select edit_count from public.general_tours where tenant_id = ${SUR}), 0) as edit`;
+    await tx`select * from public.save_general_tour(${SUR}, ${settings?.edit}, ${[ids.otherTour, ids.tour]}::uuid[], ${ids.otherTour})`;
+  });
 }
 
 let browser: Browser;
@@ -389,6 +403,16 @@ async function settled(page: Page, scene: Scene) {
     { timeout: 60_000 },
   );
   await page.waitForTimeout(1200); // tiles and the fade
+}
+
+/** Still the same document and the same Photo Sphere Viewer as when the walk started. */
+async function sameViewer(page: Page): Promise<boolean> {
+  return page.evaluate(() => {
+    const marks = window as unknown as Record<string, unknown>;
+    return (
+      marks.rikuySamePage === true && marks.rikuyViewer === document.querySelector(".psv-container")
+    );
+  });
 }
 
 async function marker(page: Page, key: string) {
@@ -438,6 +462,12 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
 
     await link.click();
     await settled(page, a);
+    // From here on: the same page and the same viewer (WebGL is never rebuilt).
+    await page.evaluate(() => {
+      const marks = window as unknown as Record<string, unknown>;
+      marks.rikuySamePage = true;
+      marks.rikuyViewer = document.querySelector(".psv-container");
+    });
     expect(await page.locator(".tour-bar-title").textContent()).toContain("Escena 1 de 3");
     expect(await sceneOnScreen(page)).toBe("a");
     // Only the entry was downloaded (and the previews its arrows lead to).
@@ -465,6 +495,7 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     expect(requests.some((url) => url.includes(`${b.assetId}/1/panorama/tiles/`))).toBe(true);
     expect(requests.some((url) => url.includes(`${b.assetId}/1/panorama/image.webp`))).toBe(false);
     expect(new URL(page.url()).searchParams.get("escena")).toBe(b.sceneId);
+    expect(await sameViewer(page)).toBe(true);
 
     // Next and previous, in the published order.
     await page.getByRole("button", { name: /^Siguiente/ }).click();
@@ -490,10 +521,18 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     // "Go to another tour" opens that tour.
     const pill = await marker(page, "jump");
     expect(await pill.textContent()).toContain("Plaza de prueba");
+    const beforeJump = requests.length;
     await pill.click();
     await page.waitForURL(`${PORTAL}/destinos/${ids.otherSlug}/tour`);
     await settled(page, d);
     expect(await sceneOnScreen(page)).toBe("d");
+    // Without leaving the viewer: one request for that tour's data, no new page.
+    expect(await sameViewer(page)).toBe(true);
+    expect(
+      requests.slice(beforeJump).filter((url) => url.includes("/recorrido/datos")),
+    ).toHaveLength(1);
+    expect(await page.locator("h1").textContent()).toBe("Plaza de prueba");
+    expect(await page.title()).toContain("Tour 360° de Plaza de prueba");
 
     // And back to the destination.
     await page.getByRole("link", { name: "← Volver a Plaza de prueba" }).click();
@@ -536,6 +575,108 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     await page.waitForTimeout(3000);
     expect(await sceneOnScreen(page)).toBe("c");
     expect(await page.locator(".tour-stage").getAttribute("data-shown-scene")).toBe(c.sceneId);
+  });
+
+  it("is one general tour: the municipality's order and start, jumps without leaving the viewer, back, «cerca de ti»", async () => {
+    const { a, b, c, d } = SCENES as Required<Record<"a" | "b" | "c" | "d", Scene>>;
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      geolocation: { latitude: MUSEUM_AT.lat + 0.0005, longitude: MUSEUM_AT.lng },
+      permissions: ["geolocation"],
+    });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    const requests: string[] = [];
+    page.on("request", (request) => requests.push(request.url()));
+
+    // The header links the general tour; it starts where the municipality chose.
+    await page.goto(`${PORTAL}/`);
+    const header = page.getByRole("navigation", { name: "Principal" });
+    expect(await header.getByRole("link", { name: "Tours 360°" }).getAttribute("href")).toBe(
+      "/recorrido",
+    );
+    await header.getByRole("link", { name: "Tours 360°" }).click();
+    await page.waitForURL(`${PORTAL}/recorrido`);
+    await settled(page, d);
+    expect(await page.locator("h1").textContent()).toBe("Plaza de prueba");
+    await page.evaluate(() => {
+      const marks = window as unknown as Record<string, unknown>;
+      marks.rikuySamePage = true;
+      marks.rikuyViewer = document.querySelector(".psv-container");
+    });
+    // Only the chosen tour: nothing of the museum yet, not even its preview in the menu.
+    expect(requests.some((url) => url.includes(`${a.assetId}/`))).toBe(false);
+
+    // The menu: the municipality's order, the current tour marked.
+    const toggle = page.getByRole("button", { name: /Tours del municipio/ });
+    await toggle.click();
+    const menu = page.locator("#tour-menu");
+    await menu.waitFor();
+    const titles = () => menu.locator(".tour-menu-entry strong").allTextContents();
+    // (A local stack may keep tours of earlier runs: they come after, without a place.)
+    expect((await titles()).slice(0, 2)).toEqual(["Plaza de prueba", "Museo de prueba"]);
+    expect(await menu.locator('[aria-current="page"]').textContent()).toContain("Plaza de prueba");
+
+    // «Cerca de ti»: next to the museum, it comes first.
+    await menu.getByRole("button", { name: "Ver los más cercanos" }).click();
+    await menu.locator('[data-order="proximity"]').waitFor();
+    expect((await titles())[0]).toBe("Museo de prueba");
+    expect((await titles()).at(-1)).toBe("Plaza de prueba");
+
+    // Jump: one request for the museum's data and its entry; nothing of its other scenes.
+    const beforeJump = requests.length;
+    await menu.getByRole("link", { name: /Museo de prueba/ }).click();
+    await page.waitForURL(`${PORTAL}/destinos/${ids.slug}/tour`);
+    await settled(page, a);
+    expect(await sceneOnScreen(page)).toBe("a");
+    expect(await sameViewer(page)).toBe(true);
+    const jump = requests.slice(beforeJump);
+    expect(jump.filter((url) => url.includes("/recorrido/datos"))).toHaveLength(1);
+    expect(
+      jump.some(
+        (url) =>
+          url.includes(`${b.assetId}/1/panorama/tiles`) ||
+          url.includes(`${c.assetId}/1/panorama/image`),
+      ),
+    ).toBe(false);
+    expect(await menu.isHidden()).toBe(true);
+
+    // Back returns to the general tour, again without leaving the viewer.
+    await page.goBack();
+    await page.waitForURL(`${PORTAL}/recorrido`);
+    await settled(page, d);
+    expect(await page.locator("h1").textContent()).toBe("Plaza de prueba");
+    expect(await sameViewer(page)).toBe(true);
+
+    // A late answer never wins: on a fresh visit, the museum's data arrives late and the
+    // visitor goes back to the plaza meanwhile.
+    const fresh = await (
+      await browser.newContext({ viewport: { width: 1280, height: 900 } })
+    ).newPage();
+    let late = 0;
+    await fresh.route("**/recorrido/datos?*", async (route) => {
+      late += 1;
+      await new Promise((resolve) => setTimeout(resolve, 2500));
+      await route.continue().catch(() => undefined); // the browser may have cancelled it
+    });
+    await fresh.goto(`${PORTAL}/recorrido`);
+    await settled(fresh, d);
+    const freshToggle = fresh.getByRole("button", { name: /Tours del municipio/ });
+    const freshMenu = fresh.locator("#tour-menu");
+    await freshToggle.click();
+    await freshMenu.getByRole("link", { name: /Museo de prueba/ }).click();
+    expect(await fresh.locator(".tour-bar-title span").textContent()).toBe("Abriendo el tour…");
+    await freshToggle.click();
+    await freshMenu.getByRole("link", { name: /Plaza de prueba/ }).click();
+    await fresh.waitForTimeout(3500);
+    expect(late).toBe(1);
+    expect(await fresh.locator(".tour-explorer").getAttribute("data-tour")).toBe(
+      `destination:${ids.otherSlug}`,
+    );
+    expect(new URL(fresh.url()).pathname).toBe("/recorrido");
+    expect(await sceneOnScreen(fresh)).toBe("d");
+    expect(errors).toEqual([]);
   });
 
   it("works as text without WebGL, with the keyboard", async () => {

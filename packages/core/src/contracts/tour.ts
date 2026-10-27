@@ -310,4 +310,8 @@ export interface PublishedTourIndexEntry {
   readonly entryPreview: { readonly file: string; readonly width: number; readonly height: number };
   readonly location: { readonly lat: number; readonly lng: number } | null;
   readonly publishedAt: string;
+  /** Place in the general tour (0 first): the municipality's order, then kind and title. */
+  readonly position: number;
+  /** The tour the general tour starts with (exactly one, when there are tours). */
+  readonly start: boolean;
 }

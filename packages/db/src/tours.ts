@@ -9,6 +9,8 @@ import {
   type TourEditOutcome,
   type TourListEntry,
   type TourRepository,
+  generalTourDocumentSchema,
+  type GeneralTourRepository,
 } from "@rikuy/core";
 import { z } from "zod";
 
@@ -366,6 +368,8 @@ export function createSupabasePublishedTourReader(
             latitude: z.number().nullable(),
             longitude: z.number().nullable(),
             published_at: instant,
+            position: z.number().int(),
+            is_start: z.boolean(),
           }),
         )
         .parse(data)
@@ -386,6 +390,8 @@ export function createSupabasePublishedTourReader(
               ? null
               : { lat: row.latitude, lng: row.longitude },
           publishedAt: row.published_at,
+          position: row.position,
+          start: row.is_start,
         }));
     },
 
@@ -421,6 +427,40 @@ export function createSupabasePublishedTourReader(
             targets: row.targets,
           }
         : null;
+    },
+  };
+}
+
+/** The general tour's order and start (P4 · Paso 5), with the member's session. */
+export function createGeneralTourRepository(client: SessionClient): GeneralTourRepository {
+  return {
+    async load(tenantId) {
+      const { data, error } = await client.rpc("general_tour_editor", { p_tenant_id: tenantId });
+      if (error) throw unexpected("Reading the general tour", error);
+      return generalTourDocumentSchema.parse(data);
+    },
+
+    async save(tenantId, expectedEdit, order, startTourId) {
+      const { data, error, status } = await client.rpc("save_general_tour", {
+        p_tenant_id: tenantId,
+        p_expected_edit: expectedEdit,
+        p_order: [...order],
+        p_start_tour_id: startTourId,
+      });
+      if (error) {
+        if (error.code === "42501" || status === 403) return { status: "forbidden" };
+        if (error.code === "PT409" || status === 409) return { status: "conflict" };
+        if (error.code === "23514" || error.code === "22023") {
+          return { status: "invalid", reason: error.hint === "start" ? "start" : "order" };
+        }
+        throw unexpected("Saving the general tour", error);
+      }
+      const [row] = z
+        .array(z.object({ edit_count: z.number().int(), start_tour_id: z.uuid().nullable() }))
+        .length(1)
+        .parse(data);
+      if (!row) throw new Error("Saving the general tour returned no row");
+      return { status: "saved", editCount: row.edit_count };
     },
   };
 }

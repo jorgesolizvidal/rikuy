@@ -692,7 +692,8 @@
 
   .portal-nav {
     width: 100%;
-    gap: 1.25rem;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
   }
 
   .portal-install {

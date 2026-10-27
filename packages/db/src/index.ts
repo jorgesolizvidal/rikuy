@@ -45,4 +45,8 @@ export { createJobAdminRepository } from "./job-admin";
 export { createPanoramaRepository, mapPanoramaRow } from "./panoramas";
 export { createModelRepository, mapModelRow } from "./models";
 export { createPlatformUsageRepository, createUsageRepository } from "./usage";
-export { createSupabasePublishedTourReader, createTourRepository } from "./tours";
+export {
+  createGeneralTourRepository,
+  createSupabasePublishedTourReader,
+  createTourRepository,
+} from "./tours";

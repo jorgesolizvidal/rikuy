@@ -25,6 +25,10 @@ export const PORTAL_PATHS = {
   eventCalendar: (slug: string) => `/agenda/${encodeURIComponent(slug)}/calendario.ics`,
   destinationTour: (slug: string) => `/destinos/${encodeURIComponent(slug)}/tour`,
   eventTour: (slug: string) => `/agenda/${encodeURIComponent(slug)}/tour`,
+  /** The general tour: every visible tour, in the municipality's order. */
+  generalTour: "/recorrido",
+  /** One tour's viewer data (JSON), to jump between tours without leaving the viewer. */
+  tourData: "/recorrido/datos",
   map: "/mapa",
   mapPlaces: "/mapa/lugares",
   privacy: "/privacidad",
@@ -136,6 +140,17 @@ export function buildSitemap(
     entry(PORTAL_PATHS.agenda, latest(events)),
     entry(PORTAL_PATHS.map, latest([...destinations, ...events])),
     ...events.map((e) => entry(PORTAL_PATHS.event(e.slug), e.updatedAt)),
+    ...(tours.length > 0
+      ? [
+          entry(
+            PORTAL_PATHS.generalTour,
+            tours
+              .map((t) => t.publishedAt)
+              .sort()
+              .at(-1),
+          ),
+        ]
+      : []),
     ...tours.map((t) => entry(tourPath(t.kind, t.slug), t.publishedAt)),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),

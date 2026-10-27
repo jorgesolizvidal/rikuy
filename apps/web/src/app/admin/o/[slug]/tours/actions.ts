@@ -10,6 +10,7 @@ import {
   publishTour,
   removeTourHotspot,
   restoreTourRevision,
+  saveGeneralTour,
   updateTourHotspot,
   updateTourScene,
   type CreateTourOutcome,
@@ -19,6 +20,7 @@ import {
   type OrganizationMembership,
   type PublishTourOutcome,
   type RestoreTourOutcome,
+  type SaveGeneralTourOutcome,
   type SceneEditResult,
 } from "@rikuy/core";
 
@@ -205,4 +207,28 @@ export async function removeHotspotAction(
   return run(slug, async (membership) =>
     removeTourHotspot(membership, target, (await adminSession()).tours),
   );
+}
+
+export type SaveGeneralTourState = SaveGeneralTourOutcome | SessionProblem;
+
+/** The general tour's order and start (P4 · Paso 5): public at once, so the portal refreshes. */
+export async function saveGeneralTourAction(
+  slug: string,
+  input: {
+    readonly expectedEdit: number;
+    readonly order: readonly string[];
+    readonly startTourId: string | null;
+  },
+): Promise<SaveGeneralTourState> {
+  return run(slug, async (membership) => {
+    const session = await adminSession();
+    const result = await saveGeneralTour(membership, input, { general: session.general });
+    if (result.status === "saved") {
+      await refreshPortal(
+        (tenantId) => session.content.portalHostname(tenantId),
+        membership.tenantId,
+      );
+    }
+    return result;
+  });
 }

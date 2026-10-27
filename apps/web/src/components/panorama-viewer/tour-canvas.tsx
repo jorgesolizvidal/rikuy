@@ -127,6 +127,7 @@ export default function TourCanvas({
   /** Increases on every navigation: only the latest one may finish. */
   const sequence = useRef(0);
   const firstScene = useRef(sceneId);
+  const labelRef = useRef(label);
   // The first scene's preview behind the canvas until WebGL draws.
   const [background] = useState(() => scenes.find((scene) => scene.id === sceneId)?.previewUrl);
   /** Puts a scene's points on screen once its panorama is (set by the viewer effect). */
@@ -140,6 +141,12 @@ export default function TourCanvas({
   useEffect(() => {
     scenesRef.current = new Map(scenes.map((scene) => [scene.id, scene]));
   }, [scenes]);
+
+  // The name follows the scene without rebuilding the viewer.
+  useEffect(() => {
+    labelRef.current = label;
+    viewerRef.current?.container.setAttribute("aria-label", label);
+  }, [label]);
 
   // One viewer for the whole tour.
   useEffect(() => {
@@ -176,7 +183,7 @@ export default function TourCanvas({
     viewerRef.current = viewer;
     const plugin = viewer.getPlugin<MarkersPlugin>(MarkersPlugin);
     pluginRef.current = plugin;
-    const releaseAccessibility = accessibleViewer(viewer, label);
+    const releaseAccessibility = accessibleViewer(viewer, labelRef.current);
 
     const shown = (scene: TourCanvasScene) => {
       plugin.setMarkers(scene.markers.map(markerConfig));
@@ -216,7 +223,7 @@ export default function TourCanvas({
       sequence.current += 1;
       viewer.destroy();
     };
-  }, [label]);
+  }, []);
 
   // Navigation: the last scene asked for wins.
   useEffect(() => {

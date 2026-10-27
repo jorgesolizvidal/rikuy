@@ -109,6 +109,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           <a href={PORTAL_PATHS.destinations}>Destinos</a>
           <a href={PORTAL_PATHS.agenda}>Agenda</a>
           <a href={PORTAL_PATHS.map}>Mapa</a>
+          {view.tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
           <InstallButton siteName={identity.siteName} />
         </nav>
       </header>
