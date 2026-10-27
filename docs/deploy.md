@@ -79,3 +79,26 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 - Tras cada merge a `main`, «Lighthouse on production» espera a que producción sirva ese commit (`X-Rikuy-Version`) y mide la demo con el mismo presupuesto que el PR. También se puede correr a mano (Actions → _Run workflow_).
 - El ejecutor de trabajos necesita `WORKER_DATABASE_URL` y `JOB_RUNNER_SECRET` en Vercel y dos secretos en Supabase Vault: pasos en [«Activar el ejecutor»](jobs.md#activar-el-ejecutor-una-sola-vez-por-ambiente). Sin ellos la aplicación funciona igual y los trabajos esperan en la cola.
 - Para saber dónde corre una función, mira `x-vercel-id` en una ruta dinámica (por ejemplo `/mapa`): el segundo código es la región de la función (`…::gru1::…`). Si el job falla, el motivo aparece como anotación en la página del run (no hace falta descargar el log).
+
+## Alta de un municipio real (por ejemplo, Ucureña)
+
+Ningún dato del municipio entra al código ni a variables de entorno: todo se hace desde el panel, como operador de plataforma (con segundo factor).
+
+1. **Dirección:** en Vercel → proyecto `rikuy` → Settings → Domains, agrega la dirección del portal, por ejemplo `rikuy-ucurena.vercel.app`. Si está tomada, prueba otra; es la que escribirás en el paso 2.
+2. **Alta:** en `https://rikuy-app-admin.vercel.app/plataforma/nuevo`:
+   - «Nombre del municipio»;
+   - «Identificador» (se sugiere a partir del nombre);
+   - «Dirección del portal», exactamente la del paso 1;
+   - «Correo del propietario»: tu correo, para ser el propietario del municipio (debe poder recibir el código: con el correo incluido de Supabase, solo los miembros del equipo).
+
+   La zona horaria es la de Bolivia (`America/La_Paz`).
+
+3. **Aceptar:** en el inicio del panel aparece la invitación; «Aceptar».
+4. **Marca:** en el municipio → «Marca del portal»: nombre, lema, colores, logo, contacto, redes y descripción para buscadores; «Publicar».
+5. **Poner en línea:** en `/plataforma`, «Poner en línea» junto al municipio.
+6. **Comprobar:**
+   - el portal responde en su dirección y muestra «Muy pronto en este portal»;
+   - mientras no tenga nada publicado, sus páginas llevan `<meta name="robots" content="noindex, follow">` (ver el código fuente de la página): los buscadores no lo indexan vacío;
+   - al publicar el primer destino o un evento próximo, la etiqueta desaparece sola en la siguiente visita.
+7. **Cuota:** cada municipio empieza con 300 MB de almacenamiento. Un panorama de 8K con sus teselas ocupa unos 17–20 MB. Antes de cargar muchos panoramas, súbela en `/plataforma` → «Cuotas por municipio». El total del plan gratuito de Supabase es de 1 GB para todos los municipios.
+8. **Equipo:** en el municipio → «Miembros», invita a administradores, editores y analistas cuando haga falta. Con el correo incluido de Supabase, solo pueden entrar los miembros del equipo de la organización; para gente del municipio hace falta SMTP propio (Hito · Paso 2).

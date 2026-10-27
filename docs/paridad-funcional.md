@@ -15,8 +15,8 @@ Estados: ✅ hecho · 🔜 planificado (fase · paso) · ➕ mejora sobre el sis
 | Eventos con fecha y ubicación (`dateText` libre)                                                 | ✅ P3 · Paso 4: agenda por mes, ficha con «Añadir al calendario» (.ics), «Cómo llegar» y lugar enlazado. ➕ Inicio/fin con la zona horaria del municipio: un evento vencido deja de listarse solo                                                                                                     |
 | Mapa Leaflet + OSM con capas por categoría y búsqueda                                            | ✅ P3 · Paso 5: `/mapa` con capas (destinos, eventos próximos) y mapa pequeño en cada ficha ([ADR-023](adr/ADR-023-portal-map-provider.md)). ➕ Carga diferida, lista equivalente accesible, consultas por área en vez de traer todo el catálogo. 🔜 Búsqueda por texto con el asistente (P5)         |
 | **Ubicación del visitante**: distancia en km, ordenar/filtrar por cercanía, «Cómo llegar»        | ✅ «Cómo llegar» en la ficha (P3 · Paso 3). ✅ P3 · Paso 6 ([ADR-021](adr/ADR-021-visitor-location.md)): distancia y tiempo estimado, orden por cercanía en mapa, destinos y agenda. ➕ **Tiempo real** (antes se pedía una sola vez), «estás cerca de…», precisión visible, sin guardar la ubicación |
-| Tiempo estimado a pie / en auto (velocidad fija)                                                 | 🔜 P3 · Paso 6, rotulado como estimación en línea recta; ruta real abre la app de mapas                                                                                                                                                                                                               |
-| Tours 360° (Photo Sphere Viewer) con hotspots de información, navegación y modelo 3D             | 🔜 P4. ➕ Entrega según resolución, preview inmediato, GLB optimizado y diferido, alternativa textual                                                                                                                                                                                                 |
+| Tiempo estimado a pie / en auto (velocidad fija)                                                 | ✅ P3 · Paso 6, rotulado como estimación en línea recta; la ruta real abre la app de mapas                                                                                                                                                                                                            |
+| Tours 360° (Photo Sphere Viewer) con hotspots de información, navegación y modelo 3D             | ✅ P4 (Pasos 1–7). ➕ Entrega según resolución, vista previa inmediata, GLB optimizado y solo a pedido, tour también como texto, recorrido general entre tours, «ir a otro recorrido»                                                                                                                 |
 | **Chaski** — asistente turístico (plan para hoy, qué hay cerca, ruta sugerida, preguntas libres) | 🔜 P5 ([ADR-022](adr/ADR-022-tourist-assistant.md)). ➕ Citas verificables, abstención, presupuesto por municipio, nombre configurable por municipio                                                                                                                                                  |
 | **Guía virtual dentro del tour** («¿Qué estoy viendo?»)                                          | 🔜 P5. ➕ El mismo asistente y **una sola conversación** (antes eran dos hilos separados)                                                                                                                                                                                                             |
 | Voz: dictado (Whisper) y lectura en voz alta (Web Speech)                                        | 🔜 P5 (antes en E3). ➕ Cuota de segundos de dictado por municipio; si falla, queda el texto                                                                                                                                                                                                          |
@@ -32,18 +32,18 @@ Estados: ✅ hecho · 🔜 planificado (fase · paso) · ➕ mejora sobre el sis
 
 ## Administración
 
-| Capacidad en el sistema anterior                                   | En Rikuy                                                                                                         |
-| ------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------- |
-| Login propio con JWT en `localStorage`, sin revocación             | ✅ P1 · Paso 4: código por correo, cookies `HttpOnly`, membresía revalidada en cada request                      |
-| Roles SUPER_ADMIN, CONTENT_EDITOR, REPORT_VIEWER, RESTAURANT_OWNER | ✅ owner/admin/editor/analyst + operador de plataforma con MFA (P1 · Pasos 4 y 6). 🔜 Operador de restaurante E1 |
-| Alta y gestión de usuarios                                         | ✅ P1 · Paso 6: invitaciones, cambio de rol, quitar acceso, último propietario protegido                         |
-| Subida de imágenes (WebP en el navegador)                          | ✅ P3 · Paso 1: subida firmada, validación de los bytes en el servidor, original privado                         |
-| Formularios de destinos, eventos, panoramas y hotspots             | ✅ Destinos en P3 · Paso 2; 🔜 eventos P3 · Paso 4, panoramas y hotspots P4                                      |
-| Selector de coordenadas en el mapa                                 | ✅ P3 · Paso 2 (mapa, campos y pegar coordenadas)                                                                |
-| Métricas del asistente (consultas, latencia, historial)            | 🔜 P5 sobre `ai_requests`/`ai_executions`. ➕ Sin guardar el texto ni la ubicación de los turistas por defecto   |
-| Reportes con exportación CSV/XLSX/PDF                              | 🔜 E2. ➕ Mismos filtros en pantalla y archivo; celdas neutralizadas contra fórmulas                             |
-| Campañas de newsletter y envío de push                             | 🔜 E2                                                                                                            |
-| —                                                                  | 🔜 P5 · Copilot V1/V2 para el personal del municipio (nuevo; no existía)                                         |
+| Capacidad en el sistema anterior                                   | En Rikuy                                                                                                                |
+| ------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------- |
+| Login propio con JWT en `localStorage`, sin revocación             | ✅ P1 · Paso 4: código por correo, cookies `HttpOnly`, membresía revalidada en cada request                             |
+| Roles SUPER_ADMIN, CONTENT_EDITOR, REPORT_VIEWER, RESTAURANT_OWNER | ✅ owner/admin/editor/analyst + operador de plataforma con MFA (P1 · Pasos 4 y 6). 🔜 Operador de restaurante E1        |
+| Alta y gestión de usuarios                                         | ✅ P1 · Paso 6: invitaciones, cambio de rol, quitar acceso, último propietario protegido                                |
+| Subida de imágenes (WebP en el navegador)                          | ✅ P3 · Paso 1: subida firmada, validación de los bytes en el servidor, original privado                                |
+| Formularios de destinos, eventos, panoramas y hotspots             | ✅ Destinos (P3 · Paso 2), eventos (P3 · Paso 4), panoramas (P2 · Paso 3), modelos (P2 · Paso 4), tours y hotspots (P4) |
+| Selector de coordenadas en el mapa                                 | ✅ P3 · Paso 2 (mapa, campos y pegar coordenadas)                                                                       |
+| Métricas del asistente (consultas, latencia, historial)            | 🔜 P5 sobre `ai_requests`/`ai_executions`. ➕ Sin guardar el texto ni la ubicación de los turistas por defecto          |
+| Reportes con exportación CSV/XLSX/PDF                              | 🔜 E2. ➕ Mismos filtros en pantalla y archivo; celdas neutralizadas contra fórmulas                                    |
+| Campañas de newsletter y envío de push                             | 🔜 E2                                                                                                                   |
+| —                                                                  | 🔜 P5 · Copilot V1/V2 para el personal del municipio (nuevo; no existía)                                                |
 
 ## Fallos del sistema anterior que Rikuy no repite
 
@@ -56,7 +56,7 @@ Estados: ✅ hecho · 🔜 planificado (fase · paso) · ➕ mejora sobre el sis
 | SEC-06 HTML de hotspot interpolado sin escape                          | Texto como AST permitido, sin HTML (P3 · Paso 2, P4)                                                                                                    |
 | SEC-07 IA, dictado y analítica sin límites                             | Cuotas por municipio y por sesión (P2 `usage_buckets`, P5)                                                                                              |
 | SEC-08 historial y contexto del asistente enviados por el cliente      | El servidor resuelve escena/hotspot/destino por ID y valida el tenant (P5)                                                                              |
-| FUN-02 el tour descargaba todos los hotspots                           | Manifest del tour por revisión publicada (P4)                                                                                                           |
+| FUN-02 el tour descargaba todos los hotspots                           | ✅ Manifiesto del tour por revisión publicada (P4 · Paso 3)                                                                                             |
 | RC-11 enlaces rotos (`/destinos`, `/asistente`)                        | ✅ `/destinos` existe (P3 · Paso 3) y las rutas del portal salen de un solo lugar (`PORTAL_PATHS`); acciones del asistente validadas contra él (P3, P5) |
 | Ubicación y conversaciones guardadas en `AssistantLog`                 | La ubicación no sale del dispositivo salvo redondeada para una pregunta; sin texto persistido (ADR-021/022)                                             |
 
@@ -67,3 +67,6 @@ Estados: ✅ hecho · 🔜 planificado (fase · paso) · ➕ mejora sobre el sis
 - **Plan del día y ruta sugerida deterministas**: un motor filtra por distancia, horario y vigencia; el asistente solo explica y redacta. P5.
 - **Persona del asistente por municipio** (nombre, saludo, tono), como dato de su marca. P5.
 - **Quechua** como idioma de contenidos si el municipio lo prioriza. E1.
+- **Alojamientos** como módulo, y un **catálogo de módulos que cada municipio activa** (restaurantes, alojamientos, transporte…) sin código propio. E1 (pedido del usuario, 2026-10-27).
+- **Videos insertados** (YouTube en modo de privacidad mejorada) en fichas y tours, sin alojar video. E1.
+- **Demo a medida para cada municipio interesado**, con contenido de muestra. Hito · Paso 2.

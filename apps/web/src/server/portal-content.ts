@@ -122,6 +122,19 @@ export const portalMapExtent = cache(async (view: PortalView) =>
   publishedMapReader().extent(view.context.tenant.tenantId),
 );
 
+/**
+ * A portal with nothing to visit yet: no published destination and no event still to come
+ * (the map's extent counts both). A new municipality goes online before its team loads the
+ * content; until then search engines are asked not to index it (Hito · Paso 1). On an error
+ * the portal counts as not empty: a hiccup never removes a real portal from search engines.
+ */
+export const portalIsEmpty = cache(async (view: PortalView) =>
+  portalMapExtent(view).then(
+    (extent) => extent.destinations === 0 && extent.events === 0,
+    () => false,
+  ),
+);
+
 /** The published tour of a destination or event (also of an ended event), or null. */
 export const portalTour = cache(
   async (view: PortalView, kind: "destination" | "event", slug: string) =>

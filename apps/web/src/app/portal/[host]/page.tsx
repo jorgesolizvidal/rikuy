@@ -1,7 +1,7 @@
 import { PORTAL_PATHS } from "@rikuy/core";
 import { notFound } from "next/navigation";
 
-import { portalDestinations, portalEvents } from "@/server/portal-content";
+import { portalDestinations, portalEvents, portalTourIndex } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { Contour } from "./contour";
@@ -28,11 +28,13 @@ const AGENDA_SOON = {
   text: "Ferias, fiestas y actividades con su fecha y lugar.",
 } as const;
 
+const TOURS_SOON = {
+  title: "Recorridos 360°",
+  text: "Recorre los sitios desde el celular antes de viajar.",
+} as const;
+
+/** What the platform will bring to every portal (P5). */
 const UPCOMING = [
-  {
-    title: "Recorridos 360°",
-    text: "Recorre los sitios desde el celular antes de viajar.",
-  },
   {
     title: "Guía local",
     text: "Pregunta qué hacer y recibe respuestas basadas en la información del municipio.",
@@ -44,10 +46,16 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
   if (view === null) notFound();
 
   const { identity, seo } = view.resolved.presentation;
-  const [destinations, events] = await Promise.all([portalDestinations(view), portalEvents(view)]);
+  const [destinations, events, tours] = await Promise.all([
+    portalDestinations(view),
+    portalEvents(view),
+    portalTourIndex(view),
+  ]);
+  // Only what this portal does not have yet (a new municipality shows all of it).
   const upcoming = [
     ...(destinations.length > 0 ? [] : [PLACES_SOON]),
     ...(events.length > 0 ? [] : [AGENDA_SOON]),
+    ...(tours.length > 0 ? [] : [TOURS_SOON]),
     ...UPCOMING,
   ];
 
@@ -95,6 +103,18 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
               <EventCard key={event.slug} event={event} />
             ))}
           </ul>
+        </section>
+      ) : null}
+
+      {tours.length > 0 ? (
+        <section className="portal-section" aria-labelledby="recorridos">
+          <div className="portal-section-head">
+            <h2 id="recorridos">Recorridos 360°</h2>
+            <a href={PORTAL_PATHS.generalTour}>
+              {tours.length === 1 ? "Abrir el recorrido" : `Recorrer los ${tours.length} lugares`}
+            </a>
+          </div>
+          <p className="portal-section-text">{TOURS_SOON.text}</p>
         </section>
       ) : null}
 

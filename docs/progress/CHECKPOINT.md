@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P4 ✅ (tours 360°, hotspots y GLB). P1, P2 y P3 ✅. Siguiente: ★ Hito Demo / Portafolio.
-- **Último paso completado:** P4 · Paso 7 — contratos de los tours y medición (2026-10-27), con la medición final en Android
-- **Rama:** `docs/p4-android-measurement` → PR hacia `main`
+- **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
+- **Último paso completado:** Hito · Paso 1 — Ucureña lista para cargar (2026-10-27): código y guía; el alta en producción la hace el usuario después del merge
+- **Rama:** `feat/hito-step1-ucurena` → PR hacia `main`
 
 ## Historial
 
@@ -848,19 +848,72 @@ Lo que encontraron las pruebas:
 - Repetido en laboratorio con memoria precisa y recolección forzada (80 cambios): tras el calentamiento, +5 %, con nodos y listeners estables. No hay fuga.
 - «Lighthouse on production» midió por primera vez las páginas de tour. Dio LCP simulado de 2,5–2,9 s, sobre el umbral de 2,5 s fijado con el CI. Con el LCP real de 0,68 s en el celular, el umbral de LCP del tour pasa a 3 s (`lighthouse-budget.json`); el de las demás páginas no cambia.
 
+### ★ Hito · Paso 1 — Ucureña lista para cargar
+
+- Pasos del Hito acordados con el usuario (2026-10-27):
+  1. Ucureña lista para cargar;
+  2. demo comercial por municipio, con SMTP gratuito;
+  3. operación con planes gratuitos;
+  4. README.
+- Decisiones del usuario (2026-10-27):
+  - el contenido real de Ucureña lo carga él desde el panel cuando el proyecto esté listo;
+  - sin cuenta pública de demostración: una demo a medida para cada municipio interesado;
+  - solo planes gratuitos hasta tener contrato;
+  - README sin capturas hasta tener el contenido real.
+- **Revisión del roadmap** (pedido del usuario):
+  - el Hito, reescrito con sus cuatro pasos;
+  - E1 suma alojamientos, un catálogo de módulos que cada municipio activa, eventos que se repiten, el rol de operador de establecimiento y videos insertados (YouTube, sin alojar video);
+  - E4 ata los módulos a los planes;
+  - nueva sección **«Pendientes registrados»** con todo lo que quedó fuera de un paso anterior y dónde entra: correo de invitación, segundo factor para propietarios y administradores, cambiar la dirección con redirecciones, reemplazar y borrar medios y tours, retirar medios sin uso, umbral de `/mapa`, ejecutor fuera de Vercel, planes Pro y cuotas, dominio del municipio y los arreglos en Blender;
+  - [paridad funcional](../paridad-funcional.md) al día (tours, tiempos estimados y formularios ✅; nuevos alojamientos, módulos, videos y demos a medida).
+- Portal:
+  - **un portal sin contenido publicado no se indexa**: sin destinos publicados ni eventos próximos, todas sus páginas llevan `robots: noindex, follow`. Al publicar el primero, la etiqueta se va en la siguiente visita (publicar ya invalida la caché del municipio). Si la consulta falla, el portal cuenta como no vacío: un error nunca saca a un portal real de los buscadores;
+  - en el inicio, «Muy pronto en este portal» anuncia solo lo que ese portal todavía no tiene: antes anunciaba los recorridos 360° aunque ya existieran;
+  - nueva sección **«Recorridos 360°»** en el inicio cuando hay tours, con enlace a `/recorrido` (solo texto, sin imágenes que pesen en el LCP).
+- [`docs/deploy.md`](../deploy.md): **«Alta de un municipio real»** paso a paso:
+  - dirección en Vercel;
+  - `/plataforma/nuevo`;
+  - aceptar la invitación;
+  - marca;
+  - «Poner en línea»;
+  - comprobar el `noindex`;
+  - cuota (un panorama de 8K ocupa 17–20 MB; 1 GB en total en el plan gratuito);
+  - miembros.
+- Tests:
+  - 482 unitarios y 731 pgTAP sin cambios;
+  - e2e de portales (161 verificaciones en local; en CI, también con el municipio ZC-01): los portales con contenido no llevan `robots`; ZC-01, recién dado de alta y vacío, sí, también en `/destinos`, y muestra «Muy pronto» con los recorridos 360°.
+- Verificado en local:
+  - un municipio vacío en línea con `noindex, follow` y Demo Norte sin él;
+  - Demo Sur con tours muestra «Recorrer los 3 lugares» y ya no anuncia los recorridos como «muy pronto»;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px.
+
+**Desviaciones:**
+
+- El paso no carga contenido de Ucureña (decisión del usuario) ni crea el municipio desde el código: el alta la hace el usuario en producción con la guía. El paso queda ✅ en el roadmap cuando el portal responde en su dirección.
+- `robots.txt` no cambia: si bloqueara las páginas, los buscadores no verían la etiqueta `noindex`.
+
 ## Cómo verificarlo
 
-Solo documentación: `docs/contratos-tours.md` (sección «Medición final en el dispositivo»), `docs/performance-budget.md` y este checkpoint. Para repetir la medición, abre un tour en producción con `?medir` al final de la dirección.
+```powershell
+git checkout feat/hito-step1-ucurena
+pnpm install
+pnpm db:reset
+pnpm dev
+```
 
-## Siguiente paso — ★ Hito Demo / Portafolio (requiere autorización)
+En `http://demo-norte.localhost:3000` el código fuente no tiene `<meta name="robots">`. Un municipio nuevo en línea sin nada publicado sí la tiene (`noindex, follow`). Si Demo Sur tiene un tour publicado, su inicio muestra «Recorridos 360°».
 
-Según el roadmap:
+## Después del merge — alta de Ucureña
 
-- Ucureña en vivo (`rikuy-ucurena.vercel.app`) junto a un municipio demo, desde el mismo despliegue;
-- una cuenta de demostración del panel sobre un municipio de prueba que se reinicia periódicamente;
-- README con capturas y métricas de Speed Insights.
+Sigue [«Alta de un municipio real»](../deploy.md#alta-de-un-municipio-real-por-ejemplo-ucureña) en `docs/deploy.md`. Cuando el portal responda en su dirección, avísame y marco el paso como terminado.
 
-Antes de empezarlo conviene acordar los pasos (como en P2 y P4).
+## Siguiente paso — ★ Hito · Paso 2 (requiere autorización)
+
+**Demo comercial por municipio:**
+
+- una plantilla de contenido de muestra, sin datos de ningún municipio real;
+- crear con ella la demo de un municipio interesado en minutos;
+- correo SMTP gratuito para los códigos de acceso y las invitaciones.
 
 ## Decisiones pendientes del usuario
 
