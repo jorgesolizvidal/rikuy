@@ -697,6 +697,11 @@ Lo que encontraron las pruebas:
   - el enlace y el **QR del recorrido general**;
   - editores y analistas lo ven sin controles;
   - el texto de la página ya no dice que los tours no se ven en el portal.
+- Rendimiento: con este paso, el LCP de las fichas en el CI quedó en 2,53–2,59 s, sobre el límite de 2,5 s. El medidor ahora deja los números de cada página y las partes de su LCP como **anotación** del job, y así se vio que el retraso estaba en lo que bloquea la primera pintura, no en el servidor (TTFB de 3–8 ms). Correcciones:
+  - los estilos del panel salen de `globals.css` (que también carga el portal) a `admin/admin.css`: el CSS del portal baja de 9 a 5 KB;
+  - la fuente de títulos del portal se sirve con `next/font/local` y se precarga con la página (antes se descubría después del CSS);
+  - la cabecera lee el índice de tours solo en las páginas, no en los íconos ni en el manifiesto, y las fichas saben si tienen tour por ese mismo índice, sin otra consulta.
+  - Resultado en el CI: fichas en 2,44–2,46 s, inicio y listados en 1,8–2,4 s, CLS 0; accesibilidad, buenas prácticas y SEO 100.
 - Corrección del Paso 4: el nombre accesible del visor cambiaba con cada escena y eso **reconstruía el visor entero** (WebGL incluido). Terminaba en la escena correcta, pero con trabajo de más. Ahora el nombre se actualiza sin rehacerlo, y RC-07 comprueba que el visor es el mismo de principio a fin.
 - Tests:
   - 482 unitarios (core 311, db 102, web 35, worker 27, config 7);
@@ -727,6 +732,7 @@ Lo que encontraron las pruebas:
 
 **Desviaciones:**
 
+- Las fichas quedan a ~50 ms del límite de LCP del CI: es el margen que hay que cuidar en los próximos pasos.
 - El orden no tiene versiones (sí auditoría): volver a uno anterior es reordenar.
 - En el celular, el menú cubre el visor mientras está abierto; se cierra al elegir un tour.
 - El modelo 3D dentro del tour sigue con su poster hasta el Paso 6.
