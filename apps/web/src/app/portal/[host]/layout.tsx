@@ -55,11 +55,12 @@ export async function generateMetadata({
   const { siteName, shortName } = presentation.identity;
   const description = presentation.seo.description || undefined;
   const canonicalHost = view.context.tenant.canonicalHost ?? view.context.host;
-  // Not indexed until it has something to visit; its pages still link to each other.
-  const empty = await portalIsEmpty(view);
+  // Not indexed until it has something to visit, nor ever if it is a commercial demo
+  // (ADR-034); its pages still link to each other.
+  const hidden = view.context.tenant.demo === true || (await portalIsEmpty(view));
 
   return {
-    ...(empty ? { robots: { index: false, follow: true } } : {}),
+    ...(hidden ? { robots: { index: false, follow: true } } : {}),
     metadataBase: new URL(platformSettings().portalOrigin(canonicalHost)),
     title: { default: siteName, template: `%s | ${siteName}` },
     ...(description ? { description } : {}),
@@ -97,6 +98,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
+  const demo = view.context.tenant.demo === true;
 
   return (
     <div
@@ -109,6 +111,11 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
       <a className="portal-skip" href="#contenido">
         Saltar al contenido
       </a>
+      {demo ? (
+        <p className="portal-demo">
+          <strong>Portal de demostración.</strong> El contenido es de muestra.
+        </p>
+      ) : null}
       <header className="portal-header">
         <a href="/" className="portal-brand">
           {view.logo ? (
@@ -163,7 +170,12 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           <a href={PORTAL_PATHS.privacy}>Privacidad</a>
           <a href={PORTAL_PATHS.terms}>Términos de uso</a>
         </nav>
-        <p className="portal-credit">Portal oficial de {identity.siteName}. Funciona con Rikuy.</p>
+        <p className="portal-credit">
+          {demo
+            ? `Demostración del portal de ${identity.siteName}.`
+            : `Portal oficial de ${identity.siteName}.`}{" "}
+          Funciona con Rikuy.
+        </p>
       </footer>
       {/* Real-user performance (anonymous, no cookies), only where Vercel serves it. */}
       {process.env.VERCEL === "1" ? <SpeedInsights /> : null}

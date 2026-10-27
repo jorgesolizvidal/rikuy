@@ -2,6 +2,7 @@ import type {
   AbandonedUploadStore,
   ClaimedJob,
   HeartbeatOutcome,
+  InvitationMailStore,
   JobLedger,
   ModelStore,
   PanoramaStore,
@@ -34,6 +35,8 @@ export interface PostgresJobLedger extends JobLedger {
   readonly panoramas: PanoramaStore;
   /** media.process_model: worker_api.model_source / complete_model / reject_model. */
   readonly models: ModelStore;
+  /** mail.membership_invitation: worker_api.invitation_mail / mark_invitation_mailed. */
+  readonly invitations: InvitationMailStore;
   close(): Promise<void>;
 }
 
@@ -180,6 +183,39 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
             select worker_api.mark_upload_abandoned(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as outcome
           `;
           return z.enum(["marked", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    invitations: {
+      async inspect(lease) {
+        try {
+          const [row] = await sql`
+            select * from worker_api.invitation_mail(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          const state = z.enum(["send", "already_sent", "not_pending"]).parse(row?.state);
+          if (state !== "send") return { state };
+          return {
+            state,
+            email: z.string().min(3).parse(row?.email),
+            tenantName: z.string().min(1).parse(row?.tenant_name),
+            role: z.enum(["owner", "admin", "editor", "analyst"]).parse(row?.role),
+            tenantStatus: z.enum(["provisioning", "active"]).parse(row?.tenant_status),
+          };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async markMailed(lease) {
+        try {
+          const [row] = await sql`
+            select worker_api.mark_invitation_mailed(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as outcome
+          `;
+          return z.enum(["marked", "already_settled"]).parse(row?.outcome);
         } catch (error) {
           if (leaseLost(error)) return "lease_lost";
           throw error;

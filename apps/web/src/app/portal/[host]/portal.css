@@ -45,6 +45,16 @@
   top: 0.75rem;
 }
 
+/* A commercial demo says so on every page (ADR-034). */
+.portal-demo {
+  margin: 0;
+  padding: 0.5rem var(--gutter);
+  background: var(--fg);
+  color: var(--bg);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .portal-header {

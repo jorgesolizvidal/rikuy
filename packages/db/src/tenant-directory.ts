@@ -23,6 +23,8 @@ const rowSchema = z.object({
   canonical_host: z.string().nullable(),
   is_canonical: z.boolean(),
   active_config_id: z.uuid().nullable(),
+  // Optional while the app may be deployed before the migration that adds it (ADR-034).
+  is_demo: z.boolean().optional(),
 });
 
 export function mapTenantRow(row: unknown): PortalTenant {
@@ -36,6 +38,7 @@ export function mapTenantRow(row: unknown): PortalTenant {
     canonicalHost: r.canonical_host,
     isCanonical: r.is_canonical,
     activeConfigId: r.active_config_id,
+    ...(r.is_demo ? { demo: true } : {}),
   };
 }
 

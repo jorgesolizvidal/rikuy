@@ -51,6 +51,7 @@ const tenantRowSchema = z.object({
   owner_email: z.string().nullable(),
   owner_status: membershipStatusSchema.nullable(),
   created_at: z.string(),
+  is_demo: z.boolean().optional(),
 });
 
 export function createPlatformRepository(client: SessionClient): PlatformRepository {
@@ -76,6 +77,7 @@ export function createPlatformRepository(client: SessionClient): PlatformReposit
           ownerEmail: row.owner_email,
           ownerStatus: row.owner_status,
           createdAt: row.created_at,
+          demo: row.is_demo === true,
         }));
     },
 
@@ -87,6 +89,8 @@ export function createPlatformRepository(client: SessionClient): PlatformReposit
         p_owner_user_id: request.ownerUserId,
         p_default_locale: request.defaultLocale,
         p_timezone: request.timezone,
+        // Only when asked, so a provisioning still works against a database without it.
+        ...(request.demo ? { p_demo: true } : {}),
       });
       if (error) {
         const { code, hint } = rpcError(error);
@@ -180,6 +184,7 @@ export function createMemberRepository(client: SessionClient): MemberRepository 
             status: membershipStatusSchema,
             invited_at: z.string(),
             accepted_at: z.string().nullable(),
+            invitation_mailed_at: z.string().nullable().optional(),
           }),
         )
         .parse(data)
@@ -191,6 +196,7 @@ export function createMemberRepository(client: SessionClient): MemberRepository 
           status: row.status,
           invitedAt: row.invited_at,
           acceptedAt: row.accepted_at,
+          invitationMailedAt: row.invitation_mailed_at ?? null,
         }));
     },
     async add(tenantId, userId, role) {

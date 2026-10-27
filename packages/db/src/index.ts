@@ -50,3 +50,4 @@ export {
   createSupabasePublishedTourReader,
   createTourRepository,
 } from "./tours";
+export { createSharpSampleImageRenderer, sampleIllustrationSvg } from "./sample-images";

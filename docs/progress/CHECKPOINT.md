@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
-- **Último paso completado:** Hito · Paso 1 — Ucureña lista para cargar (2026-10-27), con Ucureña en línea en producción
-- **Rama:** `docs/hito-step1-done` → PR hacia `main`
+- **Último paso completado:** Hito · Paso 2 — demo comercial por municipio y correo de invitación (2026-10-27): código y guía; el SMTP en producción lo configura el usuario después del merge
+- **Rama:** `feat/hito-step2-demos` → PR hacia `main`
 
 ## Historial
 
@@ -904,21 +904,112 @@ Comprobado desde fuera:
 - `sitemap.xml` y `robots.txt` responden;
 - sirve la versión `4679c204f5db` (el merge de este paso).
 
+### ★ Hito · Paso 2 — demo comercial por municipio y correo de invitación
+
+- Decisiones ([ADR-034](../adr/ADR-034-commercial-demos-and-mail.md)):
+  - la demo es un **tipo de municipio** que elige el operador al darlo de alta, no un plan ni un dato de la marca;
+  - el contenido de muestra pasa por **los mismos casos de uso del panel** (subidas firmadas, revisión de bytes, derivados, cuotas, publicación, auditoría);
+  - las ilustraciones se **generan** (SVG → sharp), sin fotos de lugares reales ni binarios en el repositorio;
+  - el correo de invitación es un **trabajo durable**;
+  - el SMTP gratuito es una **cuenta de Gmail dedicada** con contraseña de aplicación, porque Brevo y Resend piden dominio verificado.
+- Base de datos (`20261030000000_hito_demos_and_mail.sql`, solo expand):
+  - `tenants.is_demo`, que solo el operador fija en el alta (`provision_tenant(…, p_demo)`, auditado) y que nadie del municipio puede cambiar. Llega al portal en `resolve_tenant_by_host` y al operador en `platform_list_tenants`.
+  - Cola `mail` y tipo `mail.membership_invitation` (5 intentos), con un _payload_ que solo lleva la membresía. Un trigger en `memberships` lo encola en la misma transacción al invitar (alta del propietario, `add_tenant_member`, volver a invitar a alguien revocado), con clave lógica por invitación.
+  - Para el ejecutor: `worker_api.invitation_mail` (dirección, municipio, rol y estado bajo el arrendamiento; `send` / `already_sent` / `not_pending`) y `mark_invitation_mailed` (`memberships.invitation_mailed_at` y auditoría `membership.invitation_mailed`).
+  - `list_tenant_members` devuelve cuándo salió el correo de la invitación vigente.
+- `@rikuy/core`:
+  - plantilla `domain/demo/sample-template`: 5 destinos, 3 eventos y los 2 panoramas del tour, con textos genéricos que llevan `{municipio}` y empiezan con «Texto de muestra»; ubicaciones a menos de 2 km del centro; fechas en su día de la semana a partir de hoy;
+  - casos de uso `loadSampleContent` (idempotente por dirección), `buildSampleTour` (dos escenas con flechas de ida y vuelta, un punto de información y la publicación) y `loadSampleContentStatus`, solo para propietarios y administradores de una demo;
+  - el correo `invitationEmail` (texto y HTML simple, sin secretos ni enlaces mágicos, nombres escapados) y los puertos `InvitationMailStore` y `Mailer`.
+- `@rikuy/db`:
+  - `createSharpSampleImageRenderer`: paisajes planos por escena (plaza, mirador, museo, mercado, río, feria, festival de noche, caminata), fotos de 1600 × 1067 y panoramas de 4096 × 2048 cuyos bordes se unen;
+  - `createSmtpMailer` (nodemailer 10.1.0; TLS en 465, STARTTLS obligatorio en 587, sin TLS solo para un servidor local; los 5xx son definitivos);
+  - el ledger del ejecutor suma `invitations`;
+  - `pnpm platform:provision` acepta `"demo": true`.
+- `apps/worker`: procesador `mail.membership_invitation`. Sin SMTP termina sin enviar (`mail_not_configured`). Con la configuración a medias, los correos fallan y se ven en «Trabajos».
+- `@rikuy/config`: `parseMailEnv` (todas o ninguna de `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD`, `MAIL_FROM`), sin mostrar valores.
+- Panel:
+  - `/plataforma/nuevo` tiene la casilla **«Demo comercial»**, y la lista de municipios marca las demos;
+  - en una demo, el municipio muestra **«Contenido de muestra»** (`/o/{slug}/muestra`, 404 para editores, analistas y municipios reales):
+    - «Centro del municipio» (coordenadas pegadas de Google Maps) y «Cargar contenido de muestra»;
+    - el estado de los panoramas, que se actualiza solo;
+    - «Armar el tour de muestra» y el enlace al portal;
+  - en «Miembros», cada invitación pendiente dice «Se le envió un correo», «Correo en camino» o «Sin correo: avísale tú»;
+  - en la página del municipio se quitó el aviso viejo de que los recorridos 360° «llegarían».
+- Portal de una demo: siempre `noindex, follow`, franja «Portal de demostración. El contenido es de muestra.» y pie «Demostración del portal de…». Los municipios reales no cambian.
+- `supabase/config.toml` expone el SMTP de Mailpit (54325) para probar el correo en local y en CI.
+- [`docs/deploy.md`](../deploy.md):
+  - «Correo con SMTP gratuito (Gmail)»: cuenta dedicada, contraseña de aplicación, SMTP de Supabase Auth y sus límites, variables de Vercel y cómo comprobarlo;
+  - «Demo comercial para un municipio interesado», paso a paso.
+- `.env.example`, [runbook de trabajos](../jobs.md) e índice de ADRs actualizados.
+- Tests:
+  - 496 unitarios (core 315, db 105, web 35, worker 33, config 8);
+  - 762 pgTAP (31 nuevos, `023_demos_and_mail`):
+    - el operador marca la demo y queda auditado;
+    - el portal y los miembros ven la marca; otro municipio no;
+    - el propietario no puede cambiarla;
+    - un correo por invitación, sin dirección en el _payload_ y con la configuración de la invitación pendiente;
+    - lectura bajo arrendamiento, registro una sola vez, sin reenvío tras registrar;
+    - volver a invitar crea otro correo; aceptar antes del envío no envía nada;
+    - nadie más usa las funciones del ejecutor;
+  - **integración contra Supabase real** (`demo.int.test.ts`):
+    - la demo se reconoce en el panel y en el portal;
+    - el contenido de muestra se carga publicado, con fotos reales de 1600 × 1067 en el bucket público y los dos panoramas en la cola; cargarlo otra vez no cambia nada;
+    - el tour de muestra se publica con 2 escenas y 3 puntos;
+    - una invitación llega a **Mailpit por SMTP** una sola vez, y «Miembros» lo muestra;
+  - 0 hallazgos de `plpgsql_check`.
+- Verificado en local, en el navegador, de punta a punta:
+  - el operador crea «Demo Valle» como demo comercial, la propietaria acepta y el operador la pone en línea;
+  - «Cargar contenido de muestra» publica 5 destinos y 3 eventos en ~22 s, y los panoramas se procesan en 0,8 s cada uno;
+  - «Armar el tour de muestra» publica el tour;
+  - el portal muestra la franja de demostración, `noindex, follow`, las fichas con el nombre del municipio, la agenda y el recorrido 360°; Demo Norte no tiene franja ni `robots`;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360 y 1280 px en el alta, «Contenido de muestra» y el portal;
+  - con un servidor SMTP local, invitar desde «Miembros» envió «Invitación al panel de Municipio Demo Norte» (texto y HTML) al despertar el ejecutor, y la fila pasó de «Correo en camino» a «Se le envió un correo»;
+  - portales 161 y contratos RC-09/10/11/12 189 verificaciones en verde.
+- Lo que encontraron las pruebas, ya corregido: un contenido o un tour recién creados abren su borrador con un número de edición, así que publicar o agregar escenas sin él chocaba con la concurrencia.
+
+**Desviaciones:**
+
+- El paso queda ✅ en el roadmap cuando, con el SMTP configurado en producción, una persona invitada que no es del equipo de Supabase recibe la invitación y entra con su código.
+- Las ilustraciones son genéricas a propósito: para una demo más convincente se reemplazan con fotos y panoramas reales del municipio desde el panel.
+- Una demo contratada no se convierte en municipio real: se da de alta el real y la demo se suspende.
+- Al menos una vez: si el ejecutor muere entre enviar y registrar, el correo se repite.
+
 ## Cómo verificarlo
 
-Abre `https://rikuy-ucurena.vercel.app`: muestra la marca de Ucureña y «Muy pronto en este portal». En el código fuente de la página, `<meta name="robots" content="noindex, follow">` sigue ahí hasta que publiques el primer destino o un evento próximo.
+```powershell
+git checkout feat/hito-step2-demos
+pnpm install
+pnpm db:reset
+pnpm dev
+```
 
-## Siguiente paso — ★ Hito · Paso 2 (requiere autorización)
+1. Entra a `http://app.localhost:3000` como `operador@rikuy.example.test` y en `/plataforma/nuevo` da de alta un municipio con «Demo comercial» marcado y `owner@demo-sur.example.test` como propietario.
+2. Entra como `owner@demo-sur.example.test` (el código llega a Mailpit, `http://127.0.0.1:54324`) y acepta. La invitación también llega como correo si en `apps/web/.env.local` pones `SMTP_HOST=127.0.0.1`, `SMTP_PORT=54325` y `MAIL_FROM=Rikuy <avisos@rikuy.example.test>`, y activas el ejecutor (`WORKER_DATABASE_URL`, `WORKER_DATABASE_ROLE`, `JOB_RUNNER_SECRET`).
+3. Como operador, ponla en línea. Como propietaria, entra a «Contenido de muestra», pega `-17.3901, -66.1502` y carga. Procesa la cola y arma el tour.
+4. Abre su portal: franja de demostración, `noindex, follow`, destinos, agenda y recorrido 360°.
 
-**Demo comercial por municipio:**
+## Después del merge — correo en producción
 
-- una plantilla de contenido de muestra, sin datos de ningún municipio real;
-- crear con ella la demo de un municipio interesado en minutos;
-- correo SMTP gratuito para los códigos de acceso y las invitaciones.
+1. Sigue [«Correo con SMTP gratuito (Gmail)»](../deploy.md#correo-con-smtp-gratuito-gmail) en `docs/deploy.md`: cuenta de Gmail dedicada, contraseña de aplicación, SMTP en Supabase Auth y las cinco variables en Vercel.
+2. Invita a un correo tuyo que no sea del equipo de Supabase: debe llegar la invitación y después el código.
+3. Si quieres, crea una demo siguiendo [«Demo comercial para un municipio interesado»](../deploy.md#demo-comercial-para-un-municipio-interesado).
+
+Cuando la invitación llegue, avísame y marco el paso como terminado.
+
+## Siguiente paso — ★ Hito · Paso 3 (requiere autorización)
+
+**Operación con planes gratuitos:**
+
+- tarea diaria que evita la pausa de Supabase por inactividad y avisa si algo cae;
+- Lighthouse de producción a partir del sitemap de cada portal (también Ucureña);
+- aviso de uso del almacenamiento (1 GB del plan) y limpieza de medios que ya no se usan;
+- umbral de rendimiento propio para `/mapa`.
 
 ## Decisiones pendientes del usuario
 
-- Ninguna bloqueante. El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».
+- Crear la cuenta de Gmail dedicada para el correo (o elegir otro proveedor si ya hay dominio).
+- El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».
 - **Al final del proyecto, en Blender** (pedido del usuario, 2026-10-25):
   - corregir la iluminación de la ametralladora: sus mapas marcan casi todo como metal sobre colores muy oscuros;
   - corregir su material dorado, que tiene la textura equivocada;

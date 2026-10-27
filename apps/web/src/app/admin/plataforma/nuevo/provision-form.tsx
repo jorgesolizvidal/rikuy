@@ -79,8 +79,8 @@ export function ProvisionForm({
     return (
       <div className="form" role="status">
         <p className="notice">
-          Municipio creado en preparación. Se invitó a <strong>{state.ownerEmail}</strong> como
-          propietario.
+          {state.demo ? "Demo comercial creada" : "Municipio creado"} en preparación. Se invitó a{" "}
+          <strong>{state.ownerEmail}</strong> como propietario.
         </p>
         <p>
           Pídele que entre en <strong>{adminOrigin}</strong> con ese correo, reciba su código y
@@ -171,6 +171,17 @@ export function ProvisionForm({
           {...invalidProps("ownerEmail", errorFor("ownerEmail"))}
         />
       </Field>
+
+      <div className="field">
+        <label className="checkbox">
+          <input type="checkbox" name="demo" aria-describedby="demo-hint" />
+          Demo comercial
+        </label>
+        <p className="field-hint" id="demo-hint">
+          Para mostrar Rikuy a un municipio interesado: su portal no aparece en buscadores, avisa
+          que es una demostración y puede cargar contenido de muestra. No se puede cambiar después.
+        </p>
+      </div>
 
       {STATUS_MESSAGES[state.status] ? (
         <p className="form-error" role="alert">

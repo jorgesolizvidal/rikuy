@@ -13,6 +13,8 @@ export const portalTenantSchema = z.object({
   canonicalHost: z.string().min(1).max(253).nullable(),
   isCanonical: z.boolean(),
   activeConfigId: z.uuid().nullable(),
+  /** A commercial demo (ADR-034): never indexed and says so. Absent means a real portal. */
+  demo: z.boolean().optional(),
 });
 
 export type PortalTenant = z.infer<typeof portalTenantSchema>;

@@ -335,6 +335,9 @@ importers:
       meshoptimizer:
         specifier: 1.3.0
         version: 1.3.0
+      nodemailer:
+        specifier: 10.1.0
+        version: 10.1.0
       postgres:
         specifier: 3.4.9
         version: 3.4.9
@@ -344,6 +347,10 @@ importers:
       zod:
         specifier: 4.6.7
         version: 4.6.7
+    devDependencies:
+      '@rikuy/worker':
+        specifier: workspace:*
+        version: link:../../apps/worker
 
   packages/ui: {}
 
@@ -2555,6 +2562,10 @@ packages:
   node-releases@2.0.59:
     resolution: {integrity: sha512-5qr2okC4ItAI0hG5SaV0HoYMpnM/Y6+Oqr7AmPYy/2uEoGvS+GbSKLeRxSS1uAdu59yz0ouzcuXievSgg///WA==}
     engines: {node: '>=18'}
+
+  nodemailer@10.1.0:
+    resolution: {integrity: sha512-fXW8AulB25aOTuwfRYV6lqHyfz2VM4rr4SGXH03mE7x5znEUpzL5mu6anARUpZN7744Ziwkmr4AxSLPJsBQspg==}
+    engines: {node: '>=20.0.0'}
 
   object-assign@4.1.1:
     resolution: {integrity: sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg==}
@@ -5532,6 +5543,8 @@ snapshots:
       semver: 6.3.1
 
   node-releases@2.0.59: {}
+
+  nodemailer@10.1.0: {}
 
   object-assign@4.1.1: {}
 

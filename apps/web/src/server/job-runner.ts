@@ -2,22 +2,26 @@ import "server-only";
 
 import { createHash, timingSafeEqual } from "node:crypto";
 
-import { EnvValidationError, parseJobRunnerEnv } from "@rikuy/config/env";
+import { EnvValidationError, parseJobRunnerEnv, parseMailEnv } from "@rikuy/config/env";
 import {
   drainJobs,
   newRunnerId,
   type DrainReport,
   type JobLogger,
   type JobProcessor,
+  MailDeliveryError,
+  type Mailer,
 } from "@rikuy/core";
 import {
   createGltfModelOptimizer,
   createPostgresJobLedger,
   createSharpPanoramaRenderer,
+  createSmtpMailer,
 } from "@rikuy/db/worker";
 import { createProcessors, LONG_JOB_KINDS } from "@rikuy/worker";
 
 import { mediaAdmin } from "./media-admin";
+import { platformSettings } from "./platform";
 
 /**
  * The durable job runner on Vercel (ADR-019, P2 · Paso 2). The only module that opens the
@@ -48,6 +52,31 @@ function settings() {
 
 export function jobRunnerConfigured(): boolean {
   return settings() !== null;
+}
+
+/** The SMTP account for invitation emails, or null (no email; ADR-034). */
+function mailer(): Mailer | null {
+  let mail;
+  try {
+    mail = parseMailEnv();
+  } catch (error) {
+    if (!(error instanceof EnvValidationError)) throw error;
+    // Half-configured: the emails fail (and show up in /plataforma/trabajos) instead of
+    // vanishing; everything else keeps running.
+    const keys = error.invalidKeys.join(", ");
+    return {
+      send: () =>
+        Promise.reject(new MailDeliveryError(`SMTP settings are invalid: ${keys}`, false)),
+    };
+  }
+  if (!mail) return null;
+  return createSmtpMailer({
+    host: mail.SMTP_HOST,
+    port: mail.SMTP_PORT,
+    from: mail.MAIL_FROM,
+    ...(mail.SMTP_USER ? { user: mail.SMTP_USER } : {}),
+    ...(mail.SMTP_PASSWORD ? { password: mail.SMTP_PASSWORD } : {}),
+  });
 }
 
 /** Compares the request's Authorization header with the runner secret in constant time. */
@@ -119,6 +148,9 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           models: ledger.models,
           optimizer: createGltfModelOptimizer(),
           media: mediaAdmin(),
+          invitations: ledger.invitations,
+          mailer: mailer(),
+          adminOrigin: platformSettings().adminOrigin,
         }),
       ),
       runnerId,

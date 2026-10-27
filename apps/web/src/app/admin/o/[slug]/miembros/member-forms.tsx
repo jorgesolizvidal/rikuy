@@ -39,9 +39,12 @@ function useRefreshOnDone(state: MemberActionState) {
 export function InviteMemberForm({
   slug,
   roles,
+  mail,
 }: {
   readonly slug: string;
   readonly roles: readonly RoleOption[];
+  /** Invitation emails go out (SMTP configured). */
+  readonly mail: boolean;
 }) {
   const [state, action, pending] = useActionState(inviteMemberAction, IDLE);
   const id = useId();
@@ -78,7 +81,9 @@ export function InviteMemberForm({
       <p className={message ? "form-error" : "form-success"} role="status">
         {message ??
           (state.status === "done"
-            ? "Invitación creada. La persona la verá al entrar al panel con su correo."
+            ? mail
+              ? "Invitación creada. Le enviamos un correo; la verá al entrar al panel con su correo."
+              : "Invitación creada. La persona la verá al entrar al panel con su correo."
             : "")}
       </p>
     </form>

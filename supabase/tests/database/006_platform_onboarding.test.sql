@@ -49,7 +49,7 @@ set constraints all immediate;
 select plan(54);
 
 -- ── Privileges ──────────────────────────────────────────────────────────────
-select ok(not has_function_privilege('anon', 'public.provision_tenant(text, text, text, uuid, text, text)', 'EXECUTE'), 'anon cannot provision');
+select ok(not has_function_privilege('anon', 'public.provision_tenant(text, text, text, uuid, text, text, boolean)', 'EXECUTE'), 'anon cannot provision');
 select ok(not has_function_privilege('anon', 'public.platform_user_id_by_email(text)', 'EXECUTE'), 'anon cannot look up users');
 select ok(not has_function_privilege('authenticated', 'public.platform_user_id_by_email(text)', 'EXECUTE'), 'users cannot look up other users');
 select ok(has_function_privilege('service_role', 'public.platform_user_id_by_email(text)', 'EXECUTE'), 'the identity adapter (service role) can look up users');

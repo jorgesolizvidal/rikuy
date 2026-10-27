@@ -59,6 +59,7 @@ describe("platform repository", () => {
       ownerUserId: USER,
       defaultLocale: "es",
       timezone: "America/La_Paz",
+      demo: false,
     };
     expect(await createPlatformRepository(ok.client).provision(request)).toEqual({
       status: "provisioned",
@@ -66,6 +67,11 @@ describe("platform repository", () => {
     });
     expect(ok.calls[0]?.url.pathname).toBe("/rest/v1/rpc/provision_tenant");
     expect(ok.calls[0]?.body).toMatchObject({ p_slug: "demo-este", p_owner_user_id: USER });
+    // A real municipality does not send the demo flag (works before and after ADR-034).
+    expect(ok.calls[0]?.body).not.toHaveProperty("p_demo");
+    const demo = session(() => json([{ tenant_id: TENANT, domain_id: TENANT }]));
+    await createPlatformRepository(demo.client).provision({ ...request, demo: true });
+    expect(demo.calls[0]?.body).toMatchObject({ p_demo: true });
 
     for (const [code, status, hint, outcome] of [
       ["PT409", 409, "slug", "slug_taken"],

@@ -27,7 +27,7 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
    - Authentication → Sign In / Providers → _Allow new users to sign up_: **desactivado** (nadie se registra solo). Email: activado, sin confirmación de correo, código de 6 dígitos, vence en 3600 s.
    - Authentication → URL Configuration → _Site URL_: `https://rikuy-app-admin.vercel.app`; _Redirect URLs_: `https://rikuy-app-admin.vercel.app/auth/callback`.
    - Authentication → Emails → _Magic link_: asunto «Tu código de acceso a Rikuy» y el contenido de `supabase/templates/magic-link.html` (incluye el código `{{ .Token }}` que pide el panel).
-4. **Correo:** el servidor de correo incluido en Supabase solo envía a los miembros del equipo de la organización y pocos mensajes por hora. Para la demo basta; para municipios reales hace falta un proveedor SMTP propio (Authentication → Emails → SMTP).
+4. **Correo:** el servidor de correo incluido en Supabase solo envía a los miembros del equipo de la organización y pocos mensajes por hora. Para que entre gente de un municipio hace falta SMTP propio: ver [«Correo con SMTP gratuito»](#correo-con-smtp-gratuito-gmail).
 
 ### GitHub (Settings → Secrets and variables → Actions)
 
@@ -101,4 +101,56 @@ Ningún dato del municipio entra al código ni a variables de entorno: todo se h
    - mientras no tenga nada publicado, sus páginas llevan `<meta name="robots" content="noindex, follow">` (ver el código fuente de la página): los buscadores no lo indexan vacío;
    - al publicar el primer destino o un evento próximo, la etiqueta desaparece sola en la siguiente visita.
 7. **Cuota:** cada municipio empieza con 300 MB de almacenamiento. Un panorama de 8K con sus teselas ocupa unos 17–20 MB. Antes de cargar muchos panoramas, súbela en `/plataforma` → «Cuotas por municipio». El total del plan gratuito de Supabase es de 1 GB para todos los municipios.
-8. **Equipo:** en el municipio → «Miembros», invita a administradores, editores y analistas cuando haga falta. Con el correo incluido de Supabase, solo pueden entrar los miembros del equipo de la organización; para gente del municipio hace falta SMTP propio (Hito · Paso 2).
+8. **Equipo:** en el municipio → «Miembros», invita a administradores, editores y analistas cuando haga falta. Con SMTP configurado ([«Correo con SMTP gratuito»](#correo-con-smtp-gratuito-gmail)) les llega un correo con la invitación y pueden recibir su código; sin él, solo entran los miembros del equipo de la organización de Supabase.
+
+## Correo con SMTP gratuito (Gmail)
+
+Un mismo SMTP envía dos cosas ([ADR-034](adr/ADR-034-commercial-demos-and-mail.md)):
+
+- **los códigos de acceso**, que envía Supabase Auth;
+- **los correos de invitación**, que envía el ejecutor de trabajos (necesita estar activado: [runbook](jobs.md#activar-el-ejecutor-una-sola-vez-por-ambiente)).
+
+Sin dominio propio, lo más simple y gratuito es una **cuenta de Gmail dedicada** (por ejemplo `rikuy.avisos@gmail.com`), que permite unos 500 correos al día. Brevo (300 al día) y Resend (100 al día) piden un dominio verificado para entregar bien; se cambia a ellos cuando el municipio tenga su dominio, modificando solo las variables.
+
+1. **Cuenta:** crea la cuenta de Gmail y activa la verificación en dos pasos (Cuenta de Google → Seguridad).
+2. **Contraseña de aplicación:** Cuenta de Google → Seguridad → _Contraseñas de aplicaciones_ → nombre «Rikuy». Google la muestra una sola vez (16 letras): guárdala en tu gestor de contraseñas. **Nunca** va al repositorio ni a un chat.
+3. **Supabase** → Authentication → Emails → _SMTP Settings_ → _Enable custom SMTP_:
+
+   | Campo        | Valor                                |
+   | ------------ | ------------------------------------ |
+   | Sender email | la cuenta de Gmail                   |
+   | Sender name  | `Rikuy`                              |
+   | Host         | `smtp.gmail.com`                     |
+   | Port         | `465`                                |
+   | Username     | la cuenta de Gmail                   |
+   | Password     | la contraseña de aplicación (paso 2) |
+
+   Después, Authentication → _Rate Limits_: con SMTP propio Supabase permite 30 correos por hora; súbelo a 60 si hace falta.
+
+4. **Vercel** → Settings → Environment Variables, solo **Production**, las dos últimas como **Sensitive**:
+
+   | Variable        | Valor                         |
+   | --------------- | ----------------------------- |
+   | `SMTP_HOST`     | `smtp.gmail.com`              |
+   | `SMTP_PORT`     | `465`                         |
+   | `SMTP_USER`     | la cuenta de Gmail            |
+   | `SMTP_PASSWORD` | la contraseña de aplicación   |
+   | `MAIL_FROM`     | `Rikuy <la-cuenta@gmail.com>` |
+
+   Luego _Redeploy_ de producción.
+
+5. **Comprobar:** desde el panel, «Miembros» → invita a un correo tuyo que no sea miembro del equipo de Supabase. En menos de un minuto llega «Invitación al panel de…» y la fila dice «Se le envió un correo». Al entrar al panel con ese correo llega el código. Si no llega, `/plataforma/trabajos` muestra el error del trabajo «Correo de invitación» (por ejemplo, una contraseña de aplicación mal copiada).
+
+## Demo comercial para un municipio interesado
+
+Cada municipio interesado recibe su propia demo, con su nombre y contenido de muestra (5 destinos, 3 eventos y un tour 360° con ilustraciones genéricas). El portal de una demo **no aparece en buscadores** y avisa que es una demostración ([ADR-034](adr/ADR-034-commercial-demos-and-mail.md)).
+
+1. **Dirección:** en Vercel → Settings → Domains, agrega por ejemplo `rikuy-demo-<municipio>.vercel.app`.
+2. **Alta:** en `/plataforma/nuevo`, igual que un municipio real, con **«Demo comercial»** marcado y tu correo como propietario (así preparas la demo tú; después puedes invitar a la gente del municipio desde «Miembros»).
+3. **Aceptar** la invitación en el inicio del panel, ajustar la **marca** (nombre, colores, logo del municipio si lo tienes) y **ponerla en línea** en `/plataforma`.
+4. **Contenido de muestra:** en el municipio → «Contenido de muestra»:
+   - pega las coordenadas de la plaza principal (clic derecho en Google Maps) y pulsa «Cargar contenido de muestra» (alrededor de un minuto);
+   - cuando los panoramas terminen de procesarse (la página se actualiza sola), pulsa «Armar el tour de muestra».
+5. **A medida:** reemplaza lo que quieras con fotos y textos reales del municipio desde «Destinos», «Agenda», «Panoramas 360°» y «Tours 360°». Todo se edita como cualquier contenido.
+6. **Mostrarla:** comparte el enlace del portal (y el QR del recorrido, en «Tours 360°»).
+7. **Después:** si el municipio contrata, se da de alta su municipio real (como Ucureña, sin «Demo comercial») y la demo se suspende en `/plataforma`. La demo ocupa unos 3–5 MB de la cuota.
