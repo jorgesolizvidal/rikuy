@@ -13,70 +13,18 @@ import { createRequire } from "node:module";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  deltaE,
-  drainJobs,
-  srgbToLab,
-  summarizeDifferences,
-  type DerivedFile,
-  type ModelManifest,
-} from "@rikuy/core";
-import { createMemoryJobLedger } from "@rikuy/core/testing";
+import { deltaE, srgbToLab, summarizeDifferences } from "@rikuy/core";
 import { syntheticModel } from "@rikuy/db/testing";
-import { createGltfModelOptimizer } from "@rikuy/db/worker";
-import { createProcessModelProcessor } from "@rikuy/worker";
 import { chromium, type Browser } from "playwright-core";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { optimizeAsProduction } from "./support/production-model";
 
 const require = createRequire(import.meta.url);
 const THREE_ROOT = join(dirname(require.resolve("three")), "..");
 const PAGE = join(dirname(fileURLToPath(import.meta.url)), "model-colors", "index.html");
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
-
-/** The real processor over an in-memory ledger and Storage: what production would write. */
-async function optimizeAsProduction(original: Uint8Array) {
-  const files = new Map<string, Uint8Array>([["t/a/1/original", original]]);
-  let manifest: ModelManifest | null = null;
-  const processor = createProcessModelProcessor({
-    optimizer: createGltfModelOptimizer(),
-    models: {
-      source: async () => ({
-        status: "processing",
-        originalPath: "t/a/1/original",
-        declaredMime: "model/gltf-binary",
-        prefix: "t/a/1/",
-      }),
-      complete: async (_lease, _original, written) => {
-        manifest = written;
-        return "ready";
-      },
-      reject: async (_lease, problem) => {
-        throw new Error(`rejected: ${problem}`);
-      },
-    },
-    media: {
-      readOriginal: async (path) => files.get(path) ?? null,
-      storeDerivatives: async (prefix, written: readonly DerivedFile[]) => {
-        for (const file of written) files.set(prefix + file.name, file.bytes);
-      },
-      removeOriginal: async (path) => {
-        files.delete(path);
-      },
-    },
-  });
-  const ledger = createMemoryJobLedger();
-  ledger.add({
-    jobId: "j",
-    kind: "media.process_model",
-    payload: { versionId: "5eed3000-0000-4000-8000-000000000099" },
-  });
-  await drainJobs({ ledger, processors: [processor], runnerId: "e2e", budgetMs: 280_000 });
-  const optimized = files.get("t/a/1/model/model.glb");
-  if (!optimized || !manifest)
-    throw new Error(`not optimized: ${JSON.stringify(ledger.jobs.get("j"))}`);
-  return { optimized, manifest: manifest as ModelManifest };
-}
 
 const TYPES: Record<string, string> = {
   ".html": "text/html",

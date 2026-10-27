@@ -30,7 +30,17 @@ export type TourPointDto =
     })
   | (PointBase & {
       readonly kind: "model";
+      /** What the model shows, in words: the 3D viewer's text alternative (may be empty). */
+      readonly body: RichText;
       readonly poster: { readonly url: string; readonly width: number; readonly height: number };
+      /** Downloaded only when the visitor opens the 3D viewer (RC-08). */
+      readonly model: {
+        readonly url: string;
+        /** Download size, as visitors read it ("1,9 MB"). */
+        readonly size: string;
+        /** Over 5 MB: may take a while on mobile data. */
+        readonly heavy: boolean;
+      };
     })
   | (PointBase & {
       readonly kind: "tour";

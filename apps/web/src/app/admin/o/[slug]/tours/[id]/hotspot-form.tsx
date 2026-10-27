@@ -14,7 +14,7 @@ export interface EditorHotspot {
   readonly kind: HotspotKind;
   readonly title: string;
   readonly position: { readonly yaw: number; readonly pitch: number };
-  /** Info: the text in the writing format of destinations (## títulos, - listas…). */
+  /** Info: the text; model: its description. In the writing format of destinations. */
   readonly body: string;
   readonly gallery: readonly EditorImage[];
   readonly targetSceneId: string | null;
@@ -49,7 +49,7 @@ export interface SceneOption {
 const KIND_HINT: Record<HotspotKind, string> = {
   info: "Un texto y, si quieres, fotos: lo que el visitante lee al tocar el punto.",
   scene: "Una flecha que lleva a otra escena de este mismo tour.",
-  model: "Abre un modelo 3D que el visitante puede girar.",
+  model: "Muestra la imagen de un modelo 3D; el visitante puede abrirlo y girarlo.",
   tour: "Lleva al tour de otro destino o evento del municipio, sin salir del recorrido.",
 };
 
@@ -117,6 +117,9 @@ function fieldsOf(
   }
   if (kind === "model" && (!initial || values.modelVersionId !== initial.model?.versionId)) {
     fields.modelVersionId = values.modelVersionId;
+  }
+  if (kind === "model" && (initial ? values.body !== initial.body : values.body.trim() !== "")) {
+    fields.body = values.body;
   }
   if (kind === "tour" && (!initial || values.targetContentId !== initial.target?.contentId)) {
     fields.targetContentId = values.targetContentId;
@@ -333,6 +336,25 @@ export function HotspotForm({
           ) : null}
           {fieldError("target")}
         </fieldset>
+      ) : null}
+
+      {kind === "model" ? (
+        <div className="field">
+          <label htmlFor={`${id}-body`}>Descripción del modelo</label>
+          <textarea
+            id={`${id}-body`}
+            value={body}
+            rows={4}
+            onChange={(event) => setBody(event.target.value)}
+            aria-invalid={issueOf("body") ? true : undefined}
+            aria-describedby={`${id}-model-body-hint${issueOf("body") ? ` ${errorId("body")}` : ""}`}
+          />
+          <p id={`${id}-model-body-hint`} className="field-hint">
+            Qué es y cómo se ve (forma, material, color, tamaño real). Es lo que lee quien no puede
+            ver el modelo 3D o usa un lector de pantalla. Mismo formato que los destinos.
+          </p>
+          {fieldError("body")}
+        </div>
       ) : null}
 
       {kind === "tour" ? (

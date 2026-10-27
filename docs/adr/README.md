@@ -36,3 +36,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 030 | [Publicar un tour: medios públicos antes de sellar y un manifiesto por revisión](ADR-030-tour-publication.md)                     | Aceptada (2026-10-26)                                                       |
 | 031 | [Visor público del tour: una página por tour, un visor por recorrido y el tour también como texto](ADR-031-public-tour-viewer.md) | Aceptada (2026-10-26)                                                       |
 | 032 | [Recorrido general: el orden lo elige el municipio y se salta entre tours sin salir del visor](ADR-032-general-tour.md)           | Aceptada (2026-10-26)                                                       |
+| 033 | [Modelo 3D en el tour: imagen primero, visor 3D solo a pedido y una descripción como alternativa](ADR-033-tour-models.md)         | Aceptada (2026-10-27)                                                       |

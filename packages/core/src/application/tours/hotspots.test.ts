@@ -67,6 +67,36 @@ describe("hotspot rules", () => {
       ok: true,
       hotspot: { kind: "scene", title: "A la sala", position: at, targetSceneId: OTHER },
     });
+    expect(
+      parseNewHotspot({
+        kind: "model",
+        title: "Horno",
+        position: at,
+        modelVersionId: OTHER,
+        body: "Un horno.",
+      }),
+    ).toEqual({
+      ok: true,
+      hotspot: {
+        kind: "model",
+        title: "Horno",
+        position: at,
+        modelVersionId: OTHER,
+        body: [{ type: "paragraph", children: [{ type: "text", text: "Un horno." }] }],
+      },
+    });
+    expect(
+      parseNewHotspot({
+        kind: "model",
+        title: "Horno",
+        position: at,
+        modelVersionId: OTHER,
+        body: "",
+      }),
+    ).toEqual({
+      ok: true,
+      hotspot: { kind: "model", title: "Horno", position: at, modelVersionId: OTHER },
+    });
     expect(parseNewHotspot({ kind: "puerta", title: "X", position: at })).toMatchObject({
       ok: false,
     });
@@ -100,6 +130,24 @@ describe("hotspot rules", () => {
       changes: { position: { yaw: 0.25, pitch: -0.5 } },
     });
     expect(parseHotspotChanges("scene", { body: "Texto" })).toMatchObject({ ok: false });
+    expect(parseHotspotChanges("tour", { body: "Texto" })).toMatchObject({ ok: false });
+    // A model point's description: the text alternative of its 3D viewer (P4 · Paso 6).
+    expect(parseHotspotChanges("model", { body: "Horno de **adobe**." })).toEqual({
+      ok: true,
+      changes: {
+        body: [
+          {
+            type: "paragraph",
+            children: [
+              { type: "text", text: "Horno de " },
+              { type: "text", text: "adobe", marks: ["bold"] },
+              { type: "text", text: "." },
+            ],
+          },
+        ],
+      },
+    });
+    expect(parseHotspotChanges("model", { gallery: [] })).toMatchObject({ ok: false });
     expect(parseHotspotChanges("scene", { modelVersionId: IMG })).toMatchObject({ ok: false });
     expect(parseHotspotChanges("tour", { kind: "info" })).toMatchObject({ ok: false });
     expect(parseHotspotChanges("info", { gallery: [] })).toEqual({

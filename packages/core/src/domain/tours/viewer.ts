@@ -55,6 +55,8 @@ export type TourViewerPoint =
     })
   | (PointBase & {
       readonly kind: "model";
+      /** What the model shows, in words (the 3D viewer's text alternative); may be empty. */
+      readonly body: RichText;
       readonly poster: { readonly path: string; readonly width: number; readonly height: number };
       readonly model: { readonly path: string; readonly bytes: number; readonly heavy: boolean };
     })

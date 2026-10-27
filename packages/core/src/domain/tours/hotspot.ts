@@ -151,6 +151,10 @@ export function parseNewHotspot(
 
   const parsedTarget = target(input[TARGET_KEY[kind]]);
   if (isIssue(parsedTarget)) issues.push(parsedTarget);
+  // A model point may come with its description (the 3D viewer's text alternative).
+  const modelBody =
+    kind === "model" && input.body !== undefined ? parseHotspotBody(input.body) : [];
+  if (modelBody.length > 0 && isIssue(modelBody[0])) issues.push(...(modelBody as HotspotIssue[]));
   if (
     issues.length > 0 ||
     isIssue(parsedTitle) ||
@@ -164,7 +168,15 @@ export function parseNewHotspot(
     case "scene":
       return { ok: true, hotspot: { kind, ...base, targetSceneId: parsedTarget } };
     case "model":
-      return { ok: true, hotspot: { kind, ...base, modelVersionId: parsedTarget } };
+      return {
+        ok: true,
+        hotspot: {
+          kind,
+          ...base,
+          modelVersionId: parsedTarget,
+          ...(modelBody.length > 0 ? { body: modelBody as RichText } : {}),
+        },
+      };
     case "tour":
       return { ok: true, hotspot: { kind, ...base, targetContentId: parsedTarget } };
   }
@@ -200,7 +212,8 @@ export function parseHotspotChanges(
     else changes.position = value;
   }
   if ("body" in input) {
-    if (kind !== "info") issues.push({ field: "body", code: "invalid" });
+    // Text for information points and, as their description, for model points.
+    if (kind !== "info" && kind !== "model") issues.push({ field: "body", code: "invalid" });
     else {
       const value = parseHotspotBody(input.body);
       if (value.length > 0 && isIssue(value[0])) issues.push(...(value as HotspotIssue[]));
