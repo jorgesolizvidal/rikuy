@@ -31,6 +31,7 @@ La velocidad de carga es un **contrato verificable**, no una intención. Estos o
 - Lo primero en pantalla (LCP) es la vista previa borrosa de la entrada, precargada con prioridad alta, junto con el texto del tour.
 - three.js y Photo Sphere Viewer (~200 KB gzip) se cargan con `import()` después de `load`, cuando el navegador queda libre. Luego se pide solo la imagen o las teselas de la escena en pantalla.
 - La ficha del destino o evento no pide ningún archivo del panorama.
+- Un punto de modelo 3D muestra su imagen; el visor 3D (~56 KB gzip, sobre el three.js que ya cargó el panorama) y el GLB se piden solo al pulsar «Ver en 3D» (RC-08, [ADR-033](adr/ADR-033-tour-models.md)). Al cerrarlo se libera el contexto WebGL.
 - En laboratorio (móvil, CPU ×4) la página queda en 60–69 de rendimiento, como `/mapa`. No tiene umbral propio hasta medirla en un Android real (P4 · Paso 4).
 
 ## Reglas de implementación

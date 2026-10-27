@@ -6,12 +6,14 @@ import { RichTextView } from "@/components/rich-text";
 
 import { PortalImage } from "./portal-image";
 import type { TourPointDto } from "./tour-dto";
+import { TourModel } from "./tour-model";
 
 /**
  * A point's dialog in the tour: information (text and its gallery, photo by photo) or a 3D
- * model (its poster; the model itself comes with P4 · Paso 6). A native <dialog>: it keeps
- * the focus inside, closes with Escape and gives the focus back to what opened it; it also
- * shows over the stage in fullscreen.
+ * model (its poster, its description and, on request, the 3D viewer: `TourModel`). A native
+ * <dialog>: it keeps the focus inside, closes with Escape and gives the focus back to what
+ * opened it; it also shows over the stage in fullscreen. Closing it unmounts its content,
+ * which frees a 3D model's memory.
  */
 const GALLERY_SIZES = "(min-width: 48rem) 44rem, 92vw";
 
@@ -103,15 +105,7 @@ export function PointDialog({
               ) : null}
             </>
           ) : (
-            <figure className="tour-model-poster">
-              {/* eslint-disable-next-line @next/next/no-img-element -- published, versioned derivative */}
-              <img
-                src={point.poster.url}
-                width={point.poster.width}
-                height={point.poster.height}
-                alt={`Imagen del modelo 3D «${point.title}»`}
-              />
-            </figure>
+            <TourModel key={point.id} point={point} />
           )}
         </div>
       ) : null}

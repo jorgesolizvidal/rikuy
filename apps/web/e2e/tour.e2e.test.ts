@@ -17,11 +17,14 @@
 import { randomUUID } from "node:crypto";
 
 import { imageCandidates, planPanorama, type DerivedFile } from "@rikuy/core";
+import { syntheticModel } from "@rikuy/db/testing";
 import { createSharpPanoramaRenderer } from "@rikuy/db/worker";
 import { chromium, type Browser, type Page } from "playwright-core";
 import postgres from "postgres";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+
+import { optimizeAsProduction } from "./support/production-model";
 
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const PORT = Number(process.env.RIKUY_PORT ?? 3000);
@@ -192,41 +195,41 @@ async function publishPhoto(color: Rgb): Promise<{ assetId: string }> {
   return { assetId: asset };
 }
 
+/**
+ * A published model as production leaves it: a synthetic GLB through the real processor and
+ * optimizer (Meshopt geometry, KTX2 textures), with a flat poster of its own color, so the
+ * screen tells the poster from the model drawn in 3D.
+ */
+const POSTER_COLOR: Rgb = [120, 90, 60];
+const glb = { path: "", bytes: 0 };
+
 async function publishModel(): Promise<string> {
   const asset = randomUUID();
   const version = randomUUID();
   const prefix = `${SUR}/${asset}/1/model/`;
+  const original = await syntheticModel({ dataAsColor: false });
+  const { optimized, manifest } = await optimizeAsProduction(original);
+  const [r, g, b] = POSTER_COLOR;
   const poster = await sharp({
-    create: { width: 1280, height: 960, channels: 3, background: { r: 120, g: 90, b: 60 } },
+    create: { width: 1280, height: 960, channels: 3, background: { r, g, b } },
   })
     .webp()
     .toBuffer();
   await upload(`${prefix}poster.webp`, new Uint8Array(poster), "image/webp");
-  await upload(`${prefix}model.glb`, new Uint8Array(64), "model/gltf-binary");
-  const manifest = {
-    version: 1,
-    format: "glb",
-    source: {
-      bytes: 482828,
-      sha256: "a".repeat(64),
-      triangles: 1200,
-      vertices: 800,
-      materials: 1,
-      textures: 0,
-      generator: "e2e",
-      extensions: [],
-    },
-    model: { file: "model.glb", bytes: 64, triangles: 1200, geometry: "meshopt", textures: [] },
-    colors: { materials: "unchanged", vertexColors: null, suspects: [] },
-    weight: "light",
+  await upload(`${prefix}model.glb`, optimized, "model/gltf-binary");
+  glb.path = `${prefix}model.glb`;
+  glb.bytes = optimized.byteLength;
+  const published = {
+    ...manifest,
     poster: { file: "poster.webp", width: 1280, height: 960, bytes: poster.byteLength },
   };
   await db`insert into public.assets (id, tenant_id, purpose) values (${asset}, ${SUR}, 'model')`;
   await db`
     insert into public.asset_versions (id, tenant_id, asset_id, version, status, declared_mime, declared_bytes,
                                        mime, bytes, sha256, ready_at, published_at, manifest)
-    values (${version}, ${SUR}, ${asset}, 1, 'ready', 'model/gltf-binary', 482828, 'model/gltf-binary', 482828,
-            ${"a".repeat(64)}, now(), now(), ${db.json(manifest)})`;
+    values (${version}, ${SUR}, ${asset}, 1, 'ready', 'model/gltf-binary', ${original.byteLength},
+            'model/gltf-binary', ${original.byteLength}, ${"a".repeat(64)}, now(), now(),
+            ${db.json(published as never)})`;
   return version;
 }
 
@@ -322,6 +325,14 @@ async function buildTours(photos: { assetId: string }[], model: string) {
       title: "Horno de barro",
       position: at(0, -0.4),
       modelVersionId: model,
+      body: [
+        {
+          type: "paragraph",
+          children: [
+            { type: "text", text: "Horno de adobe con boca de arco, de un metro de alto." },
+          ],
+        },
+      ],
     });
     await hotspot("jump", a.sceneId, {
       kind: "tour",
@@ -423,6 +434,45 @@ async function marker(page: Page, key: string) {
   return point;
 }
 
+/** Whether a frame is something else than a flat poster color (the model is drawn). */
+async function differsFrom(png: Buffer, color: Rgb): Promise<boolean> {
+  const { data } = await sharp(png).removeAlpha().raw().toBuffer({ resolveWithObject: true });
+  let far = 0;
+  for (let i = 0; i < data.length; i += 3) {
+    const d = Math.hypot(
+      (data[i] ?? 0) - color[0],
+      (data[i + 1] ?? 0) - color[1],
+      (data[i + 2] ?? 0) - color[2],
+    );
+    if (d > 60) far += 1;
+  }
+  return far / (data.length / 3) > 0.05;
+}
+
+/**
+ * Two frames of the same view (a few pixels may differ from antialiasing). The edge is left
+ * out: the keyboard brings the focus ring in.
+ */
+async function sameImage(a: Buffer, b: Buffer): Promise<boolean> {
+  const [x, y] = await Promise.all(
+    [a, b].map(async (png) => {
+      const { width = 0, height = 0 } = await sharp(png).metadata();
+      return sharp(png)
+        .extract({ left: 8, top: 8, width: width - 16, height: height - 16 })
+        .removeAlpha()
+        .raw()
+        .toBuffer();
+    }),
+  );
+  if (!x || !y || x.length !== y.length) return false;
+  let different = 0;
+  for (let i = 0; i < x.length; i += 3) {
+    if (Math.abs((x[i] ?? 0) - (y[i] ?? 0)) + Math.abs((x[i + 1] ?? 0) - (y[i + 1] ?? 0)) > 24)
+      different += 1;
+  }
+  return different / (x.length / 3) < 0.005;
+}
+
 const ready = SUPABASE_URL !== "" && SECRET !== "";
 
 describe.runIf(ready)("RC-07 · a tour in the portal", () => {
@@ -515,6 +565,7 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     expect(await dialog.locator("img").getAttribute("alt")).toBe(
       "Imagen del modelo 3D «Horno de barro»",
     );
+    expect(await dialog.textContent()).toContain("Horno de adobe con boca de arco");
     await page.keyboard.press("Escape");
     await dialog.waitFor({ state: "detached" });
 
@@ -537,6 +588,121 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     // And back to the destination.
     await page.getByRole("link", { name: "← Volver a Plaza de prueba" }).click();
     await page.waitForURL(`${PORTAL}/destinos/${ids.otherSlug}`);
+    expect(errors).toEqual([]);
+  });
+
+  it("RC-08: the model loads only when asked for, closes, reopens, retries and frees its memory", async () => {
+    const context = await browser.newContext({
+      viewport: { width: 1280, height: 900 },
+      reducedMotion: "reduce",
+    });
+    const page = await context.newPage();
+    const errors: string[] = [];
+    page.on("pageerror", (error) => errors.push(String(error)));
+    const requests: string[] = [];
+    page.on("request", (request) => requests.push(request.url()));
+    const glbRequests = () => requests.filter((url) => url.includes(glb.path)).length;
+
+    await page.goto(`${PORTAL}/destinos/${ids.slug}/tour`);
+    await settled(page, SCENES.a as Scene);
+    // The poster, its description and the size, and still nothing of the model.
+    await (await marker(page, "model")).click();
+    const dialog = page.locator("dialog.tour-dialog[open]");
+    await dialog.waitFor();
+    await dialog.locator(".tour-model-poster img").waitFor();
+    expect(await dialog.textContent()).toContain("Horno de adobe con boca de arco");
+    const open3d = dialog.getByRole("button", { name: "Ver en 3D" });
+    expect(await dialog.locator(".tour-model-hint").textContent()).toMatch(
+      /^Descarga de \d+,\d MB\./u,
+    );
+    await page.waitForTimeout(500);
+    expect(glbRequests()).toBe(0);
+    expect(requests.some((url) => url.includes("/vendor/three/"))).toBe(false);
+
+    // Open: one download, the model drawn in place of the poster, the focus on it.
+    const stage = dialog.locator(".tour-model-stage");
+    const status = dialog.locator(".tour-model-status");
+    await open3d.click();
+    await status.filter({ hasText: "Modelo 3D listo." }).waitFor({ timeout: 60_000 });
+    expect(glbRequests()).toBe(1);
+    expect(await dialog.locator(".tour-model-poster").isHidden()).toBe(true);
+    const canvas = stage.locator("canvas");
+    expect(await canvas.getAttribute("aria-label")).toContain("Modelo 3D «Horno de barro»");
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("CANVAS");
+    await page.waitForTimeout(300);
+    const first = await stage.screenshot();
+    expect(await differsFrom(first, POSTER_COLOR)).toBe(true);
+    // Nothing moves by itself ("reduce motion" needs nothing more).
+    await page.waitForTimeout(800);
+    expect(await sameImage(first, await stage.screenshot())).toBe(true);
+    // The keyboard turns it; Home goes back to the first view.
+    await page.keyboard.press("ArrowLeft");
+    await page.keyboard.press("ArrowLeft");
+    await page.waitForTimeout(200);
+    expect(await sameImage(first, await stage.screenshot())).toBe(false);
+    await page.keyboard.press("Home");
+    await page.waitForTimeout(200);
+    expect(await sameImage(first, await stage.screenshot())).toBe(true);
+
+    // Back to the poster: the WebGL context is given back at once.
+    await page.evaluate(() => {
+      (window as unknown as Record<string, unknown>).rikuyModelCanvas = document.querySelector(
+        ".tour-model-stage canvas",
+      );
+    });
+    await dialog.getByRole("button", { name: "Volver a la imagen" }).click();
+    expect(await canvas.count()).toBe(0);
+    expect(await dialog.locator(".tour-model-poster").isVisible()).toBe(true);
+    expect(
+      await page.evaluate(() => {
+        const old = (window as unknown as Record<string, HTMLCanvasElement>).rikuyModelCanvas;
+        return old?.getContext("webgl2")?.isContextLost() ?? null;
+      }),
+    ).toBe(true);
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe("Ver en 3D");
+
+    // Reopen, then close the dialog and open the point again: it starts from the poster.
+    await open3d.click();
+    await status.filter({ hasText: "Modelo 3D listo." }).waitFor({ timeout: 60_000 });
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
+    await (await marker(page, "model")).click();
+    await dialog.waitFor();
+    expect(await dialog.locator(".tour-model-stage canvas").count()).toBe(0);
+    expect(await dialog.locator(".tour-model-poster").isVisible()).toBe(true);
+
+    // A download that fails: the poster stays, with "Reintentar"; the retry works.
+    await page.route(`**/${glb.path}`, (route) => route.abort("connectionreset"));
+    await dialog.getByRole("button", { name: "Ver en 3D" }).click();
+    await status
+      .filter({ hasText: "No se pudo descargar el modelo 3D" })
+      .waitFor({ timeout: 30_000 });
+    expect(await dialog.locator(".tour-model-poster").isVisible()).toBe(true);
+    expect(await page.evaluate(() => document.activeElement?.textContent)).toBe("Reintentar");
+    await page.unroute(`**/${glb.path}`);
+    await dialog.getByRole("button", { name: "Reintentar" }).click();
+    await status.filter({ hasText: "Modelo 3D listo." }).waitFor({ timeout: 60_000 });
+
+    // The GPU drops the context (a phone short of video memory): back to the poster, with
+    // a notice and a way to open it again.
+    await page.evaluate(() => {
+      const element = document.querySelector<HTMLCanvasElement>(".tour-model-stage canvas");
+      element?.getContext("webgl2")?.getExtension("WEBGL_lose_context")?.loseContext();
+    });
+    await status.filter({ hasText: "El visor 3D se cerró" }).waitFor({ timeout: 10_000 });
+    expect(await dialog.locator(".tour-model-poster").isVisible()).toBe(true);
+    expect(await dialog.locator(".tour-model-stage canvas").count()).toBe(0);
+    await dialog.getByRole("button", { name: "Volver a abrir en 3D" }).click();
+    await status.filter({ hasText: "Modelo 3D listo." }).waitFor({ timeout: 60_000 });
+
+    // Only our own origin and Storage: the Basis transcoder too, never a CDN.
+    const origins = new Set(requests.map((url) => new URL(url).origin));
+    expect([...origins].sort()).toEqual(
+      [new URL(PORTAL).origin, new URL(SUPABASE_URL).origin].sort(),
+    );
+    expect(requests.some((url) => url.includes("/vendor/three/") && url.includes("basis"))).toBe(
+      true,
+    );
     expect(errors).toEqual([]);
   });
 
@@ -703,6 +869,18 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     await dialog.waitFor({ state: "detached" });
     // Focus goes back to the point that opened it.
     expect(await page.evaluate(() => document.activeElement?.textContent)).toBe("Arados antiguos");
+    // The model: its poster and description are the model; "Ver en 3D" says why not.
+    await page.getByRole("button", { name: "Horno de barro" }).click();
+    await dialog.waitFor();
+    expect(await dialog.textContent()).toContain("Horno de adobe con boca de arco");
+    await dialog.getByRole("button", { name: "Ver en 3D" }).click();
+    const notice = dialog.getByText("Este navegador no puede mostrar modelos 3D");
+    await notice.waitFor({ timeout: 30_000 });
+    expect(await dialog.getByRole("button", { name: "Ver en 3D" }).count()).toBe(0);
+    expect(await page.evaluate(() => document.activeElement?.className)).toBe("tour-model-status");
+    expect(await dialog.locator(".tour-model-poster").isVisible()).toBe(true);
+    await page.keyboard.press("Escape");
+    await dialog.waitFor({ state: "detached" });
     // Scenes from the list.
     await page
       .getByRole("navigation", { name: "Escenas del tour" })

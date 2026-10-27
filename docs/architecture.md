@@ -129,6 +129,7 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Recorrido general (P4 · Paso 5, [ADR-032](adr/ADR-032-general-tour.md)):
   - lo forman los tours visibles; el municipio guarda solo su orden y el tour de inicio (`general_tours`, `general_tour_entries`);
   - `/recorrido` y cada página de tour comparten un visor que salta entre tours pidiendo solo los datos del elegido (`/recorrido/datos`).
+- Modelos 3D en el tour (P4 · Paso 6, [ADR-033](adr/ADR-033-tour-models.md)): el diálogo del punto muestra la imagen y la descripción; el visor 3D (el mismo del panel) y el GLB se descargan solo al pulsar «Ver en 3D», y cerrar libera el contexto WebGL.
 
 ## 8 bis. Cuotas por municipio (ADR-012, ADR-027)
 

@@ -184,6 +184,8 @@ export type NewHotspot =
       readonly title: string;
       readonly position: HotspotPosition;
       readonly modelVersionId: string;
+      /** What the model shows, in words: the 3D viewer's text alternative (P4 · Paso 6). */
+      readonly body?: RichText;
     }
   | {
       readonly kind: "tour";

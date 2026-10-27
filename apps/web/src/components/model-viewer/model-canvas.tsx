@@ -25,10 +25,17 @@ import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment
  * The 3D model viewer (ADR-026): three.js with KTX2 (Basis transcoder served from our own
  * origin) and Meshopt. Always loaded with next/dynamic (ssr: false), so three never enters
  * a page's initial bundle. The same settings draw the panel's preview, its poster capture
- * and, from P4, the portal's hotspot, so the poster looks like what visitors see.
+ * and the portal's model points in a tour (ADR-033), so the poster looks like what visitors
+ * see.
  *
  * Color fidelity: sRGB output, Khronos PBR Neutral tone mapping (made to keep base colors)
  * and a neutral room environment; no extra colored lights.
+ *
+ * Nothing moves by itself (no auto-rotation, no inertia): the view changes only when the
+ * visitor drags, zooms or uses the keys, so "reduce motion" needs nothing else. Keys, with
+ * the canvas focused: arrows turn the model, + and − zoom, Home goes back to the first view.
+ * Unmounting frees the model, its textures and the WebGL context at once (a phone's video
+ * memory is the scarce resource).
  */
 export interface ModelCanvasHandle {
   /** The current view as an image (WebP when the browser can encode it, else PNG). */
@@ -36,14 +43,25 @@ export interface ModelCanvasHandle {
   resetView(): void;
 }
 
+/** "webgl": no WebGL here; "load": the file did not load; "context": the GPU dropped it. */
+export type ModelCanvasFailure = "webgl" | "load" | "context";
+
 export interface ModelCanvasProps {
   readonly url: string;
   /** Accessible name of the canvas (the page gives the text alternative next to it). */
   readonly label: string;
+  /** Keep the frame readable for `capture()` (the panel); the portal does not need it. */
+  readonly capturable?: boolean | undefined;
   readonly onReady?: ((handle: ModelCanvasHandle) => void) | undefined;
+  /** Share of the file downloaded (0–1), while it loads and its size is known. */
+  readonly onProgress?: ((fraction: number) => void) | undefined;
   /** WebGL or the file could not load: the page says so and keeps working. */
-  readonly onFailure?: (() => void) | undefined;
+  readonly onFailure?: ((reason: ModelCanvasFailure) => void) | undefined;
 }
+
+/** One key press: about 15° of turn, or a tenth closer or farther. */
+const KEY_TURN = Math.PI / 12;
+const KEY_ZOOM = 1.1;
 
 const TRANSCODER_PATH = `/vendor/three/${process.env.NEXT_PUBLIC_THREE_VERSION}/basis/`;
 
@@ -68,12 +86,26 @@ function toBlob(canvas: HTMLCanvasElement, type: string, quality?: number): Prom
   return new Promise((resolve) => canvas.toBlob(resolve, type, quality));
 }
 
-export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCanvasProps) {
+export default function ModelCanvas({
+  url,
+  label,
+  capturable = true,
+  onReady,
+  onProgress,
+  onFailure,
+}: ModelCanvasProps) {
   const host = useRef<HTMLDivElement>(null);
-  const callbacks = useRef({ onReady, onFailure });
+  const callbacks = useRef({ onReady, onProgress, onFailure });
+  const labelRef = useRef(label);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   useEffect(() => {
-    callbacks.current = { onReady, onFailure };
-  }, [onReady, onFailure]);
+    callbacks.current = { onReady, onProgress, onFailure };
+  }, [onReady, onProgress, onFailure]);
+  // The name may change without rebuilding the viewer (and downloading the model again).
+  useEffect(() => {
+    labelRef.current = label;
+    canvasRef.current?.setAttribute("aria-label", label);
+  }, [label]);
 
   useEffect(() => {
     const element = host.current;
@@ -81,9 +113,13 @@ export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCan
     let disposed = false;
     let renderer: WebGLRenderer;
     try {
-      renderer = new WebGLRenderer({ antialias: true, alpha: true, preserveDrawingBuffer: true });
+      renderer = new WebGLRenderer({
+        antialias: true,
+        alpha: true,
+        preserveDrawingBuffer: capturable,
+      });
     } catch {
-      callbacks.current.onFailure?.();
+      callbacks.current.onFailure?.("webgl");
       return;
     }
     renderer.outputColorSpace = SRGBColorSpace;
@@ -92,9 +128,10 @@ export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCan
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     const canvas = renderer.domElement;
     canvas.setAttribute("role", "img");
-    canvas.setAttribute("aria-label", label);
+    canvas.setAttribute("aria-label", labelRef.current);
     canvas.tabIndex = 0;
     element.appendChild(canvas);
+    canvasRef.current = canvas;
 
     const scene = new Scene();
     const pmrem = new PMREMGenerator(renderer);
@@ -103,8 +140,14 @@ export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCan
     const camera = new PerspectiveCamera(40, 1, 0.01, 1000);
     const controls = new OrbitControls(camera, canvas);
     controls.enableDamping = false;
-    controls.listenToKeyEvents(canvas);
+    // The panel may shift the model to frame its poster; visitors only turn and zoom.
+    controls.enablePan = capturable;
     const home = { position: new Vector3(), target: new Vector3() };
+    const resetView = () => {
+      camera.position.copy(home.position);
+      controls.target.copy(home.target);
+      controls.update();
+    };
 
     const render = () => {
       if (!disposed) renderer.render(scene, camera);
@@ -125,8 +168,33 @@ export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCan
     const loader = new GLTFLoader().setKTX2Loader(ktx2).setMeshoptDecoder(MeshoptDecoder);
     let model: Object3D | null = null;
 
+    // Our own keys: OrbitControls' arrows pan, which loses the model off the screen.
+    const keydown = (event: KeyboardEvent) => {
+      if (event.altKey || event.ctrlKey || event.metaKey) return;
+      const turn: Partial<Record<string, () => void>> = {
+        ArrowLeft: () => controls.rotateLeft(KEY_TURN),
+        ArrowRight: () => controls.rotateLeft(-KEY_TURN),
+        ArrowUp: () => controls.rotateUp(KEY_TURN),
+        ArrowDown: () => controls.rotateUp(-KEY_TURN),
+        "+": () => controls.dollyIn(KEY_ZOOM),
+        "=": () => controls.dollyIn(KEY_ZOOM),
+        "-": () => controls.dollyOut(KEY_ZOOM),
+        Home: resetView,
+      };
+      const action = turn[event.key];
+      if (!action || model === null) return;
+      event.preventDefault();
+      action();
+      controls.update();
+    };
+    canvas.addEventListener("keydown", keydown);
+
     loader
-      .loadAsync(url)
+      .loadAsync(url, (event) => {
+        if (!disposed && event.lengthComputable && event.total > 0) {
+          callbacks.current.onProgress?.(Math.min(1, event.loaded / event.total));
+        }
+      })
       .then((gltf) => {
         if (disposed) {
           disposeTree(gltf.scene);
@@ -175,21 +243,21 @@ export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCan
             resize();
             return null;
           },
-          resetView() {
-            camera.position.copy(home.position);
-            controls.target.copy(home.target);
-            controls.update();
-          },
+          resetView,
         });
       })
       .catch(() => {
-        if (!disposed) callbacks.current.onFailure?.();
+        if (!disposed) callbacks.current.onFailure?.("load");
       });
 
-    canvas.addEventListener("webglcontextlost", () => callbacks.current.onFailure?.());
+    // Low video memory on a phone: the browser drops the context and the canvas goes black.
+    const contextLost = () => callbacks.current.onFailure?.("context");
+    canvas.addEventListener("webglcontextlost", contextLost);
 
     return () => {
       disposed = true;
+      canvas.removeEventListener("webglcontextlost", contextLost);
+      canvas.removeEventListener("keydown", keydown);
       observer.disconnect();
       controls.dispose();
       if (model) disposeTree(model);
@@ -197,9 +265,12 @@ export default function ModelCanvas({ url, label, onReady, onFailure }: ModelCan
       pmrem.dispose();
       ktx2.dispose();
       renderer.dispose();
+      // Give the video memory back now, not whenever the browser collects the canvas.
+      renderer.forceContextLoss();
       canvas.remove();
+      canvasRef.current = null;
     };
-  }, [url, label]);
+  }, [url, capturable]);
 
   return <div ref={host} className="model-canvas" />;
 }

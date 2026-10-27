@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P4 (tours 360°, hotspots y GLB). P1, P2 y P3 ✅.
-- **Último paso completado:** P4 · Paso 5 — recorrido general (2026-10-26)
-- **Rama:** `feat/p4-step5-general-tour` → PR hacia `main`
+- **Último paso completado:** P4 · Paso 6 — modelo 3D en el tour (2026-10-27)
+- **Rama:** `feat/p4-step6-tour-models` → PR hacia `main`
 
 ## Historial
 
@@ -737,31 +737,86 @@ Lo que encontraron las pruebas:
 - En el celular, el menú cubre el visor mientras está abierto; se cierra al elegir un tour.
 - El modelo 3D dentro del tour sigue con su poster hasta el Paso 6.
 
+### P4 · Paso 6 — modelo 3D en el tour ✅
+
+- Decisiones ([ADR-033](../adr/ADR-033-tour-models.md)): primero la imagen; el visor 3D y el GLB, solo a pedido; al cerrar, se libera la memoria; y una **descripción del modelo** como alternativa en texto.
+- Base de datos (`20261029000000_p4_model_descriptions.sql`, solo expand):
+  - los puntos de modelo aceptan texto enriquecido (nunca fotos); las flechas y los «ir a otro recorrido» siguen sin texto;
+  - es opcional, así que los puntos ya publicados siguen siendo válidos;
+  - el manifiesto sellado ya llevaba el texto de cada punto: la publicación no cambia.
+- `@rikuy/core`: `parseNewHotspot` y `parseHotspotChanges` aceptan la descripción del modelo; el modelo del visor la incluye.
+- Panel, editor del tour: campo **«Descripción del modelo»** en los puntos de modelo, con la explicación de para qué sirve. Cambiar el modelo conserva la descripción (RC-01).
+- Visor 3D (`components/model-viewer`, el mismo del panel):
+  - informa el progreso de la descarga y por qué falló (sin WebGL, descarga, contexto perdido);
+  - teclado propio con el modelo enfocado: flechas para girar, + y − para acercar, Inicio para volver a la primera vista (las flechas de OrbitControls desplazaban el modelo fuera de la vista);
+  - en el portal no reserva el búfer de captura ni desplaza el modelo; en el panel, sí, para encuadrar el poster;
+  - al desmontarse libera geometría, texturas y entorno, y **devuelve el contexto WebGL en el momento**;
+  - el nombre accesible cambia sin rehacer el visor.
+- Portal, diálogo del punto de modelo (`tour-model.tsx`):
+  - el poster, el peso de la descarga («Descarga de 1,9 MB», con aviso si es pesado) y la descripción;
+  - **«Ver en 3D»** carga el visor (import dinámico) y el GLB, con barra de progreso, encima del poster e invisible hasta que el modelo está en pantalla: la caja no cambia de tamaño;
+  - listo: el foco pasa al modelo, con «Volver a la imagen» y «Restablecer vista»; al volver, el foco regresa a «Ver en 3D»;
+  - si la descarga falla, «Reintentar»; si el teléfono pierde el contexto WebGL, vuelve al poster con aviso y «Volver a abrir en 3D»; sin WebGL, el poster y la descripción son el modelo y el foco va al aviso;
+  - nada se mueve solo, así que «reducir movimiento» no necesita más;
+  - cerrar el diálogo desmonta el visor; al reabrirlo empieza otra vez en el poster y el GLB sale de la caché del navegador.
+- Tests:
+  - 482 unitarios (core 311, db 102, web 35, worker 27, config 7), con casos nuevos de la descripción;
+  - 731 pgTAP (11 nuevos, `022_model_descriptions`): agregar con y sin descripción, sin fotos, formato no permitido, flecha sin texto, cambiar solo la descripción conservando modelo, posición y nombre (RC-01), analista sin permiso y la descripción en el manifiesto publicado;
+  - 0 hallazgos de `plpgsql_check`;
+  - **RC-08 en un navegador real** (en `tour.e2e.test.ts`, job «Contracts»). El fixture ahora es un GLB **real**: el modelo sintético pasado por el procesador y el optimizador reales (Meshopt y KTX2; `e2e/support/production-model.ts`, compartido con la comparación de colores). Comprueba:
+    - cero peticiones del GLB y de three.js antes de pulsar «Ver en 3D», incluso con el diálogo abierto;
+    - una sola descarga al abrir, el modelo dibujado en lugar del poster y el foco en él;
+    - con «reducir movimiento», nada se mueve solo; las flechas lo giran e Inicio vuelve a la primera vista;
+    - «Volver a la imagen» quita el canvas, el contexto WebGL queda liberado y el foco vuelve al botón;
+    - volver a abrir, cerrar el diálogo y reabrir el punto empieza en el poster;
+    - una descarga que falla deja el poster y «Reintentar», que funciona;
+    - un contexto perdido vuelve al poster con aviso, y se puede volver a abrir;
+    - solo se habla con el portal y con Storage: el transcodificador KTX2 sale de nuestro origen;
+    - sin WebGL: poster, descripción, aviso y el foco en el aviso.
+- Verificado en local, en el navegador, con los **modelos reales**:
+  - en el panel, «Horno de barro» con su descripción; cambiar después al `horno.glb` conservó la descripción;
+  - en el portal, `horno.glb` (1,9 MB, 4 texturas KTX2) listo en ~5 s con el transcodificador desde `/vendor/three/0.186.0/basis/`; girado con el teclado; cerrar quita el canvas;
+  - el visor que se descarga al abrir pesa ~56 KB gzip (three.js ya lo cargó el panorama);
+  - axe sin hallazgos críticos ni graves con el poster, cargando y listo, y sin desbordes a 360, 390 y 1280 px;
+  - la captura del poster en el panel sigue funcionando;
+  - contratos RC-09/10/11/12 en verde (189).
+- Lo que encontraron las pruebas, ya corregido:
+  - la descripción quedaba lejos del resto por el margen de los textos del portal;
+  - sin WebGL, el foco se perdía al desaparecer el botón: ahora va al aviso.
+
+**Desviaciones:**
+
+- La memoria del celular no se puede medir aquí (laboratorio sin GPU real): queda para tu Android, en este paso o en el 7.
+- La descripción del modelo es opcional para no invalidar tours ya publicados; el panel la pide con su explicación.
+- El visor no tiene giro automático ni animaciones de entrada: es lo que hace innecesario un modo aparte para «reducir movimiento».
+
 ## Cómo verificarlo en tu PC
 
 ```powershell
-git checkout feat/p4-step5-general-tour
+git checkout feat/p4-step6-tour-models
 pnpm install
 pnpm db:reset
 pnpm db:test
-pnpm --filter @rikuy/db test:integration
 ```
 
-`pnpm db:test` incluye `021_general_tour`. En el panel, «Tours 360°» → «Recorrido general»: cambia el orden, elige «Empezar aquí» y guarda. En el portal, «Tours 360°» en la cabecera abre `/recorrido`; el botón «Tours» del visor abre el menú.
+`pnpm db:test` incluye `022_model_descriptions`. En el panel, edita un punto de modelo de un tour y escribe su «Descripción del modelo»; publica. En el portal, abre el tour, toca el punto del modelo: verás la imagen, el peso y la descripción; «Ver en 3D» lo carga, «Volver a la imagen» lo cierra.
 
 ## Después del merge
 
-«Deploy database» aplica la migración. Comprobación: con dos tours publicados en un municipio de demo, ordénalos en el panel y abre «Tours 360°» en el portal desde el celular.
+«Deploy database» aplica la migración. Comprobación en tu Android (producción, con datos móviles si puedes):
 
-## Siguiente paso — P4 · Paso 6 (requiere autorización)
+1. abre un tour con un modelo, toca el punto y fíjate en que la imagen aparece sin esperar;
+2. «Ver en 3D»: anota cuánto tarda y si el teléfono se calienta o se pone lento;
+3. gíralo, ciérralo con «Volver a la imagen», ábrelo y ciérralo unas cinco veces seguidas, y después cambia de escena: el tour debe seguir fluido (si el visor se cerrara solo, verás el aviso de memoria);
+4. si puedes, en Chrome de escritorio con el celular conectado (`chrome://inspect`), mira la memoria de la pestaña antes de abrir, con el modelo abierto y después de cerrarlo.
 
-**Modelos 3D dentro del tour (RC-08):**
+## Siguiente paso — P4 · Paso 7 (requiere autorización)
 
-- el punto de modelo abre el visor 3D (three.js, KTX2) bajo demanda, sobre su poster;
-- ninguna petición del GLB antes de abrirlo;
-- pérdida del contexto WebGL con aviso y vuelta al poster;
-- teclado, «reducir movimiento» y descripción en texto;
-- medir la memoria en tu Android.
+**Contratos RC-01/02/07/08 en CI y medición final en Android:**
+
+- recorridos de referencia en CI revisados contra la auditoría: RC-01 (cambios parciales), RC-02 (escena de entrada y grafo al volver a una versión), RC-07 (recorrido) y RC-08 (modelo);
+- Lighthouse de la página del tour con su umbral propio, fijado con la medición del celular;
+- medición final en tu Android anotada en el presupuesto de rendimiento.
 
 ## Decisiones pendientes del usuario
 

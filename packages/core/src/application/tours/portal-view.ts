@@ -62,6 +62,7 @@ function pointOf(
       return {
         ...base,
         kind: "model",
+        body: hotspot.body,
         poster: {
           path: model.folder + model.poster.file,
           width: model.poster.width,

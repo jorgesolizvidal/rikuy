@@ -29,6 +29,16 @@ function mediaUrl(path: string): string {
   return publicMediaUrl(platformSettings().env.NEXT_PUBLIC_SUPABASE_URL, path);
 }
 
+const MEGABYTES = new Intl.NumberFormat("es", {
+  maximumFractionDigits: 1,
+  minimumFractionDigits: 1,
+});
+
+/** "1,9 MB": what a visitor reads next to "Ver en 3D". */
+function megabytes(bytes: number): string {
+  return `${MEGABYTES.format(Math.max(0.1, bytes / (1024 * 1024)))} MB`;
+}
+
 export function tourData(view: PortalView, tour: PublishedTour): TourDataDto {
   const tenantId = view.context.tenant.tenantId;
   const model = tourViewerModel(tour);
@@ -54,10 +64,16 @@ export function tourData(view: PortalView, tour: PublishedTour): TourDataDto {
         return {
           ...base,
           kind: "model",
+          body: point.body,
           poster: {
             url: mediaUrl(point.poster.path),
             width: point.poster.width,
             height: point.poster.height,
+          },
+          model: {
+            url: mediaUrl(point.model.path),
+            size: megabytes(point.model.bytes),
+            heavy: point.model.heavy,
           },
         };
       case "tour":

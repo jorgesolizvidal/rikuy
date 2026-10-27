@@ -80,6 +80,7 @@ const tour = {
       scene(B, "Sala", true, [
         hotspot("f5", {
           kind: "model",
+          body: [{ type: "paragraph", children: [{ type: "text", text: "Horno de adobe." }] }],
           model: {
             folder: `${T}/m/1/model/`,
             file: "model.glb",
@@ -136,10 +137,11 @@ describe("the public tour viewer's model", () => {
     expect(patio?.points[2]).toMatchObject({
       target: { slug: "plaza", title: "Plaza", href: "/destinos/plaza/tour" },
     });
-    // A model keeps its poster; a scene that is not in this revision is dropped.
+    // A model keeps its poster and its description; a scene not in this revision is dropped.
     expect(sala?.points).toEqual([
       expect.objectContaining({
         kind: "model",
+        body: [{ type: "paragraph", children: [{ type: "text", text: "Horno de adobe." }] }],
         poster: { path: `${T}/m/1/model/poster.webp`, width: 1280, height: 640 },
         model: { path: `${T}/m/1/model/model.glb`, bytes: 900, heavy: true },
       }),
