@@ -93,6 +93,6 @@ Agregar `?medir` a la dirección de un tour abre un panel de medición, cargado 
 | RC-07    | `RUNTIME_CONFIRMED` en CI (laboratorio)                   | navegador                      | commit `6c4e523`                                               |
 | RC-08    | `RUNTIME_CONFIRMED` en CI (laboratorio), con el sustituto | navegador                      | desde P4 · Paso 6; reabierto y ampliado en el Paso 7           |
 
-Lighthouse del tour en el CI (móvil, mediana de 3, commit `6c4e523`): rendimiento 79, LCP 2,4 s y TBT 0,73–0,76 s, en el tour de una escena y en `/recorrido`.
+Lighthouse del tour en el CI (móvil, mediana de 3), en el tour de una escena y en `/recorrido`: rendimiento 79 y 88 en las dos primeras corridas (el runner varía), LCP 2,4 s y TBT 0,4–0,76 s.
 
 **En Android:** el usuario probó los tours en su celular, en producción, tras los Pasos 4, 5 y 6: funcionan bien. La medición con números (`?medir`) se hace en producción después del merge de este paso y se anota aquí.

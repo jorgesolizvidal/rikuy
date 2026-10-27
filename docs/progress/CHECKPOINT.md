@@ -811,7 +811,7 @@ Lo que encontraron las pruebas:
   - en el PR corre después de RC-07 (nuevo paso del job «Contracts», con sus informes como artefacto);
   - en producción, en «Lighthouse on production», sobre los tours publicados (sin tours: un aviso);
   - umbral propio en `lighthouse-budget.json`: rendimiento ≥ 70, LCP ≤ 2,5 s, CLS ≤ 0,1, JS ≤ 380 KB;
-  - CI: rendimiento 79, LCP 2,4 s, TBT 0,73–0,76 s.
+  - CI (dos corridas): rendimiento 79 y 88, LCP 2,4 s, TBT 0,4–0,76 s.
   - Las direcciones `*.localhost` se piden a 127.0.0.1 con su `Host` (no todos los sistemas las resuelven).
 - **Panel de medición `?medir`** en las páginas de tour (`tour-measure.tsx`), cargado solo con ese parámetro y sin enviar nada:
   - dispositivo (modelo y sistema si el navegador los informa, memoria, núcleos, GPU, pantalla, red);
