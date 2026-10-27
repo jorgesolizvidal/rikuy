@@ -7,6 +7,12 @@ Ajuste del roadmap P0–P6 aprobado en septiembre de 2026. Cambios respecto del 
 3. Revisión de paridad con el sistema anterior (2026-10-17, [paridad funcional](paridad-funcional.md)): se agregan la **ubicación del visitante en tiempo real** (P3 · Paso 6, [ADR-021](adr/ADR-021-visitor-location.md)) y el **asistente turístico con voz** detallado en P5 ([ADR-022](adr/ADR-022-tourist-assistant.md)).
 4. P3 · Paso 7 dividido (2026-10-19, decisión del usuario): Lighthouse CI y contratos corren en GitHub Actions; Vercel, Supabase en la nube y la caché de CDN pasan a un **Paso 8 de despliegue** (requiere liberar o pagar un proyecto de Supabase).
 5. Gate P6 ajustado por [ADR-020](adr/ADR-020-panorama-delivery-by-resolution.md) (tiles condicionados a fuentes > 4096 px), [ADR-019](adr/ADR-019-pilot-jobs-on-vercel.md) (jobs en Vercel) y el [cierre P0](p0-closure.md) (gold inicial de 40 casos). El dominio propio verificado pasa a opcional.
+6. Hito Demo / Portafolio ajustado (2026-10-27, decisión del usuario):
+   - Ucureña es la vitrina real y su contenido lo carga el usuario cuando el proyecto esté listo;
+   - en lugar de una cuenta pública de demostración, cada municipio interesado recibe su **propia demo** (alta en minutos, con su nombre y contenido de muestra);
+   - se usan solo planes gratuitos hasta tener contrato (Vercel Pro y Supabase Pro llegan con el primer municipio que contrate);
+   - el README va sin capturas hasta que Ucureña tenga su contenido;
+   - se suman a E1 los **alojamientos**, el **catálogo de módulos que cada municipio activa** y los **videos insertados**.
 
 Cada fase se divide en **pasos**; un paso = una rama = un PR con CI en verde y checkpoint actualizado. Ningún paso se inicia sin autorización explícita.
 
@@ -84,7 +90,16 @@ Pasos confirmados por el usuario (2026-10-26), cada uno requiere autorización. 
 
 ## ★ Hito Demo / Portafolio
 
-Proyecto Supabase en la nube + Vercel. Dos portales en vivo (`rikuy-ucurena.vercel.app` y un municipio demo) desde el mismo deployment, con mapa y ubicación del visitante, panel de administración con una cuenta de demostración sobre un tenant sandbox que se reinicia periódicamente, README con capturas y métricas de Speed Insights.
+Ucureña como vitrina real y una demo a medida para cada municipio interesado, desde el mismo despliegue y con planes gratuitos. El contenido real de Ucureña (destinos, eventos, fotos, panoramas, modelos 3D) lo carga el usuario desde el panel cuando el proyecto esté listo; ningún dato de Ucureña entra al código ni al repositorio.
+
+Pasos acordados con el usuario (2026-10-27), cada uno requiere autorización:
+
+| Paso | Contenido                                                                                                                                                                                                                                                                                    | Terminado cuando                                                                                                              |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| 1    | **Ucureña lista para cargar:** alta del municipio desde el panel de plataforma con `rikuy-ucurena.vercel.app`, el usuario como propietario y su marca básica. Un portal sin contenido publicado no se indexa en buscadores hasta que publica algo, y se muestra con avisos de «próximamente» | El portal de Ucureña responde desde el mismo despliegue, sin indexarse mientras está vacío, y su propietario entra a su panel |
+| 2    | **Demo comercial por municipio:** plantilla de contenido de muestra (sin datos de ningún municipio real) para crear la demo de un municipio interesado en minutos; correo SMTP gratuito para los códigos de acceso y las invitaciones (hoy no se envían)                                     | Se crea la demo de un municipio con contenido de muestra y su gente entra con su correo                                       |
+| 3    | **Operación con planes gratuitos:** tarea diaria que evita la pausa de Supabase por inactividad y avisa si algo cae; Lighthouse de producción a partir del sitemap de cada portal; aviso de uso del almacenamiento (1 GB del plan) y limpieza de medios que ya no se usan                    | Una semana con la tarea en verde y el proyecto sin pausas                                                                     |
+| 4    | **README de portafolio** (sin capturas por ahora): qué es, enlaces en vivo, arquitectura en texto, decisiones con sus ADR, métricas reales y cómo correrlo. Las capturas, con el contenido real de Ucureña                                                                                   | Alguien sin contexto entiende el proyecto y lo abre en dos minutos                                                            |
 
 ## P5 — Asistente turístico y Copilot V1/V2
 
@@ -108,8 +123,26 @@ Los diez criterios originales con estos cambios: (5) política de entrega por re
 
 ## Expansión y migración
 
-- **E1** patrimonio, gastronomía/menús, transporte, eventos avanzados, traducciones (incluido quechua si se prioriza).
+- **E1** patrimonio, gastronomía/menús, **alojamientos**, transporte, eventos avanzados (que se repiten), traducciones (incluido quechua si se prioriza). Cada uno como **módulo de la plataforma** con sus campos, SEO y capa en el mapa, que **cada municipio activa** como dato, sin código propio; rol de operador de establecimiento (solo sus locales). **Videos insertados** (YouTube en modo de privacidad mejorada) en fichas y tours, sin alojar video en Storage.
 - **E2** PWA offline selectiva, analítica/reportes, newsletter/push con ledger de entregas.
 - **E3** IA avanzada (embeddings/híbrido, reranker, multimodal) y Copilot V3 con aprobación vinculante.
-- **E4** billing, planes, roles configurables, escala.
+- **E4** billing, planes (módulos por plan), roles configurables, escala.
 - **X0/X1** ensayo y corte de la migración del sistema anterior, con autorización separada.
+
+## Pendientes registrados
+
+Lo que quedó fuera de un paso ya hecho, con el lugar donde entra. Nada se pierde en silencio: cuando un pendiente se resuelve, se marca aquí.
+
+| Pendiente                                                                                                 | De dónde viene                | Dónde entra                                         |
+| --------------------------------------------------------------------------------------------------------- | ----------------------------- | --------------------------------------------------- |
+| Correo de invitación (hoy la persona entra con su correo y ve la invitación)                              | P1 · Paso 6                   | Hito · Paso 2 (SMTP)                                |
+| Segundo factor obligatorio para propietarios y administradores de municipios                              | P1 · Paso 6                   | P6                                                  |
+| Cambiar la dirección (`slug`) de un destino o evento con redirecciones                                    | P3 · Paso 2                   | E1, antes de cargar el contenido de Ucureña         |
+| Reemplazar y borrar panoramas y modelos; foto propia como poster; borrar un tour o cambiar su destino     | P2 · Pasos 3 y 4, P4 · Paso 1 | E1, antes de cargar el contenido de Ucureña         |
+| Retirar del bucket público los medios que ya no se usan; limpiar versiones huérfanas                      | P3 · Paso 1, P4 · Paso 3      | Hito · Paso 3                                       |
+| Copiar los medios del tour en un trabajo de la cola si un tour grande se acerca al límite de la función   | P4 · Paso 3                   | Si hace falta al cargar Ucureña                     |
+| Umbral de rendimiento propio para `/mapa`, con una medición en el celular                                 | P3 · Paso 5                   | Hito · Paso 3                                       |
+| Revisar el ejecutor de trabajos y las capacidades de Storage de ADR-014 si el ejecutor sale de Vercel     | P2 · Paso 2                   | P6                                                  |
+| Vercel Pro y Supabase Pro; subir las cuotas por defecto (`private.quota_default`)                         | P2 · Paso 5, P3 · Paso 8      | Al firmar con el primer municipio                   |
+| Dominio propio del municipio (lo aporta el municipio; Rikuy ya resuelve por dirección)                    | P3 · Paso 8                   | Al firmar; verificación de dominio en P6 (opcional) |
+| Arreglos en Blender: iluminación y material dorado de la ametralladora, centro de giro de algunos modelos | P2 · Paso 4                   | Al final, antes de cargar los modelos de Ucureña    |

@@ -167,6 +167,11 @@ for (const portal of portals) {
     assert.match(xml, new RegExp(`<loc>http://${portal.host}:${port}/destinos/${slug}</loc>`)),
   );
   for (const hidden of portal.hidden) check(() => assert.doesNotMatch(xml, new RegExp(hidden)));
+  // A portal with content is indexed (only an empty one is not, below with ZC-01).
+  const homeHtml = (await get(portal.host, "/")).body.toString();
+  check(() =>
+    assert.doesNotMatch(homeHtml, /<meta name="robots"/, `${portal.host} home is indexable`),
+  );
   const robots = (await get(portal.host, "/robots.txt")).body.toString();
   check(() =>
     assert.match(robots, new RegExp(`Sitemap: http://${portal.host}:${port}/sitemap.xml`)),
@@ -303,6 +308,12 @@ if (zc01) {
   check(() => assert.match(html, /<title>Ensayo ZC-01<\/title>/));
   // Neutral default brand until its owner publishes one.
   check(() => assert.match(html, /--brand:#24557a/));
+  // Nothing published yet: online, but not indexed, and it says what is coming.
+  check(() => assert.match(html, /<meta name="robots" content="noindex, follow"/));
+  check(() => assert.match(html, /Muy pronto en este portal/));
+  check(() => assert.match(html, /Recorridos 360°/));
+  const places = (await get("zc-ensayo.localhost", "/destinos")).body.toString();
+  check(() => assert.match(places, /<meta name="robots" content="noindex, follow"/));
 }
 
 const unknown = await get("nadie.localhost", "/");

@@ -7,7 +7,7 @@ import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 
 import { platformSettings } from "@/server/platform";
-import { portalTourIndex } from "@/server/portal-content";
+import { portalIsEmpty, portalTourIndex } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -55,8 +55,11 @@ export async function generateMetadata({
   const { siteName, shortName } = presentation.identity;
   const description = presentation.seo.description || undefined;
   const canonicalHost = view.context.tenant.canonicalHost ?? view.context.host;
+  // Not indexed until it has something to visit; its pages still link to each other.
+  const empty = await portalIsEmpty(view);
 
   return {
+    ...(empty ? { robots: { index: false, follow: true } } : {}),
     metadataBase: new URL(platformSettings().portalOrigin(canonicalHost)),
     title: { default: siteName, template: `%s | ${siteName}` },
     ...(description ? { description } : {}),

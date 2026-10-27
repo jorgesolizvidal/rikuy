@@ -394,6 +394,12 @@
   margin-bottom: 1.5rem;
 }
 
+.portal-section-text {
+  max-width: 72rem;
+  margin: -0.75rem 0 0;
+  color: var(--muted);
+}
+
 .portal-section-head h2 {
   margin: 0;
   font-family: var(--font-display);
