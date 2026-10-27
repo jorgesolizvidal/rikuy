@@ -20,9 +20,9 @@ const CATEGORIES = ["performance", "accessibility", "best-practices", "seo"];
 
 // In GitHub Actions the reason also goes out as an annotation, readable on the run page
 // and through the API even when the job's log cannot be downloaded.
-const annotate = (message) => {
+const annotate = (message, level = "error") => {
   if (process.env.GITHUB_ACTIONS === "true") {
-    console.log(`::error title=Lighthouse::${String(message).replace(/\r?\n/gu, "%0A")}`);
+    console.log(`::${level} title=Lighthouse::${String(message).replace(/\r?\n/gu, "%0A")}`);
   }
 };
 for (const event of ["uncaughtException", "unhandledRejection"]) {
@@ -133,6 +133,11 @@ function measure(lhr) {
     tbtMs: Math.round(lhr.audits["total-blocking-time"].numericValue),
     cls: Number(lhr.audits["cumulative-layout-shift"].numericValue.toFixed(3)),
     scriptKb: Math.round((scripts?.transferSize ?? 0) / 1024),
+    ttfbMs: Math.round(lhr.audits["server-response-time"]?.numericValue ?? 0),
+    // Where the LCP time goes (time to first byte, load delay and duration, render delay).
+    lcpPhases: (lhr.audits["lcp-breakdown-insight"]?.details?.items?.[0]?.items ?? [])
+      .map((item) => `${item.subpart}=${Math.round(item.duration)}`)
+      .join(" "),
   };
 }
 
@@ -240,6 +245,18 @@ if (process.env.GITHUB_STEP_SUMMARY) {
     `## Lighthouse (móvil, ${where})\n\n${table}\n`,
   );
 }
+
+// Every page's numbers as one annotation: readable on the PR even when logs and artifacts
+// cannot be downloaded, and comparable between runs.
+annotate(
+  rows
+    .map(
+      ({ page, chosen, runs }) =>
+        `${page.label} perf ${chosen.scores.performance} [${runs.join(", ")}] LCP ${chosen.lcpMs} TTFB ${chosen.ttfbMs} TBT ${chosen.tbtMs} · ${chosen.lcpPhases}`,
+    )
+    .join("\n"),
+  "notice",
+);
 
 if (problems.length > 0) {
   console.error(`\nOver budget:\n${problems.map((p) => `  ${p}`).join("\n")}`);
