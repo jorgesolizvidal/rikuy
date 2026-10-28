@@ -69,4 +69,4 @@ Estados: ✅ hecho · 🔜 planificado (fase · paso) · ➕ mejora sobre el sis
 - **Quechua** como idioma de contenidos si el municipio lo prioriza. E1.
 - **Alojamientos** como módulo, y un **catálogo de módulos que cada municipio activa** (restaurantes, alojamientos, transporte…) sin código propio. E1 (pedido del usuario, 2026-10-27).
 - **Videos insertados** (YouTube en modo de privacidad mejorada) en fichas y tours, sin alojar video. E1.
-- **Demo a medida para cada municipio interesado**, con contenido de muestra. Hito · Paso 2.
+- **Demo a medida para cada municipio interesado**, con contenido de muestra. ✅ Hito · Paso 2.
