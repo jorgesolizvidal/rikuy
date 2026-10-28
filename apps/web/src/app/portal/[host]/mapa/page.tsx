@@ -13,6 +13,7 @@ import { portalMapExtent, toMapPoint } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { MapExplorer } from "../map-explorer";
+import { MapMeasureLoader } from "../map-measure-loader";
 
 /** `?lat=…&lng=…` changes the page, so it is rendered per request (not cached, ADR-024). */
 export const dynamic = "force-dynamic";
@@ -107,6 +108,7 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
           {...(center ? { center } : {})}
         />
       )}
+      {query.medir !== undefined ? <MapMeasureLoader /> : null}
     </div>
   );
 }

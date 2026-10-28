@@ -11,6 +11,7 @@ import {
   createMemberRepository,
   createMfaGateway,
   createModelRepository,
+  createOperationsRepository,
   createPanoramaRepository,
   createPlatformRepository,
   createPlatformUsageRepository,
@@ -71,6 +72,7 @@ export const adminSession = cache(async () => {
     tours: createTourRepository(client),
     general: createGeneralTourRepository(client),
     jobs: createJobAdminRepository(client),
+    operations: createOperationsRepository(client),
   };
 });
 

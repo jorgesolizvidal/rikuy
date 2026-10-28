@@ -1,5 +1,5 @@
 // Lighthouse against one production build (`next start`) and the seed, or against the
-// deployed sites (LIGHTHOUSE_ORIGINS): every public page kind of both municipalities,
+// deployed sites (LIGHTHOUSE_ORIGINS): every public page kind of each portal (from its sitemap),
 // measured `runs` times (mobile, simulated 4G, CPU x4); the median run must meet
 // lighthouse-budget.json. Fails the CI step when a page breaks it.
 //
@@ -39,13 +39,12 @@ for (const event of ["uncaughtException", "unhandledRejection"]) {
   });
 }
 
-// The seed's municipalities. Locally (and in the PR job) they are served by `next start`
-// on *.localhost; after a deployment, LIGHTHOUSE_ORIGINS points at the real sites, e.g.
-// "demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app".
-const PORTALS = [
-  { slug: "demo-norte", destination: "mirador-del-valle", event: "feria-del-choclo" },
-  { slug: "demo-sur", destination: "laguna-espejo", event: "noche-de-estrellas" },
-];
+// Locally (and in the PR job) the seed's municipalities, served by `next start` on
+// *.localhost; after a deployment, LIGHTHOUSE_ORIGINS lists the real portals, e.g.
+// "demo-norte=https://rikuy-demo-norte.vercel.app,otro=https://otro-portal.vercel.app".
+// Each portal's pages come from its own sitemap (Hito · Paso 3): its first destination and
+// its first upcoming event, whatever they are; a portal without them skips those pages.
+const SEED_PORTALS = ["demo-norte", "demo-sur"];
 const origins = new Map(
   (process.env.LIGHTHOUSE_ORIGINS ?? "")
     .split(",")
@@ -55,7 +54,7 @@ const origins = new Map(
 const originOf = (slug) =>
   (origins.get(slug) ?? `http://${slug}.localhost:${port}`).replace(/\/$/u, "");
 const SET = process.env.LIGHTHOUSE_SET === "tours" ? "tours" : "portal";
-const measured = PORTALS.filter((portal) => origins.size === 0 || origins.has(portal.slug));
+const measured = origins.size > 0 ? [...origins.keys()] : SEED_PORTALS;
 const pageOf = (slug, kind, path) => {
   const url = `${originOf(slug)}${path}`;
   return { kind, label: url.replace(/^https?:\/\//u, ""), url };
@@ -91,32 +90,44 @@ async function get(url) {
   });
 }
 
-/** A portal's tour pages, from its sitemap: the first tour and the general tour. */
-async function tourPages(slug) {
+/** The paths a portal's sitemap lists. */
+async function sitemapPaths(slug) {
   const response = await get(`${originOf(slug)}/sitemap.xml`);
   if (response.status !== 200) throw new Error(`${slug}: sitemap answered ${response.status}`);
-  const paths = [...response.text.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(
+  return [...response.text.matchAll(/<loc>([^<]+)<\/loc>/gu)].map(
     ([, loc]) => new URL(loc).pathname,
   );
+}
+
+/** A portal's tour pages, from its sitemap: the first tour and the general tour. */
+async function tourPages(slug) {
+  const paths = await sitemapPaths(slug);
   const tour = paths.find((path) => /^\/(destinos|agenda)\/[^/]+\/tour$/u.test(path));
   return tour && paths.includes("/recorrido")
     ? [pageOf(slug, "tour", tour), pageOf(slug, "generalTour", "/recorrido")]
     : [];
 }
 
-const pages =
-  SET === "tours"
-    ? (await Promise.all(measured.map((portal) => tourPages(portal.slug)))).flat()
-    : measured.flatMap((portal) =>
-        Object.entries({
-          home: "/",
-          destinations: "/destinos",
-          destination: `/destinos/${portal.destination}`,
-          agenda: "/agenda",
-          event: `/agenda/${portal.event}`,
-          map: "/mapa",
-        }).map(([kind, path]) => pageOf(portal.slug, kind, path)),
-      );
+/** A portal's pages of each kind, from its sitemap (one of each). */
+async function portalPages(slug) {
+  const paths = await sitemapPaths(slug);
+  const first = (pattern) => paths.find((path) => pattern.test(path));
+  const kinds = {
+    home: "/",
+    destinations: "/destinos",
+    destination: first(/^\/destinos\/[^/]+$/u),
+    agenda: "/agenda",
+    event: first(/^\/agenda\/[^/]+$/u),
+    map: "/mapa",
+  };
+  return Object.entries(kinds)
+    .filter(([, path]) => path !== undefined)
+    .map(([kind, path]) => pageOf(slug, kind, path));
+}
+
+const pages = (
+  await Promise.all(measured.map((slug) => (SET === "tours" ? tourPages(slug) : portalPages(slug))))
+).flat();
 if (pages.length === 0) {
   const message = "no tour pages in the sitemaps: nothing to measure";
   if (process.env.LIGHTHOUSE_REQUIRE_TOURS === "1") throw new Error(message);

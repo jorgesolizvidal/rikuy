@@ -1,0 +1,54 @@
+/* The measurement panels (`?medir`): tours (P4 · Paso 7) and the map (Hito · Paso 3). Loaded
+   only with the panel, never with the page. */
+.measure-panel {
+  position: fixed;
+  inset: auto 0.5rem 0.5rem;
+  z-index: 200;
+  display: grid;
+  gap: 0.5rem;
+  max-height: 70dvh;
+  padding: 0.75rem;
+  overflow: auto;
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+  border-radius: 0.75rem;
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: 0 8px 32px rgb(0 0 0 / 30%);
+  font-size: 0.875rem;
+}
+
+.measure-panel[data-open="false"] {
+  inset: auto 0.5rem 0.5rem auto;
+}
+
+.measure-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.measure-panel h2,
+.measure-panel p {
+  margin: 0;
+  font-size: inherit;
+}
+
+.measure-panel-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.measure-panel-status:empty {
+  display: none;
+}
+
+.measure-panel-report {
+  margin: 0;
+  max-height: 30dvh;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-size: 0.75rem;
+}

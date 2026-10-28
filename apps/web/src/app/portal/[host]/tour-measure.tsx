@@ -1,6 +1,23 @@
 "use client";
 
+import "./measure.css";
+
 import { useCallback, useEffect, useRef, useState } from "react";
+
+import {
+  copyText,
+  deviceFacts,
+  heapMb,
+  kb,
+  markTime,
+  mb,
+  ms,
+  NA,
+  pageLoadFacts,
+  percentile,
+  recordFrames,
+  reportText as sectionsText,
+} from "./measure-shared";
 
 /**
  * The tour's measurement panel (P4 · Paso 7): only with `?medir` in the address, loaded on
@@ -20,95 +37,11 @@ interface Report {
   model: Record<string, string>[];
 }
 
-const NA = "no disponible";
-
-interface ChromeMemory {
-  readonly usedJSHeapSize: number;
-  readonly totalJSHeapSize: number;
-}
-
-function heapMb(): number | null {
-  const memory = (performance as Performance & { memory?: ChromeMemory }).memory;
-  return memory ? memory.usedJSHeapSize / (1024 * 1024) : null;
-}
-
-const mb = (value: number | null) => (value === null ? NA : `${value.toFixed(1)} MB`);
-const ms = (value: number | null | undefined) =>
-  value === null || value === undefined ? NA : `${Math.round(value)} ms`;
-const kb = (bytes: number) => `${Math.round(bytes / 1024)} KB`;
-
-function percentile(values: readonly number[], p: number): number | null {
-  if (values.length === 0) return null;
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.ceil((p / 100) * sorted.length) - 1)] ?? null;
-}
-
-async function deviceFacts(): Promise<Record<string, string>> {
-  const nav = navigator as Navigator & {
-    deviceMemory?: number;
-    connection?: { effectiveType?: string; downlink?: number; rtt?: number; saveData?: boolean };
-    userAgentData?: {
-      brands?: { brand: string; version: string }[];
-      getHighEntropyValues?: (hints: string[]) => Promise<Record<string, string>>;
-    };
-  };
-  let model = NA;
-  let platform = NA;
-  try {
-    const values = await nav.userAgentData?.getHighEntropyValues?.([
-      "model",
-      "platform",
-      "platformVersion",
-    ]);
-    if (values?.model) model = values.model;
-    if (values?.platform) platform = `${values.platform} ${values.platformVersion ?? ""}`.trim();
-  } catch {
-    // Not offered: stays "no disponible".
-  }
-  let gpu = NA;
-  try {
-    const canvas = document.createElement("canvas");
-    const gl = canvas.getContext("webgl2") ?? canvas.getContext("webgl");
-    if (gl) {
-      const info = gl.getExtension("WEBGL_debug_renderer_info");
-      gpu = String(gl.getParameter(info ? info.UNMASKED_RENDERER_WEBGL : gl.RENDERER));
-      gl.getExtension("WEBGL_lose_context")?.loseContext();
-    }
-  } catch {
-    // No WebGL: stays "no disponible".
-  }
-  const brands = nav.userAgentData?.brands
-    ?.filter((brand) => !/not.?a.?brand/iu.test(brand.brand))
-    .map((brand) => `${brand.brand} ${brand.version}`)
-    .join(", ");
-  const connection = nav.connection;
-  return {
-    Modelo: model,
-    Sistema: platform,
-    Navegador: brands || navigator.userAgent,
-    "Memoria del equipo": nav.deviceMemory ? `${nav.deviceMemory} GB (aprox.)` : NA,
-    Núcleos: navigator.hardwareConcurrency ? String(navigator.hardwareConcurrency) : NA,
-    GPU: gpu,
-    Pantalla: `${screen.width} × ${screen.height} px, densidad ${window.devicePixelRatio}`,
-    Red: connection
-      ? `${connection.effectiveType ?? "?"}, ~${connection.downlink ?? "?"} Mbps, ~${connection.rtt ?? "?"} ms${connection.saveData ? ", ahorro de datos" : ""}`
-      : NA,
-  };
-}
-
 function loadFacts(lcp: number | null): Record<string, string> {
-  const navigation = performance.getEntriesByType("navigation")[0] as
-    PerformanceNavigationTiming | undefined;
-  const fcp = performance.getEntriesByName("first-contentful-paint")[0]?.startTime;
-  const viewer = performance.getEntriesByName("rikuy:tour-viewer-start")[0]?.startTime;
-  const shown = performance.getEntriesByName("rikuy:tour-shown")[0]?.startTime;
   return {
-    "Primer byte": ms(navigation?.responseStart),
-    "Primer contenido": ms(fcp),
-    "Mayor contenido (LCP)": ms(lcp),
-    "Página cargada": ms(navigation?.loadEventEnd || null),
-    "Arranque del visor": ms(viewer),
-    "Primera escena en pantalla": ms(shown),
+    ...pageLoadFacts(lcp),
+    "Arranque del visor": ms(markTime("rikuy:tour-viewer-start")),
+    "Primera escena en pantalla": ms(markTime("rikuy:tour-shown")),
   };
 }
 
@@ -180,23 +113,19 @@ function buttonNamed(name: RegExp): HTMLButtonElement | null {
 }
 
 function reportText(report: Report): string {
-  const section = (title: string, values: Record<string, string> | null) =>
-    values
-      ? `${title}\n${Object.entries(values)
-          .map(([key, value]) => `  ${key}: ${value}`)
-          .join("\n")}`
-      : `${title}\n  (sin medir)`;
-  return [
-    `Medición del tour · ${location.pathname} · ${new Date().toISOString()}`,
-    section("Dispositivo", report.device),
-    section("Carga", report.load),
-    section("Datos descargados", report.bytes),
-    section("Cambios de escena", report.changes),
-    section("Fluidez al girar", report.smoothness),
+  return sectionsText("Medición del tour", [
+    ["Dispositivo", report.device],
+    ["Carga", report.load],
+    ["Datos descargados", report.bytes],
+    ["Cambios de escena", report.changes],
+    ["Fluidez al girar", report.smoothness],
     ...(report.model.length > 0
-      ? report.model.map((entry, index) => section(`Modelo 3D (${index + 1})`, entry))
-      : [section("Modelo 3D", null)]),
-  ].join("\n\n");
+      ? report.model.map((entry, index): [string, Record<string, string>] => [
+          `Modelo 3D (${index + 1})`,
+          entry,
+        ])
+      : [["Modelo 3D", null] as [string, null]]),
+  ]);
 }
 
 export default function TourMeasure() {
@@ -314,26 +243,11 @@ export default function TourMeasure() {
   /** Frames of the browser for 5 s while the visitor turns the panorama. */
   async function measureSmoothness() {
     setBusy("Gira el panorama con el dedo durante 5 segundos…");
-    const frames: number[] = [];
-    await new Promise<void>((resolve) => {
-      let last = performance.now();
-      const end = last + 5000;
-      const tick = (now: number) => {
-        frames.push(now - last);
-        last = now;
-        if (now < end) requestAnimationFrame(tick);
-        else resolve();
-      };
-      requestAnimationFrame(tick);
-    });
+    const frames = await recordFrames(5000);
     setBusy(null);
-    const total = frames.reduce((sum, frame) => sum + frame, 0);
     await refresh({
       smoothness: {
-        "Cuadros por segundo (promedio)":
-          total > 0 ? (frames.length / (total / 1000)).toFixed(0) : NA,
-        "Cuadro p95": ms(percentile(frames, 95)),
-        "Cuadros de más de 50 ms": String(frames.filter((frame) => frame > 50).length),
+        ...frames,
         Nota: "cuadros del navegador mientras girabas; no es una medición de la GPU",
       },
     });
@@ -341,8 +255,8 @@ export default function TourMeasure() {
 
   const text = report ? reportText(report) : "";
   return (
-    <aside className="tour-measure" aria-label="Medición del tour" data-open={open}>
-      <div className="tour-measure-header">
+    <aside className="measure-panel" aria-label="Medición del tour" data-open={open}>
+      <div className="measure-panel-header">
         <h2>Medición del tour</h2>
         <button type="button" className="portal-button" onClick={() => setOpen((value) => !value)}>
           {open ? "Ocultar" : "Mostrar"}
@@ -351,7 +265,7 @@ export default function TourMeasure() {
       {open ? (
         <>
           <p>Solo en este dispositivo: nada se envía. Prueba en este orden y copia el resultado.</p>
-          <div className="tour-measure-actions">
+          <div className="measure-panel-actions">
             <button
               type="button"
               className="portal-button"
@@ -373,22 +287,19 @@ export default function TourMeasure() {
               className="portal-button"
               disabled={!report}
               onClick={() => {
-                void navigator.clipboard?.writeText(text).then(
-                  () => setCopied(true),
-                  () => setCopied(false),
-                );
+                void copyText(text).then(setCopied);
               }}
             >
               Copiar resultados
             </button>
           </div>
-          <p className="tour-measure-hint">
+          <p className="measure-panel-hint">
             3. Para el modelo 3D: abre su punto y pulsa «Ver en 3D»; se anota solo.
           </p>
-          <p role="status" className="tour-measure-status">
+          <p role="status" className="measure-panel-status">
             {busy ?? (copied ? "Resultados copiados." : "")}
           </p>
-          <pre className="tour-measure-report" tabIndex={0}>
+          <pre className="measure-panel-report" tabIndex={0}>
             {text || "Midiendo la carga…"}
           </pre>
         </>

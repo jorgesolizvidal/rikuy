@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
-- **Último paso completado:** Hito · Paso 2 — demo comercial por municipio y correo de invitación (2026-10-27), con el correo funcionando en producción
-- **Rama:** `docs/hito-step2-done` → PR hacia `main`
+- **Último paso completado:** Hito · Paso 3 — operación con planes gratuitos (2026-10-27), pendiente de confirmar en producción
+- **Rama:** `feat/hito-step3-operations` → PR hacia `main`
 
 ## Historial
 
@@ -981,18 +981,62 @@ Comprobado desde fuera:
 - La invitación llegó a la carpeta de spam. La persona entró con el código que envía Supabase por el mismo SMTP, aceptó y ya es administradora activa.
 - Mientras no haya dominio propio, el correo puede caer en spam: sale de una cuenta de Gmail nueva, sin un dominio con SPF/DKIM propios. Se mitiga pidiendo marcarlo como «No es spam». Se resuelve con el dominio del municipio y un proveedor con dominio verificado (ADR-034).
 
+### ★ Hito · Paso 3 — operación con planes gratuitos ✅ (falta confirmarlo en producción)
+
+- Decisiones del usuario ([ADR-035](../adr/ADR-035-free-plan-operations.md)):
+  - limpieza **automática**, solo de fotos y logos sin uso por más de 7 días; panoramas, modelos y copias públicas nunca;
+  - avisos **por correo y en el panel**;
+  - un umbral para `/mapa` y una medición en su celular con `?medir`.
+- **Control externo diario** (`.github/workflows/daily-health.yml`, 12:23 UTC, también a mano):
+  - `e2e/health.mjs` pide el inicio de cada portal de `LIGHTHOUSE_ORIGINS` (200 y `X-Rikuy-Version`), su `/mapa` (dinámico, lee la base por la Data API: es la actividad que evita la pausa de Supabase) y, con `ADMIN_ORIGIN`, el inicio de sesión del panel;
+  - reintenta una vez; si algo falla, el job falla (GitHub le escribe al dueño del repositorio) y el motivo queda como anotación;
+  - no necesita secretos.
+- Base de datos (`20261031000000_hito_operations.sql`, solo expand):
+  - `private.operations_snapshot()`: Storage del proyecto y tamaño de la base contra el plan gratuito (1 GB y 500 MB), trabajos fallidos en 24 h, la espera más larga de la cola, municipios activos al 80 % de una cuota y la limpieza de la semana. `platform_operations()` para operadores con segundo factor (sin correos); `worker_api.operations_report()` para el ejecutor (con los correos de los operadores activos).
+  - Tarea `rikuy-daily-report` (11:07 UTC): despierta al ejecutor por el mismo aviso de Vault con la razón `daily`.
+  - Tipo de trabajo `media.remove_unused` y tarea `rikuy-remove-unused-media` (07:37 UTC), que encola una limpieza por cada foto o logo listo hace más de 7 días que no usa ninguna revisión de contenido (borrador o sellada), punto de tour ni versión de la marca.
+  - `worker_api.claim_unused_media`: bajo el arrendamiento, **primero rechaza** la versión (libera su cuota, audita `media.unused_removed` con los bytes) y devuelve su carpeta; un reintento recibe la misma carpeta y una versión que volvió a usarse, nada.
+- `@rikuy/core`: contratos del resumen, `operationsAlerts` («Revisar» al 80 %, «Urgente» al 95 % o con la cola atascada más de 15 min), el correo `operationsEmail`, `sendDailyReport` (sin nada que revisar no envía), `loadOperations` y los puertos de la limpieza.
+- `@rikuy/db`: el ledger del ejecutor suma `unusedMedia` y `operationsReport`; el adaptador de medios borra la carpeta exacta de una versión en los dos buckets (lista y borra, valida la forma de la ruta); `createOperationsRepository`.
+- `apps/worker`: procesador `media.remove_unused` (`removed` con los archivos borrados o `in_use`; un error de Storage se reintenta).
+- Web:
+  - `POST /api/jobs/drain` con `{"reason":"daily"}` arma y envía el informe antes de drenar la cola; registro `operations.daily_report`.
+  - `/plataforma`: **«Estado de la plataforma»** con los avisos, el almacenamiento y la base del proyecto, la cola y las imágenes limpiadas en la semana.
+  - `/mapa?medir`: panel **«Medición del mapa»** (dispositivo, carga, arranque del mapa, primera vista completa, datos, fluidez al moverlo 5 s y «Copiar resultados»), cargado solo con ese parámetro; nada se envía. MapLibre deja marcas `rikuy:map-start`, `rikuy:map-ready` y `rikuy:map-idle`. El del tour comparte con él `measure-shared.ts` y `measure.css`.
+- **Lighthouse a partir del sitemap:** `e2e/lighthouse.mjs` toma de cada portal su primer destino y su primer evento (sin ellos, omite esas páginas), así que sirve para Ucureña o cualquier municipio. `/mapa` tiene umbral: rendimiento ≥ 60, LCP ≤ 3,5 s, CLS ≤ 0,1, JS ≤ 700 KB.
+- Docs: [runbook de trabajos](../jobs.md) («Informe diario» y el nuevo tipo), [despliegue](../deploy.md) («Operación diaria con planes gratuitos» y las variables de GitHub), [presupuesto](../performance-budget.md), arquitectura y roadmap.
+- Tests:
+  - 506 unitarios (core 321, db 105, web 35, worker 37, config 8);
+  - 790 pgTAP (28 nuevos, `024_operations`): resumen y límites, operador sin correos y sin segundo factor o visitante rechazados, avisos de fallidos, espera y cuotas, aviso diario con la razón `daily` (y nada sin el ejecutor configurado), horarios de pg_cron, solo la foto vieja sin uso encolada (no la usada en un borrador, el logo de la marca, la reciente ni el panorama) y una sola vez, rechazo antes de borrar con auditoría, reintento con la misma carpeta y una versión que vuelve a usarse queda igual;
+  - integración contra Supabase real (`operations.int.test.ts`): la foto sin uso desaparece de Storage y libera su cuota, la reciente queda, y el ejecutor lee el informe;
+  - 0 hallazgos de `plpgsql_check`.
+- Verificado en local, en el navegador:
+  - una foto subida y nunca guardada, puesta 8 días atrás: barrido → trabajo → rechazada con su motivo, sin archivos, cuota en 0 y auditoría con los bytes;
+  - «Estado de la plataforma» sin hallazgos de axe ni desbordes;
+  - el informe diario llegó como «Revisar: 1 aviso de la plataforma» a un servidor SMTP local;
+  - `/mapa?medir`: arranque 804 ms, listo 903 ms, vista completa 1342 ms, 60 cuadros/s; sin `?medir` el panel no existe;
+  - `health.mjs` contra producción: 7 de 7 en verde (versión `cad464fb5016`);
+  - Lighthouse: 12 páginas descubiertas por el sitemap dentro del presupuesto (`/mapa` 67–69, LCP 2,4–2,6 s); tours 75 (LCP 2,1–2,3 s);
+  - portales 161, contratos 189 y tour 8 de 8 en verde.
+
+**Desviaciones:**
+
+- El paso queda ✅ en el roadmap tras **una semana con «Daily health» en verde y el proyecto sin pausas**, como dice su criterio.
+- Las copias públicas de medios que ya no se usan no se retiran: las revisiones selladas las necesitan para «Volver a esta versión».
+- Una foto subida hace más de 7 días y guardada recién después ya no existe: hay que volver a subirla (el editor la rechaza al guardar).
+- GitHub desactiva los workflows programados de un repositorio sin commits en 60 días: hay que volver a activarlo en Actions.
+- Localmente, un 404 de `/destinos/…` que Next regenera en su caché puede llevar dos etiquetas `robots` (las dos `noindex`). No cambia nada para los buscadores y no viene de este paso.
+
 ## Cómo verificarlo
 
-En `https://rikuy-app-admin.vercel.app/o/ucurena/miembros`, el administrador invitado aparece «Activo». En `/plataforma/trabajos`, los trabajos «Correo de invitación» están «Terminado».
+1. En GitHub → Settings → Variables: `LIGHTHOUSE_ORIGINS` con Ucureña (`…,ucurena=https://rikuy-ucurena.vercel.app`) y `ADMIN_ORIGIN` = `https://rikuy-app-admin.vercel.app`.
+2. Actions → «Daily health» → _Run workflow_: la tabla del resumen muestra cada portal y el panel en verde.
+3. `/plataforma` muestra «Estado de la plataforma» con el espacio del proyecto.
+4. En el celular, `https://rikuy-demo-norte.vercel.app/mapa?medir` → «Medir la fluidez (5 s)» → «Copiar resultados».
 
-## Siguiente paso — ★ Hito · Paso 3 (requiere autorización)
+## Siguiente paso — ★ Hito · Paso 4 (requiere autorización)
 
-**Operación con planes gratuitos:**
-
-- tarea diaria que evita la pausa de Supabase por inactividad y avisa si algo cae;
-- Lighthouse de producción a partir del sitemap de cada portal (también Ucureña);
-- aviso de uso del almacenamiento (1 GB del plan) y limpieza de medios que ya no se usan;
-- umbral de rendimiento propio para `/mapa`.
+**README de portafolio** (sin capturas por ahora): qué es, enlaces en vivo, arquitectura en texto, decisiones con sus ADR, métricas reales y cómo correrlo.
 
 ## Decisiones pendientes del usuario
 

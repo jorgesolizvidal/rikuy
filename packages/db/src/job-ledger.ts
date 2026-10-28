@@ -4,9 +4,12 @@ import type {
   HeartbeatOutcome,
   InvitationMailStore,
   JobLedger,
+  OperationsReport,
+  UnusedMediaStore,
   ModelStore,
   PanoramaStore,
 } from "@rikuy/core";
+import { operationsReportSchema } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
 
@@ -37,6 +40,10 @@ export interface PostgresJobLedger extends JobLedger {
   readonly models: ModelStore;
   /** mail.membership_invitation: worker_api.invitation_mail / mark_invitation_mailed. */
   readonly invitations: InvitationMailStore;
+  /** media.remove_unused: worker_api.claim_unused_media. */
+  readonly unusedMedia: UnusedMediaStore;
+  /** The daily report (worker_api.operations_report): no lease, changes nothing. */
+  operationsReport(): Promise<OperationsReport>;
   close(): Promise<void>;
 }
 
@@ -188,6 +195,25 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
           throw error;
         }
       },
+    },
+
+    unusedMedia: {
+      async claim(lease) {
+        try {
+          const [row] = await sql`
+            select worker_api.claim_unused_media(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as folder
+          `;
+          return typeof row?.folder === "string" ? row.folder : null;
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    async operationsReport() {
+      const [row] = await sql`select worker_api.operations_report() as report`;
+      return operationsReportSchema.parse(row?.report);
     },
 
     invitations: {
