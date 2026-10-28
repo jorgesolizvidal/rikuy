@@ -806,14 +806,14 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     page.on("pageerror", (error) => errors.push(String(error)));
     await page.goto(`${PORTAL}/destinos/${ids.slug}/tour`);
     await settled(page, SCENES.a as Scene);
-    expect(await page.locator(".tour-measure").count()).toBe(0);
+    expect(await page.locator(".measure-panel").count()).toBe(0);
 
     const requests: string[] = [];
     page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
     await page.goto(`${PORTAL}/destinos/${ids.slug}/tour?medir=1`);
     const panel = page.getByRole("complementary", { name: "Medición del tour" });
     await panel.waitFor();
-    const report = panel.locator(".tour-measure-report");
+    const report = panel.locator(".measure-panel-report");
     await report.filter({ hasText: "Primera escena en pantalla: " }).waitFor({ timeout: 30_000 });
     await panel.getByRole("button", { name: "1. Medir 20 cambios de escena" }).click();
     await report.filter({ hasText: "Cambios: 20" }).waitFor({ timeout: 240_000 });

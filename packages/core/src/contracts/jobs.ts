@@ -10,6 +10,8 @@ export const JOB_KINDS = {
   processPanorama: "media.process_panorama",
   /** Validates and optimizes a GLB (Meshopt + KTX2), checking that colors are kept. */
   processModel: "media.process_model",
+  /** Removes a photo or a logo nothing uses after 7 days, freeing its quota (ADR-035). */
+  removeUnusedMedia: "media.remove_unused",
   /** Emails an invitation to administer a municipality (ADR-034). */
   membershipInvitationMail: "mail.membership_invitation",
 } as const;
@@ -31,6 +33,7 @@ export const probePayloadSchema = z
 export const expireAbandonedUploadPayloadSchema = z.object({ versionId: z.uuid() }).strict();
 export const processPanoramaPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const processModelPayloadSchema = expireAbandonedUploadPayloadSchema;
+export const removeUnusedMediaPayloadSchema = expireAbandonedUploadPayloadSchema;
 /** The membership only: the runner reads the address under the job's lease. */
 export const membershipInvitationMailPayloadSchema = z.object({ membershipId: z.uuid() }).strict();
 

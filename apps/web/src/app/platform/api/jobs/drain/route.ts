@@ -4,6 +4,7 @@ import {
   isJobRunnerRequest,
   jobRunnerConfigured,
   KICK_RUN,
+  runDailyReport,
   runJobQueue,
 } from "@/server/job-runner";
 
@@ -24,8 +25,14 @@ export async function POST(request: Request) {
   if (!isJobRunnerRequest(request.headers.get("authorization"))) {
     return NextResponse.json({ error: "unauthorized" }, { status: 401, headers: noStore });
   }
+  // The body only says why the database called (ADR-025, ADR-035); it grants nothing.
+  const reason = await request
+    .json()
+    .then((body: unknown) => (body as { reason?: unknown } | null)?.reason)
+    .catch(() => null);
   after(async () => {
     try {
+      if (reason === "daily") await runDailyReport();
       await runJobQueue(KICK_RUN);
     } catch (error) {
       // The ledger stays consistent: leases expire and the next wake-up retries.

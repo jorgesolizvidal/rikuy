@@ -1,14 +1,20 @@
 import "server-only";
 
 import { parseServerEnv } from "@rikuy/config/env";
-import type { ImageProcessor, MediaAdmin, OriginalRemover, SampleImageRenderer } from "@rikuy/core";
+import type {
+  ImageProcessor,
+  MediaAdmin,
+  MediaFolderRemover,
+  OriginalRemover,
+  SampleImageRenderer,
+} from "@rikuy/core";
 import {
   createSharpImageProcessor,
   createSharpSampleImageRenderer,
   createSupabaseMediaAdmin,
 } from "@rikuy/db";
 
-let admin: (MediaAdmin & OriginalRemover) | undefined;
+let admin: (MediaAdmin & OriginalRemover & MediaFolderRemover) | undefined;
 let processor: ImageProcessor | undefined;
 
 /**
@@ -16,7 +22,7 @@ let processor: ImageProcessor | undefined;
  * §1.3). The image Server Actions use it after the use case authorized the caller, and the
  * job runner removes originals with it, only for an exact path the ledger handed a job.
  */
-export function mediaAdmin(): MediaAdmin & OriginalRemover {
+export function mediaAdmin(): MediaAdmin & OriginalRemover & MediaFolderRemover {
   if (admin) return admin;
   const env = parseServerEnv();
   admin = createSupabaseMediaAdmin({

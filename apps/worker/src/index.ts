@@ -21,12 +21,17 @@ import {
   type ProcessPanoramaDeps,
 } from "./processors/process-panorama";
 import { probeProcessor } from "./processors/probe";
+import {
+  createRemoveUnusedMediaProcessor,
+  type RemoveUnusedMediaDeps,
+} from "./processors/remove-unused-media";
 
 export {
   createExpireAbandonedUploadProcessor,
   createMembershipInvitationMailProcessor,
   createProcessModelProcessor,
   createProcessPanoramaProcessor,
+  createRemoveUnusedMediaProcessor,
   probeProcessor,
 };
 export type {
@@ -34,13 +39,15 @@ export type {
   MembershipInvitationMailDeps,
   ProcessModelDeps,
   ProcessPanoramaDeps,
+  RemoveUnusedMediaDeps,
 };
 
 /** What the processors need from the platform (adapters built by the runtime). */
 export type ProcessorDeps = ExpireAbandonedUploadDeps &
   ProcessPanoramaDeps &
   Omit<ProcessModelDeps, "media"> &
-  MembershipInvitationMailDeps;
+  MembershipInvitationMailDeps &
+  RemoveUnusedMediaDeps;
 
 /** Kinds that can run for minutes: only the database's wake-up runs them, not the panel. */
 export const LONG_JOB_KINDS: readonly string[] = ["media.process_panorama", "media.process_model"];
@@ -52,5 +59,6 @@ export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
     createProcessPanoramaProcessor(deps),
     createProcessModelProcessor(deps),
     createMembershipInvitationMailProcessor(deps),
+    createRemoveUnusedMediaProcessor(deps),
   ];
 }

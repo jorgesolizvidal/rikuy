@@ -6,6 +6,7 @@ import {
   type ImageProcessor,
   type ImageVersionRecord,
   type MediaAdmin,
+  type MediaFolderRemover,
   type OriginalRemover,
   type MediaRepository,
 } from "@rikuy/core";
@@ -172,7 +173,9 @@ export interface MediaAdminOptions {
   readonly fetch?: typeof fetch;
 }
 
-export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin & OriginalRemover {
+export function createSupabaseMediaAdmin(
+  options: MediaAdminOptions,
+): MediaAdmin & OriginalRemover & MediaFolderRemover {
   const admin = createClient(options.url, options.secretKey, {
     auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
     ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
@@ -232,6 +235,30 @@ export function createSupabaseMediaAdmin(options: MediaAdminOptions): MediaAdmin
       });
       if (error) throw unexpected("Rejecting the upload", error);
       await originals().remove([originalPath]);
+    },
+
+    // Photos and logos keep every file directly in their version's folder (no subfolders).
+    async removeVersionFolder(prefix) {
+      if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[1-9][0-9]{0,5}\/$/u.test(prefix)) {
+        throw new Error("Refusing to remove anything but one version's folder");
+      }
+      let removed = 0;
+      for (const bucket of [MEDIA_BUCKETS.originals, MEDIA_BUCKETS.public]) {
+        const { data, error } = await admin.storage
+          .from(bucket)
+          .list(prefix.slice(0, -1), { limit: 1000 });
+        if (error) throw new Error(`Listing a version's files failed (${error.name || "unknown"})`);
+        const names = (data ?? [])
+          .filter((item) => item.id !== null)
+          .map((item) => `${prefix}${item.name}`);
+        if (names.length === 0) continue;
+        const { error: removeError } = await admin.storage.from(bucket).remove(names);
+        if (removeError) {
+          throw new Error(`Removing a version's files failed (${removeError.name || "unknown"})`);
+        }
+        removed += names.length;
+      }
+      return removed;
     },
 
     async removeOriginal(originalPath) {

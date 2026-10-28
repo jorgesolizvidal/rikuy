@@ -1628,3 +1628,39 @@ a.button-quiet {
 .sample-panel .members-invite {
   margin: 0;
 }
+
+/* ── Platform: operations (ADR-035) ──────────────────────────────────── */
+
+.operations {
+  margin: 2rem 0;
+}
+
+.operations h2,
+.operations-heading {
+  margin: 0 0 0.75rem;
+  font-size: 1.25rem;
+}
+
+.operations-alerts {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0 0 1rem;
+  padding: 0;
+  list-style: none;
+}
+
+.operations-alerts li {
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+  border-left: 4px solid var(--muted);
+  border-radius: 8px;
+}
+
+.operations-alerts li[data-level="critical"] {
+  border-left-color: var(--accent);
+}
+
+.operations .usage-card h3 {
+  margin: 0 0 0.25rem;
+  font-size: 1rem;
+}

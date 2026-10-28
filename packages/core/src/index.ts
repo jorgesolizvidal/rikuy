@@ -75,3 +75,5 @@ export * from "./domain/tours/viewer";
 export * from "./application/mail/invitations";
 export * from "./domain/demo/sample-template";
 export * from "./application/demo/sample-content";
+export * from "./application/media/unused-media";
+export * from "./application/platform/operations";

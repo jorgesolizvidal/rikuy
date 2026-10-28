@@ -173,6 +173,8 @@ export default function MapCanvas({
       setWorkerUrl(PORTAL_MAP.workerUrl);
       workerConfigured = true;
     }
+    // Marks for the measurement panel (`/mapa?medir`, Hito · Paso 3); they cost nothing.
+    performance.mark("rikuy:map-start");
     let instance: MapLibre;
     try {
       instance = new MapLibre({
@@ -208,7 +210,24 @@ export default function MapCanvas({
       loaded = true;
       window.clearTimeout(giveUp);
       setStyleReady(true);
+      performance.mark("rikuy:map-ready");
     });
+    // Every tile of the first view drawn.
+    instance.once("idle", () => performance.mark("rikuy:map-idle"));
+    // The measurement panel asks for 5 s of panning to time the frames.
+    const measurePan = () => {
+      const steps: [number, number][] = [
+        [240, 0],
+        [0, 160],
+        [-240, 0],
+        [0, -160],
+        [240, 120],
+      ];
+      steps.forEach((offset, index) => {
+        window.setTimeout(() => instance.panBy(offset, { duration: 950 }), index * 1000);
+      });
+    };
+    if (interactive) window.addEventListener("rikuy:map-measure-pan", measurePan);
     // Some styles name icons their sprite lacks: draw nothing instead of logging warnings.
     instance.setMissingStyleImageResolver((id) => {
       if (!instance.hasImage(id)) {
@@ -242,6 +261,7 @@ export default function MapCanvas({
 
     const placed = markers.current;
     return () => {
+      window.removeEventListener("rikuy:map-measure-pan", measurePan);
       resize.disconnect();
       window.clearTimeout(giveUp);
       placed.clear();

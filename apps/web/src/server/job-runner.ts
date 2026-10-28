@@ -6,6 +6,8 @@ import { EnvValidationError, parseJobRunnerEnv, parseMailEnv } from "@rikuy/conf
 import {
   drainJobs,
   newRunnerId,
+  sendDailyReport,
+  type DailyReportOutcome,
   type DrainReport,
   type JobLogger,
   type JobProcessor,
@@ -151,6 +153,8 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           invitations: ledger.invitations,
           mailer: mailer(),
           adminOrigin: platformSettings().adminOrigin,
+          unusedMedia: ledger.unusedMedia,
+          folders: mediaAdmin(),
         }),
       ),
       runnerId,
@@ -159,6 +163,41 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
       concurrency: 2,
       logger: jsonJobLogger,
     });
+  } finally {
+    await ledger.close();
+  }
+}
+
+/**
+ * The daily report (ADR-035): the database asks for it once a day through the same wake-up
+ * (reason "daily"). Emails the operators only when something needs a look.
+ */
+export async function runDailyReport(): Promise<DailyReportOutcome | null> {
+  const env = settings();
+  if (!env) return null;
+  const ledger = createPostgresJobLedger({
+    url: env.WORKER_DATABASE_URL,
+    ...(env.WORKER_DATABASE_ROLE ? { role: env.WORKER_DATABASE_ROLE } : {}),
+    maxConnections: 1,
+  });
+  try {
+    const outcome = await sendDailyReport({
+      reader: ledger,
+      mailer: mailer(),
+      adminOrigin: platformSettings().adminOrigin,
+    });
+    console.log(
+      JSON.stringify({
+        level: outcome.alerts.length > 0 ? "warn" : "info",
+        event: "operations.daily_report",
+        alerts: outcome.alerts.map((alert) => alert.code).join(",") || "none",
+        mail: outcome.mail,
+        sent: outcome.sent,
+        failed: outcome.failed,
+        at: new Date().toISOString(),
+      }),
+    );
+    return outcome;
   } finally {
     await ledger.close();
   }

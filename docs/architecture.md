@@ -144,6 +144,12 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
   - al terminar un trabajo de medios, el cómputo se liquida con la duración de sus intentos.
 - Panel: «Uso del plan» para los miembros del municipio; `/plataforma/cuotas` para el operador.
 
+### Operación con planes gratuitos (ADR-035)
+
+- **Control externo diario** (GitHub Actions, «Daily health»): inicio y `/mapa` de cada portal y el panel. Avisa aunque Vercel y Supabase estén caídos, y su lectura de la base evita la pausa del plan gratuito.
+- **Informe interno diario:** pg_cron despierta al ejecutor con la razón `daily`; `worker_api.operations_report()` da el espacio del proyecto, el tamaño de la base, los trabajos fallidos o esperando y las cuotas al 80 %. Si hay algo que revisar, correo a los operadores. El mismo resumen está en `/plataforma`.
+- **Limpieza de fotos y logos sin uso** (`media.remove_unused`): la base rechaza la versión bajo el arrendamiento (así nada empieza a usarla) y después el ejecutor borra su carpeta en los dos buckets. Panoramas, modelos y copias públicas no se tocan.
+
 ## 9. Mapa y ubicación del visitante (ADR-021, ADR-023)
 
 - Mapa del portal: MapLibre con teselas vectoriales de OpenFreeMap; el estilo es configuración (`NEXT_PUBLIC_MAP_STYLE_URL`). La librería se carga solo donde hay mapa (`/mapa` y, en las fichas, cuando el visitante llega al mapa pequeño); su _worker_ se sirve desde `/vendor/maplibre-gl/<versión>/`. El panel usa Leaflet + OpenStreetMap (uso ligero).

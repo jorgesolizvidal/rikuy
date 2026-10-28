@@ -4,16 +4,17 @@ Cómo está montada la demo en la nube y qué se configura a mano una sola vez. 
 
 ## Piezas
 
-| Pieza                 | Dónde                                                                      | Notas                                                                                                    |
-| --------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Base de datos         | Supabase, proyecto `rikuy` (ref `jltzysyxqureudfavgpj`), São Paulo         | Plan gratuito. Las migraciones las aplica el workflow «Deploy database»                                  |
-| Aplicación            | Vercel, proyecto `rikuy` (raíz `apps/web`), funciones en São Paulo (gru1)  | Plan Hobby: demo y pruebas. Para municipios reales (uso comercial) hace falta Pro                        |
-| Plataforma            | `https://rikuy-app.vercel.app`                                             | `PLATFORM_ROOT_DOMAIN`                                                                                   |
-| Panel                 | `https://rikuy-app-admin.vercel.app`                                       | `PLATFORM_ADMIN_HOST`                                                                                    |
-| Portales de demo      | `https://rikuy-demo-norte.vercel.app`, `https://rikuy-demo-sur.vercel.app` | Registrados en `tenant_domains` (`supabase/demo/vercel-demo.sql`)                                        |
-| Rendimiento real      | Vercel Speed Insights                                                      | Métricas anónimas, sin cookies (página de privacidad)                                                    |
-| Lighthouse en la nube | Workflow «Lighthouse on production»                                        | Tras cada despliegue de producción, con `apps/web/lighthouse-budget.json`                                |
-| Ejecutor de trabajos  | `POST https://rikuy-app.vercel.app/api/jobs/drain`, despertado por la base | `pg_cron` + `pg_net` ([ADR-025](adr/ADR-025-job-runner-wake-up.md)); activación en el [runbook](jobs.md) |
+| Pieza                 | Dónde                                                                      | Notas                                                                                                                                  |
+| --------------------- | -------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Base de datos         | Supabase, proyecto `rikuy` (ref `jltzysyxqureudfavgpj`), São Paulo         | Plan gratuito. Las migraciones las aplica el workflow «Deploy database»                                                                |
+| Aplicación            | Vercel, proyecto `rikuy` (raíz `apps/web`), funciones en São Paulo (gru1)  | Plan Hobby: demo y pruebas. Para municipios reales (uso comercial) hace falta Pro                                                      |
+| Plataforma            | `https://rikuy-app.vercel.app`                                             | `PLATFORM_ROOT_DOMAIN`                                                                                                                 |
+| Panel                 | `https://rikuy-app-admin.vercel.app`                                       | `PLATFORM_ADMIN_HOST`                                                                                                                  |
+| Portales de demo      | `https://rikuy-demo-norte.vercel.app`, `https://rikuy-demo-sur.vercel.app` | Registrados en `tenant_domains` (`supabase/demo/vercel-demo.sql`)                                                                      |
+| Rendimiento real      | Vercel Speed Insights                                                      | Métricas anónimas, sin cookies (página de privacidad)                                                                                  |
+| Lighthouse en la nube | Workflow «Lighthouse on production»                                        | Tras cada despliegue de producción, con `apps/web/lighthouse-budget.json`                                                              |
+| Control diario        | Workflow «Daily health»                                                    | Cada día, los portales de `LIGHTHOUSE_ORIGINS` y el panel; evita la pausa de Supabase ([ADR-035](adr/ADR-035-free-plan-operations.md)) |
+| Ejecutor de trabajos  | `POST https://rikuy-app.vercel.app/api/jobs/drain`, despertado por la base | `pg_cron` + `pg_net` ([ADR-025](adr/ADR-025-job-runner-wake-up.md)); activación en el [runbook](jobs.md)                               |
 
 Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuevo` con un alias exacto como `rikuy-municipio.vercel.app`, que antes se agrega en Vercel → Settings → Domains. Un dominio propio (por ejemplo `turismo.municipio.gob.bo`) se agrega igual en Vercel y en el alta; no requiere cambios de código.
 
@@ -32,7 +33,10 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 ### GitHub (Settings → Secrets and variables → Actions)
 
 - _Secrets:_ `SUPABASE_ACCESS_TOKEN` (paso 2) y `SUPABASE_DB_PASSWORD` (paso 1).
-- _Variables:_ `SUPABASE_PROJECT_REF` = `jltzysyxqureudfavgpj` y `LIGHTHOUSE_ORIGINS` = `demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app`.
+- _Variables:_
+  - `SUPABASE_PROJECT_REF` = `jltzysyxqureudfavgpj`;
+  - `LIGHTHOUSE_ORIGINS` = los portales que se miden y se vigilan, `nombre=origen` separados por comas: `demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app,ucurena=https://rikuy-ucurena.vercel.app`. Un municipio nuevo en línea se suma aquí;
+  - `ADMIN_ORIGIN` = `https://rikuy-app-admin.vercel.app` (opcional: el control diario también comprueba el panel).
 
 ### Vercel
 
@@ -79,6 +83,22 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 - Tras cada merge a `main`, «Lighthouse on production» espera a que producción sirva ese commit (`X-Rikuy-Version`) y mide la demo con el mismo presupuesto que el PR. También se puede correr a mano (Actions → _Run workflow_).
 - El ejecutor de trabajos necesita `WORKER_DATABASE_URL` y `JOB_RUNNER_SECRET` en Vercel y dos secretos en Supabase Vault: pasos en [«Activar el ejecutor»](jobs.md#activar-el-ejecutor-una-sola-vez-por-ambiente). Sin ellos la aplicación funciona igual y los trabajos esperan en la cola.
 - Para saber dónde corre una función, mira `x-vercel-id` en una ruta dinámica (por ejemplo `/mapa`): el segundo código es la región de la función (`…::gru1::…`). Si el job falla, el motivo aparece como anotación en la página del run (no hace falta descargar el log).
+
+## Operación diaria con planes gratuitos
+
+Lo que corre solo cada día ([ADR-035](adr/ADR-035-free-plan-operations.md)), sin configuración nueva más allá de las variables de GitHub:
+
+| Hora (Bolivia) | Qué                                                     | Dónde                                      | Si algo falla                                                                             |
+| -------------- | ------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
+| 03:37          | Limpieza de fotos y logos sin uso por más de 7 días     | Supabase (`rikuy-remove-unused-media`)     | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
+| 07:07          | Informe interno: espacio, base, trabajos y cuotas       | Supabase (`rikuy-daily-report`) → ejecutor | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
+| 08:23          | Control externo: inicio y `/mapa` de cada portal, panel | GitHub Actions («Daily health»)            | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
+
+- **La pausa de Supabase:** el plan gratuito pausa el proyecto tras 7 días con poca actividad. «Daily health» pide `/mapa`, que lee la base en cada visita, así que mientras corra el proyecto no se pausa. GitHub desactiva los workflows programados de un repositorio sin commits en 60 días: si llega ese aviso, se vuelve a activar en Actions.
+- **Probarlo a mano:** Actions → «Daily health» → _Run workflow_. La tabla del resumen dice qué respondió cada portal y con qué versión.
+- **El informe interno** no envía nada si no hay nada que revisar. Avisa desde el 80 % del almacenamiento (1 GB) o de la base (500 MB), con trabajos fallidos en 24 h, con trabajo esperando más de 15 min (el ejecutor no se despierta) y con municipios al 80 % de una cuota. En los registros de Vercel queda una línea `operations.daily_report`.
+- **La limpieza** solo toca fotos y logos que ninguna revisión de contenido, punto de tour ni versión de la marca usa. Panoramas, modelos 3D y copias públicas nunca se borran. Una foto subida y no guardada en 7 días hay que volver a subirla.
+- **Medir el mapa en un celular:** abre `https://<portal>/mapa?medir`, espera a que el mapa cargue, pulsa «Medir la fluidez (5 s)» y «Copiar resultados». Nada se envía.
 
 ## Alta de un municipio real (por ejemplo, Ucureña)
 

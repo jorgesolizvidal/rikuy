@@ -1,4 +1,4 @@
-import { listPlatformTenants, type TenantStatus } from "@rikuy/core";
+import { listPlatformTenants, loadOperations, type TenantStatus } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -8,6 +8,7 @@ import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../sign-out-button";
 import { MfaPanel } from "./mfa-panel";
+import { OperationsSummary } from "./operations-summary";
 import { TenantStatusButton } from "./tenant-status-button";
 
 export const metadata: Metadata = { title: "Plataforma" };
@@ -47,7 +48,10 @@ export default async function PlatformPage() {
     );
   }
 
-  const tenants = (await listPlatformTenants(session.platform)) ?? [];
+  const [tenants, operations] = await Promise.all([
+    listPlatformTenants(session.platform).then((list) => list ?? []),
+    loadOperations(session.platform, session.operations),
+  ]);
   const { portalOrigin } = platformSettings();
 
   return (
@@ -72,6 +76,11 @@ export default async function PlatformPage() {
         </p>
       </div>
 
+      {operations ? (
+        <OperationsSummary snapshot={operations.snapshot} alerts={operations.alerts} />
+      ) : null}
+
+      <h2 className="operations-heading">Municipios</h2>
       <div className="table-wrap">
         <table className="data-table">
           <caption className="visually-hidden">Municipios de la plataforma</caption>

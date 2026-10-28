@@ -1,0 +1,38 @@
+name: Daily health
+
+# Once a day (08:23 in Bolivia), and on demand: the portals and the panel answer, and the
+# map page reads the database through the Data API — the activity that keeps the free
+# Supabase project from being paused after 7 days without it (ADR-035). A red run means
+# something is down: GitHub emails the owner of the schedule.
+#
+# Repository variables: LIGHTHOUSE_ORIGINS (the portals, as for Lighthouse) and ADMIN_ORIGIN
+# (optional, e.g. https://rikuy-app-admin.vercel.app).
+#
+# GitHub pauses scheduled workflows of a repository without commits for 60 days: a commit,
+# or «Enable workflow» in the Actions tab, turns it back on.
+
+on:
+  schedule:
+    - cron: "23 12 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Production answers
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      LIGHTHOUSE_ORIGINS: ${{ vars.LIGHTHOUSE_ORIGINS }}
+      ADMIN_ORIGIN: ${{ vars.ADMIN_ORIGIN }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Check
+        run: node apps/web/e2e/health.mjs
