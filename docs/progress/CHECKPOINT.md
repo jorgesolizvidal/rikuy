@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
-- **Último paso completado:** Hito · Paso 3 — operación con planes gratuitos (2026-10-27), pendiente de confirmar en producción
-- **Rama:** `fix/lighthouse-empty-portals` → PR hacia `main`
+- **Último paso completado:** Hito · Paso 4 — README de portafolio (2026-10-31). El Paso 3 espera su semana de control diario en verde (hasta el 4 de noviembre)
+- **Rama:** `feat/hito-step4-readme` → PR hacia `main` (después de `fix/lighthouse-empty-portals`)
 
 ## Historial
 
@@ -1041,15 +1041,41 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 
 **Corrección posterior (`fix/lighthouse-empty-portals`):** con Ucureña en `LIGHTHOUSE_ORIGINS`, «Lighthouse on production» falló por su SEO (69 < 95). Ucureña todavía no tiene nada publicado, así que lleva `noindex` a propósito (Hito · Paso 1), y Lighthouse lo cuenta como falla. Ahora el medidor reconoce un portal vacío por su sitemap (sin destinos ni eventos) y juzga su SEO sin la auditoría de rastreo; un portal con contenido sigue fallando si aparece con `noindex`. Contra producción: Ucureña con SEO 100 en sus 4 páginas y Demo Sur medido con todas las auditorías.
 
+### ★ Hito · Paso 4 — README de portafolio ✅
+
+- Decisiones del usuario (2026-10-31):
+  - el README en **español** (`README.md`) y en **inglés completo** (`README.en.md`), enlazados arriba, para empresas de Cochabamba y clientes de Upwork;
+  - una sección **«Autor»** con su nombre, su perfil (ingeniero de sistemas, EMI) y su LinkedIn, sin correo ni teléfono.
+- Contenido, pensado para que alguien sin contexto entienda el proyecto y lo abra en dos minutos:
+  - qué es en dos líneas y las insignias de CI y de «Daily health»;
+  - **«Pruébalo en vivo»**: Demo Norte, un tour 360°, el recorrido general, Demo Sur (mismo build, otra marca) y Ucureña; el panel, solo por invitación;
+  - qué hace para el visitante, para el municipio y para el operador, solo con lo que ya existe;
+  - estado (P1–P4 terminadas, el Hito y P5 con la IA);
+  - arquitectura en texto con un diagrama Mermaid y siete principios;
+  - diez decisiones con su ADR;
+  - **métricas reales**: Lighthouse sobre producción del 31 de octubre, la medición en Android (tour y mapa) y las pruebas;
+  - stack, cómo correrlo en local (usuarios del seed y Mailpit), la documentación y «Autor».
+- Sin capturas, como se acordó: llegan con el contenido real de Ucureña.
+- Verificado:
+  - las direcciones en vivo responden 200 y los enlaces internos existen (los de GitHub y LinkedIn los bloquea el proxy de mi entorno; los dos workflows de las insignias existen y están activos);
+  - el diagrama Mermaid se dibuja;
+  - el tour enlazado se describe como es en producción: dos escenas con flechas, un modelo 3D y el salto a otro recorrido (panoramas de 2880 px, sin teselas), comprobado con una consulta de solo lectura.
+
+**Desviaciones:**
+
+- La documentación interna sigue en español; el README en inglés lo dice donde enlaza a ella.
+- Las métricas son una foto del 31 de octubre: se actualizan cuando cambien de forma notable o con el contenido real de Ucureña.
+
 ## Cómo verificarlo
 
-1. Actions → «Daily health»: una corrida verde por día, con cada portal y el panel.
-2. `/plataforma` muestra «Estado de la plataforma» con el espacio del proyecto.
-3. En el celular, `https://rikuy-demo-norte.vercel.app/mapa?medir` muestra el panel «Medición del mapa» (después de este merge, también sin `=1`).
+1. En GitHub, la página del repositorio muestra el README con sus insignias y el diagrama; «English» abre `README.en.md`.
+2. Los enlaces de «Pruébalo en vivo» abren los portales y el tour.
+3. Actions → «Daily health»: una corrida verde por día (el Paso 3 se cierra el 4 de noviembre con una semana completa).
 
-## Siguiente paso — ★ Hito · Paso 4 (requiere autorización)
+## Siguiente paso
 
-**README de portafolio** (sin capturas por ahora): qué es, enlaces en vivo, arquitectura en texto, decisiones con sus ADR, métricas reales y cómo correrlo.
+1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ en el roadmap y el checkpoint.
+2. **P5 · Paso 1 — Gateway de IA** (requiere autorización): perfiles, `ai_requests`/`ai_executions`, cuotas y degradación sin IA. Terminado cuando una cuota agotada detiene la IA y el portal sigue funcionando.
 
 ## Decisiones pendientes del usuario
 
