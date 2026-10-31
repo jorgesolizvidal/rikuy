@@ -1031,11 +1031,19 @@ Comprobado desde fuera:
 
 **Corrección posterior (`fix/map-measure-param`):** en el celular, `/mapa?medir` no mostraba el panel. En producción, un `?medir` sin valor no llega al servidor (`?medir=1` sí), y la página lo leía ahí. Ahora el panel lo lee en el navegador, como el del tour. Verificado en local con y sin valor; sin el parámetro, el código del panel no se descarga.
 
+**Medición del mapa en Android (2026-10-31):** el usuario midió `/mapa?medir=1` en producción, en su celular (CRT-NX3, Android 15, Mali-G57 MC2, 4G):
+
+- LCP 1,99 s (umbral 3,5 s); el mapa completo a los 3,25 s, 0,89 s después de arrancar;
+- 82 cuadros/s al moverlo, p95 de 17 ms y ningún cuadro de más de 50 ms;
+- 472 KB de JavaScript (MapLibre, solo en esta página).
+
+El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-budget.md)).
+
 ## Cómo verificarlo
 
 1. Actions → «Daily health»: una corrida verde por día, con cada portal y el panel.
 2. `/plataforma` muestra «Estado de la plataforma» con el espacio del proyecto.
-3. En el celular, `https://rikuy-demo-norte.vercel.app/mapa?medir` → «Medir la fluidez (5 s)» → «Copiar resultados».
+3. En el celular, `https://rikuy-demo-norte.vercel.app/mapa?medir` muestra el panel «Medición del mapa» (después de este merge, también sin `=1`).
 
 ## Siguiente paso — ★ Hito · Paso 4 (requiere autorización)
 
