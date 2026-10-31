@@ -6,7 +6,7 @@
 
 - **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
 - **Último paso completado:** Hito · Paso 3 — operación con planes gratuitos (2026-10-27), pendiente de confirmar en producción
-- **Rama:** `feat/hito-step3-operations` → PR hacia `main`
+- **Rama:** `fix/map-measure-param` → PR hacia `main`
 
 ## Historial
 
@@ -1027,12 +1027,15 @@ Comprobado desde fuera:
 - GitHub desactiva los workflows programados de un repositorio sin commits en 60 días: hay que volver a activarlo en Actions.
 - Localmente, un 404 de `/destinos/…` que Next regenera en su caché puede llevar dos etiquetas `robots` (las dos `noindex`). No cambia nada para los buscadores y no viene de este paso.
 
+**Puesta en marcha (2026-10-31):** el usuario agregó Ucureña a `LIGHTHOUSE_ORIGINS` y `ADMIN_ORIGIN`, y corrió «Daily health» a mano: los 7 controles en 200 con la versión `d57b9426e65e`. Desde el 28, «Daily health» corre sola cada día en verde, y las tareas `rikuy-daily-report` y `rikuy-remove-unused-media` terminan sin errores (consulta de solo lectura a `cron.job_run_details`). «Lighthouse on production» pasó con este merge.
+
+**Corrección posterior (`fix/map-measure-param`):** en el celular, `/mapa?medir` no mostraba el panel. En producción, un `?medir` sin valor no llega al servidor (`?medir=1` sí), y la página lo leía ahí. Ahora el panel lo lee en el navegador, como el del tour. Verificado en local con y sin valor; sin el parámetro, el código del panel no se descarga.
+
 ## Cómo verificarlo
 
-1. En GitHub → Settings → Variables: `LIGHTHOUSE_ORIGINS` con Ucureña (`…,ucurena=https://rikuy-ucurena.vercel.app`) y `ADMIN_ORIGIN` = `https://rikuy-app-admin.vercel.app`.
-2. Actions → «Daily health» → _Run workflow_: la tabla del resumen muestra cada portal y el panel en verde.
-3. `/plataforma` muestra «Estado de la plataforma» con el espacio del proyecto.
-4. En el celular, `https://rikuy-demo-norte.vercel.app/mapa?medir` → «Medir la fluidez (5 s)» → «Copiar resultados».
+1. Actions → «Daily health»: una corrida verde por día, con cada portal y el panel.
+2. `/plataforma` muestra «Estado de la plataforma» con el espacio del proyecto.
+3. En el celular, `https://rikuy-demo-norte.vercel.app/mapa?medir` → «Medir la fluidez (5 s)» → «Copiar resultados».
 
 ## Siguiente paso — ★ Hito · Paso 4 (requiere autorización)
 
