@@ -108,7 +108,7 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
           {...(center ? { center } : {})}
         />
       )}
-      {query.medir !== undefined ? <MapMeasureLoader /> : null}
+      <MapMeasureLoader />
     </div>
   );
 }
