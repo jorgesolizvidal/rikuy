@@ -6,7 +6,7 @@
 
 - **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
 - **Último paso completado:** Hito · Paso 3 — operación con planes gratuitos (2026-10-27), pendiente de confirmar en producción
-- **Rama:** `fix/map-measure-param` → PR hacia `main`
+- **Rama:** `fix/lighthouse-empty-portals` → PR hacia `main`
 
 ## Historial
 
@@ -1038,6 +1038,8 @@ Comprobado desde fuera:
 - 472 KB de JavaScript (MapLibre, solo en esta página).
 
 El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-budget.md)).
+
+**Corrección posterior (`fix/lighthouse-empty-portals`):** con Ucureña en `LIGHTHOUSE_ORIGINS`, «Lighthouse on production» falló por su SEO (69 < 95). Ucureña todavía no tiene nada publicado, así que lleva `noindex` a propósito (Hito · Paso 1), y Lighthouse lo cuenta como falla. Ahora el medidor reconoce un portal vacío por su sitemap (sin destinos ni eventos) y juzga su SEO sin la auditoría de rastreo; un portal con contenido sigue fallando si aparece con `noindex`. Contra producción: Ucureña con SEO 100 en sus 4 páginas y Demo Sur medido con todas las auditorías.
 
 ## Cómo verificarlo
 
