@@ -44,6 +44,10 @@ for (const event of ["uncaughtException", "unhandledRejection"]) {
 // "demo-norte=https://rikuy-demo-norte.vercel.app,otro=https://otro-portal.vercel.app".
 // Each portal's pages come from its own sitemap (Hito · Paso 3): its first destination and
 // its first upcoming event, whatever they are; a portal without them skips those pages.
+//
+// A portal with neither (nothing published yet, like a municipality just set up) carries
+// `noindex` on purpose (Hito · Paso 1): its SEO is judged without the crawlability audit.
+// A portal with content is judged on all of it, so an unwanted `noindex` still fails.
 const SEED_PORTALS = ["demo-norte", "demo-sur"];
 const origins = new Map(
   (process.env.LIGHTHOUSE_ORIGINS ?? "")
@@ -55,9 +59,9 @@ const originOf = (slug) =>
   (origins.get(slug) ?? `http://${slug}.localhost:${port}`).replace(/\/$/u, "");
 const SET = process.env.LIGHTHOUSE_SET === "tours" ? "tours" : "portal";
 const measured = origins.size > 0 ? [...origins.keys()] : SEED_PORTALS;
-const pageOf = (slug, kind, path) => {
+const pageOf = (slug, kind, path, empty = false) => {
   const url = `${originOf(slug)}${path}`;
-  return { kind, label: url.replace(/^https?:\/\//u, ""), url };
+  return { kind, label: url.replace(/^https?:\/\//u, ""), url, empty };
 };
 
 /**
@@ -112,6 +116,7 @@ async function tourPages(slug) {
 async function portalPages(slug) {
   const paths = await sitemapPaths(slug);
   const first = (pattern) => paths.find((path) => pattern.test(path));
+  const empty = !paths.some((path) => /^\/(destinos|agenda)\/[^/]+$/u.test(path));
   const kinds = {
     home: "/",
     destinations: "/destinos",
@@ -122,7 +127,7 @@ async function portalPages(slug) {
   };
   return Object.entries(kinds)
     .filter(([, path]) => path !== undefined)
-    .map(([kind, path]) => pageOf(slug, kind, path));
+    .map(([kind, path]) => pageOf(slug, kind, path, empty));
 }
 
 const pages = (
@@ -194,14 +199,39 @@ async function startChrome() {
 
 const median = (values) => [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)];
 
-function measure(lhr) {
+/**
+ * The SEO score without `is-crawlable`, weighted as Lighthouse weighs the category: for an
+ * empty portal, whose `noindex` is intended.
+ */
+function seoWithoutCrawlability(lhr) {
+  let total = 0;
+  let weights = 0;
+  for (const { id, weight } of lhr.categories.seo?.auditRefs ?? []) {
+    const audit = lhr.audits[id];
+    if (id === "is-crawlable" || weight === 0 || audit?.score === null || audit === undefined) {
+      continue;
+    }
+    total += audit.score * weight;
+    weights += weight;
+  }
+  return weights === 0 ? 0 : Math.round((total / weights) * 100);
+}
+
+function measure(lhr, page) {
+  const intendedNoindex = page.empty && lhr.audits["is-crawlable"]?.score === 0;
   const scripts = lhr.audits["resource-summary"]?.details?.items?.find(
     (item) => item.resourceType === "script",
   );
   return {
     scores: Object.fromEntries(
-      CATEGORIES.map((id) => [id, Math.round((lhr.categories[id]?.score ?? 0) * 100)]),
+      CATEGORIES.map((id) => [
+        id,
+        id === "seo" && intendedNoindex
+          ? seoWithoutCrawlability(lhr)
+          : Math.round((lhr.categories[id]?.score ?? 0) * 100),
+      ]),
     ),
+    intendedNoindex,
     lcpMs: Math.round(lhr.audits["largest-contentful-paint"].numericValue),
     tbtMs: Math.round(lhr.audits["total-blocking-time"].numericValue),
     cls: Number(lhr.audits["cumulative-layout-shift"].numericValue.toFixed(3)),
@@ -260,7 +290,7 @@ const problems = [];
     const runs = [];
     for (let run = 0; run < budget.runs; run += 1) {
       const result = await runOnce(page);
-      runs.push({ lhr: result.lhr, report: result.report, ...measure(result.lhr) });
+      runs.push({ lhr: result.lhr, report: result.report, ...measure(result.lhr, page) });
     }
     // The run with the median performance score represents the page (as Lighthouse CI does).
     const target = median(runs.map((r) => r.scores.performance));
@@ -295,7 +325,7 @@ const problems = [];
           ", ",
         )}] a11y ${chosen.scores.accessibility} bp ${chosen.scores["best-practices"]} seo ${
         chosen.scores.seo
-      } LCP ${chosen.lcpMs} ms TBT ${chosen.tbtMs} ms CLS ${chosen.cls} JS ${chosen.scriptKb} KB`,
+      }${chosen.intendedNoindex ? " (noindex: portal vacío)" : ""} LCP ${chosen.lcpMs} ms TBT ${chosen.tbtMs} ms CLS ${chosen.cls} JS ${chosen.scriptKb} KB`,
     );
   }
 }
@@ -307,7 +337,7 @@ const table = [
     ({ page, chosen, runs, ok }) =>
       `| ${page.label} | ${chosen.scores.performance} (${runs.join(", ")}) | ${chosen.scores.accessibility} | ${
         chosen.scores["best-practices"]
-      } | ${chosen.scores.seo} | ${(chosen.lcpMs / 1000).toFixed(1)} s | ${chosen.tbtMs} ms | ${chosen.cls} | ${
+      } | ${chosen.scores.seo}${chosen.intendedNoindex ? " (noindex: portal vacío)" : ""} | ${(chosen.lcpMs / 1000).toFixed(1)} s | ${chosen.tbtMs} ms | ${chosen.cls} | ${
         chosen.scriptKb
       } KB | ${ok ? "✅" : "❌"} |`,
   ),
