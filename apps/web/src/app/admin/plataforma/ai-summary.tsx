@@ -19,15 +19,25 @@ export function AiSummary({
   readonly status: AiGatewayStatus;
   readonly tenants: readonly { readonly tenantId: string; readonly displayName: string }[];
 }) {
-  const connection = !status.configured
-    ? "Sin configurar en este despliegue: el portal funciona igual y el asistente muestra su aviso."
-    : status.provider === "simulated"
-      ? `Modelo simulado (${status.model}), solo para desarrollo: no llama a ningún proveedor.`
-      : `Conectado a Groq con ${status.model}.`;
+  const connection =
+    status.invalidKeys.length > 0
+      ? `Configuración con errores en ${status.invalidKeys.join(", ")}: el portal funciona igual y el asistente muestra su aviso hasta que se corrija.`
+      : !status.configured
+        ? "Sin configurar en este despliegue: el portal funciona igual y el asistente muestra su aviso."
+        : status.provider === "simulated"
+          ? `Modelo simulado (${status.model}), solo para desarrollo: no llama a ningún proveedor.`
+          : `Conectado a Groq con ${status.model}.`;
   return (
     <section aria-labelledby="ia" className="operations">
       <h2 id="ia">Asistente con IA</h2>
       <p>{connection}</p>
+      {status.invalidKeys.includes("AI_DATABASE_URL") ? (
+        <p className="field-hint">
+          Si la contraseña de <code>rikuy_ai</code> tiene símbolos como # / ? o %, cámbiala por una
+          solo con letras y números (o escríbelos codificados: %23, %2F, %3F, %25) y vuelve a
+          desplegar.
+        </p>
+      ) : null}
       <ul className="usage-list">
         {ai ? (
           <li className="usage-card">
