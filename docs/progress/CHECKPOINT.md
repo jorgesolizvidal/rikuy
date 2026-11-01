@@ -1101,6 +1101,14 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - La estimación de tokens de entrada es aproximada (caracteres / 3) y reserva de más.
 - La IA en producción necesita la activación del usuario (rol, clave y dos variables): [«Activar la IA»](../deploy.md#activar-la-ia-groq).
 
+**Corrección posterior (`fix/ai-database-url`):** tras activar la IA en producción, «Probar la IA» respondía «No pudimos hacer la prueba». La base no registró ningún intento de conexión de `rikuy_ai` (sin pedidos, sesiones ni fallos de contraseña), así que el error ocurría antes de conectarse. Reproducido: una contraseña con `#`, `/`, `?` o `%` sin codificar pasa el patrón `postgres://…` pero el controlador no puede leer la dirección y lanza un error fuera del gateway.
+
+- `@rikuy/config`: `AI_DATABASE_URL` y `WORKER_DATABASE_URL` se validan como direcciones legibles (`isReadablePostgresUrl`). Una inválida es un error de configuración con el nombre de la variable, nunca su valor.
+- Gateway: si la conexión o el proveedor no se pueden crear, la respuesta es «sin IA» (`not_configured`) con el registro `ai.setup_failed`, nunca una excepción.
+- `/plataforma` → «Asistente con IA» dice «Configuración con errores en AI_DATABASE_URL» y explica lo de los símbolos.
+- `docs/deploy.md` y `docs/jobs.md` piden contraseñas solo con letras y números (o con los símbolos codificados).
+- Tests: config 14 (+5), web 38 (+3).
+
 ## Cómo verificarlo
 
 1. Después del merge, seguir [«Activar la IA (Groq)»](../deploy.md#activar-la-ia-groq): clave `rikuy-produccion`, `alter role rikuy_ai with login password …`, `AI_DATABASE_URL` y `GROQ_API_KEY` en Vercel y _Redeploy_.

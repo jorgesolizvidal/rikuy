@@ -16,6 +16,30 @@ const hostSchema = z
   .min(1)
   .regex(/^[a-z0-9.-]+(:\d+)?$/, "must be a lowercase host, optionally with a port");
 
+/**
+ * Whether a postgres:// connection string can be read the way the drivers read it (as a
+ * URL, with the user and password percent-decoded). A password with an unescaped `#`, `/`,
+ * `?` or `%` passes a simple pattern but breaks the driver at the first query; checking it
+ * here turns that into a named configuration error.
+ */
+export function isReadablePostgresUrl(value: string): boolean {
+  try {
+    const url = new URL(value.replace(/^postgres(ql)?:/u, "http:"));
+    decodeURIComponent(url.username);
+    decodeURIComponent(url.password);
+    return url.hostname !== "";
+  } catch {
+    return false;
+  }
+}
+
+const postgresUrlSchema = z
+  .string()
+  .regex(/^postgres(ql)?:\/\/\S+$/u, "must be a postgres:// connection string")
+  .refine(isReadablePostgresUrl, {
+    message: "cannot be read: percent-encode # / ? % in the password, or use letters and digits",
+  });
+
 export const publicEnvSchema = z.object({
   NEXT_PUBLIC_SUPABASE_URL: z.url(),
   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: z.string().min(1),
@@ -89,9 +113,7 @@ export function parseServerEnv(
  *   as `postgres` to the local stack.
  */
 export const jobRunnerEnvSchema = z.object({
-  WORKER_DATABASE_URL: z
-    .string()
-    .regex(/^postgres(ql)?:\/\/\S+$/u, "must be a postgres:// connection string"),
+  WORKER_DATABASE_URL: postgresUrlSchema,
   JOB_RUNNER_SECRET: z.string().min(32, "must be at least 32 characters"),
   WORKER_DATABASE_ROLE: z
     .string()
@@ -166,9 +188,7 @@ export function parseMailEnv(
  */
 export const aiEnvSchema = z
   .object({
-    AI_DATABASE_URL: z
-      .string()
-      .regex(/^postgres(ql)?:\/\/\S+$/u, "must be a postgres:// connection string"),
+    AI_DATABASE_URL: postgresUrlSchema,
     AI_DATABASE_ROLE: z
       .string()
       .regex(/^[a-z_][a-z0-9_]{0,62}$/u)

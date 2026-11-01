@@ -168,7 +168,7 @@ Sin dominio propio, lo más simple y gratuito es una **cuenta de Gmail dedicada*
 Sin esto no hay IA y el portal funciona igual: el asistente muestra su aviso ([ADR-036](adr/ADR-036-ai-gateway.md)). Se hace una sola vez.
 
 1. **La clave de Groq:** en [console.groq.com](https://console.groq.com) → _API Keys_ → _Create API Key_, con el nombre `rikuy-produccion`. Cópiala: se muestra una sola vez. **Una sola clave para toda la plataforma**: Groq aplica sus límites a la organización (tu cuenta), no a cada clave, así que una clave por municipio no agrega capacidad. El reparto entre municipios lo hacen las cuotas de Rikuy.
-2. **El rol de la IA en la base:** genera una contraseña larga (por ejemplo con tu gestor de contraseñas) y, en Supabase → _SQL Editor_:
+2. **El rol de la IA en la base:** genera una contraseña larga **solo con letras y números** (por ejemplo, 40 caracteres en tu gestor de contraseñas con los símbolos desactivados) y, en Supabase → _SQL Editor_:
 
    ```sql
    alter role rikuy_ai with login password '<CONTRASEÑA_DE_LA_IA>';
@@ -176,6 +176,9 @@ Sin esto no hay IA y el portal funciona igual: el asistente muestra su aviso ([A
 
 3. **La conexión:** Supabase → _Connect_ → _Transaction pooler_. Copia la cadena y cambia el usuario `postgres.<ref>` por `rikuy_ai.<ref>` y la contraseña por la del paso 2:
    `postgresql://rikuy_ai.<ref>:<CONTRASEÑA_DE_LA_IA>@<host-del-pooler>:6543/postgres`
+
+   La contraseña va dentro de una dirección: `#`, `/`, `?` o `%` la rompen. Si la tuya los tiene, cámbiala o escríbelos codificados (`%23`, `%2F`, `%3F`, `%25`).
+
 4. **Vercel** → _Settings_ → _Environment Variables_, solo en _Production_ y marcadas como _Sensitive_:
    - `AI_DATABASE_URL`: la cadena del paso 3;
    - `GROQ_API_KEY`: la clave del paso 1.
@@ -186,7 +189,7 @@ Sin esto no hay IA y el portal funciona igual: el asistente muestra su aviso ([A
 
 **Si no funciona:**
 
-- «Sin configurar»: falta una variable o está mal escrita. En Vercel → _Logs_, `ai.misconfigured` dice cuál.
+- «Sin configurar»: falta una variable. «Configuración con errores en …»: esa variable está mal escrita; si es `AI_DATABASE_URL`, casi siempre es un símbolo de la contraseña (paso 3). En Vercel → _Logs_, `ai.misconfigured` dice cuál.
 - «La IA no está configurada… o su conexión a la base no responde»: la conexión del paso 3 (usuario `rikuy_ai.<ref>`, puerto 6543, contraseña). En los registros aparece `ai.begin_failed`.
 - «Groq rechazó el pedido»: la clave (cópiala de nuevo) o el modelo.
 - «Groq no respondió»: Groq caído o saturado; vuelve a probar en unos minutos.

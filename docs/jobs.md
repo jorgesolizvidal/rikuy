@@ -88,6 +88,9 @@ $b = New-Object byte[] 32; [System.Security.Cryptography.RandomNumberGenerator]:
 
 2. **Supabase → Connect → Transaction pooler**: copia la cadena de conexión y cambia el usuario `postgres.<ref>` por `rikuy_worker.<ref>` y la contraseña por la del paso 1:
    `postgresql://rikuy_worker.<ref>:<CONTRASEÑA_DEL_EJECUTOR>@<host-del-pooler>:6543/postgres`
+
+   Usa una contraseña solo con letras y números: `#`, `/`, `?` o `%` rompen la dirección (o escríbelos codificados: `%23`, `%2F`, `%3F`, `%25`).
+
 3. **Vercel → Settings → Environment Variables** (Production, marcadas como **Sensitive**):
    - `WORKER_DATABASE_URL` = la cadena del paso 2;
    - `JOB_RUNNER_SECRET` = el mismo secreto del aviso del paso 1.

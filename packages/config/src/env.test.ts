@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   EnvValidationError,
+  isReadablePostgresUrl,
   parseAiEnv,
   parseJobRunnerEnv,
   parseMailEnv,
@@ -154,5 +155,34 @@ describe("environment contract", () => {
         VERCEL_ENV: "production",
       }),
     ).toEqual(["AI_PROVIDER"]);
+  });
+
+  it.each(["#", "/", "?", "%"])(
+    "names a connection string whose password has an unescaped %s, without echoing it",
+    (symbol) => {
+      const url = `postgresql://rikuy_ai.ref:pw${symbol}secreto@pooler.example.test:6543/postgres`;
+      try {
+        parseAiEnv({ AI_DATABASE_URL: url, GROQ_API_KEY: `gsk_${"x".repeat(32)}` });
+        expect.unreachable();
+      } catch (error) {
+        expect((error as EnvValidationError).invalidKeys).toEqual(["AI_DATABASE_URL"]);
+        expect(String((error as Error).message)).not.toContain("secreto");
+      }
+      expect(() =>
+        parseJobRunnerEnv({
+          WORKER_DATABASE_URL: url.replace("rikuy_ai", "rikuy_worker"),
+          JOB_RUNNER_SECRET: "x".repeat(40),
+        }),
+      ).toThrow(EnvValidationError);
+    },
+  );
+
+  it("accepts a password with the same symbols percent-encoded", () => {
+    const url = "postgresql://rikuy_ai.ref:pw%23%2F%3F%25@pooler.example.test:6543/postgres";
+    expect(isReadablePostgresUrl(url)).toBe(true);
+    expect(
+      parseAiEnv({ AI_DATABASE_URL: url, GROQ_API_KEY: `gsk_${"x".repeat(32)}` }),
+    ).toMatchObject({ AI_DATABASE_URL: url });
+    expect(isReadablePostgresUrl("postgresql://postgres@127.0.0.1:55432/rikuy")).toBe(true);
   });
 });
