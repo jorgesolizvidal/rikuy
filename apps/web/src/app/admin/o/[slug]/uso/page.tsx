@@ -1,4 +1,4 @@
-import { loadUsage } from "@rikuy/core";
+import { loadAiUsage, loadUsage } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -17,7 +17,11 @@ interface UsagePageProps {
 
 export default async function UsagePage({ params }: UsagePageProps) {
   const membership = await requireOrganization((await params).slug);
-  const meters = await loadUsage(membership, (await adminSession()).usage);
+  const session = await adminSession();
+  const [meters, ai] = await Promise.all([
+    loadUsage(membership, session.usage),
+    loadAiUsage(membership, session.aiUsage),
+  ]);
 
   return (
     <main id="contenido" tabIndex={-1} className="shell">
@@ -31,7 +35,8 @@ export default async function UsagePage({ params }: UsagePageProps) {
         <h1 className="title title-sm">Uso del plan</h1>
         <p className="lead">
           Cuánto usa {membership.displayName} de lo que tiene asignado. Cuando algo llega a su
-          límite, se rechazan las subidas nuevas; no se borra nada de lo que ya está.
+          límite, se rechazan las subidas nuevas (o el asistente avisa que no puede responder); no
+          se borra nada de lo que ya está.
         </p>
       </div>
 
@@ -56,6 +61,28 @@ export default async function UsagePage({ params }: UsagePageProps) {
             ) : null}
           </li>
         ))}
+        <li className="usage-card">
+          <h2>{RESOURCE_LABELS.ai_tokens}</h2>
+          <p className="field-hint">{RESOURCE_DETAILS.ai_tokens}</p>
+          <UsageBar meter={ai.meter} />
+          <p className="field-hint">
+            Hoy: {ai.answeredToday === 1 ? "1 respuesta" : `${ai.answeredToday} respuestas`}
+            {ai.refusedToday > 0
+              ? ` y ${ai.refusedToday === 1 ? "1 pregunta" : `${ai.refusedToday} preguntas`} sin responder por un límite`
+              : ""}
+            . Se renueva cada día a medianoche.
+          </p>
+          {ai.meter.level === "full" ? (
+            <p className="notice" role="status">
+              Usó su IA de hoy: el asistente responde con un aviso y enlaces útiles hasta
+              medianoche. El resto del portal funciona igual.
+            </p>
+          ) : ai.meter.level === "near" ? (
+            <p className="notice" role="status">
+              Ya usa más del 80 % de su IA de hoy.
+            </p>
+          ) : null}
+        </li>
       </ul>
       <p className="field-hint">
         Lo «reservado» es una estimación de lo que están subiendo o procesando ahora; se ajusta a lo

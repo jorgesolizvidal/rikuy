@@ -25,6 +25,20 @@ export const operationsSnapshotSchema = z.object({
     }),
   ),
   unusedMedia: z.object({ removed7d: count, bytes7d: count }),
+  // ADR-036: today's platform cap (UTC) and the municipalities at 80 % of their AI quota.
+  // Optional: a database without the AI gateway yet has no such key.
+  ai: z
+    .object({
+      used: count,
+      limit: count,
+      answered24h: count,
+      refused24h: count,
+      failed24h: count,
+      quotas: z.array(
+        z.object({ tenant: z.string(), slug: z.string(), used: count, limit: count }),
+      ),
+    })
+    .optional(),
   at: z.string(),
 });
 export type OperationsSnapshot = z.infer<typeof operationsSnapshotSchema>;
@@ -36,7 +50,8 @@ export type OperationsReport = z.infer<typeof operationsReportSchema>;
 
 export interface OperationsAlert {
   readonly level: "warning" | "critical";
-  readonly code: "storage" | "database" | "failed_jobs" | "queue_stuck" | "quota";
+  readonly code:
+    "storage" | "database" | "failed_jobs" | "queue_stuck" | "quota" | "ai_platform" | "ai_quota";
   readonly message: string;
 }
 
@@ -49,6 +64,13 @@ export function formatStorage(bytes: number): string {
   return bytes >= 1_073_741_824
     ? `${format.format(bytes / 1_073_741_824)} GB`
     : `${format.format(bytes / 1_048_576)} MB`;
+}
+
+/** "12.500" tokens, with the Spanish thousands separator. */
+export function formatTokens(tokens: number): string {
+  return new Intl.NumberFormat("es", { maximumFractionDigits: 0, useGrouping: true }).format(
+    tokens,
+  );
 }
 
 function share(used: number, limit: number): number {
@@ -103,6 +125,24 @@ export function operationsAlerts(snapshot: OperationsSnapshot): OperationsAlert[
       code: "quota",
       message: `${quota.tenant} usa el ${percent(ratio)} de su cuota: ${what}.`,
     });
+  }
+  if (snapshot.ai !== undefined) {
+    const ai = share(snapshot.ai.used, snapshot.ai.limit);
+    if (ai >= 0.8) {
+      alerts.push({
+        level: level(ai),
+        code: "ai_platform",
+        message: `La IA de la plataforma va por el ${percent(ai)} de su tope de hoy: ${formatTokens(snapshot.ai.used)} de ${formatTokens(snapshot.ai.limit)} tokens. Al llegar al tope, el asistente deja de responder en todos los municipios hasta mañana.`,
+      });
+    }
+    for (const quota of snapshot.ai.quotas) {
+      const ratio = share(quota.used, quota.limit);
+      alerts.push({
+        level: level(ratio),
+        code: "ai_quota",
+        message: `${quota.tenant} usa el ${percent(ratio)} de su cuota de IA de hoy: ${formatTokens(quota.used)} de ${formatTokens(quota.limit)} tokens.`,
+      });
+    }
   }
   return alerts.sort((a, b) => (a.level === b.level ? 0 : a.level === "critical" ? -1 : 1));
 }

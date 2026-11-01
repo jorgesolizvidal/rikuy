@@ -3,10 +3,12 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { operatorContext } from "@/server/operator";
 import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../sign-out-button";
+import { AiSummary } from "./ai-summary";
 import { MfaPanel } from "./mfa-panel";
 import { OperationsSummary } from "./operations-summary";
 import { TenantStatusButton } from "./tenant-status-button";
@@ -79,6 +81,14 @@ export default async function PlatformPage() {
       {operations ? (
         <OperationsSummary snapshot={operations.snapshot} alerts={operations.alerts} />
       ) : null}
+
+      <AiSummary
+        ai={operations?.snapshot.ai}
+        status={aiGatewayStatus()}
+        tenants={tenants
+          .filter((tenant) => tenant.status !== "suspended")
+          .map(({ tenantId, displayName }) => ({ tenantId, displayName }))}
+      />
 
       <h2 className="operations-heading">Municipios</h2>
       <div className="table-wrap">

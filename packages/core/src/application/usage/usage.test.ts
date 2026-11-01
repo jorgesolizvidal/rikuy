@@ -26,8 +26,12 @@ const storage = (
 });
 
 describe("quotas (P2 · Paso 5)", () => {
-  it("defaults to 300 MB and 30 min of media compute per month", () => {
-    expect(QUOTA_DEFAULTS).toEqual({ storage_bytes: 300 * MB, media_compute_seconds: 1800 });
+  it("defaults to 300 MB, 30 min of media compute per month and 40,000 AI tokens per day", () => {
+    expect(QUOTA_DEFAULTS).toEqual({
+      storage_bytes: 300 * MB,
+      media_compute_seconds: 1800,
+      ai_tokens: 40_000,
+    });
   });
 
   it("counts what is in progress and warns from 80 %", () => {
@@ -55,6 +59,9 @@ describe("quotas (P2 · Paso 5)", () => {
       resource: "media_compute_seconds",
       limit: 0,
     });
+    expect(parseQuotaInput("ai_tokens", "40")).toEqual({ resource: "ai_tokens", limit: 40_000 });
+    expect(parseQuotaInput("ai_tokens", "12,5")).toEqual({ resource: "ai_tokens", limit: 12_500 });
+    expect(parseQuotaInput("ai_tokens", "10001")).toBeNull();
     for (const bad of ["-1", "abc", "", "1e9", "99999999"])
       expect(parseQuotaInput("storage_bytes", bad)).toBeNull();
     expect(parseQuotaInput("ai_cost", "10")).toBeNull();

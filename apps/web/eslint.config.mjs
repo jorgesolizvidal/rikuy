@@ -38,6 +38,20 @@ const jobRunnerPaths = [
   },
 ];
 
+// The AI workload's connection (rikuy_ai) and the provider key live in exactly one module.
+const aiGatewayModule = "src/server/ai-gateway.ts";
+const aiGatewayPaths = [
+  {
+    name: "@rikuy/db/ai",
+    message: `The AI gateway's connection and provider live only in ${aiGatewayModule}.`,
+  },
+  {
+    name: "@rikuy/config/env",
+    importNames: ["parseAiEnv"],
+    message: `The AI gateway's settings are read only in ${aiGatewayModule}.`,
+  },
+];
+
 const config = [
   ignores,
   ...nextVitals,
@@ -46,7 +60,10 @@ const config = [
     rules: {
       "no-restricted-imports": [
         "error",
-        { patterns: [noSupabaseInUi], paths: [...secretKeyPaths, ...jobRunnerPaths] },
+        {
+          patterns: [noSupabaseInUi],
+          paths: [...secretKeyPaths, ...jobRunnerPaths, ...aiGatewayPaths],
+        },
       ],
     },
   },
@@ -63,6 +80,7 @@ const config = [
           paths: [
             ...secretKeyPaths,
             ...jobRunnerPaths,
+            ...aiGatewayPaths,
             {
               name: "next/navigation",
               importNames: ["redirect", "permanentRedirect"],
@@ -77,13 +95,28 @@ const config = [
   {
     files: secretKeyModules,
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: jobRunnerPaths }],
+      "no-restricted-imports": [
+        "error",
+        { patterns: [noSupabaseInUi], paths: [...jobRunnerPaths, ...aiGatewayPaths] },
+      ],
     },
   },
   {
     files: [jobRunnerModule],
     rules: {
-      "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
+      "no-restricted-imports": [
+        "error",
+        { patterns: [noSupabaseInUi], paths: [...secretKeyPaths, ...aiGatewayPaths] },
+      ],
+    },
+  },
+  {
+    files: [aiGatewayModule],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [noSupabaseInUi], paths: [...secretKeyPaths, ...jobRunnerPaths] },
+      ],
     },
   },
   {

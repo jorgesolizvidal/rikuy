@@ -44,7 +44,12 @@ export type { SupabasePublishedContentReaderOptions } from "./content";
 export { createJobAdminRepository } from "./job-admin";
 export { createPanoramaRepository, mapPanoramaRow } from "./panoramas";
 export { createModelRepository, mapModelRow } from "./models";
-export { createPlatformUsageRepository, createUsageRepository } from "./usage";
+export {
+  createAiUsageRepository,
+  createPlatformAiUsageRepository,
+  createPlatformUsageRepository,
+  createUsageRepository,
+} from "./usage";
 export {
   createGeneralTourRepository,
   createSupabasePublishedTourReader,

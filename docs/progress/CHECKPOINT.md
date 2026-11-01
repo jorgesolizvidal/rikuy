@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** ★ Hito Demo / Portafolio. P1, P2, P3 y P4 ✅.
-- **Último paso completado:** Hito · Paso 4 — README de portafolio (2026-10-31). El Paso 3 espera su semana de control diario en verde (hasta el 4 de noviembre)
-- **Rama:** `feat/hito-step4-readme` → PR hacia `main` (después de `fix/lighthouse-empty-portals`)
+- **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
+- **Último paso completado:** P5 · Paso 1 — gateway de IA (2026-10-31)
+- **Rama:** `feat/p5-step1-ai-gateway` → PR hacia `main`
 
 ## Historial
 
@@ -1066,16 +1066,51 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - La documentación interna sigue en español; el README en inglés lo dice donde enlaza a ella.
 - Las métricas son una foto del 31 de octubre: se actualizan cuando cambien de forma notable o con el contenido real de Ucureña.
 
+### P5 · Paso 1 — gateway de IA ✅
+
+- Decisiones del usuario ([ADR-036](../adr/ADR-036-ai-gateway.md)), 2026-10-31:
+  - **una sola clave de Groq** para toda la plataforma (`rikuy-produccion`): sus límites son de la organización, no de cada clave, así que una por municipio no agrega capacidad. La clave propia por municipio queda en «Pendientes registrados» para los planes (E4);
+  - **cuota por municipio en tokens por día**, 40.000 por defecto, ajustable por el operador; **un tope de la plataforma** de 180.000 (el 90 % de los 200.000 diarios del plan gratuito); **10 preguntas por hora** por visitante; una sola cuota para el asistente del visitante y el de administración;
+  - **nunca un error para el visitante:** sin cuota o con el proveedor caído, un aviso con el nombre del asistente y enlaces útiles.
+- Base de datos (`20261101000000_p5_ai_enum.sql` y `20261101000100_p5_ai_gateway.sql`, solo expand):
+  - **Rol `rikuy_ai`** (sin inicio de sesión hasta que el operador lo habilita) y esquema `ai_api`: ni la clave pública ni la secreta pueden reservar ni gastar cuota de IA.
+  - `ai_tokens` como recurso de cuota con período **diario** en la hora del municipio. `tenant_usage`, `platform_tenant_usage` y las cuotas del resumen de operaciones **siguen devolviendo solo almacenamiento y procesamiento** (el panel desplegado valida una lista cerrada); la IA tiene sus lecturas: `tenant_ai_usage`, `platform_ai_usage` y la clave `ai` del resumen.
+  - `ai_requests` (reservado → liquidado, o rechazado con su motivo; estados revalidados por la base), `ai_executions` (cada llamada al proveedor) y `ai_platform_days` (el tope por día UTC). Sin el texto de preguntas ni respuestas; el visitante, solo como `sha256(sal del día ‖ municipio ‖ clave)`.
+  - `ai_api.begin_request` revisa en una transacción el municipio (suspendido, o no en línea para el asistente del visitante), el límite del visitante, la cuota del municipio y el tope de la plataforma; lo que no cabe queda rechazado sin reservar nada. `ai_api.finish_request` liquida con lo realmente usado (idempotente).
+  - Tarea `rikuy-expire-ai-requests` (cada 15 min): una reserva abierta más de 10 min se cuenta como usada; borra pedidos de más de 90 días.
+- `@rikuy/core`: contrato de la IA y perfiles (`assistant` 6.000 / 1.000 tokens, `copilot` 12.000 / 2.000, `probe` 200 / 256), `runAiRequest` (reservar → llamar → liquidar; un reintento ante caída o tiempo agotado, ninguno ante un 429; nada llega al proveedor sin estar contado; en los registros solo el tipo de error), los avisos para el visitante (`aiNotice`), el proveedor simulado, `probeAi` y las lecturas de uso. El resumen de operaciones suma avisos de IA al 80 % (plataforma y municipios), también en el correo diario.
+- `@rikuy/config`: `parseAiEnv` (todas o ninguna; el modelo simulado prohibido en producción).
+- `@rikuy/db`: entrada `@rikuy/db/ai` con el registro por el rol `rikuy_ai` y el **proveedor Groq** por HTTP, sin SDK (`reasoning_effort: "low"`, sin devolver el razonamiento; la clave nunca llega a un error ni a un registro); repositorios de uso de IA con la sesión del usuario.
+- Web: `src/server/ai-gateway.ts`, el único módulo que abre la conexión de la IA y tiene la clave (ESLint lo impide en cualquier otro). En el panel:
+  - `/plataforma` → **«Asistente con IA»**: estado de la conexión y el modelo, la IA de la plataforma hoy, las últimas 24 h y **«Probar la IA»** a nombre de un municipio, que muestra también qué leería un visitante si no hay respuesta;
+  - `/plataforma/cuotas`: la cuota de IA de cada municipio, en miles de tokens por día;
+  - «Uso del plan»: la IA del día, con respuestas y preguntas sin responder.
+- El lint de SQL del CI suma el esquema `ai_api`.
+- Tests:
+  - 550 unitarios (core 351, db 118, web 35, worker 37, config 9);
+  - 840 pgTAP (50 nuevos, `025_ai_gateway`): nadie fuera de `rikuy_ai` llega al gateway (visitante, miembro ni clave secreta) y `rikuy_ai` no lee tablas; reservar, liquidar y liquidar dos veces; un fallo con dos intentos; cuota del municipio y tope de la plataforma (devolviendo la reserva); 10 preguntas por visitante y no 11, otro visitante y otro municipio sí; suspendido y en preparación; reservas abandonadas; estados inconsistentes rechazados; lecturas (las existentes sin IA, la del día en la hora del municipio, otro municipio sin acceso, operador con segundo factor);
+  - integración contra PostgreSQL real con el rol `rikuy_ai` (`ai.int.test.ts`): un pedido respondido y liquidado; **8 pedidos a la vez con cupo para 3 → exactamente 3**; con la cuota agotada el proveedor nunca se llama y el portal sigue listando destinos;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador, con el proveedor simulado y el rol `rikuy_ai`: «Probar la IA» responde y queda registrado con el operador; con la cuota de Demo Norte en 0,1 mil tokens la siguiente prueba se rechaza sin reservar y muestra el aviso del visitante; «Uso del plan» lo refleja; el portal responde 200 en inicio, destinos, mapa y agenda; axe sin hallazgos críticos ni graves y sin desbordes a 360 y 1280 px. Contratos 189 y portales 161 en verde.
+- Lo que encontraron las pruebas, ya corregido: `platform_ai_usage` no devolvía el período del día y el panel lo exige; el nombre accesible del campo de cuota decía «asistente con ia».
+
+**Desviaciones:**
+
+- El asistente todavía no tiene ventana en el portal: llega en el Paso 3. Este paso deja el gateway, los estados degradados con sus textos y la prueba del operador.
+- La documentación de Groq no dice si el razonamiento de `gpt-oss` cuenta dentro del máximo de salida; se asume que sí (como en la API de OpenAI) y los máximos de salida dejan margen. Se confirma con la primera prueba en producción.
+- La estimación de tokens de entrada es aproximada (caracteres / 3) y reserva de más.
+- La IA en producción necesita la activación del usuario (rol, clave y dos variables): [«Activar la IA»](../deploy.md#activar-la-ia-groq).
+
 ## Cómo verificarlo
 
-1. En GitHub, la página del repositorio muestra el README con sus insignias y el diagrama; «English» abre `README.en.md`.
-2. Los enlaces de «Pruébalo en vivo» abren los portales y el tour.
-3. Actions → «Daily health»: una corrida verde por día (el Paso 3 se cierra el 4 de noviembre con una semana completa).
+1. Después del merge, seguir [«Activar la IA (Groq)»](../deploy.md#activar-la-ia-groq): clave `rikuy-produccion`, `alter role rikuy_ai with login password …`, `AI_DATABASE_URL` y `GROQ_API_KEY` en Vercel y _Redeploy_.
+2. `/plataforma` → «Asistente con IA» dice «Conectado a Groq con openai/gpt-oss-120b»; «Probar la IA» con Ucureña responde «listo».
+3. `/plataforma/cuotas` muestra la IA de cada municipio; `/o/ucurena/uso`, la IA del día.
 
 ## Siguiente paso
 
-1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ en el roadmap y el checkpoint.
-2. **P5 · Paso 1 — Gateway de IA** (requiere autorización): perfiles, `ai_requests`/`ai_executions`, cuotas y degradación sin IA. Terminado cuando una cuota agotada detiene la IA y el portal sigue funcionando.
+1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real).
+2. **P5 · Paso 2 — conocimiento** (requiere autorización): `knowledge_chunks` desde contenidos publicados y documentos del municipio (texto/PDF), búsqueda de texto completo en español y citas. Terminado cuando un borrador o un documento retirado nunca aparece en una respuesta.
 
 ## Decisiones pendientes del usuario
 

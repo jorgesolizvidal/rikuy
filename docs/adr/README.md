@@ -39,3 +39,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 033 | [Modelo 3D en el tour: imagen primero, visor 3D solo a pedido y una descripción como alternativa](ADR-033-tour-models.md)           | Aceptada (2026-10-27)                                                       |
 | 034 | [Demos comerciales con contenido de muestra y correo de invitación por SMTP](ADR-034-commercial-demos-and-mail.md)                  | Aceptada (2026-10-27)                                                       |
 | 035 | [Operación con planes gratuitos: control diario, avisos por correo y limpieza de imágenes sin uso](ADR-035-free-plan-operations.md) | Aceptada (2026-10-27)                                                       |
+| 036 | [Gateway de IA: rol propio, cuota diaria en tokens y degradación sin IA](ADR-036-ai-gateway.md)                                     | Aceptada (2026-10-31)                                                       |

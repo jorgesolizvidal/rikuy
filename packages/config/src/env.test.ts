@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   EnvValidationError,
+  parseAiEnv,
   parseJobRunnerEnv,
   parseMailEnv,
   parsePlatformEnv,
@@ -112,5 +113,46 @@ describe("environment contract", () => {
     expect(() => parseMailEnv({ ...gmail, MAIL_FROM: "Rikuy <x@y.test>\nBcc: z@y.test" })).toThrow(
       EnvValidationError,
     );
+  });
+
+  it("reads the AI gateway's settings, all or nothing, never simulated in production", () => {
+    expect(parseAiEnv({})).toBeNull();
+    const groq = {
+      AI_DATABASE_URL:
+        "postgresql://rikuy_ai.ref:pw@aws-0-sa-east-1.pooler.supabase.com:6543/postgres",
+      // Not a key: low entropy on purpose, so no secret scanner mistakes it for one.
+      GROQ_API_KEY: `gsk_${"x".repeat(32)}`,
+    };
+    expect(parseAiEnv(groq)).toEqual({
+      ...groq,
+      AI_PROVIDER: "groq",
+      AI_MODEL: "openai/gpt-oss-120b",
+    });
+    expect(
+      parseAiEnv({
+        AI_DATABASE_URL: "postgresql://postgres@127.0.0.1:55432/rikuy",
+        AI_DATABASE_ROLE: "rikuy_ai",
+        AI_PROVIDER: "simulated",
+      }),
+    ).toMatchObject({ AI_PROVIDER: "simulated", AI_DATABASE_ROLE: "rikuy_ai" });
+    const invalid = (source: Record<string, string>) => {
+      try {
+        parseAiEnv(source);
+        return [];
+      } catch (error) {
+        expect(String((error as Error).message)).not.toContain("gsk_");
+        return (error as EnvValidationError).invalidKeys;
+      }
+    };
+    expect(invalid({ GROQ_API_KEY: groq.GROQ_API_KEY })).toEqual(["AI_DATABASE_URL"]);
+    expect(invalid({ AI_DATABASE_URL: groq.AI_DATABASE_URL })).toEqual(["GROQ_API_KEY"]);
+    expect(invalid({ ...groq, AI_MODEL: "gpt oss" })).toEqual(["AI_MODEL"]);
+    expect(
+      invalid({
+        AI_DATABASE_URL: groq.AI_DATABASE_URL,
+        AI_PROVIDER: "simulated",
+        VERCEL_ENV: "production",
+      }),
+    ).toEqual(["AI_PROVIDER"]);
   });
 });

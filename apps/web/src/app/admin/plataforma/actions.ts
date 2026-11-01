@@ -1,7 +1,9 @@
 "use server";
 
 import {
+  aiNotice,
   changeTenantStatus,
+  probeAi,
   provisionTenant,
   startOperatorEnrollment,
   verifyOperatorCode,
@@ -9,6 +11,7 @@ import {
 } from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
+import { runAi } from "@/server/ai-gateway";
 import { identityAdmin } from "@/server/identity-admin";
 import { platformSettings } from "@/server/platform";
 
@@ -134,6 +137,49 @@ export async function provisionTenantAction(
       portalUrl: settings.portalOrigin(hostname),
       demo: input.demo === "on",
     };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+export type AiProbeState =
+  | { readonly status: "idle" | "forbidden" | "not_found" | "error" }
+  | {
+      readonly status: "done";
+      readonly outcome: string;
+      readonly text?: string;
+      readonly model?: string;
+      readonly latencyMs?: number;
+      readonly tokens?: number;
+      /** What a visitor would read in its place (refusals only). */
+      readonly notice?: string;
+    };
+
+/** «Probar la IA» (ADR-036): the smallest request, through the gateway, for a municipality. */
+export async function probeAiAction(
+  _previous: AiProbeState,
+  formData: FormData,
+): Promise<AiProbeState> {
+  try {
+    const actor = await currentAdminActor();
+    if (actor === null) return { status: "forbidden" };
+    const { platform } = await adminSession();
+    const probe = await probeAi(
+      { tenantId: formData.get("tenantId"), actorId: actor.userId },
+      { platform, gateway: runAi },
+    );
+    if (probe.status !== "done") return { status: probe.status };
+    const result = probe.result;
+    return result.outcome === "answered"
+      ? {
+          status: "done",
+          outcome: result.outcome,
+          text: result.text.slice(0, 200),
+          model: result.model,
+          latencyMs: result.latencyMs,
+          tokens: result.usage.inputTokens + result.usage.outputTokens,
+        }
+      : { status: "done", outcome: result.outcome, notice: aiNotice(result.outcome).message };
   } catch {
     return { status: "error" };
   }
