@@ -126,7 +126,7 @@ export function createMediaRepository(client: SessionClient): MediaRepository {
       if (asset.error) throw unexpected("Reading the image", asset.error);
       if (asset.data === null) return null;
       const { purpose } = z
-        .object({ purpose: z.enum(["logo", "content", "panorama", "model"]) })
+        .object({ purpose: z.enum(["logo", "content", "panorama", "model", "document"]) })
         .parse(asset.data);
 
       return {

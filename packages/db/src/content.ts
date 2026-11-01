@@ -43,11 +43,11 @@ const revisionRowSchema = z.object({
   sealed_at: z.string().nullable(),
 });
 
-function unexpected(operation: string, error: PostgrestError): Error {
+export function unexpected(operation: string, error: PostgrestError): Error {
   return new Error(`${operation} failed (${error.code || "unknown"})`);
 }
 
-function failure(error: PostgrestError, status: number) {
+export function failure(error: PostgrestError, status: number) {
   if (error.code === "42501" || status === 403) return "forbidden" as const;
   if (error.code === "PT404" || status === 404) return "not_found" as const;
   if (error.code === "PT409" || status === 409) return "conflict" as const;
@@ -60,14 +60,15 @@ function statusOf(item: z.infer<typeof itemRowSchema>): ContentStatus {
   return item.draft_revision_id === null ? "published" : "changed";
 }
 
-type Kind = "destination" | "event";
+type Kind = "destination" | "event" | "knowledge";
 
 function eventStatus(published: boolean, draft: boolean): ContentStatus {
   if (!published) return "draft";
   return draft ? "changed" : "published";
 }
 
-export function createContentRepository(client: SessionClient): ContentRepository {
+/** Reads and creation shared by every kind of content (destinations, events, knowledge). */
+export function contentAccess(client: SessionClient) {
   async function revision<D>(
     tenantId: string,
     revisionId: string,
@@ -170,6 +171,12 @@ export function createContentRepository(client: SessionClient): ContentRepositor
         })),
     };
   }
+
+  return { revision, create, find };
+}
+
+export function createContentRepository(client: SessionClient): ContentRepository {
+  const { revision, create, find } = contentAccess(client);
 
   return {
     async listDestinations(tenantId) {

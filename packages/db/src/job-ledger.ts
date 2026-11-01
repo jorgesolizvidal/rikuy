@@ -1,6 +1,8 @@
 import type {
   AbandonedUploadStore,
   ClaimedJob,
+  DocumentStore,
+  KnowledgeIndexStore,
   HeartbeatOutcome,
   InvitationMailStore,
   JobLedger,
@@ -42,6 +44,10 @@ export interface PostgresJobLedger extends JobLedger {
   readonly invitations: InvitationMailStore;
   /** media.remove_unused: worker_api.claim_unused_media. */
   readonly unusedMedia: UnusedMediaStore;
+  /** media.extract_document: worker_api.document_source / complete_document / reject_document. */
+  readonly documents: DocumentStore;
+  /** knowledge.index: worker_api.knowledge_source / store_knowledge_chunks. */
+  readonly knowledge: KnowledgeIndexStore;
   /** The daily report (worker_api.operations_report): no lease, changes nothing. */
   operationsReport(): Promise<OperationsReport>;
   close(): Promise<void>;
@@ -337,6 +343,81 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
             ) as outcome
           `;
           return z.enum(["rejected", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    documents: {
+      async source(lease) {
+        try {
+          const [row] = await sql`
+            select * from worker_api.document_source(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          if (!row || row.status === "not_found") return "not_found";
+          return {
+            status: z.enum(["uploading", "processing", "ready", "rejected"]).parse(row.status),
+            originalPath: z.string().parse(row.original_path),
+            declaredMime: z.string().parse(row.declared_mime),
+            prefix: z.string().parse(row.prefix),
+          };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async complete(lease, original, manifest) {
+        try {
+          const [row] = await sql`
+            select worker_api.complete_document(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${original.mime},
+              ${original.bytes}::integer, ${original.sha256}, ${json(manifest)}::jsonb
+            ) as outcome
+          `;
+          return z.enum(["ready", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async reject(lease, problem) {
+        try {
+          const [row] = await sql`
+            select worker_api.reject_document(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${problem}
+            ) as outcome
+          `;
+          return z.enum(["rejected", "already_settled", "not_found"]).parse(row?.outcome);
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    knowledge: {
+      async source(lease) {
+        try {
+          const [row] = await sql`
+            select worker_api.knowledge_source(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as source
+          `;
+          return row?.source ?? { status: "not_found" };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async store(lease, chunkerVersion, title, chunks) {
+        try {
+          const [row] = await sql`
+            select worker_api.store_knowledge_chunks(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${chunkerVersion}::integer,
+              ${title}, ${json(chunks)}::jsonb
+            ) as outcome
+          `;
+          return z.enum(["stored", "not_found"]).parse(row?.outcome);
         } catch (error) {
           if (leaseLost(error)) return "lease_lost";
           throw error;

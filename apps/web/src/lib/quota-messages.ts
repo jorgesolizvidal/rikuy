@@ -5,7 +5,7 @@ export const QUOTA_MESSAGES: Readonly<Record<UsageResource, string>> = {
   storage_bytes:
     "El municipio llegó a su límite de almacenamiento. Revisa «Uso del plan» o pide al equipo de la plataforma que lo amplíe.",
   media_compute_seconds:
-    "El municipio usó su tiempo de procesamiento de este mes para panoramas y modelos 3D. Se renueva el día 1; si lo necesitas antes, pide al equipo de la plataforma que lo amplíe.",
+    "El municipio usó su tiempo de procesamiento de este mes para panoramas, modelos 3D y documentos. Se renueva el día 1; si lo necesitas antes, pide al equipo de la plataforma que lo amplíe.",
   ai_tokens:
     "El municipio usó su IA de hoy. Se renueva a medianoche; si la necesitas antes, pide al equipo de la plataforma que la amplíe.",
 };

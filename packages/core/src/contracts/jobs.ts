@@ -14,6 +14,10 @@ export const JOB_KINDS = {
   removeUnusedMedia: "media.remove_unused",
   /** Emails an invitation to administer a municipality (ADR-034). */
   membershipInvitationMail: "mail.membership_invitation",
+  /** Reads the text of a knowledge document (TXT or PDF), page by page (ADR-037). */
+  extractDocument: "media.extract_document",
+  /** Cuts a sealed revision (content or tour) into the assistant's fragments (ADR-037). */
+  indexKnowledge: "knowledge.index",
 } as const;
 
 export type JobKind = (typeof JOB_KINDS)[keyof typeof JOB_KINDS];
@@ -34,6 +38,11 @@ export const expireAbandonedUploadPayloadSchema = z.object({ versionId: z.uuid()
 export const processPanoramaPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const processModelPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const removeUnusedMediaPayloadSchema = expireAbandonedUploadPayloadSchema;
+export const extractDocumentPayloadSchema = expireAbandonedUploadPayloadSchema;
+/** The sealed revision to index: of a content item or of a tour. */
+export const indexKnowledgePayloadSchema = z
+  .object({ source: z.enum(["content", "tour"]), revisionId: z.uuid() })
+  .strict();
 /** The membership only: the runner reads the address under the job's lease. */
 export const membershipInvitationMailPayloadSchema = z.object({ membershipId: z.uuid() }).strict();
 

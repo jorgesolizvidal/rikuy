@@ -8,3 +8,4 @@ export { createSharpPanoramaRenderer } from "./panorama-renderer";
 export { createGltfModelOptimizer } from "./model-optimizer";
 export { createSmtpMailer, isPermanentSmtpError } from "./smtp-mailer";
 export type { SmtpMailerOptions } from "./smtp-mailer";
+export { createPdfTextReader } from "./pdf-text";

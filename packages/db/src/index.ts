@@ -57,3 +57,4 @@ export {
 } from "./tours";
 export { createSharpSampleImageRenderer, sampleIllustrationSvg } from "./sample-images";
 export { createOperationsRepository } from "./operations";
+export { createKnowledgeRepository, mapPassageRow } from "./knowledge";

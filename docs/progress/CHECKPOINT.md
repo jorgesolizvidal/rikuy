@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 1 — gateway de IA (2026-10-31)
-- **Rama:** `feat/p5-step1-ai-gateway` → PR hacia `main`
+- **Último paso completado:** P5 · Paso 2 — conocimiento del asistente (2026-10-31)
+- **Rama:** `feat/p5-step2-knowledge` → PR hacia `main`
 
 ## Historial
 
@@ -1109,16 +1109,59 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - `docs/deploy.md` y `docs/jobs.md` piden contraseñas solo con letras y números (o con los símbolos codificados).
 - Tests: config 14 (+5), web 38 (+3).
 
+### P5 · Paso 2 — conocimiento del asistente ✅
+
+- Decisiones del usuario ([ADR-037](../adr/ADR-037-assistant-knowledge.md)), 2026-10-31:
+  - los documentos de conocimiento **solo los usa el asistente** (sin página pública ni descarga): la cita lleva título y página;
+  - formatos **TXT y PDF con texto**; un PDF escaneado se rechaza con su motivo (OCR para después);
+  - los textos de los **tours 360°** (escenas y puntos de información o de modelo) entran ya;
+  - para probar a mano, una copia local del libro histórico del sistema anterior (nunca en el repositorio).
+- Base de datos (`20261102000000_p5_knowledge_enums.sql` y `20261102000100_p5_knowledge.sql`, solo expand):
+  - tipo de contenido `knowledge` con el mismo flujo de revisiones que destinos y eventos, más **«Retirar»** (`retire_content`, solo conocimiento): el puntero publicado queda vacío y las versiones selladas siguen ahí;
+  - documentos como medios de propósito `document` (PDF o texto, hasta 20 MB; la base revalida tipo y tamaño), con su reserva de almacenamiento y de procesamiento en las cuotas. `submit_document` encola `media.extract_document`; para el ejecutor, `document_source`, `complete_document` (manifiesto revalidado: formato, páginas, caracteres, archivo de texto dentro de la versión) y `reject_document`;
+  - `knowledge_chunks` (FK compuestas, `tsvector` generado en español con `unaccent` inmutable, título y sección con más peso) y `knowledge_indexed_revisions`; RLS sin permisos para nadie. **Solo revisiones selladas** pueden tener fragmentos (trigger);
+  - un trigger en el puntero publicado de contenidos y tours encola `knowledge.index` en la misma transacción (y la migración encola lo ya publicado); `worker_api.knowledge_source` y `store_knowledge_chunks` (reemplaza todos los fragmentos de la revisión de una vez);
+  - **la búsqueda une cada fragmento con el puntero publicado actual** de su contenido (o de su tour y su contenido), del mismo municipio: un borrador, algo retirado o una versión reemplazada nunca aparecen, sin esperar a ningún trabajo. Volver a una versión reutiliza sus fragmentos. Los eventos terminados vienen marcados;
+  - `ai_api.search_knowledge` (rol `rikuy_ai`, municipios en línea), `search_tenant_knowledge` y `knowledge_index_status` (cualquier miembro);
+  - guardas de tipo: el conocimiento no tiene tour ni es destino de «ir a otro recorrido».
+- `@rikuy/core`: contrato del conocimiento (documento, manifiesto, texto por página, pasaje, cita D5); lectura de texto (UTF-8 o Windows-1252, marcas de página impresas «14 |» / «| 15» corregidas por secuencia), bloques (líneas cortadas, palabras con guion, títulos numerados o en mayúsculas, encabezados repetidos), **fragmentación determinista** (~1.500 caracteres por sección, oración repetida entre fragmentos, abreviaturas, versión 1); fuentes de contenido y de tour; `validateCitations` y `publicCitation` (enlace a la ficha o al tour en su escena; documentos sin enlace); casos de uso del editor, «Retirar», documentos y la búsqueda del panel.
+- `@rikuy/db`: lector de PDF con **pdf.js 6.4.299** (sin fuentes ni scripts; detecta contraseña; su módulo de trabajo se carga explícito para que Vercel lo incluya en la función), repositorio del panel y los almacenes del ejecutor.
+- `apps/worker`: procesadores `media.extract_document` (rechaza con motivo y borra el original) y `knowledge.index`. La lectura de documentos va con los trabajos largos (solo el aviso de la base).
+- Panel, **«Conocimiento del asistente»** (`/o/{slug}/conocimiento`):
+  - **«Probar la búsqueda»**: una pregunta de visitante y los pasajes que encontraría el asistente, con la cita que vería (tipo, título, sección, página o enlace), sin IA ni cuota;
+  - textos y documentos con estado (borrador, publicado, con cambios, retirado) y «Nuevo conocimiento»;
+  - **«Lo que el asistente ya leyó»**: cada publicación (destinos, eventos, tours y conocimiento) con sus pasajes, o «Leyéndose…» / error;
+  - editor con nombre, resumen, texto con formato y **documento** (subida directa a Storage, lectura en segundo plano con su estado: «Texto leído: 121 páginas, 157.488 caracteres»), guardar, publicar, retirar, descartar y el historial con «Volver a esta versión».
+- Tests:
+  - 603 unitarios (core 381, db 127, web 38, worker 43, config 14);
+  - 899 pgTAP (59 nuevos, `026_knowledge`): límites y tipos de documento, analista y otro municipio sin permiso, manifiesto fuera de la versión o con otro tipo rechazado, un trabajo de lectura a la vez por municipio, foto o documento rechazado como documento, publicar encola la indexación, **un borrador nunca tiene fragmentos**, la versión reemplazada deja de encontrarse al publicar la nueva (antes de indexarla), volver a la versión 1 la encuentra al momento, **retirar la quita en la misma transacción**, editor sin «Retirar», destinos no se retiran, otro municipio no busca ni ve, el asistente encuentra lo mismo que un miembro y nada de un municipio suspendido, el conocimiento nunca es destino de un tour;
+  - integración contra Supabase local (`knowledge.int.test.ts`): un PDF subido por URL firmada lo lee el extractor real, el conocimiento publicado lo indexa el indexador real, un miembro y el rol `rikuy_ai` lo encuentran con su página, otro municipio no, retirarlo lo quita; y todo lo publicado del seed (también tours) se indexa sin errores;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador, con el **libro histórico real** (165 KB, 121 páginas):
+  - se lee en ~3 s y se indexa en 144 pasajes;
+  - «¿Qué fue la ch'ampa guerra?» → «2.3. La ch'ampa guerra…», págs. 61–68; «¿Cuándo se firmó el decreto de Reforma Agraria?» → sección 2.6, págs. 105–114; «himno de Ucureña» → págs. 133–137; «¿Cuál es el horario del teleférico?» → nada (el asistente diría que no lo sabe);
+  - retirarlo lo quita al momento y «Volver a esta versión» lo devuelve sin reindexar;
+  - un analista ve y busca sin crear; el conocimiento de Demo Norte da 404 bajo Demo Sur;
+  - axe sin hallazgos críticos ni graves y sin desbordes a 360, 390 y 1280 px.
+- Lo que encontraron las pruebas, ya corregido: pdf.js carga su módulo de trabajo por ruta y Vercel no lo incluía en la función (todos los PDF habrían salido «dañados»); la limpieza de la cola de D-01 dejaba sin indexar el seed para las demás pruebas.
+
+**Desviaciones:**
+
+- El asistente todavía no responde: llega en el Paso 3, que usará `ai_api.search_knowledge` y `validateCitations`.
+- La búsqueda es de texto completo en español: no entiende sinónimos ni preguntas en inglés. El Paso 3 reformula la pregunta en español antes de buscar (D6).
+- Entre publicar y terminar la indexación (segundos), la versión nueva aún no aparece.
+- Un documento retirado deja de usarse pero no se borra; los fragmentos de versiones viejas quedan. Registrado en «Pendientes».
+
 ## Cómo verificarlo
 
-1. Después del merge, seguir [«Activar la IA (Groq)»](../deploy.md#activar-la-ia-groq): clave `rikuy-produccion`, `alter role rikuy_ai with login password …`, `AI_DATABASE_URL` y `GROQ_API_KEY` en Vercel y _Redeploy_.
-2. `/plataforma` → «Asistente con IA» dice «Conectado a Groq con openai/gpt-oss-120b»; «Probar la IA» con Ucureña responde «listo».
-3. `/plataforma/cuotas` muestra la IA de cada municipio; `/o/ucurena/uso`, la IA del día.
+1. Después del merge, «Deploy database» aplica las dos migraciones y encola la indexación de todo lo publicado; el aviso de la base despierta al ejecutor.
+2. Panel → municipio → **«Conocimiento del asistente»**: «Lo que el asistente ya leyó» muestra los destinos, eventos y tours publicados como «Leído».
+3. «Nuevo conocimiento» → subir un PDF con texto o un .txt → esperar «Texto leído» → «Publicar». En «Probar la búsqueda», una pregunta sobre su contenido lo encuentra con su página; «Retirar» lo quita al momento.
 
 ## Siguiente paso
 
-1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real).
-2. **P5 · Paso 2 — conocimiento** (requiere autorización): `knowledge_chunks` desde contenidos publicados y documentos del municipio (texto/PDF), búsqueda de texto completo en español y citas. Terminado cuando un borrador o un documento retirado nunca aparece en una respuesta.
+1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
+2. **P5 · Paso 3 — asistente del visitante en el portal** (requiere autorización): una conversación con contexto de página, persona por municipio (nombre y saludo en la marca), español/inglés, citas validadas y abstención, sobre el gateway (Paso 1) y el conocimiento (Paso 2). Terminado con el gold de 40 casos.
 
 ## Decisiones pendientes del usuario
 

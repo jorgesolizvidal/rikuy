@@ -76,6 +76,17 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/conocimiento`} className="org-card">
+            <span>
+              <span className="org-name">Conocimiento del asistente</span>
+              <span className="org-detail">
+                Textos y documentos que lee el asistente, y prueba de lo que encuentra
+              </span>
+            </span>
+            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
               <span className="org-name">Marca del portal</span>
