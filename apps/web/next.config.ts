@@ -34,7 +34,14 @@ const nextConfig: NextConfig = {
   transpilePackages: ["@rikuy/config", "@rikuy/core", "@rikuy/ui"],
   // The GLB pipeline (job runner) loads WebAssembly from these packages at run time: kept as
   // node_modules (traced into the function) instead of bundled.
-  serverExternalPackages: ["ktx2-encoder", "draco3dgltf", "gltf-validator", "meshoptimizer"],
+  // pdf.js (knowledge documents) loads its worker module from its own folder: same reason.
+  serverExternalPackages: [
+    "ktx2-encoder",
+    "draco3dgltf",
+    "gltf-validator",
+    "meshoptimizer",
+    "pdfjs-dist",
+  ],
   // Map worker and KTX2 transcoder are served from public/vendor/<package>/<version>/.
   env: { NEXT_PUBLIC_MAPLIBRE_VERSION: maplibreVersion, NEXT_PUBLIC_THREE_VERSION: threeVersion },
   async headers() {

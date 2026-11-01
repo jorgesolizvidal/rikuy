@@ -15,6 +15,14 @@ import {
   createMembershipInvitationMailProcessor,
   type MembershipInvitationMailDeps,
 } from "./processors/membership-invitation-mail";
+import {
+  createExtractDocumentProcessor,
+  type ExtractDocumentDeps,
+} from "./processors/extract-document";
+import {
+  createIndexKnowledgeProcessor,
+  type IndexKnowledgeDeps,
+} from "./processors/index-knowledge";
 import { createProcessModelProcessor, type ProcessModelDeps } from "./processors/process-model";
 import {
   createProcessPanoramaProcessor,
@@ -28,6 +36,8 @@ import {
 
 export {
   createExpireAbandonedUploadProcessor,
+  createExtractDocumentProcessor,
+  createIndexKnowledgeProcessor,
   createMembershipInvitationMailProcessor,
   createProcessModelProcessor,
   createProcessPanoramaProcessor,
@@ -36,6 +46,8 @@ export {
 };
 export type {
   ExpireAbandonedUploadDeps,
+  ExtractDocumentDeps,
+  IndexKnowledgeDeps,
   MembershipInvitationMailDeps,
   ProcessModelDeps,
   ProcessPanoramaDeps,
@@ -47,10 +59,16 @@ export type ProcessorDeps = ExpireAbandonedUploadDeps &
   ProcessPanoramaDeps &
   Omit<ProcessModelDeps, "media"> &
   MembershipInvitationMailDeps &
-  RemoveUnusedMediaDeps;
+  RemoveUnusedMediaDeps &
+  Omit<ExtractDocumentDeps, "media"> &
+  Omit<IndexKnowledgeDeps, "media">;
 
 /** Kinds that can run for minutes: only the database's wake-up runs them, not the panel. */
-export const LONG_JOB_KINDS: readonly string[] = ["media.process_panorama", "media.process_model"];
+export const LONG_JOB_KINDS: readonly string[] = [
+  "media.process_panorama",
+  "media.process_model",
+  "media.extract_document",
+];
 
 export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
   return [
@@ -60,5 +78,7 @@ export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
     createProcessModelProcessor(deps),
     createMembershipInvitationMailProcessor(deps),
     createRemoveUnusedMediaProcessor(deps),
+    createExtractDocumentProcessor(deps),
+    createIndexKnowledgeProcessor(deps),
   ];
 }

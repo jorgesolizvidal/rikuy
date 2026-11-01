@@ -1,7 +1,7 @@
 import type { UsageResource } from "../../contracts/usage";
 import type { ImageMime } from "../../domain/media/image";
 
-export type AssetPurpose = "logo" | "content" | "panorama" | "model";
+export type AssetPurpose = "logo" | "content" | "panorama" | "model" | "document";
 
 export interface PendingUpload {
   readonly assetId: string;
@@ -35,7 +35,7 @@ export interface MediaRepository {
   createImageUpload(
     tenantId: string,
     purpose: AssetPurpose,
-    mime: ImageMime | "model/gltf-binary",
+    mime: ImageMime | "model/gltf-binary" | "application/pdf" | "text/plain",
     bytes: number,
   ): Promise<CreateUploadOutcome>;
   /** One-time URL the browser PUTs the original to. The bytes never pass through the BFF. */
@@ -50,7 +50,8 @@ export interface MediaRepository {
 
 export interface DerivedFile {
   readonly name: string;
-  readonly contentType: "image/webp" | "image/png" | "image/ktx2" | "model/gltf-binary";
+  readonly contentType:
+    "image/webp" | "image/png" | "image/ktx2" | "model/gltf-binary" | "application/json";
   readonly bytes: Uint8Array;
 }
 

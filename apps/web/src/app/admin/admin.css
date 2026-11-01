@@ -1693,3 +1693,50 @@ a.button-quiet {
   margin: 0.25rem 0 0;
   overflow-wrap: anywhere;
 }
+
+/* ── Assistant's knowledge (ADR-037) ─────────────────────────────────── */
+
+.knowledge-search input[type="search"] {
+  width: 100%;
+  min-width: 0;
+}
+
+.passage-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0.75rem 0 0;
+  padding-left: 1.5rem;
+}
+
+.passage-list li {
+  padding: 0.75rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+  border-radius: 0.5rem;
+}
+
+.passage-source {
+  margin: 0;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.passage-text {
+  margin: 0.5rem 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.knowledge-search > [aria-live] {
+  margin-top: 0.75rem;
+}
+
+.knowledge-section {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+.passage-more summary {
+  cursor: pointer;
+  font-weight: 600;
+}

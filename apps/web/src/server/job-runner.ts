@@ -16,6 +16,7 @@ import {
 } from "@rikuy/core";
 import {
   createGltfModelOptimizer,
+  createPdfTextReader,
   createPostgresJobLedger,
   createSharpPanoramaRenderer,
   createSmtpMailer,
@@ -95,7 +96,7 @@ export interface JobRunOptions {
   /** Stop claiming with less than this left (room for the longest job). */
   readonly reserveMs: number;
   readonly reason: "kick" | "operator";
-  /** Run the kinds that take minutes (panoramas). Only a wake-up has the time for them. */
+  /** Run the kinds that take minutes (panoramas, models, documents). Only a wake-up has the time. */
   readonly longJobs: boolean;
 }
 
@@ -155,6 +156,9 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           adminOrigin: platformSettings().adminOrigin,
           unusedMedia: ledger.unusedMedia,
           folders: mediaAdmin(),
+          documents: ledger.documents,
+          pdf: createPdfTextReader(),
+          knowledge: ledger.knowledge,
         }),
       ),
       runnerId,

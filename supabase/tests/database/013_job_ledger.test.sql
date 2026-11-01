@@ -100,6 +100,9 @@ select private.enqueue_job(:'ta', 'system.probe', 'probe:two');
 select private.enqueue_job(:'ta', 'system.probe', 'probe:three');
 select private.enqueue_job(:'tc', 'system.probe', 'probe:suspended');
 update public.tenants set status = 'suspended' where id = :'tc';
+-- The seed's published content leaves knowledge.index jobs (ADR-037): out of the way here.
+update public.background_jobs set available_at = now() + interval '1 day'
+where kind = 'knowledge.index' and status = 'pending';
 
 -- ── Claims: fairness and concurrency ───────────────────────────────────────
 set local role rikuy_worker;
