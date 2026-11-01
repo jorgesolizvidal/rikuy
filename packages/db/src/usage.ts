@@ -1,5 +1,9 @@
 import {
   USAGE_RESOURCES,
+  type AiUsageRepository,
+  type AiUsageView,
+  type PlatformAiUsageRepository,
+  type PlatformAiUsageRow,
   type PlatformUsageRepository,
   type PlatformUsageRow,
   type UsageRepository,
@@ -97,6 +101,69 @@ export function createPlatformUsageRepository(client: SessionClient): PlatformUs
       if (error.code === "PT404") return "not_found";
       if (error.code === "23514") return "invalid";
       throw new Error(`Changing a quota failed (${error.code || "unknown"})`);
+    },
+  };
+}
+
+// ── AI (migration 20261101000100, ADR-036) ──────────────────────────────────
+
+const aiRowSchema = z.object({
+  limit_amount: amount,
+  reserved: amount,
+  consumed: amount,
+  period_start: z.string().transform((value) => new Date(value).toISOString()),
+  period_end: z.string().transform((value) => new Date(value).toISOString()),
+  answered_today: amount,
+  refused_today: amount,
+});
+
+function mapAiUsage(row: z.infer<typeof aiRowSchema>): AiUsageView {
+  return {
+    limit: row.limit_amount,
+    reserved: row.reserved,
+    consumed: row.consumed,
+    periodStart: row.period_start,
+    periodEnd: row.period_end,
+    answeredToday: row.answered_today,
+    refusedToday: row.refused_today,
+  };
+}
+
+export function createAiUsageRepository(client: SessionClient): AiUsageRepository {
+  return {
+    async tenantAiUsage(tenantId) {
+      const { data, error } = await client.rpc("tenant_ai_usage", { p_tenant_id: tenantId });
+      if (error) throw new Error(`Reading AI usage failed (${error.code || "unknown"})`);
+      return mapAiUsage(z.tuple([aiRowSchema]).parse(data)[0]);
+    },
+  };
+}
+
+const platformAiRowSchema = aiRowSchema.extend({
+  tenant_id: z.uuid(),
+  slug: z.string(),
+  display_name: z.string(),
+  status: z.enum(["provisioning", "active", "suspended"]),
+  is_default: z.boolean(),
+});
+
+export function createPlatformAiUsageRepository(client: SessionClient): PlatformAiUsageRepository {
+  return {
+    async list(): Promise<PlatformAiUsageRow[] | null> {
+      const { data, error } = await client.rpc("platform_ai_usage");
+      if (error?.code === "42501") return null;
+      if (error) throw new Error(`Reading platform AI usage failed (${error.code || "unknown"})`);
+      return z
+        .array(platformAiRowSchema)
+        .parse(data)
+        .map((row) => ({
+          ...mapAiUsage(row),
+          tenantId: row.tenant_id,
+          slug: row.slug,
+          displayName: row.display_name,
+          status: row.status,
+          isDefault: row.is_default,
+        }));
     },
   };
 }

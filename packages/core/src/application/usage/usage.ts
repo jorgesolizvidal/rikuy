@@ -58,12 +58,13 @@ export async function loadUsage(
   });
 }
 
-/** Operator input: megabytes for storage, minutes for compute (what people think in). */
+/** Operator input: megabytes for storage, minutes for compute, thousands of tokens for AI. */
 export const QUOTA_UNITS: Readonly<
   Record<UsageResource, { readonly factor: number; readonly max: number }>
 > = {
   storage_bytes: { factor: 1024 * 1024, max: 1024 * 1024 },
   media_compute_seconds: { factor: 60, max: 100_000 },
+  ai_tokens: { factor: 1000, max: 10_000 },
 };
 
 export function parseQuotaInput(

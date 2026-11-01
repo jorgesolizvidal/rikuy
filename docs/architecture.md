@@ -160,7 +160,8 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 
 ## 10. IA (ADR-018 + cierre P0 + ADR-022)
 
-- Gateway propio con perfiles por caso de uso; proveedor intercambiable sin tocar módulos.
+- **Gateway propio** ([ADR-036](adr/ADR-036-ai-gateway.md)): toda llamada a un modelo pasa por `runAiRequest`, con perfiles por caso de uso (asistente del visitante, de administración y la prueba del operador) y el proveedor como puerto (Groq por HTTP, o simulado en desarrollo). La IA se conecta a PostgreSQL con su propio rol, `rikuy_ai`, que solo ejecuta `ai_api`: ni la clave pública ni la secreta pueden gastar cuota de IA.
+- **Reservar antes de llamar:** cada pedido reserva tokens en la cuota diaria del municipio (40.000 por defecto, medianoche en su hora) y en el tope de la plataforma (180.000 por día UTC, el 90 % del plan gratuito de Groq). Un visitante tiene 10 preguntas por hora. Lo que no cabe se rechaza sin llamar al proveedor, y al terminar se liquida lo realmente usado. No se guarda el texto de las preguntas ni de las respuestas; el visitante, solo como hash con sal diaria.
 - Datos vigentes (eventos, horarios, ubicaciones) por **consultas estructuradas**; narrativa por **FTS en español**. Embeddings y búsqueda híbrida se activan solo si superan a FTS en evaluación.
 - Respuestas con citas verificables, abstención cuando falta evidencia y presupuesto por tenant. Si la IA falla, catálogo, mapa y tours siguen funcionando.
 - **Asistente del visitante** (ADR-022): una sola conversación con contexto de página, tour/escena/hotspot y ubicación redondeada; «qué hay cerca», «plan para hoy» y «ruta sugerida» desde un motor determinista; persona (nombre, saludo, tono) configurada por cada municipio en su marca; voz con dictado por cuota y lectura del navegador. La conversación vive en el dispositivo; el servidor no guarda su texto.

@@ -153,3 +153,59 @@ export function parseMailEnv(
   if (Object.values(present).every((value) => value === undefined)) return null;
   return parseWith(mailEnvSchema, present);
 }
+
+/**
+ * The AI gateway (ADR-036). All or nothing: with none of these set, there is no AI and the
+ * portal works the same; with some set, it is a mistake.
+ * - AI_DATABASE_URL: PostgreSQL connection of the role rikuy_ai (Supabase pooler).
+ * - AI_PROVIDER: "groq" (default) or "simulated" (no network or key; never in production).
+ * - GROQ_API_KEY: the platform's single key (Groq limits are per organization, not per key).
+ * - AI_MODEL: the model of every profile (the pilot uses one, D4).
+ * - AI_DATABASE_ROLE: local development only, to act as rikuy_ai when connecting as
+ *   `postgres` to the local stack.
+ */
+export const aiEnvSchema = z
+  .object({
+    AI_DATABASE_URL: z
+      .string()
+      .regex(/^postgres(ql)?:\/\/\S+$/u, "must be a postgres:// connection string"),
+    AI_DATABASE_ROLE: z
+      .string()
+      .regex(/^[a-z_][a-z0-9_]{0,62}$/u)
+      .optional(),
+    AI_PROVIDER: z.enum(["groq", "simulated"]).default("groq"),
+    GROQ_API_KEY: z.string().min(20, "looks too short").regex(/^\S+$/u, "has spaces").optional(),
+    AI_MODEL: z
+      .string()
+      .regex(/^[A-Za-z0-9._:/-]{1,100}$/u, "must be a model name")
+      .default("openai/gpt-oss-120b"),
+    VERCEL_ENV: z.string().optional(),
+  })
+  .refine((env) => env.AI_PROVIDER !== "groq" || env.GROQ_API_KEY !== undefined, {
+    path: ["GROQ_API_KEY"],
+    message: "is required with AI_PROVIDER=groq",
+  })
+  .refine((env) => env.AI_PROVIDER !== "simulated" || env.VERCEL_ENV !== "production", {
+    path: ["AI_PROVIDER"],
+    message: "simulated is not allowed in production",
+  })
+  .transform(({ VERCEL_ENV: _environment, ...env }) => env);
+
+export type AiEnv = z.infer<typeof aiEnvSchema>;
+
+const AI_KEYS = [
+  "AI_DATABASE_URL",
+  "AI_DATABASE_ROLE",
+  "AI_PROVIDER",
+  "GROQ_API_KEY",
+  "AI_MODEL",
+] as const;
+
+/** The AI gateway's settings, or null when none is set (AI is optional). */
+export function parseAiEnv(source: Record<string, string | undefined> = process.env): AiEnv | null {
+  const present = Object.fromEntries(
+    AI_KEYS.map((key) => [key, source[key] || undefined] as const),
+  );
+  if (Object.values(present).every((value) => value === undefined)) return null;
+  return parseWith(aiEnvSchema, { ...present, VERCEL_ENV: source.VERCEL_ENV || undefined });
+}

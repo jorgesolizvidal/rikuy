@@ -15,6 +15,7 @@ Cómo está montada la demo en la nube y qué se configura a mano una sola vez. 
 | Lighthouse en la nube | Workflow «Lighthouse on production»                                        | Tras cada despliegue de producción, con `apps/web/lighthouse-budget.json`                                                              |
 | Control diario        | Workflow «Daily health»                                                    | Cada día, los portales de `LIGHTHOUSE_ORIGINS` y el panel; evita la pausa de Supabase ([ADR-035](adr/ADR-035-free-plan-operations.md)) |
 | Ejecutor de trabajos  | `POST https://rikuy-app.vercel.app/api/jobs/drain`, despertado por la base | `pg_cron` + `pg_net` ([ADR-025](adr/ADR-025-job-runner-wake-up.md)); activación en el [runbook](jobs.md)                               |
+| IA                    | Groq (`openai/gpt-oss-120b`) a través del gateway, rol `rikuy_ai`          | Una sola clave para toda la plataforma ([ADR-036](adr/ADR-036-ai-gateway.md)); activación en [«Activar la IA»](#activar-la-ia-groq)    |
 
 Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuevo` con un alias exacto como `rikuy-municipio.vercel.app`, que antes se agrega en Vercel → Settings → Domains. Un dominio propio (por ejemplo `turismo.municipio.gob.bo`) se agrega igual en Vercel y en el alta; no requiere cambios de código.
 
@@ -93,6 +94,7 @@ Lo que corre solo cada día ([ADR-035](adr/ADR-035-free-plan-operations.md)), si
 | 03:37          | Limpieza de fotos y logos sin uso por más de 7 días     | Supabase (`rikuy-remove-unused-media`)     | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
 | 07:07          | Informe interno: espacio, base, trabajos y cuotas       | Supabase (`rikuy-daily-report`) → ejecutor | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
 | 08:23          | Control externo: inicio y `/mapa` de cada portal, panel | GitHub Actions («Daily health»)            | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
+| Cada 15 min    | Reservas de IA abandonadas (más de 10 min abiertas)     | Supabase (`rikuy-expire-ai-requests`)      | Se cuentan como usadas; también borra pedidos de más de 90 días                           |
 
 - **La pausa de Supabase:** el plan gratuito pausa el proyecto tras 7 días con poca actividad. «Daily health» pide `/mapa`, que lee la base en cada visita, así que mientras corra el proyecto no se pausa. GitHub desactiva los workflows programados de un repositorio sin commits en 60 días: si llega ese aviso, se vuelve a activar en Actions.
 - **Probarlo a mano:** Actions → «Daily health» → _Run workflow_. La tabla del resumen dice qué respondió cada portal y con qué versión.
@@ -160,6 +162,36 @@ Sin dominio propio, lo más simple y gratuito es una **cuenta de Gmail dedicada*
    Luego _Redeploy_ de producción.
 
 5. **Comprobar:** desde el panel, «Miembros» → invita a un correo tuyo que no sea miembro del equipo de Supabase. En menos de un minuto llega «Invitación al panel de…» y la fila dice «Se le envió un correo». Al entrar al panel con ese correo llega el código. Si no llega, `/plataforma/trabajos` muestra el error del trabajo «Correo de invitación» (por ejemplo, una contraseña de aplicación mal copiada).
+
+## Activar la IA (Groq)
+
+Sin esto no hay IA y el portal funciona igual: el asistente muestra su aviso ([ADR-036](adr/ADR-036-ai-gateway.md)). Se hace una sola vez.
+
+1. **La clave de Groq:** en [console.groq.com](https://console.groq.com) → _API Keys_ → _Create API Key_, con el nombre `rikuy-produccion`. Cópiala: se muestra una sola vez. **Una sola clave para toda la plataforma**: Groq aplica sus límites a la organización (tu cuenta), no a cada clave, así que una clave por municipio no agrega capacidad. El reparto entre municipios lo hacen las cuotas de Rikuy.
+2. **El rol de la IA en la base:** genera una contraseña larga (por ejemplo con tu gestor de contraseñas) y, en Supabase → _SQL Editor_:
+
+   ```sql
+   alter role rikuy_ai with login password '<CONTRASEÑA_DE_LA_IA>';
+   ```
+
+3. **La conexión:** Supabase → _Connect_ → _Transaction pooler_. Copia la cadena y cambia el usuario `postgres.<ref>` por `rikuy_ai.<ref>` y la contraseña por la del paso 2:
+   `postgresql://rikuy_ai.<ref>:<CONTRASEÑA_DE_LA_IA>@<host-del-pooler>:6543/postgres`
+4. **Vercel** → _Settings_ → _Environment Variables_, solo en _Production_ y marcadas como _Sensitive_:
+   - `AI_DATABASE_URL`: la cadena del paso 3;
+   - `GROQ_API_KEY`: la clave del paso 1.
+
+   `AI_PROVIDER` (por defecto `groq`) y `AI_MODEL` (por defecto `openai/gpt-oss-120b`) no hace falta definirlas. Luego _Redeploy_ de producción.
+
+5. **Comprobar:** `/plataforma` → «Asistente con IA» dice «Conectado a Groq con openai/gpt-oss-120b». Elige un municipio y pulsa «Probar la IA»: debe responder «listo» en uno o dos segundos. La prueba cuenta en la cuota de ese municipio (unos 100 tokens).
+
+**Si no funciona:**
+
+- «Sin configurar»: falta una variable o está mal escrita. En Vercel → _Logs_, `ai.misconfigured` dice cuál.
+- «La IA no está configurada… o su conexión a la base no responde»: la conexión del paso 3 (usuario `rikuy_ai.<ref>`, puerto 6543, contraseña). En los registros aparece `ai.begin_failed`.
+- «Groq rechazó el pedido»: la clave (cópiala de nuevo) o el modelo.
+- «Groq no respondió»: Groq caído o saturado; vuelve a probar en unos minutos.
+
+**Límites del plan gratuito de Groq:** 200.000 tokens y 1.000 pedidos por día para toda la cuenta. Rikuy corta antes: la plataforma usa como mucho 180.000 por día y cada municipio 40.000 por defecto (unas 15–20 respuestas del asistente). Las cuotas de IA se cambian en `/plataforma/cuotas`, en miles de tokens por día. Al pasar al plan de pago de Groq se suben esos valores.
 
 ## Demo comercial para un municipio interesado
 

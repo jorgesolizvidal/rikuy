@@ -21,7 +21,7 @@
     "db:status": "supabase status",
     "db:reset": "supabase db reset",
     "db:test": "supabase test db",
-    "db:lint": "supabase db lint --schema public,private --level warning --fail-on warning",
+    "db:lint": "supabase db lint --schema public,private,ai_api --level warning --fail-on warning",
     "db:types": "supabase gen types --lang typescript --local > packages/db/src/database.types.ts",
     "platform:add-operator": "node --env-file-if-exists=apps/web/.env.local packages/db/scripts/platform.mjs add-operator",
     "platform:provision": "node --env-file-if-exists=apps/web/.env.local packages/db/scripts/platform.mjs provision"

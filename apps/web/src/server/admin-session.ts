@@ -2,6 +2,7 @@ import "server-only";
 
 import type { Actor } from "@rikuy/core";
 import {
+  createAiUsageRepository,
   createContentRepository,
   createMediaRepository,
   createMembershipReader,
@@ -13,6 +14,7 @@ import {
   createModelRepository,
   createOperationsRepository,
   createPanoramaRepository,
+  createPlatformAiUsageRepository,
   createPlatformRepository,
   createPlatformUsageRepository,
   createSupabaseAuthGateway,
@@ -69,6 +71,8 @@ export const adminSession = cache(async () => {
     models: createModelRepository(client),
     usage: createUsageRepository(client),
     platformUsage: createPlatformUsageRepository(client),
+    aiUsage: createAiUsageRepository(client),
+    platformAiUsage: createPlatformAiUsageRepository(client),
     tours: createTourRepository(client),
     general: createGeneralTourRepository(client),
     jobs: createJobAdminRepository(client),

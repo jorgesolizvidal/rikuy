@@ -47,7 +47,8 @@ export function QuotaForm({
       <input type="hidden" name="tenantId" value={tenantId} />
       <input type="hidden" name="resource" value={resource} />
       <label htmlFor={id} className="visually-hidden">
-        Nuevo límite de {resourceLabel.toLowerCase()} para {tenantName}, en {unit}
+        Nuevo límite de {resourceLabel.charAt(0).toLowerCase() + resourceLabel.slice(1)} para{" "}
+        {tenantName}, en {unit}
       </label>
       <input
         id={id}

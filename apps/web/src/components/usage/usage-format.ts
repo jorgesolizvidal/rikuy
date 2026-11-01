@@ -7,6 +7,7 @@ const PERCENT = new Intl.NumberFormat("es-BO", { style: "percent", maximumFracti
 export const RESOURCE_LABELS: Readonly<Record<UsageResource, string>> = {
   storage_bytes: "Almacenamiento",
   media_compute_seconds: "Procesamiento de medios",
+  ai_tokens: "Asistente con IA",
 };
 
 export const RESOURCE_DETAILS: Readonly<Record<UsageResource, string>> = {
@@ -14,10 +15,15 @@ export const RESOURCE_DETAILS: Readonly<Record<UsageResource, string>> = {
     "Lo que ocupan las fotos, panoramas y modelos 3D del municipio: cada archivo subido más sus versiones optimizadas.",
   media_compute_seconds:
     "El tiempo que la plataforma dedica a preparar panoramas y modelos 3D. Se cuenta por mes.",
+  ai_tokens:
+    "Lo que usan las respuestas del asistente con IA, medido en tokens (pedazos de texto que lee y escribe el modelo). Se cuenta por día.",
 };
 
-/** Bytes as MB (or GB from 1024 MB); compute seconds as minutes. */
+const WHOLE = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 0 });
+
+/** Bytes as MB (or GB from 1024 MB); compute seconds as minutes; AI as tokens. */
 export function formatAmount(resource: UsageResource, value: number): string {
+  if (resource === "ai_tokens") return `${WHOLE.format(value)} tokens`;
   if (resource === "media_compute_seconds") {
     return value < 60 ? `${Math.round(value)} s` : `${ONE_DECIMAL.format(value / 60)} min`;
   }
@@ -36,4 +42,5 @@ export const RESOURCE_INPUT_UNITS: Readonly<
 > = {
   storage_bytes: { label: "MB", factor: MB },
   media_compute_seconds: { label: "min por mes", factor: 60 },
+  ai_tokens: { label: "mil tokens por día", factor: 1000 },
 };
