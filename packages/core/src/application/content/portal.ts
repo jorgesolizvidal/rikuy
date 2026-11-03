@@ -33,9 +33,19 @@ export const PORTAL_PATHS = {
   mapPlaces: "/mapa/lugares",
   /** The visitor assistant's questions (POST, ADR-038). */
   assistant: "/asistente",
+  /** The places a plan can include, with coordinates, for distances on the phone (ADR-039). */
+  assistantPlaces: "/asistente/lugares",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
+
+/** The map's query for a plan's route: `?ruta=destination:plaza,event:feria` (ADR-039). */
+export const MAP_ROUTE_QUERY = "ruta";
+export const MAP_ROUTE_MAX = 6;
+
+export function mapRoutePath(keys: readonly string[]): string {
+  return `${PORTAL_PATHS.map}?${MAP_ROUTE_QUERY}=${keys.slice(0, MAP_ROUTE_MAX).join(",")}`;
+}
 
 /** The 360° tour page of a destination or an event. */
 export function tourPath(kind: "destination" | "event", slug: string): string {
@@ -322,6 +332,7 @@ export function createCachedPublishedDestinationReader(
   return {
     list: (tenantId) => cached(`list:${tenantId}`, () => inner.list(tenantId)),
     find: (tenantId, slug) => cached(`find:${tenantId}:${slug}`, () => inner.find(tenantId, slug)),
+    openingHours: (tenantId) => cached(`hours:${tenantId}`, () => inner.openingHours(tenantId)),
   };
 }
 

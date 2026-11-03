@@ -184,6 +184,7 @@ describe("sources", () => {
     body: [{ type: "paragraph" as const, children: [{ type: "text" as const, text: "Cuerpo." }] }],
     timezone: "America/La_Paz",
     venueTitle: "Plaza principal",
+    hours: null,
     document: null,
   };
 
@@ -201,6 +202,34 @@ describe("sources", () => {
       "Fecha: Sábado, 7 de noviembre de 2026, 19:00–22:00. Lugar: Plaza principal.",
       "Cuerpo.",
     ]);
+  });
+
+  it("a destination says its opening hours in words", () => {
+    const units = contentUnits(
+      {
+        ...base,
+        kind: "destination",
+        schedule: null,
+        venueTitle: null,
+        hours: {
+          mode: "weekly",
+          days: [
+            [],
+            [["09:00", "17:00"]],
+            [["09:00", "17:00"]],
+            [["09:00", "17:00"]],
+            [["09:00", "17:00"]],
+            [["09:00", "17:00"]],
+            [["09:00", "13:00"]],
+          ],
+          note: "Entrada libre",
+        },
+      },
+      null,
+    );
+    expect(units[0]?.blocks[1]?.text).toBe(
+      "Horario de atención: Lunes: cerrado; martes a sábado: 9:00–17:00; domingo: 9:00–13:00. Entrada libre.",
+    );
   });
 
   it("a knowledge item adds its document's text with its pages", () => {

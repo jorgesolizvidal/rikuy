@@ -1,3 +1,4 @@
+import type { OpeningHours } from "../../domain/plan/hours";
 import type { DestinationDocument, GeoPoint } from "../../contracts/destination";
 import type { EventDocument, EventSchedule } from "../../contracts/event";
 import type { BoundingBox } from "../../domain/geo/bounds";
@@ -146,6 +147,8 @@ export interface PublishedDestination extends PublishedDestinationSummary {
 export interface PublishedDestinationReader {
   list(tenantId: string): Promise<PublishedDestinationSummary[]>;
   find(tenantId: string, slug: string): Promise<PublishedDestination | null>;
+  /** The published destinations that have opening hours, by slug (ADR-039). */
+  openingHours(tenantId: string): Promise<ReadonlyMap<string, OpeningHours>>;
 }
 
 export interface PublishedEventSummary {

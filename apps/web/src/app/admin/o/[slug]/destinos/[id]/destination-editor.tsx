@@ -23,6 +23,8 @@ import {
   type RevisionActionState,
   type SaveDestinationState,
 } from "../actions";
+import { HoursField } from "./hours-field";
+import { fromHoursValues, type HoursValues } from "./hours-values";
 import { CoverField, GalleryField, type EditorImage } from "./image-fields";
 import { LocationField } from "./location-field";
 import { ScheduleField, VenueField, type VenueOption } from "./schedule-field";
@@ -35,6 +37,8 @@ export interface EditorValues {
   readonly location: { readonly lat: number; readonly lng: number } | null;
   readonly cover: EditorImage | null;
   readonly gallery: readonly EditorImage[];
+  /** Destinations only (ADR-039). */
+  readonly hours?: HoursValues;
   /** Events only. */
   readonly schedule?: ScheduleValues;
   readonly venueId?: string | null;
@@ -86,12 +90,22 @@ const FIELD_MESSAGES = {
   scheduleOrder: "El final no puede ser antes del inicio.",
   schedule: "Revisa la fecha y la hora (un evento dura como máximo un año).",
   venue: "Ese destino ya no está disponible. Elige otro o ninguno.",
+  hours:
+    "Revisa el horario: cada día abre antes de cerrar, el segundo horario empieza después de que cierra el primero, y al menos un día está abierto.",
 } as const;
 
 function fieldErrors(issues: readonly DestinationIssue[] = []) {
   const errors: Partial<
     Record<
-      "title" | "summary" | "body" | "location" | "images" | "coverAlt" | "schedule" | "venue",
+      | "title"
+      | "summary"
+      | "body"
+      | "location"
+      | "images"
+      | "coverAlt"
+      | "schedule"
+      | "venue"
+      | "hours",
       string
     >
   > = {};
@@ -115,6 +129,7 @@ function fieldErrors(issues: readonly DestinationIssue[] = []) {
             ? FIELD_MESSAGES.scheduleOrder
             : FIELD_MESSAGES.schedule;
     else if (head === "venueId") errors.venue = FIELD_MESSAGES.venue;
+    else if (head === "hours") errors.hours = FIELD_MESSAGES.hours;
     else if (head === "cover") errors.coverAlt = FIELD_MESSAGES.alt;
     else if (head === "gallery" && third === "alt") galleryAlts.add(Number(second));
     else if (head === "gallery") errors.images = FIELD_MESSAGES.images;
@@ -216,6 +231,7 @@ export function DestinationEditor({
             venueId: values.venueId ?? null,
           }
         : {}),
+      ...(kind === "destination" && values.hours ? { hours: fromHoursValues(values.hours) } : {}),
     };
     startTransition(() => dispatch({ payload, snapshot: JSON.stringify(values) }));
   }
@@ -363,6 +379,15 @@ export function DestinationEditor({
             </p>
           ) : null}
         </fieldset>
+      ) : null}
+
+      {kind === "destination" && values.hours ? (
+        <HoursField
+          value={values.hours}
+          disabled={locked}
+          error={errors.hours}
+          onChange={(hours) => set("hours", hours)}
+        />
       ) : null}
 
       <LocationField

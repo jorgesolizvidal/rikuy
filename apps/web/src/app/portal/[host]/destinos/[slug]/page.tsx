@@ -4,6 +4,7 @@ import {
   destinationJsonLd,
   directionsUrl,
   formatCoordinates,
+  openingHoursLines,
   openStreetMapUrl,
   serializeJsonLd,
   tourPath,
@@ -15,6 +16,7 @@ import { RichTextView } from "@/components/rich-text";
 import {
   portalDestination,
   portalNearbyTargets,
+  portalOpeningHours,
   portalOrigin,
   portalHasTour,
   responsiveImage,
@@ -22,6 +24,7 @@ import {
 import { portalView } from "@/server/portal-view";
 
 import { MiniMap } from "../../mini-map";
+import { OpenNow } from "../../open-now";
 import { PortalImage } from "../../portal-image";
 import { ShareButton } from "../../share-button";
 import { DistanceText, LocationButton, NearbyNotice } from "../../visitor-location";
@@ -82,10 +85,13 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const loaded = await load(params);
   if (loaded === null) notFound();
   const { view, destination } = loaded;
-  const [targets, tour] = await Promise.all([
+  const [targets, tour, allHours] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "destination", destination.slug),
+    // Without the hours the page still shows: they are one more section.
+    portalOpeningHours(view).catch(() => new Map()),
   ]);
+  const hours = allHours.get(destination.slug) ?? null;
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
   const url = `${portalOrigin(view)}${PORTAL_PATHS.destination(destination.slug)}`;
@@ -173,6 +179,22 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
               );
             })}
           </ul>
+        </section>
+      ) : null}
+
+      {hours ? (
+        <section aria-labelledby="horario" className="portal-hours">
+          <h2 id="horario">Horario</h2>
+          <OpenNow hours={hours} timezone={view.context.tenant.timezone} />
+          <dl className="portal-hours-week">
+            {openingHoursLines(hours).map((line) => (
+              <div key={line.days}>
+                <dt>{line.days}</dt>
+                <dd>{line.times}</dd>
+              </div>
+            ))}
+          </dl>
+          {hours.note ? <p className="portal-hours-note">{hours.note}</p> : null}
         </section>
       ) : null}
 

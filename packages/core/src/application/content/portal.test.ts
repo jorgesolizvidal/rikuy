@@ -126,6 +126,9 @@ describe("cached published destination reader", () => {
         calls.push(`find:${tenantId}:${slug}`);
         return slug === destination.slug ? destination : null;
       },
+      async openingHours() {
+        return new Map();
+      },
     };
     return { inner, calls, setFail: (value: boolean) => (fail = value) };
   }

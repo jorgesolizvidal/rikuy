@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 3 — asistente del visitante en el portal (gold con el modelo real: 38 de 40, y 40 de 40 con la corrección `fix/assistant-inline-sources`, 2026-11-03)
-- **Rama:** `fix/assistant-inline-sources` → PR hacia `main`
+- **Último paso completado:** P5 · Paso 4 — planes del asistente («qué hay cerca», «plan para hoy», «ruta sugerida») y horario de atención de los destinos
+- **Rama:** `feat/p5-step4-plans` → PR hacia `main`
 
 ## Historial
 
@@ -1205,15 +1205,58 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 
 **Corrección posterior (`fix/assistant-inline-sources`):** `parseAnswer` reconoce la marca «FUENTES:» o «SOURCES:» (en mayúsculas, como se le pide) también al final del texto; cuenta la última y no muestra nada desde ella. Una palabra «fuentes» del texto no es la marca. Con las dos respuestas reales del gold como pruebas: con esto, las 40 pasan.
 
+### P5 · Paso 4 — planes del asistente y horario de atención ✅
+
+- Decisiones del usuario ([ADR-039](../adr/ADR-039-assistant-plans.md)), 2026-11-03:
+  - **horario de atención opcional** en los destinos, en este paso: días y horas, o «siempre abierto»; la ficha muestra «Abierto ahora / Cerrado»; un lugar sin horario entra en los planes con «confirma el horario»;
+  - **se calcula en el celular:** el teléfono envía solo sus distancias a los lugares; la posición no sale del dispositivo;
+  - **en el chat y en el mapa:** lista ordenada con distancias y tiempos a pie, y «Ver la ruta en el mapa».
+- Base de datos (`20261103100000_p5_opening_hours.sql`, solo expand):
+  - `content_revisions.opening_hours` con su validación en la base (`private.is_valid_opening_hours`: lunes a domingo, hasta 2 rangos por día, «24:00» cierra a medianoche, sin rangos que pasen la medianoche, al menos uno; o «siempre abierto»; nota de una línea hasta 120 caracteres). Se sella con la revisión y vuelve con «Volver a esta versión».
+  - `is_valid_destination_draft` acepta `hours` (opcional); `save_content_draft` lo guarda; `revision_document` agrega la clave **solo cuando hay horario** (el panel ya desplegado sigue funcionando durante el despliegue).
+  - `portal_opening_hours` (anónima, solo destinos publicados de municipios en línea).
+  - `worker_api.knowledge_source` incluye el horario: el asistente también responde «¿a qué hora abre…?» con el texto indexado.
+  - Seed: el Mirador de Demo Norte «siempre abierto (al aire libre)»; la Plaza sin horario.
+- `@rikuy/core`:
+  - `domain/plan`: reloj del municipio (`localClock`, `minutesFromDayStart`), horario (`openStateAt`, `isOpenThrough`, `openingHoursLines`, `describeOpenState`), **motor** `makePlan` («qué hay cerca», «plan para hoy», «ruta sugerida» con vecino más cercano y 2-opt) y `detectPlanIntent` (frases claras en español e inglés);
+  - `application/assistant/plan`: `answerPlan` (origen: distancias del teléfono, la ficha o el centro; textos en español e inglés; una llamada `[tarea:explicar]` sin distancias; si el modelo escribe una hora que el plan no tiene o no hay IA, frase fija) y `loadAssistantPlaces`;
+  - `askAssistant` desvía los planes antes de buscar; la pregunta acepta `intent` y `distances` (claves `destination:slug`/`event:slug`, hasta 60, redondeadas a 100 m);
+  - contrato `openingHoursSchema` (el evento no lo acepta), horario en el texto indexado, `PublishedDestinationReader.openingHours`, `mapRoutePath` y `PORTAL_PATHS.assistantPlaces`;
+  - la demo de muestra suma horarios (plaza y mirador siempre abiertos, museo martes a domingo 9:00–17:00, mercado 6:00–13:00);
+  - **gold de 46 casos**: G41–G46 de planes, con su calificación propia.
+- Web:
+  - **`GET /asistente/lugares`**: claves y coordenadas públicas de los lugares que un plan puede incluir, para medir distancias en el teléfono (caché 60 s).
+  - Panel del asistente: botones **«¿Qué hay cerca?», «Plan para hoy», «Ruta sugerida»** sobre el campo de la pregunta; con la ubicación activada se envían solo las distancias; sin ella, «qué hay cerca» ofrece «Usar mi ubicación» y repite la pregunta sola cuando el teléfono la conoce. El plan se ve como lista numerada (enlace a la ficha, horas en el plan de hoy, «Estás aquí» o distancia y tiempo a pie, avisos de horario y de eventos) con «Verlos en el mapa» / «Ver la ruta en el mapa».
+  - **`/mapa?ruta=…`**: pines numerados, línea discontinua en línea recta y la lista en el mismo orden, con «Quitar la ruta»; una clave desconocida, de otro municipio o de un evento terminado se ignora. Sus estilos (`map-route.css`) solo cargan con la ruta.
+  - Ficha del destino: sección **«Horario»** con la semana y «Abierto ahora · cierra a las 18:00» calculado en el navegador (la página está en caché), sin mover nada al aparecer. Sus estilos (`hours.css`) no entran en la hoja común del portal.
+  - Panel, editor del destino: **«Horario de atención»** (sin horario / siempre abierto / por días con dos horarios por día, «Copiar el lunes a todos los días», nota y vista previa en palabras).
+  - Privacidad: qué se envía con los planes (distancias redondeadas, nunca coordenadas; se podría estimar la posición con ~100 m de margen, por eso no se guardan ni llegan a Groq).
+- Tests:
+  - 656 unitarios (core 433, db 127, web 39, worker 43, config 14), entre ellos el motor con **400 entradas aleatorias**: nunca un evento terminado ni un destino cerrado a la hora de llegar, sin repetidos y con su tope de paradas; y que las distancias no llegan al modelo;
+  - 946 pgTAP (27 nuevos, `028_opening_hours`): forma, rangos inválidos, nota, editor sí y analista u otro municipio no, sellado inmutable, visitantes solo lo publicado, versión 2 sin horario y volver a la 1, borrador invisible, municipio suspendido;
+  - integración (`plans.int.test.ts`): con las lecturas reales de Demo Norte, el evento terminado del seed y un borrador nunca entran en ningún plan, aunque el teléfono diga que son lo más cercano; las 46 preguntas del gold pasan por la búsqueda y el motor reales con el modelo simulado;
+  - **e2e en un navegador real** (nuevo caso en `assistant.e2e.test.ts`, 5 en total): «¿Qué hay cerca?» pide la ubicación sin llamar al modelo; al compartirla, la lista llega con la laguna y su aviso de horario; ninguna petición lleva coordenadas, solo distancias a lugares de Demo Sur; la ruta abre en el mapa y una clave de otro municipio se ignora; axe sin hallazgos y sin desbordes a 390 px.
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador: editor con un rango inválido rechazado con su mensaje, lunes con dos horarios copiado a la semana, domingo cerrado y la nota; la ficha muestra «Cerrado ahora · abre mañana a las 9:00» y la semana; panel y mapa con la ruta numerada a 390 y 1280 px; contratos RC-09/10/11/12 (189), portales (161) y ubicación RC-06 (35) en verde; Lighthouse local de las 12 páginas dentro del presupuesto (fichas 97–100, LCP 1,4–2,4 s).
+- Lo que encontraron las pruebas, ya corregido: el nombre accesible de los pines cambiaba con la ruta y el contrato RC-10 lo detectó; «menos de 10 m · ~menos de 1 min a pie» pasó a «Estás aquí»; el enlace al mapa del plan quedaba sin color de texto.
+
+**Desviaciones:**
+
+- Distancias y tiempos en línea recta: no siguen calles. La página lo dice; «Cómo llegar» abre la app de mapas.
+- Sin horarios por fecha (feriados, temporadas) ni rangos que pasen la medianoche: la nota del horario lo cubre por ahora.
+- Las demos creadas antes de este paso (Demo Valle) no tienen horarios hasta que se editen sus destinos o se cree otra demo.
+- Los casos del gold de planes con el modelo real se corren después del merge, desde el caso 41 (6 preguntas, ~1.000 tokens en total).
+
 ## Cómo verificarlo
 
-1. Después del merge, en `/plataforma` → «Evaluar el asistente» → Demo Valle, «Desde el caso» `21` y luego `26`: G23 y G26 quedan «Bien», sin «FUENTES: F1» en la respuesta y con la guía citada.
-2. Al terminar, la cuota de IA de Demo Valle vuelve a `40` en `/plataforma/cuotas`.
+1. Después del merge, en el panel, abrir un destino de Demo Valle → «Horario de atención» → «Por días», ajustar y publicar; la ficha muestra «Horario» y «Abierto ahora» o «Cerrado».
+2. En el portal de Demo Valle, abrir el asistente y tocar «Plan para hoy», «Ruta sugerida» y «¿Qué hay cerca?» (en el celular, con «Usar mi ubicación»); «Ver la ruta en el mapa» abre los puntos numerados.
+3. En `/plataforma` → «Evaluar el asistente» → Demo Valle, «Desde el caso» `41`: G41–G46 «Bien».
 
 ## Siguiente paso
 
 1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
-2. **P5 · Paso 4 — «qué hay cerca», «plan para hoy» y «ruta sugerida»** (requiere autorización): motor determinista (distancia, horario, vigencia) que el modelo solo explica; 0 eventos o lugares vencidos recomendados como vigentes.
+2. **P5 · Paso 5 — guía dentro del tour 360°** (requiere autorización): escena y hotspot resueltos en el servidor, en la misma conversación; RC-05 con contexto conocido, ausente y malicioso.
 
 ## Decisiones pendientes del usuario
 

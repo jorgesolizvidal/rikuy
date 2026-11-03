@@ -65,6 +65,7 @@ export async function evaluateAssistantGold(
       question: gold.question,
       history: gold.history ?? [],
       page: gold.page ?? { kind: "home" },
+      ...(gold.distances ? { distances: gold.distances } : {}),
     });
     const grade = gradeAssistantCase(gold, result);
     const reply = result.reply;
@@ -82,7 +83,7 @@ export async function evaluateAssistantGold(
           : reply.status === "notice"
             ? reply.notice.message
             : "",
-      cited: result.trace?.cited ?? [],
+      cited: result.trace?.plan?.stops ?? result.trace?.cited ?? [],
       retrieved: result.trace?.retrieved ?? [],
       planned: result.trace?.planned ?? false,
       tokens: (result.trace?.inputTokens ?? 0) + (result.trace?.outputTokens ?? 0),

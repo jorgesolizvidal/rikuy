@@ -13,6 +13,8 @@ import {
   createSimulatedAiProvider,
   defaultPresentation,
   drainJobs,
+  gradeAssistantCase,
+  loadAssistantPlaces,
   runAiSession,
   loadSampleContent,
   loadSampleContentStatus,
@@ -29,7 +31,11 @@ import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { createPostgresAiLedger } from "./ai-ledger";
-import { createContentRepository } from "./content";
+import {
+  createContentRepository,
+  createSupabasePublishedContentReader,
+  createSupabasePublishedEventReader,
+} from "./content";
 import { env, mailpit, signIn, stackAvailable, USERS } from "./integration/local-stack";
 import { createPostgresJobLedger } from "./job-ledger";
 import { createKnowledgeRepository } from "./knowledge";
@@ -279,6 +285,16 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       presentation: defaultPresentation({ displayName: "Demo Valle Integración" }),
     };
     const misses: string[] = [];
+    const readers = {
+      destinations: createSupabasePublishedContentReader({
+        url: env.url,
+        publishableKey: env.publishableKey,
+      }),
+      events: createSupabasePublishedEventReader({
+        url: env.url,
+        publishableKey: env.publishableKey,
+      }),
+    };
     try {
       for (const gold of ASSISTANT_GOLD) {
         const result = await askAssistant(
@@ -287,6 +303,7 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
             question: gold.question,
             history: gold.history ?? [],
             page: gold.page ?? { kind: "home" },
+            ...(gold.distances ? { distances: gold.distances } : {}),
           },
           null,
           {
@@ -296,10 +313,16 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
               page.slug
                 ? { label: `Lugar «${page.slug}»`, title: page.slug.replaceAll("-", " ") }
                 : null,
+            places: (id) => loadAssistantPlaces(id, readers),
             now: () => new Date(),
           },
         );
         expect(result.reply.status, gold.id).toBe("answered");
+        if (gold.expect.kind === "plan") {
+          // Plans (ADR-039): the engine's list, graded like in production.
+          expect(gradeAssistantCase(gold, result).problems, gold.id).toEqual([]);
+          continue;
+        }
         // Every citation that reaches the visitor is one of the retrieved passages (D5).
         expect(result.trace?.invalidCitations, gold.id).toBe(0);
         // A question in Spanish, asked as it is: its source is among what the model reads.

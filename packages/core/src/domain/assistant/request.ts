@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import type { PlanIntent } from "../plan/engine";
 import { ASSISTANT_LIMITS } from "./limits";
 import {
   ASSISTANT_PAGE_KINDS,
@@ -25,12 +26,25 @@ const requestSchema = z.object({
       slug: z.string().max(200).nullable().optional(),
     })
     .optional(),
+  /** A plan asked with the panel's buttons (ADR-039). */
+  intent: z.enum(["nearby", "today", "route"]).nullable().optional(),
+  /**
+   * Straight-line meters from the visitor to each place («destination:slug», «event:slug»),
+   * computed on their phone. Never coordinates: the position stays on the device.
+   */
+  distances: z.record(z.string().max(100), z.number()).optional(),
 });
+
+/** Place keys the phone may send distances for. */
+const PLACE_KEY = /^(?:destination|event):[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
 export interface AssistantRequest {
   readonly question: string;
   readonly history: readonly AssistantTurn[];
   readonly page: AssistantPage;
+  readonly intent: PlanIntent | null;
+  /** Rounded to ASSISTANT_LIMITS.distanceStep; at most ASSISTANT_LIMITS.distances entries. */
+  readonly distances: ReadonlyMap<string, number>;
 }
 
 function oneLine(text: string): string {
@@ -58,5 +72,14 @@ export function parseAssistantRequest(raw: unknown): AssistantRequest | null {
     pageHasItem(kind) && slug !== null && ASSISTANT_SLUG_PATTERN.test(slug)
       ? { kind, slug }
       : { kind: pageHasItem(kind) ? "other" : kind, slug: null };
-  return { question, history, page };
+  const distances = new Map<string, number>();
+  for (const [key, meters] of Object.entries(parsed.data.distances ?? {})) {
+    if (distances.size >= ASSISTANT_LIMITS.distances) break;
+    if (!PLACE_KEY.test(key) || !Number.isFinite(meters) || meters < 0 || meters > 20_000_000) {
+      continue;
+    }
+    const step = ASSISTANT_LIMITS.distanceStep;
+    distances.set(key, Math.round(meters / step) * step);
+  }
+  return { question, history, page, intent: parsed.data.intent ?? null, distances };
 }

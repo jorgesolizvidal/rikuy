@@ -195,6 +195,7 @@ export async function loadSampleContent(
           location,
           cover,
           gallery: [photo],
+          ...(item.hours ? { hours: item.hours } : {}),
         },
         draft?.draft?.editCount ?? null,
         deps.content,

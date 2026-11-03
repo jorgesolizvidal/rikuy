@@ -1,0 +1,48 @@
+/* Opening hours of a destination (ADR-039): only on the pages that have them. */
+
+.portal-hours {
+  margin-top: 3rem;
+}
+
+.portal-hours h2 {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: 650;
+}
+
+.portal-open-now {
+  min-height: 1.5em;
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+.portal-open-now[data-open="true"] {
+  color: var(--brand);
+}
+
+.portal-hours-week {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+}
+
+.portal-hours-week div {
+  display: grid;
+  grid-template-columns: 8.5rem minmax(0, 1fr);
+  gap: 0 1rem;
+}
+
+.portal-hours-week dt {
+  font-weight: 600;
+}
+
+.portal-hours-week dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-hours-note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}

@@ -5,12 +5,20 @@ import "./assistant.css";
 import {
   ASSISTANT_LIMITS,
   assistantPageFromPath,
+  detectPlanIntent,
   type AnswerBlock,
   type AssistantLink,
+  type AssistantPlan,
   type AssistantReply,
+  type PlanIntent,
   type PublicCitation,
 } from "@rikuy/core/assistant-client";
+import { distanceMeters, type PositionFix } from "@rikuy/core/geo";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+
+import { useVisitorLocation } from "@/lib/use-visitor-location";
+
+import { LocationButton } from "./visitor-location";
 
 /**
  * The assistant's conversation (ADR-038), loaded only when the visitor opens it. A modal
@@ -21,6 +29,8 @@ import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from 
 
 const STORAGE_KEY = "rikuy.assistant.v1";
 const ENDPOINT = "/asistente";
+/** Places a plan may include, with coordinates: the phone measures its distance to each. */
+const PLACES_ENDPOINT = "/asistente/lugares";
 const WIDE = "(min-width: 48rem)";
 
 type Shown = Exclude<AssistantReply, { status: "invalid" }>;
@@ -33,6 +43,45 @@ type Message =
 interface Saved {
   readonly startedAt: number;
   readonly messages: readonly Message[];
+}
+
+/** Plans (ADR-039): the engine decides the stops, the model explains them. */
+const PLANS: readonly { readonly intent: PlanIntent; readonly label: string }[] = [
+  { intent: "nearby", label: "¿Qué hay cerca?" },
+  { intent: "today", label: "Plan para hoy" },
+  { intent: "route", label: "Ruta sugerida" },
+];
+
+interface PlacePoint {
+  readonly key: string;
+  readonly lat: number;
+  readonly lng: number;
+}
+
+let placesRequest: Promise<readonly PlacePoint[]> | null = null;
+
+function planPlaces(): Promise<readonly PlacePoint[]> {
+  placesRequest ??= fetch(PLACES_ENDPOINT)
+    .then((response) => (response.ok ? response.json() : { places: [] }))
+    .then((body: { places?: PlacePoint[] }) => body.places ?? [])
+    .catch(() => {
+      placesRequest = null;
+      return [];
+    });
+  return placesRequest;
+}
+
+/**
+ * The visitor's distance to each place, measured here: only these numbers go to the
+ * server (rounded there to 100 m), never the position (ADR-021, ADR-039).
+ */
+async function distancesFrom(fix: PositionFix): Promise<Record<string, number>> {
+  const places = await planPlaces();
+  return Object.fromEntries(
+    places
+      .slice(0, ASSISTANT_LIMITS.distances)
+      .map((place) => [place.key, Math.round(distanceMeters(fix, place))]),
+  );
 }
 
 const SUGGESTIONS: Readonly<Record<string, readonly string[]>> = {
@@ -117,6 +166,10 @@ export default function AssistantPanel({
   const [startedAt, setStartedAt] = useState(initial.startedAt);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
+  const location = useVisitorLocation();
+  const fix = location.fix;
+  /** A plan that asked for the location: asked again once the phone knows where it is. */
+  const waiting = useRef<{ text: string; intent: PlanIntent } | null>(null);
 
   // Open as a modal on a phone, as a panel beside the page on a wider screen.
   useEffect(() => {
@@ -135,14 +188,19 @@ export default function AssistantPanel({
   }, [messages, startedAt]);
 
   const ask = useCallback(
-    async (text: string) => {
+    async (text: string, intent: PlanIntent | null = null, again = false) => {
       const asked = text.replace(/\s+/gu, " ").trim();
       if (asked.length < 2 || busy) return;
       const context = history(messages);
-      setMessages((current) => [...current, { id: nextId(), role: "user", text: asked }]);
+      if (!again) {
+        setMessages((current) => [...current, { id: nextId(), role: "user", text: asked }]);
+      }
       setQuestion("");
       setBusy(true);
       try {
+        // Distances only for a plan, and only when the visitor shares the location.
+        const plan = intent ?? detectPlanIntent(asked);
+        const distances = plan && fix ? await distancesFrom(fix) : null;
         const response = await fetch(ENDPOINT, {
           method: "POST",
           headers: { "content-type": "application/json" },
@@ -150,11 +208,17 @@ export default function AssistantPanel({
             question: asked,
             history: context,
             page: assistantPageFromPath(window.location.pathname),
+            ...(intent ? { intent } : {}),
+            ...(distances && Object.keys(distances).length > 0 ? { distances } : {}),
           }),
         });
         const reply = (await response.json()) as AssistantReply;
         if (!response.ok || reply.status === "invalid") throw new Error(String(response.status));
         setMessages((current) => [...current, { id: nextId(), role: "assistant", reply }]);
+        // Asked again once the location is known — only if it was not known this time.
+        if (reply.status === "answered" && reply.plan?.needsLocation && distances === null) {
+          waiting.current = { text: asked, intent: reply.plan.intent };
+        }
       } catch {
         setMessages((current) => [
           ...current,
@@ -169,8 +233,16 @@ export default function AssistantPanel({
         input.current?.focus();
       }
     },
-    [busy, messages],
+    [busy, messages, fix],
   );
+
+  // The visitor shared the location after a plan asked for it: the same plan, now with it.
+  useEffect(() => {
+    const plan = waiting.current;
+    if (!plan || !fix || busy) return;
+    waiting.current = null;
+    void ask(plan.text, plan.intent, true);
+  }, [fix, busy, ask]);
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -178,6 +250,7 @@ export default function AssistantPanel({
   }
 
   function restart() {
+    waiting.current = null;
     setMessages([]);
     setStartedAt(Date.now());
     input.current?.focus();
@@ -263,6 +336,20 @@ export default function AssistantPanel({
             {name} está escribiendo…
           </p>
         ) : null}
+      </div>
+
+      <div className="assistant-plans" role="group" aria-label="Planes con lo publicado">
+        {PLANS.map((plan) => (
+          <button
+            key={plan.intent}
+            type="button"
+            className="assistant-chip"
+            disabled={busy}
+            onClick={() => void ask(plan.label, plan.intent)}
+          >
+            {plan.label}
+          </button>
+        ))}
       </div>
 
       <form className="assistant-form" onSubmit={submit}>
@@ -431,6 +518,7 @@ function MessageView({ message, name }: { readonly message: Message; readonly na
           {reply.lang === "en" ? "No published source." : "Sin fuentes publicadas."}
         </p>
       ) : null}
+      {reply.plan ? <PlanView plan={reply.plan} lang={reply.lang} /> : null}
       <Sources sources={reply.sources} lang={reply.lang} />
       <Links
         links={reply.links}
@@ -438,5 +526,61 @@ function MessageView({ message, name }: { readonly message: Message; readonly na
       />
       <Contact contact={reply.contact} lang={reply.lang} />
     </div>
+  );
+}
+
+function PlanView({ plan, lang }: { readonly plan: AssistantPlan; readonly lang: "es" | "en" }) {
+  const en = lang === "en";
+  if (plan.needsLocation) {
+    return (
+      <div className="assistant-plan">
+        <LocationButton label={en ? "Use my location" : "Usar mi ubicación"} />
+      </div>
+    );
+  }
+  if (plan.stops.length === 0) return null;
+  return (
+    <section className="assistant-plan" aria-label={plan.title}>
+      <p className="assistant-plan-title">
+        {plan.title}
+        {plan.start ? <span className="assistant-plan-start"> · {plan.start}</span> : null}
+      </p>
+      <ol className="assistant-plan-stops">
+        {plan.stops.map((stop) => (
+          <li key={stop.href} className="assistant-plan-stop">
+            <span className="assistant-plan-number" aria-hidden="true">
+              {stop.position}
+            </span>
+            <span className="assistant-plan-body">
+              <a href={stop.href}>{stop.title}</a>
+              <span className="assistant-plan-kind">
+                {stop.kind === "event" ? (en ? "Event" : "Evento") : en ? "Place" : "Destino"}
+              </span>
+              {stop.time ? <span className="assistant-plan-time">{stop.time}</span> : null}
+              {stop.distance ? (
+                <span className="assistant-plan-distance">{stop.distance}</span>
+              ) : null}
+              {stop.note ? <span className="assistant-plan-note">{stop.note}</span> : null}
+            </span>
+          </li>
+        ))}
+      </ol>
+      <p className="assistant-plan-hint">
+        {en
+          ? "Straight-line distances and estimated walking times."
+          : "Distancias en línea recta y tiempos a pie estimados."}
+      </p>
+      {plan.mapHref ? (
+        <a className="assistant-plan-map" href={plan.mapHref}>
+          {plan.intent === "nearby"
+            ? en
+              ? "See them on the map"
+              : "Verlos en el mapa"
+            : en
+              ? "See the route on the map"
+              : "Ver la ruta en el mapa"}
+        </a>
+      ) : null}
+    </section>
   );
 }

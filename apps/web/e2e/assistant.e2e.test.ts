@@ -8,7 +8,8 @@
  * opened; an answer cites a published page of THIS municipality and links to it; an
  * invented citation and a web address never reach the visitor; a question in English is
  * answered in English; the conversation stays in this browser (24 h) until «Nueva
- * conversación»; the endpoint refuses another origin; with the AI quota used up the visitor
+ * conversación»; a plan (P5 · Paso 4) sends distances, never the visitor's position, and
+ * opens its route on the map; the endpoint refuses another origin; with the AI quota used up the visitor
  * gets a notice and the portal; and the panel works by keyboard, on a phone, without axe
  * findings.
  *
@@ -263,6 +264,68 @@ describe("the visitor's assistant (simulated model)", () => {
     expect((await post(PORTAL, "no es json")).status).toBe(400);
     const answered = await post(PORTAL, '{"question":"¿Qué es la laguna espejo?"}');
     expect(answered).toEqual({ status: 200, cache: "no-store" });
+  });
+
+  it("plans (ADR-039): the location stays on the phone, only distances go, and the route opens on the map", async () => {
+    // Next to the lake (Demo Sur), on a phone.
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      geolocation: { latitude: -21.5306, longitude: -64.7301 },
+    });
+    const page = await context.newPage();
+    const sent: string[] = [];
+    page.on("request", (request) => {
+      sent.push(`${request.url()} ${request.postData() ?? ""}`);
+    });
+    await page.goto(`${PORTAL}/`);
+    await page.getByRole("button", { name: /hacer una pregunta/u }).click();
+    await page.getByRole("dialog").waitFor();
+
+    // Without the location: no model call, a button to share it.
+    const before = await page.locator(".assistant-from-assistant").count();
+    await page.getByRole("button", { name: "¿Qué hay cerca?" }).click();
+    await page.waitForFunction(
+      (count) =>
+        document.querySelectorAll(".assistant-from-assistant").length > count &&
+        !document.querySelector(".assistant-typing"),
+      before,
+    );
+    const share = page.locator(".assistant-plan .portal-location-button");
+    expect(await share.count()).toBe(1);
+
+    // Shared: the same plan again, with distances measured here.
+    await context.grantPermissions(["geolocation"], { origin: PORTAL });
+    await share.click();
+    await page.locator(".assistant-plan-stop").first().waitFor({ timeout: 15_000 });
+    const stop = page.locator(".assistant-plan-stop").first();
+    expect(await stop.innerText()).toContain("Laguna Espejo");
+    expect(await stop.locator("a").getAttribute("href")).toBe("/destinos/laguna-espejo");
+    expect(await stop.innerText()).toContain("Sin horario publicado");
+
+    // Only distances to this portal's places left the phone, never its coordinates.
+    const asked = sent.filter((line) => line.includes("/asistente "));
+    expect(asked.some((line) => line.includes('"destination:laguna-espejo":'))).toBe(true);
+    expect(sent.some((line) => /-21\.53|-64\.73/u.test(line))).toBe(false);
+    expect(sent.some((line) => /mirador-del-valle|plaza-principal/u.test(line))).toBe(false);
+
+    expect(await serious(page)).toEqual([]);
+    expect(
+      await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+    ).toBe(false);
+
+    // «Verlos en el mapa»: the stops numbered, in order, as a list too.
+    const map = await page.locator(".assistant-plan-map").last().getAttribute("href");
+    // The star night is in 20 days: not «cerca» now.
+    expect(map).toBe("/mapa?ruta=destination:laguna-espejo");
+    await page.goto(`${PORTAL}${map}`);
+    const stops = page.locator(".portal-route-stops li");
+    await stops.first().waitFor();
+    expect(await stops.first().innerText()).toContain("Laguna Espejo");
+    // An unknown or another municipality's place in the address is left out.
+    await page.goto(`${PORTAL}/mapa?ruta=destination:mirador-del-valle,destination:laguna-espejo`);
+    expect(await page.locator(".portal-route-stops li").count()).toBe(1);
+    expect(await serious(page)).toEqual([]);
+    await context.close();
   });
 
   it("with the AI quota used up, the visitor gets a notice and the portal keeps working", async () => {

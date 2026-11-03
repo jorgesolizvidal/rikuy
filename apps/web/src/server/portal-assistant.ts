@@ -9,7 +9,12 @@ import {
 } from "@rikuy/core";
 
 import { runAiWork, searchAiKnowledge } from "./ai-gateway";
-import { portalDestination, portalEvent, portalTourIndex } from "./portal-content";
+import {
+  portalDestination,
+  portalEvent,
+  portalPlanPlaces,
+  portalTourIndex,
+} from "./portal-content";
 import type { PortalView } from "./portal-view";
 
 /**
@@ -50,6 +55,7 @@ export async function askPortalAssistant(
     session: (input, work) => runAiWork(input, work),
     search: searchAiKnowledge,
     page: (_tenantId, page) => pageItem(view, page),
+    places: () => portalPlanPlaces(view),
     now: () => new Date(),
   });
 }

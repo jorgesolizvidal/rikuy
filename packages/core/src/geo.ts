@@ -6,4 +6,7 @@
  */
 export * from "./domain/geo/bounds";
 export * from "./domain/geo/proximity";
+// Opening hours and the local clock (ADR-039): «Abierto ahora» is computed in the browser.
+export * from "./domain/plan/clock";
+export * from "./domain/plan/hours";
 export type { GeoPoint } from "./contracts/destination";
