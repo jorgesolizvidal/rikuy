@@ -1,17 +1,25 @@
 import "./portal.css";
 
-import { PORTAL_PATHS, monogram, portalIconPath, themeCssVariables } from "@rikuy/core";
+import {
+  PORTAL_PATHS,
+  assistantPersona,
+  monogram,
+  portalIconPath,
+  themeCssVariables,
+} from "@rikuy/core";
 import type { Metadata, Viewport } from "next";
 import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
 
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { platformSettings } from "@/server/platform";
 import { portalIsEmpty, portalTourIndex } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
+import { AssistantLauncher } from "./assistant-launcher";
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
 
@@ -99,11 +107,14 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
   const demo = view.context.tenant.demo === true;
+  // The assistant's button only where the platform has AI; without it nothing is shown.
+  const persona = aiGatewayStatus().configured ? assistantPersona(presentation) : null;
 
   return (
     <div
       className={`portal ${display.variable}`}
       data-mode={palette.mode}
+      data-assistant={persona ? "" : undefined}
       lang={view.context.tenant.defaultLocale}
       // Validated #rrggbb values only (see themeCssVariables).
       style={themeCssVariables(palette) as CSSProperties}
@@ -177,6 +188,14 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           Funciona con Rikuy.
         </p>
       </footer>
+      {persona ? (
+        <AssistantLauncher
+          name={persona.name}
+          named={persona.named}
+          greeting={persona.greeting}
+          siteName={identity.siteName}
+        />
+      ) : null}
       {/* Real-user performance (anonymous, no cookies), only where Vercel serves it. */}
       {process.env.VERCEL === "1" ? <SpeedInsights /> : null}
     </div>

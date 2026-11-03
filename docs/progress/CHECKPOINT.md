@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 2 — conocimiento del asistente (2026-10-31)
-- **Rama:** `feat/p5-step2-knowledge` → PR hacia `main`
+- **Último paso completado:** P5 · Paso 3 — asistente del visitante en el portal (2026-11-02; falta correr el gold con el modelo real en producción)
+- **Rama:** `feat/p5-step3-visitor-assistant` → PR hacia `main`
 
 ## Historial
 
@@ -1152,16 +1152,66 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - Entre publicar y terminar la indexación (segundos), la versión nueva aún no aparece.
 - Un documento retirado deja de usarse pero no se borra; los fragmentos de versiones viejas quedan. Registrado en «Pendientes».
 
+### P5 · Paso 3 — asistente del visitante en el portal ✅ (falta el gold con el modelo real)
+
+- Decisiones del usuario ([ADR-038](../adr/ADR-038-visitor-assistant.md)), 2026-11-02:
+  - el asistente se abre con un **botón flotante** en todas las páginas: pantalla completa en el celular, panel lateral en la PC;
+  - **tono con opciones fijas**, «Cercano» o «Formal» (sin texto libre que llegue al modelo);
+  - responde **en el idioma de la pregunta** (inglés si se pregunta en inglés; si no, español); el portal sigue en español.
+- Base de datos (`20261103000000_p5_visitor_assistant.sql`, solo expand):
+  - la marca acepta `assistant: { name (1–40), greeting (0–240), tone: warm | formal }`, opcional, revalidada en `private.is_valid_presentation` (una línea, sin claves extra, el tono solo entre los dos valores);
+  - **búsqueda mejor ordenada**: cada palabra de la pregunta pesa según lo rara que es entre los fragmentos visibles del municipio (idf de BM25). Con el contenido de muestra, «¿Hay wifi gratis en algún lugar?» encontraba primero lo que decía «lugar»; ahora encuentra la guía. Mismas reglas de visibilidad.
+- `@rikuy/core`:
+  - `runAiSession`: un pedido al gateway con varias llamadas al modelo (una reserva, una cuenta en el límite del visitante, hasta 3 llamadas registradas). `runAiRequest` usa lo mismo;
+  - dominio del asistente: idioma (`detectLanguage`), página desde la ruta (`assistantPageFromPath`), persona con saludo por defecto (`assistantPersona`), lector de la pregunta (`parseAssistantRequest`: últimos 6 mensajes, 600 caracteres cada uno, 500 la pregunta), instrucciones fijas (`planMessages`, `answerMessages`) y lectura de la respuesta (`parsePlan`, `parseAnswer`: etiquetas → citas D5 validadas, sin enlaces ni marcas, párrafos y listas);
+  - `askAssistant`: reformula solo si hace falta (inglés, seguimiento o pregunta desde una ficha; si la reformulación falla, sigue con la pregunta tal cual), busca, suma el nombre del lugar de la página a la búsqueda, responde con 4 pasajes y los datos del portal, y devuelve la respuesta, las fuentes con su enlace, la abstención con las secciones y el contacto del municipio, o un aviso en el idioma de la pregunta;
+  - avisos del gateway también en inglés;
+  - **gold de 40 casos** (`ASSISTANT_GOLD`) sobre el contenido de muestra, con `gradeAssistantCase` y `evaluateAssistantGold` (tandas de 5, separadas 15 s);
+  - el contenido de muestra suma la **«Guía para visitantes»** (conocimiento: cómo llegar, oficina de turismo, servicios, comida, clima, historia), publicada al cargar la muestra; una demo cargada antes la recibe al volver a cargar.
+  - entrada `@rikuy/core/assistant-client` sin esquemas para el navegador.
+- `@rikuy/db`: la conexión de la IA (`rikuy_ai`) también busca en el conocimiento (`searchKnowledge`); la lectura de pasajes pasa a su propio módulo.
+- Web:
+  - **`POST /asistente`** en el host del portal: municipio por el host, `Origin` del mismo portal (403 si no), JSON de hasta 32 KB, `no-store`; la clave del visitante es su IP (la base guarda solo un hash diario);
+  - **botón flotante** con el nombre del asistente, solo si la plataforma tiene IA configurada; el **panel** se descarga al abrirlo (o un instante antes, al pasar el puntero o el foco): ninguna página carga su código al abrirse. Saludo, preguntas sugeridas (según la página), conversación con fuentes y enlaces, «Nueva conversación», Escape y foco de vuelta al botón;
+  - la conversación queda en el navegador de ese portal hasta 24 h;
+  - «Marca del portal» → **«Asistente del portal»**: nombre, saludo y tono;
+  - **`/plataforma/asistente`** («Evaluar el asistente»): el gold con el modelo real sobre una demo en línea, de a 5 preguntas, con «Copiar resultados»;
+  - privacidad: nueva sección «El asistente» (qué se envía, a quién, qué no se guarda, el límite de 10 preguntas por hora);
+  - el inicio ya no anuncia «Guía local» como «Muy pronto» cuando hay IA.
+- CI, job «Contracts»: el servidor arranca con la IA simulada (el botón está en las páginas que miden Lighthouse y los contratos) y un nuevo paso **«Visitor assistant in a real browser»** (`e2e/assistant.e2e.test.ts`).
+- Tests:
+  - 632 unitarios (core 409, db 127, web 39, worker 43, config 14);
+  - 919 pgTAP (20 nuevos, `027_visitor_assistant`: la persona en la marca y por la RPC, el tono fijo, saltos de línea y claves extra rechazados, editor y otro municipio sin permiso, ninguna columna guarda preguntas ni respuestas);
+  - integración (`demo.int.test.ts`): la demo carga la guía; las **40 preguntas del gold** pasan por el asistente con el modelo simulado y la búsqueda real (rol `rikuy_ai`): ninguna cita inventada llega al visitante y las 26 preguntas directas en español encuentran su fuente esperada entre lo que lee el modelo;
+  - **e2e en un navegador real** (4 casos): el botón en todas las páginas y el panel cargado solo al abrirlo; respuesta que cita una página de Demo Sur con su enlace y nunca de Demo Norte; cita inventada y enlace descartados; inglés; sin pedidos a terceros; Escape y foco; la conversación sobrevive a recargar y «Nueva conversación» la borra; modal a pantalla completa en 360 px sin desbordes ni hallazgos de axe; otro origen 403, pregunta vacía o sin JSON 400; con la cuota agotada, el aviso con las secciones y el portal sigue en 200.
+- Verificado en local, en el navegador, con el modelo simulado:
+  - el propietario de Demo Norte puso «Guía Norte», un saludo y el tono formal: el botón y el saludo cambiaron en el portal; un saludo sin nombre se rechaza con su mensaje;
+  - el operador corrió una tanda del gold (casos 16–20) en 61 s: 5 de 5 bien;
+  - contratos RC-09/10/11/12 en verde (189), axe sin hallazgos críticos ni graves y sin desbordes a 360, 390 y 1280 px (también con el panel abierto);
+  - Lighthouse local: inicio, listados y fichas 97–99, JS 145–146 KB, CLS 0; `/mapa` 67.
+
+**Desviaciones:**
+
+- El gold con el **modelo real** no se puede correr desde mi entorno (no llega a Groq): queda para producción, en «Evaluar el asistente», después del merge. El paso se marca ✅ en el roadmap con esos resultados.
+- Con el plan gratuito de Groq (8.000 tokens por minuto) caben unas tres preguntas por minuto en toda la plataforma; más que eso responde «Prueba en unos minutos». Anotado en «Pendientes registrados».
+- «Qué hay cerca», «plan para hoy» y «ruta sugerida» (Paso 4), la guía dentro del tour (Paso 5) y la voz (Paso 6) no son parte de este paso.
+- Al tocar la página, el mapa pequeño de la ficha se activa (como antes): abrir el asistente desde una ficha también lo despierta.
+
 ## Cómo verificarlo
 
-1. Después del merge, «Deploy database» aplica las dos migraciones y encola la indexación de todo lo publicado; el aviso de la base despierta al ejecutor.
-2. Panel → municipio → **«Conocimiento del asistente»**: «Lo que el asistente ya leyó» muestra los destinos, eventos y tours publicados como «Leído».
-3. «Nuevo conocimiento» → subir un PDF con texto o un .txt → esperar «Texto leído» → «Publicar». En «Probar la búsqueda», una pregunta sobre su contenido lo encuentra con su página; «Retirar» lo quita al momento.
+1. Después del merge, «Deploy database» aplica la migración. Con la IA activa, todos los portales muestran el botón «Asistente».
+2. En Ucureña: panel → «Marca del portal» → «Asistente del portal»: nombre «Chaski», su saludo y el tono → «Publicar». El botón del portal dice «Chaski». Como Ucureña todavía no tiene contenido publicado, responderá que no tiene esa información y ofrecerá el contacto.
+3. **Gold con el modelo real** sobre una demo con el contenido de muestra (Demo Valle o una nueva):
+   - si la demo se cargó antes de este paso, «Contenido de muestra» → «Cargar contenido de muestra» agrega la guía del asistente;
+   - `/plataforma/cuotas`: sube la cuota de IA de la demo a 200 (miles) por ese día;
+   - `/plataforma` → «Evaluar el asistente» → 8 tandas de 5 (cada una ~1,5 min) → «Copiar resultados» y pegarlos en el chat;
+   - vuelve a bajar la cuota.
 
 ## Siguiente paso
 
 1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
-2. **P5 · Paso 3 — asistente del visitante en el portal** (requiere autorización): una conversación con contexto de página, persona por municipio (nombre y saludo en la marca), español/inglés, citas validadas y abstención, sobre el gateway (Paso 1) y el conocimiento (Paso 2). Terminado con el gold de 40 casos.
+2. **Resultados del gold con el modelo real** (después del merge): revisarlos, corregir lo que falle (instrucciones, búsqueda o casos) y marcar el P5 · Paso 3 ✅ en el roadmap.
+3. **P5 · Paso 4 — «qué hay cerca», «plan para hoy» y «ruta sugerida»** (requiere autorización): motor determinista (distancia, horario, vigencia) que el modelo solo explica; 0 eventos o lugares vencidos recomendados como vigentes.
 
 ## Decisiones pendientes del usuario
 

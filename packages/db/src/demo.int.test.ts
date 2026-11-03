@@ -7,22 +7,32 @@
 import { randomUUID } from "node:crypto";
 
 import {
+  ASSISTANT_GOLD,
+  askAssistant,
   buildSampleTour,
+  createSimulatedAiProvider,
+  defaultPresentation,
   drainJobs,
+  runAiSession,
   loadSampleContent,
   loadSampleContentStatus,
   SAMPLE_DESTINATIONS,
   SAMPLE_EVENTS,
   type OrganizationMembership,
 } from "@rikuy/core";
-import { createMembershipInvitationMailProcessor } from "@rikuy/worker";
+import {
+  createIndexKnowledgeProcessor,
+  createMembershipInvitationMailProcessor,
+} from "@rikuy/worker";
 import postgres from "postgres";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { createPostgresAiLedger } from "./ai-ledger";
 import { createContentRepository } from "./content";
 import { env, mailpit, signIn, stackAvailable, USERS } from "./integration/local-stack";
 import { createPostgresJobLedger } from "./job-ledger";
+import { createKnowledgeRepository } from "./knowledge";
 import {
   createSharpImageProcessor,
   createMediaRepository,
@@ -90,6 +100,7 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       processor: createSharpImageProcessor(),
       panoramas: createPanoramaRepository(owner.client),
       tours: createTourRepository(owner.client),
+      knowledge: createKnowledgeRepository(owner.client),
       renderer: createSharpSampleImageRenderer(),
       upload: async (url: string, bytes: Uint8Array, mime: string) =>
         (
@@ -122,6 +133,7 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       destinations: SAMPLE_DESTINATIONS.length,
       events: SAMPLE_EVENTS.length,
       panoramas: 2,
+      knowledge: 1,
     });
 
     const destinations = await d.content.listDestinations(tenantId);
@@ -138,7 +150,8 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       from public.content_revisions r join public.content_items i on i.published_revision_id = r.id
       where i.tenant_id = ${tenantId}
     `;
-    expect(row).toEqual({ n: SAMPLE_DESTINATIONS.length + SAMPLE_EVENTS.length, filled: true });
+    // …and the assistant's sample guide (ADR-038).
+    expect(row).toEqual({ n: SAMPLE_DESTINATIONS.length + SAMPLE_EVENTS.length + 1, filled: true });
     const [plaza] = await db`
       select r.latitude, r.longitude, r.summary from public.content_revisions r
       join public.content_items i on i.published_revision_id = r.id
@@ -168,6 +181,7 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       destinations: 0,
       events: 0,
       panoramas: 0,
+      knowledge: 0,
     });
     expect((await loadSampleContentStatus(membership, d))?.tour).toBe("processing");
   });
@@ -228,6 +242,79 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       where t.tenant_id = ${tenantId}
     `;
     expect(tour).toEqual({ scenes: 2, points: 3 });
+  });
+
+  it("answers the assistant's gold from the sample content (simulated model, real search)", async () => {
+    // What publishing enqueued (ADR-037): index it with the real indexer.
+    const worker = createPostgresJobLedger({
+      url: DB_URL,
+      role: "rikuy_worker",
+      maxConnections: 2,
+    });
+    try {
+      await drainJobs({
+        ledger: worker,
+        processors: [
+          createIndexKnowledgeProcessor({ knowledge: worker.knowledge, media: deps().admin }),
+        ],
+        runnerId: "it-demo-gold",
+        budgetMs: 30_000,
+        concurrency: 2,
+      });
+    } finally {
+      await worker.close();
+    }
+    await db`
+      insert into public.tenant_quotas (tenant_id, resource, limit_amount)
+      values (${tenantId}, 'ai_tokens', 2000000)
+      on conflict (tenant_id, resource) do update set limit_amount = excluded.limit_amount
+    `;
+
+    const ai = createPostgresAiLedger({ url: DB_URL, role: "rikuy_ai", maxConnections: 2 });
+    const provider = createSimulatedAiProvider();
+    const tenant = {
+      tenantId,
+      timezone: "America/La_Paz",
+      hasTours: true,
+      presentation: defaultPresentation({ displayName: "Demo Valle Integración" }),
+    };
+    const misses: string[] = [];
+    try {
+      for (const gold of ASSISTANT_GOLD) {
+        const result = await askAssistant(
+          tenant,
+          {
+            question: gold.question,
+            history: gold.history ?? [],
+            page: gold.page ?? { kind: "home" },
+          },
+          null,
+          {
+            session: (input, work) => runAiSession(input, { ledger: ai, provider }, work),
+            search: (id, query, limit) => ai.searchKnowledge(id, query, limit),
+            page: async (_id, page) =>
+              page.slug
+                ? { label: `Lugar «${page.slug}»`, title: page.slug.replaceAll("-", " ") }
+                : null,
+            now: () => new Date(),
+          },
+        );
+        expect(result.reply.status, gold.id).toBe("answered");
+        // Every citation that reaches the visitor is one of the retrieved passages (D5).
+        expect(result.trace?.invalidCitations, gold.id).toBe(0);
+        // A question in Spanish, asked as it is: its source is among what the model reads.
+        const direct = gold.lang === "es" && !gold.history && !gold.page;
+        if (direct && gold.expect.kind === "answer") {
+          const expected = gold.expect.sources;
+          if (!result.trace?.retrieved.some((source) => expected.includes(source))) {
+            misses.push(`${gold.id} ${gold.question} → ${result.trace?.retrieved.join(", ")}`);
+          }
+        }
+      }
+    } finally {
+      await ai.close();
+    }
+    expect(misses).toEqual([]);
   });
 
   it("emails an invitation through SMTP, once", async () => {

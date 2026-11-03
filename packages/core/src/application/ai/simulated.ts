@@ -1,4 +1,5 @@
 import type { AiMessage } from "../../contracts/ai";
+import { ANSWER_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
 import { AiProviderError, estimateTokens, type AiProvider } from "./gateway";
 
 /**
@@ -35,7 +36,12 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
           });
         });
       }
-      const answer = simulatedAnswer(text);
+      const system = request.messages.find((message) => message.role === "system")?.content ?? "";
+      const answer = system.startsWith(PLAN_TAG)
+        ? simulatedPlan(text)
+        : system.startsWith(ANSWER_TAG)
+          ? simulatedAssistantAnswer(text)
+          : simulatedAnswer(text);
       return {
         text: answer,
         inputTokens: estimateTokens(request.messages),
@@ -52,6 +58,37 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
 function simulatedAnswer(question: string): string {
   const trimmed = question.trim().slice(0, 120);
   return trimmed ? `Respuesta simulada a: «${trimmed}»` : "Respuesta simulada.";
+}
+
+/** The question at the end of the assistant's messages (after «Pregunta…:»). */
+function questionOf(text: string): string {
+  const index = text.lastIndexOf(":\n");
+  return (index >= 0 ? text.slice(index + 2) : text).trim();
+}
+
+/** Rephrasing: the question's own words (the simulated model knows no synonyms). */
+function simulatedPlan(text: string): string {
+  return `BUSCAR: ${questionOf(text)
+    .replace(/[¿?¡!.,]/gu, " ")
+    .replace(/\s+/gu, " ")
+    .trim()}`;
+}
+
+/**
+ * An answer in the assistant's format: it cites the first passage it was given, or says it
+ * has nothing. «[simular:cita-falsa]» cites a passage that does not exist (validation must
+ * drop it) and «[simular:enlace]» writes a web address (it must never reach the visitor).
+ */
+function simulatedAssistantAnswer(text: string): string {
+  const question = questionOf(text).slice(0, 120);
+  if (question.includes("[simular:cita-falsa]")) {
+    return `Respuesta simulada con una fuente inventada.\nFUENTES: F9`;
+  }
+  const link = question.includes("[simular:enlace]") ? " Más en https://ejemplo.invalid/x." : "";
+  const first = /^\[F1\] (.+)$/mu.exec(text)?.[1];
+  return first
+    ? `Respuesta simulada a «${question}», según ${first}.${link}\nFUENTES: F1`
+    : `No encontré información publicada sobre «${question}».${link}\nFUENTES: ninguna`;
 }
 
 /** The messages of «Probar la IA»: the smallest request that proves the key and the quota. */

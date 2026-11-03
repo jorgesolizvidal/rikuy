@@ -258,6 +258,61 @@ export function BrandingForm({
           />
         </fieldset>
 
+        <fieldset disabled={!canEdit || pending}>
+          <legend>Asistente del portal</legend>
+          <p className="field-hint">
+            El asistente responde las preguntas de los visitantes con lo que publicaste. Se abre con
+            un botón en todas las páginas del portal.
+          </p>
+          <TextField
+            field="assistantName"
+            label="Nombre del asistente"
+            hint="Aparece en el botón y en la conversación. Vacío: «Asistente»."
+            value={values.assistantName}
+            maxLength={PRESENTATION_LIMITS.assistantName}
+            onChange={(v) => set("assistantName", v)}
+            error={errors.assistantName}
+          />
+          <TextField
+            field="assistantGreeting"
+            label="Saludo"
+            hint="Lo primero que lee el visitante al abrirlo, en una línea. Vacío: un saludo con el nombre del asistente y del portal."
+            value={values.assistantGreeting}
+            maxLength={PRESENTATION_LIMITS.assistantGreeting}
+            onChange={(v) => set("assistantGreeting", v)}
+            error={errors.assistantGreeting}
+            multiline
+          />
+          <div className="field" role="radiogroup" aria-labelledby="tone-label">
+            <span id="tone-label">Tono</span>
+            <div className="choice-row">
+              {(
+                [
+                  ["warm", "Cercano"],
+                  ["formal", "Formal"],
+                ] as const
+              ).map(([tone, label]) => (
+                <label key={tone} className="choice">
+                  <input
+                    type="radio"
+                    name="assistantTone"
+                    value={tone}
+                    checked={values.assistantTone === tone}
+                    onChange={() => set("assistantTone", tone)}
+                  />
+                  {label}
+                </label>
+              ))}
+            </div>
+            <span className="field-hint">
+              Cercano: tutea y saluda con calidez. Formal: trata de «usted» y va al punto.
+            </span>
+            {errors.assistantTone ? (
+              <span className="field-error">{errors.assistantTone}</span>
+            ) : null}
+          </div>
+        </fieldset>
+
         {canEdit ? (
           <div className="form-actions branding-actions">
             <button

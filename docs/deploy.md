@@ -194,11 +194,15 @@ Sin esto no hay IA y el portal funciona igual: el asistente muestra su aviso ([A
 - «Groq rechazó el pedido»: la clave (cópiala de nuevo) o el modelo.
 - «Groq no respondió»: Groq caído o saturado; vuelve a probar en unos minutos.
 
-**Límites del plan gratuito de Groq:** 200.000 tokens y 1.000 pedidos por día para toda la cuenta. Rikuy corta antes: la plataforma usa como mucho 180.000 por día y cada municipio 40.000 por defecto (unas 15–20 respuestas del asistente). Las cuotas de IA se cambian en `/plataforma/cuotas`, en miles de tokens por día. Al pasar al plan de pago de Groq se suben esos valores.
+**El asistente en el portal** ([ADR-038](adr/ADR-038-visitor-assistant.md)): con la IA activa, todos los portales muestran el botón del asistente. Cada municipio le pone nombre, saludo y tono en «Marca del portal» → «Asistente del portal» (por ejemplo, «Chaski» en Ucureña) y publica la marca. Sin nombre, el botón dice «Asistente». Responde con lo publicado, así que en un portal sin contenido dirá que no tiene esa información y ofrecerá el contacto del municipio.
+
+**Evaluar el asistente:** `/plataforma` → «Evaluar el asistente» corre las 40 preguntas del gold con el modelo real sobre una demo en línea con su contenido de muestra (la guía del asistente se carga con él; en una demo cargada antes, «Cargar contenido de muestra» la agrega). Va de a 5 preguntas por vez, con unos segundos entre una y otra para no pasar los 8.000 tokens por minuto de Groq. Las 40 gastan unos 100–150 mil tokens: ese día, sube la cuota de IA de la demo a 200 (miles) en `/plataforma/cuotas` y vuelve a bajarla al terminar. «Copiar resultados» los deja listos para pegar.
+
+**Límites del plan gratuito de Groq:** 200.000 tokens y 1.000 pedidos por día para toda la cuenta. Además, 8.000 tokens por minuto: unas tres preguntas por minuto en toda la plataforma; más que eso, el asistente responde «Prueba en unos minutos». Rikuy corta antes: la plataforma usa como mucho 180.000 por día y cada municipio 40.000 por defecto (unas 15–20 preguntas del asistente). Las cuotas de IA se cambian en `/plataforma/cuotas`, en miles de tokens por día. Al pasar al plan de pago de Groq se suben esos valores.
 
 ## Demo comercial para un municipio interesado
 
-Cada municipio interesado recibe su propia demo, con su nombre y contenido de muestra (5 destinos, 3 eventos y un tour 360° con ilustraciones genéricas). El portal de una demo **no aparece en buscadores** y avisa que es una demostración ([ADR-034](adr/ADR-034-commercial-demos-and-mail.md)).
+Cada municipio interesado recibe su propia demo, con su nombre y contenido de muestra (5 destinos, 3 eventos, un tour 360° con ilustraciones genéricas y una guía para el asistente). El portal de una demo **no aparece en buscadores** y avisa que es una demostración ([ADR-034](adr/ADR-034-commercial-demos-and-mail.md)).
 
 1. **Dirección:** en Vercel → Settings → Domains, agrega por ejemplo `rikuy-demo-<municipio>.vercel.app`.
 2. **Alta:** en `/plataforma/nuevo`, igual que un municipio real, con **«Demo comercial»** marcado y tu correo como propietario (así preparas la demo tú; después puedes invitar a la gente del municipio desde «Miembros»).

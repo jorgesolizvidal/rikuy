@@ -72,6 +72,7 @@ export function SamplePanel({
           text:
             `Listo: ${plural(result.destinations, "destino", "destinos")} y ` +
             `${plural(result.events, "evento", "eventos")} publicados` +
+            (result.knowledge > 0 ? ", la guía del asistente" : "") +
             (result.panoramas > 0
               ? `, y ${plural(result.panoramas, "panorama", "panoramas")} en proceso para el tour.`
               : "."),

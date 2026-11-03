@@ -1,4 +1,5 @@
 import type { AiRefusal } from "../../contracts/ai";
+import type { AssistantLanguage } from "../../domain/assistant/language";
 import { PORTAL_PATHS } from "../content/portal";
 
 /**
@@ -17,6 +18,40 @@ export interface AiNotice {
 }
 
 export const NEUTRAL_ASSISTANT_NAME = "El asistente";
+
+/** The same notices for a question asked in English (ADR-038). */
+const ENGLISH: Readonly<Record<AiRefusal, string>> = {
+  tenant_quota:
+    "I have answered all the questions I could for today. Please come back tomorrow; meanwhile, this may help:",
+  platform_quota:
+    "I have answered all the questions I could for today. Please come back tomorrow; meanwhile, this may help:",
+  visitor_limit:
+    "I have answered many of your questions in the last hour. Please come back in a while; meanwhile, this may help:",
+  provider_unavailable:
+    "I am not available right now. Please try again in a few minutes; meanwhile, this may help:",
+  provider_error: "I am not available for now. Meanwhile, this may help:",
+  tenant_unavailable: "I am not available for now. Meanwhile, this may help:",
+  not_configured: "I am not available for now. Meanwhile, this may help:",
+};
+
+const LINK_LABELS = {
+  es: { destinations: "Destinos", agenda: "Agenda", map: "Mapa", tours: "Tours 360°" },
+  en: { destinations: "Places", agenda: "Events", map: "Map", tours: "360° tours" },
+} as const;
+
+/** The portal's sections, as links the visitor can open instead of an answer. */
+export function portalSectionLinks(
+  lang: AssistantLanguage,
+  hasTours: boolean,
+): { readonly label: string; readonly href: string }[] {
+  const labels = LINK_LABELS[lang];
+  return [
+    { label: labels.destinations, href: PORTAL_PATHS.destinations },
+    { label: labels.agenda, href: PORTAL_PATHS.agenda },
+    { label: labels.map, href: PORTAL_PATHS.map },
+    ...(hasTours ? [{ label: labels.tours, href: PORTAL_PATHS.generalTour }] : []),
+  ];
+}
 
 const MESSAGES: Readonly<Record<AiRefusal, { message: string; retry: AiNotice["retry"] }>> = {
   tenant_quota: {
@@ -59,18 +94,20 @@ export function aiNotice(
   context: {
     /** The municipality's assistant name (its brand); none: a neutral one. */
     readonly assistantName?: string | null;
-    readonly contact?: { readonly phone?: string; readonly email?: string } | null;
+    readonly contact?: {
+      readonly phone?: string | undefined;
+      readonly email?: string | undefined;
+    } | null;
     /** The municipality has visible tours (the general tour link would work). */
     readonly hasTours?: boolean;
+    /** The language of the question (Spanish by default). */
+    readonly lang?: AssistantLanguage;
   } = {},
 ): AiNotice {
-  const { message, retry } = MESSAGES[outcome];
-  const links = [
-    { label: "Destinos", href: PORTAL_PATHS.destinations },
-    { label: "Agenda", href: PORTAL_PATHS.agenda },
-    { label: "Mapa", href: PORTAL_PATHS.map },
-    ...(context.hasTours ? [{ label: "Tours 360°", href: PORTAL_PATHS.generalTour }] : []),
-  ];
+  const lang = context.lang ?? "es";
+  const { retry } = MESSAGES[outcome];
+  const message = lang === "en" ? ENGLISH[outcome] : MESSAGES[outcome].message;
+  const links = portalSectionLinks(lang, context.hasTours ?? false);
   const phone = context.contact?.phone?.trim();
   const email = context.contact?.email?.trim();
   return {

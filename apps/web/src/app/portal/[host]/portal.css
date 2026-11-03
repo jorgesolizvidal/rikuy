@@ -1217,3 +1217,46 @@
   line-height: 1;
   cursor: pointer;
 }
+
+/* ── Assistant button (ADR-038) ─────────────────────────────────────────── */
+/* Only the button lives here; the panel brings its own stylesheet when it opens. */
+
+.portal-assistant-launcher {
+  position: fixed;
+  right: max(1rem, env(safe-area-inset-right));
+  bottom: max(1rem, env(safe-area-inset-bottom));
+  z-index: 30;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 3rem;
+  max-width: calc(100vw - 2rem);
+  padding: 0.5rem 1.125rem 0.5rem 0.875rem;
+  border: 2px solid var(--on-brand);
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  font: inherit;
+  font-weight: 700;
+  box-shadow: 0 0.375rem 1.25rem color-mix(in srgb, var(--fg) 30%, transparent);
+  cursor: pointer;
+}
+
+.portal-assistant-launcher span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.portal-assistant-launcher[hidden] {
+  display: none;
+}
+
+.portal-assistant-launcher:hover {
+  filter: brightness(1.08);
+}
+
+/* Room at the end of the page, so the button never covers the last lines of the footer. */
+.portal[data-assistant] .portal-footer {
+  padding-bottom: 5.5rem;
+}

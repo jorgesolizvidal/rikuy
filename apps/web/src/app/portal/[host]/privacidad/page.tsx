@@ -1,7 +1,8 @@
-import { PORTAL_PATHS } from "@rikuy/core";
+import { PORTAL_PATHS, assistantPersona } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { portalView } from "@/server/portal-view";
 
 import { LegalContact } from "../legal-contact";
@@ -29,6 +30,7 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
   if (view === null) notFound();
   const { presentation } = view.resolved;
   const { siteName } = presentation.identity;
+  const assistant = aiGatewayStatus().configured ? assistantPersona(presentation).name : null;
 
   return (
     <article className="portal-page portal-prose portal-legal">
@@ -94,6 +96,38 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
         </li>
         <li>Sin permiso, el portal funciona igual: listas, fichas y mapa siguen disponibles.</li>
       </ul>
+
+      {assistant ? (
+        <>
+          <h2 id="asistente">El asistente ({assistant})</h2>
+          <p>
+            El botón «{assistant}» abre un asistente que responde tus preguntas con lo que{" "}
+            {siteName} publicó en este portal. Solo funciona si le escribes.
+          </p>
+          <ul>
+            <li>
+              La conversación se guarda solo en este dispositivo, en el navegador, durante 24 horas
+              como máximo. «Nueva conversación» la borra.
+            </li>
+            <li>
+              Con cada pregunta se envían al portal la pregunta, los últimos mensajes de la
+              conversación y la página donde estás. El portal busca la respuesta en lo publicado y
+              la redacta con un modelo de inteligencia artificial de Groq, que recibe ese texto para
+              responder. No se envían tu nombre ni tu ubicación.
+            </li>
+            <li>
+              Ni {siteName} ni la plataforma guardan el texto de las preguntas o las respuestas:
+              solo cuántas se responden, cuánto tardan y cuánto cuestan. Para limitar el uso a 10
+              preguntas por hora, se cuenta tu dirección IP con una huella que cambia cada día.
+            </li>
+            <li>
+              Las respuestas las genera una inteligencia artificial y pueden tener errores. Cada
+              respuesta indica de qué página del portal sale; ante la duda, revísala o consulta al
+              municipio.
+            </li>
+          </ul>
+        </>
+      ) : null}
 
       <h2>Enlaces a otros servicios</h2>
       <p>

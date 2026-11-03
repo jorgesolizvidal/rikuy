@@ -121,9 +121,15 @@ const config = [
   },
   {
     // Browser checks with the real pipelines: the GLB color check and RC-08 run the real
-    // optimizer (no database, no secrets) and RC-07 renders its panoramas with the real tiler.
+    // optimizer (no database, no secrets), RC-07 renders its panoramas with the real tiler
+    // and the assistant's check indexes the seed with the real indexer (as rikuy_worker).
     // Test code.
-    files: ["e2e/model-colors.e2e.test.ts", "e2e/tour.e2e.test.ts", "e2e/support/*.ts"],
+    files: [
+      "e2e/model-colors.e2e.test.ts",
+      "e2e/tour.e2e.test.ts",
+      "e2e/assistant.e2e.test.ts",
+      "e2e/support/*.ts",
+    ],
     rules: {
       "no-restricted-imports": ["error", { patterns: [noSupabaseInUi], paths: secretKeyPaths }],
     },

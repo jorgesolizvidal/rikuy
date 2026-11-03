@@ -26,7 +26,13 @@ export const PRESENTATION_LIMITS = {
   email: 254,
   url: 300,
   description: 160,
+  assistantName: 40,
+  assistantGreeting: 240,
 } as const;
+
+/** How the assistant speaks (ADR-038): fixed options, never free text sent to the model. */
+export const ASSISTANT_TONES = ["warm", "formal"] as const;
+export type AssistantTone = (typeof ASSISTANT_TONES)[number];
 
 // No control characters (newlines, tabs, NUL…): every field renders as one line of text.
 const NO_CONTROL_CHARACTERS = /^[^\p{Cc}]*$/u;
@@ -90,6 +96,14 @@ export const tenantPresentationSchema = z.strictObject({
     .strictObject({
       /** «Estás cerca de…» radius around a destination, in meters (ADR-021). */
       nearbyRadius: z.number().int().min(NEARBY_RADIUS.min).max(NEARBY_RADIUS.max),
+    })
+    .optional(),
+  /** Optional persona of the visitor's assistant (ADR-022, ADR-038); absent: a neutral one. */
+  assistant: z
+    .strictObject({
+      name: line(1, PRESENTATION_LIMITS.assistantName),
+      greeting: line(0, PRESENTATION_LIMITS.assistantGreeting),
+      tone: z.enum(ASSISTANT_TONES),
     })
     .optional(),
 });

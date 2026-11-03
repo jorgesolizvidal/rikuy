@@ -4,10 +4,15 @@ import { EnvValidationError, parseAiEnv, type AiEnv } from "@rikuy/config/env";
 import {
   createSimulatedAiProvider,
   runAiRequest,
+  runAiSession,
+  type AiCall,
   type AiLogger,
   type AiProvider,
   type AiRequestInput,
   type AiResult,
+  type AiSessionInput,
+  type AiSessionResult,
+  type KnowledgePassage,
 } from "@rikuy/core";
 import { createGroqProvider, createPostgresAiLedger, type PostgresAiLedger } from "@rikuy/db/ai";
 
@@ -96,12 +101,9 @@ function providerFor(env: AiEnv): AiProvider | null {
     : null;
 }
 
-export async function runAi(input: AiRequestInput): Promise<AiResult> {
-  const { env } = settings();
-  if (env === null) return { outcome: "not_configured", requestId: null };
-  let deps: { ledger: PostgresAiLedger; provider: AiProvider | null };
+function depsFor(env: AiEnv): { ledger: PostgresAiLedger; provider: AiProvider | null } | null {
   try {
-    deps = { ledger: ledgerFor(env), provider: providerFor(env) };
+    return { ledger: ledgerFor(env), provider: providerFor(env) };
   } catch (error) {
     // Whatever the configuration, the AI never breaks the page that asked: no AI this time.
     jsonAiLogger.event("ai.setup_failed", {
@@ -109,7 +111,36 @@ export async function runAi(input: AiRequestInput): Promise<AiResult> {
     });
     ledger = null;
     ledgerUrl = null;
-    return { outcome: "not_configured", requestId: null };
+    return null;
   }
+}
+
+export async function runAi(input: AiRequestInput): Promise<AiResult> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return { outcome: "not_configured", requestId: null };
   return runAiRequest(input, { ...deps, logger: jsonAiLogger });
+}
+
+/** A request that may call the model more than once (the visitor's assistant, ADR-038). */
+export async function runAiWork<T>(
+  input: AiSessionInput,
+  work: (call: AiCall) => Promise<T>,
+): Promise<AiSessionResult<T>> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return { outcome: "not_configured", requestId: null };
+  return runAiSession(input, { ...deps, logger: jsonAiLogger }, work);
+}
+
+/** What the assistant may read now (ai_api.search_knowledge through the AI role). */
+export async function searchAiKnowledge(
+  tenantId: string,
+  query: string,
+  limit: number,
+): Promise<KnowledgePassage[]> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return [];
+  return deps.ledger.searchKnowledge(tenantId, query, limit);
 }

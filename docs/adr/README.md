@@ -41,3 +41,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 035 | [Operación con planes gratuitos: control diario, avisos por correo y limpieza de imágenes sin uso](ADR-035-free-plan-operations.md) | Aceptada (2026-10-27)                                                       |
 | 036 | [Gateway de IA: rol propio, cuota diaria en tokens y degradación sin IA](ADR-036-ai-gateway.md)                                     | Aceptada (2026-10-31)                                                       |
 | 037 | [Conocimiento del asistente: fragmentos de lo publicado, búsqueda en español y citas](ADR-037-assistant-knowledge.md)               | Aceptada (2026-10-31)                                                       |
+| 038 | [Asistente del visitante en el portal: buscar y responder en una sola pregunta, con citas validadas](ADR-038-visitor-assistant.md)  | Aceptada (2026-11-02)                                                       |
