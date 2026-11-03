@@ -6,6 +6,7 @@ import type { AiProvider } from "../ai/gateway";
 import { AiProviderError, runAiSession, type AiLedger } from "../ai/gateway";
 import { createSimulatedAiProvider } from "../ai/simulated";
 import { askAssistant, type AssistantDeps, type AssistantTenant } from "./ask";
+import type { AssistantPlaces } from "./plan";
 
 const TENANT = "aaaaaaaa-0000-4000-8000-000000000001";
 
@@ -59,6 +60,8 @@ function setup(
     found?: KnowledgePassage[];
     page?: { label: string; title: string } | null;
     refuse?: "visitor_limit";
+    places?: AssistantPlaces;
+    now?: Date;
   } = {},
 ) {
   const l = ledger();
@@ -73,7 +76,8 @@ function setup(
     session: (input, work) => runAiSession(input, { ledger: l.value, provider }, work),
     search,
     page,
-    now: () => new Date("2026-11-01T15:00:00Z"),
+    places: vi.fn(async () => options.places ?? { destinations: [], events: [] }),
+    now: () => options.now ?? new Date("2026-11-01T15:00:00Z"),
   };
   return { deps, l, complete, search, page };
 }
@@ -246,12 +250,13 @@ describe("askAssistant", () => {
 });
 
 describe("the gold (D7)", () => {
-  it("has 40 cases with unique ids, valid pages and the expected languages", async () => {
+  it("has 46 cases with unique ids, valid pages and the expected languages", async () => {
     const { ASSISTANT_GOLD } = await import("./gold");
     const { detectLanguage } = await import("../../domain/assistant/language");
     const { parseAssistantRequest } = await import("../../domain/assistant/request");
-    expect(ASSISTANT_GOLD).toHaveLength(40);
-    expect(new Set(ASSISTANT_GOLD.map((gold) => gold.id)).size).toBe(40);
+    const { detectPlanIntent } = await import("../../domain/plan/intent");
+    expect(ASSISTANT_GOLD).toHaveLength(46);
+    expect(new Set(ASSISTANT_GOLD.map((gold) => gold.id)).size).toBe(46);
     for (const gold of ASSISTANT_GOLD) {
       expect(detectLanguage(gold.question), gold.id).toBe(gold.lang);
       const parsed = parseAssistantRequest({
@@ -261,6 +266,9 @@ describe("the gold (D7)", () => {
       });
       expect(parsed, gold.id).not.toBeNull();
       if (gold.page) expect(parsed?.page, gold.id).toEqual(gold.page);
+      // Only the plan cases are plans: the other 40 stay questions for the published texts.
+      const intent = detectPlanIntent(gold.question);
+      expect(intent, gold.id).toBe(gold.expect.kind === "plan" ? gold.expect.intent : null);
     }
     expect(ASSISTANT_GOLD.filter((gold) => gold.expect.kind === "abstain")).toHaveLength(6);
   });
@@ -376,12 +384,191 @@ describe("evaluateAssistantGold", () => {
         },
       );
     expect((await run("mfa_required", [demo], 1)).status).toBe("forbidden");
-    expect((await run("ok", [demo], 41)).status).toBe("invalid");
+    expect((await run("ok", [demo], 47)).status).toBe("invalid");
     expect((await run("ok", [], 1)).status).toBe("not_found");
     expect((await run("ok", [{ ...demo, demo: false }], 1)).status).toBe("not_ready");
     expect((await run("ok", [{ ...demo, status: "suspended" as never }], 1)).status).toBe(
       "not_ready",
     );
     expect(ask).not.toHaveBeenCalled();
+  });
+});
+
+// ── Plans (ADR-039) ────────────────────────────────────────────────────────
+
+const near = (north: number) => ({ lat: -17.39 + north / 111_000, lng: -66.15 });
+const PLACES: AssistantPlaces = {
+  destinations: [
+    { slug: "plaza", title: "Plaza principal", location: near(0), hours: null },
+    {
+      slug: "museo",
+      title: "Museo comunitario",
+      location: near(500),
+      hours: {
+        mode: "weekly",
+        days: [
+          [],
+          [["09:00", "17:00"]],
+          [["09:00", "17:00"]],
+          [["09:00", "17:00"]],
+          [["09:00", "17:00"]],
+          [["09:00", "17:00"]],
+          [["09:00", "13:00"]],
+        ],
+        note: "",
+      },
+    },
+    {
+      slug: "mirador",
+      title: "Mirador",
+      location: near(1500),
+      hours: { mode: "always", note: "" },
+    },
+  ],
+  events: [
+    {
+      slug: "feria",
+      title: "Feria del valle",
+      location: near(200),
+      startsAt: "2026-11-04T15:00:00Z",
+      endsAt: "2026-11-04T20:00:00Z",
+    },
+    {
+      slug: "terminado",
+      title: "Concierto de ayer",
+      location: near(10),
+      startsAt: "2026-11-03T22:00:00Z",
+      endsAt: "2026-11-04T01:00:00Z",
+    },
+  ],
+};
+/** Wednesday 4 November 2026, 10:00 in La Paz. */
+const WEDNESDAY_10 = new Date("2026-11-04T14:00:00Z");
+
+describe("plans in the assistant", () => {
+  it("«qué hay cerca» without a location asks for it, without calling the model", async () => {
+    const { deps, complete, l } = setup({ places: PLACES, now: WEDNESDAY_10 });
+    const { reply } = await askAssistant(
+      tenant,
+      { question: "¿Qué hay cerca?" },
+      "203.0.113.7",
+      deps,
+    );
+    expect(complete).not.toHaveBeenCalled();
+    expect(l.begun).toHaveLength(0);
+    expect(reply).toMatchObject({
+      status: "answered",
+      plan: { intent: "nearby", needsLocation: true, stops: [] },
+    });
+  });
+
+  it("with the phone's distances: nearest first, open or on soon, never what ended", async () => {
+    const { deps, complete } = setup({ places: PLACES, now: WEDNESDAY_10 });
+    const { reply, trace } = await askAssistant(
+      tenant,
+      {
+        question: "¿Qué hay cerca?",
+        intent: "nearby",
+        distances: {
+          "destination:plaza": 120,
+          "destination:museo": 480,
+          "destination:mirador": 1490,
+          "event:feria": 260,
+          "event:terminado": 90,
+          "destination:otro-municipio": 10,
+          "x:y": 1,
+        },
+      },
+      "203.0.113.7",
+      deps,
+    );
+    expect(complete).toHaveBeenCalledTimes(1);
+    // The provider gets the places, never the visitor's distances (they would locate them).
+    const sent = JSON.stringify(complete.mock.calls[0]?.[0].messages);
+    expect(sent).toContain("Plaza principal");
+    expect(sent).not.toMatch(/\d+ ?m\b|km|a pie/u);
+    expect(trace?.plan).toEqual({
+      intent: "nearby",
+      stops: ["destination:plaza", "event:feria", "destination:museo", "destination:mirador"],
+    });
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.plan.start).toBe("Desde donde estás");
+    expect(reply.plan.mapHref).toBe(
+      "/mapa?ruta=destination:plaza,event:feria,destination:museo,destination:mirador",
+    );
+    expect(reply.plan.stops[0]).toMatchObject({
+      position: 1,
+      title: "Plaza principal",
+      href: "/destinos/plaza",
+      distance: "A 100 m · ~2 min a pie",
+      note: "Sin horario publicado: confírmalo antes de ir",
+    });
+    expect(reply.plan.stops[1]?.note).toBe("Empieza a las 11:00");
+    expect(reply.plan.stops[2]?.note).toBe("Cierra a las 17:00");
+    expect(reply.blocks[0]).toEqual({
+      type: "paragraph",
+      text: "Plan simulado con 4 paradas: Plaza principal, Feria del valle, Museo comunitario, Mirador.",
+    });
+  });
+
+  it("«plan para hoy» from a place's page, with times; in English when asked in English", async () => {
+    const { deps } = setup({ places: PLACES, now: WEDNESDAY_10 });
+    const { reply } = await askAssistant(
+      tenant,
+      { question: "What can I do today?", page: { kind: "destination", slug: "museo" } },
+      null,
+      deps,
+    );
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.lang).toBe("en");
+    expect(reply.plan.title).toBe("Plan for today");
+    expect(reply.plan.start).toBe("From «Museo comunitario»");
+    expect(reply.plan.stops[0]).toMatchObject({
+      title: "Museo comunitario",
+      time: "10:00–10:45",
+      distance: null,
+    });
+    expect(reply.plan.stops.map((stop) => stop.title)).not.toContain("Concierto de ayer");
+  });
+
+  it("without the model (the visitor's hour used up), the plan still shows with a fixed sentence", async () => {
+    const { deps, complete } = setup({
+      places: PLACES,
+      now: WEDNESDAY_10,
+      refuse: "visitor_limit",
+    });
+    const { reply } = await askAssistant(tenant, { question: "Dame un plan para hoy" }, "v", deps);
+    expect(complete).not.toHaveBeenCalled();
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.plan.stops.length).toBeGreaterThan(0);
+    expect(reply.plan.start).toBe("Desde «Museo comunitario», en el centro");
+    expect(reply.blocks[0]?.type).toBe("paragraph");
+    expect(JSON.stringify(reply.blocks)).toContain("Te propongo");
+  });
+
+  it("drops the model's words when they bring a time the plan does not have", async () => {
+    const provider: AiProvider = {
+      name: "fake",
+      model: "fake",
+      complete: async () => ({
+        text: "Ve al museo a las 19:30, y luego a la feria. Más en https://x.example.",
+        inputTokens: 10,
+        outputTokens: 10,
+        model: "fake",
+      }),
+    };
+    const { deps } = setup({ places: PLACES, now: WEDNESDAY_10, provider });
+    const { reply } = await askAssistant(tenant, { question: "¿Me sugieres una ruta?" }, "v", deps);
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(JSON.stringify(reply.blocks)).not.toContain("19:30");
+    expect(JSON.stringify(reply.blocks)).toContain("Una ruta a pie");
+  });
+
+  it("late in the evening there is no plan for today, and no model call", async () => {
+    const { deps, complete } = setup({ places: PLACES, now: new Date("2026-11-05T01:30:00Z") });
+    const { reply } = await askAssistant(tenant, { question: "plan para hoy" }, "v", deps);
+    expect(complete).not.toHaveBeenCalled();
+    expect(reply).toMatchObject({ status: "answered", plan: { stops: [] } });
+    expect(JSON.stringify(reply)).toContain("Ya es tarde");
   });
 });

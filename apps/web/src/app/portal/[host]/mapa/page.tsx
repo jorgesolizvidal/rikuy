@@ -1,4 +1,6 @@
 import {
+  MAP_ROUTE_MAX,
+  MAP_ROUTE_QUERY,
   MAX_AREA_SPAN_DEGREES,
   nearbyRadiusOf,
   PORTAL_PATHS,
@@ -13,9 +15,10 @@ import { portalMapExtent, toMapPoint } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { MapExplorer } from "../map-explorer";
+import { MapRoute } from "../map-route";
 import { MapMeasureLoader } from "../map-measure-loader";
 
-/** `?lat=…&lng=…` changes the page, so it is rendered per request (not cached, ADR-024). */
+/** `?lat=…&lng=…` and `?ruta=…` change the page: rendered per request (not cached, ADR-024). */
 export const dynamic = "force-dynamic";
 
 interface MapPageProps {
@@ -50,6 +53,16 @@ function requestedCenter(query: Record<string, string | string[] | undefined>) {
   return lat === null || lng === null ? null : { lat, lng, zoom: 15 };
 }
 
+/** `?ruta=destination:plaza,event:feria` (a plan of the assistant): place keys, in order. */
+function requestedRoute(query: Record<string, string | string[] | undefined>): string[] {
+  const value = query[MAP_ROUTE_QUERY];
+  if (typeof value !== "string") return [];
+  const keys = value
+    .split(",")
+    .filter((key) => /^(?:destination|event):[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(key));
+  return [...new Set(keys)].slice(0, MAP_ROUTE_MAX);
+}
+
 function capped(box: BoundingBox): BoundingBox {
   const half = MAX_AREA_SPAN_DEGREES / 2;
   const cx = (box.west + box.east) / 2;
@@ -67,6 +80,7 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
   if (view === null) notFound();
   const [extent, query] = await Promise.all([portalMapExtent(view), searchParams]);
   const center = requestedCenter(query);
+  const routeKeys = requestedRoute(query);
   const { siteName } = view.resolved.presentation.identity;
 
   const area = extent.bounds
@@ -81,6 +95,24 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
       ])
     : [];
 
+  // The stops that are still on the map (an event that ended meanwhile is not), in order.
+  const byKey = new Map(places.map((place) => [`${place.kind}:${place.slug}`, place]));
+  const route = routeKeys
+    .flatMap((key) => {
+      const place = byKey.get(key);
+      return place ? [{ ...toMapPoint(place), order: 0 }] : [];
+    })
+    .map((point, index) => ({ ...point, order: index + 1 }));
+  const routeArea =
+    route.length > 0
+      ? padBoundingBox({
+          west: Math.min(...route.map((point) => point.lng)),
+          south: Math.min(...route.map((point) => point.lat)),
+          east: Math.max(...route.map((point) => point.lng)),
+          north: Math.max(...route.map((point) => point.lat)),
+        })
+      : null;
+
   return (
     <div className="portal-page portal-map-page">
       <nav aria-label="Ruta de navegación" className="portal-breadcrumb">
@@ -92,12 +124,20 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
         </ol>
       </nav>
       <h1 className="portal-page-title">Mapa</h1>
-      <p className="portal-lead">
-        Destinos y eventos próximos de {siteName}. Mueve el mapa para ver otra zona; la lista
-        muestra los mismos lugares. Con «Usar mi ubicación» verás dónde estás y qué tienes cerca; tu
-        ubicación no sale de tu dispositivo.
-      </p>
-      {area === null ? (
+      {route.length > 0 ? (
+        <p className="portal-lead">
+          La ruta que te sugirió el asistente por {siteName}, con sus paradas en orden.
+        </p>
+      ) : (
+        <p className="portal-lead">
+          Destinos y eventos próximos de {siteName}. Mueve el mapa para ver otra zona; la lista
+          muestra los mismos lugares. Con «Usar mi ubicación» verás dónde estás y qué tienes cerca;
+          tu ubicación no sale de tu dispositivo.
+        </p>
+      )}
+      {route.length > 0 && routeArea ? (
+        <MapRoute stops={route} area={routeArea} />
+      ) : area === null ? (
         <p className="portal-empty">Todavía no hay lugares en el mapa.</p>
       ) : (
         <MapExplorer

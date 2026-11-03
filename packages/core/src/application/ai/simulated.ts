@@ -1,5 +1,5 @@
 import type { AiMessage } from "../../contracts/ai";
-import { ANSWER_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
+import { ANSWER_TAG, EXPLAIN_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
 import { AiProviderError, estimateTokens, type AiProvider } from "./gateway";
 
 /**
@@ -41,7 +41,9 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
         ? simulatedPlan(text)
         : system.startsWith(ANSWER_TAG)
           ? simulatedAssistantAnswer(text)
-          : simulatedAnswer(text);
+          : system.startsWith(EXPLAIN_TAG)
+            ? simulatedExplanation(text)
+            : simulatedAnswer(text);
       return {
         text: answer,
         inputTokens: estimateTokens(request.messages),
@@ -89,6 +91,14 @@ function simulatedAssistantAnswer(text: string): string {
   return first
     ? `Respuesta simulada a «${question}», según ${first}.${link}\nFUENTES: F1`
     : `No encontré información publicada sobre «${question}».${link}\nFUENTES: ninguna`;
+}
+
+/** A plan in words: the names of its stops, in order (the simulated model adds nothing). */
+function simulatedExplanation(text: string): string {
+  const names = [...text.matchAll(/^\d+\. ([^·\n]+)/gmu)].map((match) => match[1]?.trim());
+  return names.length > 0
+    ? `Plan simulado con ${names.length} ${names.length === 1 ? "parada" : "paradas"}: ${names.join(", ")}.`
+    : "Plan simulado sin paradas.";
 }
 
 /** The messages of «Probar la IA»: the smallest request that proves the key and the quota. */

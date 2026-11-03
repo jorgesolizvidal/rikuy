@@ -313,3 +313,130 @@
   font-size: 0.75rem;
   line-height: 1.4;
 }
+
+/* Plans (ADR-039): «¿Qué hay cerca?», «Plan para hoy», «Ruta sugerida». */
+.assistant-plans {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem 0;
+  overflow-x: auto;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  scrollbar-width: thin;
+}
+
+.assistant-plans .assistant-chip {
+  flex: none;
+  min-height: 2.5rem;
+  white-space: nowrap;
+}
+
+.assistant-plans .assistant-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.assistant-plans + .assistant-form {
+  border-top: 0;
+}
+
+.assistant-plan {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  font-size: 0.875rem;
+}
+
+.assistant-plan-title {
+  margin: 0;
+  font-weight: 700;
+}
+
+.assistant-plan-start {
+  color: var(--muted);
+  font-weight: 400;
+}
+
+.assistant-plan-stops {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.assistant-plan-stop {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  gap: 0.5rem;
+  align-items: start;
+}
+
+.assistant-plan-number {
+  display: grid;
+  place-items: center;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 50%;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 700;
+  font-size: 0.8125rem;
+}
+
+.assistant-plan-body {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.125rem 0.5rem;
+  align-items: baseline;
+}
+
+.assistant-plan-body a {
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.assistant-plan-kind {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.assistant-plan-time,
+.assistant-plan-distance,
+.assistant-plan-note {
+  flex-basis: 100%;
+}
+
+.assistant-plan-time {
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+}
+
+.assistant-plan-distance,
+.assistant-plan-hint {
+  color: var(--muted);
+}
+
+.assistant-plan-hint {
+  margin: 0;
+  font-size: 0.75rem;
+}
+
+.assistant-message .assistant-plan-map {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.5rem;
+  padding: 0.25rem 0.875rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.assistant-plan .portal-location-control {
+  display: grid;
+  gap: 0.25rem;
+  justify-items: start;
+}

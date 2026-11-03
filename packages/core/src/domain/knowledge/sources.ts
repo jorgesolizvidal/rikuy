@@ -1,10 +1,12 @@
 import { z } from "zod";
 
+import { openingHoursSchema } from "../../contracts/destination";
 import { eventScheduleSchema } from "../../contracts/event";
 import { documentManifestSchema, type DocumentText } from "../../contracts/knowledge";
 import { richTextSchema } from "../../contracts/rich-text";
 import { tourManifestSchema } from "../../contracts/tour";
 import { formatEventSchedule } from "../events/schedule";
+import { openingHoursText } from "../plan/hours";
 import { paragraph, richTextBlocks, type ChunkUnit } from "./chunker";
 import { textBlocks } from "./text";
 
@@ -24,6 +26,8 @@ export const contentIndexSourceSchema = z.object({
   body: richTextSchema.catch([]),
   timezone: z.string(),
   schedule: eventScheduleSchema.nullable().catch(null),
+  /** A destination's opening hours (ADR-039); absent before P5 · Paso 4. */
+  hours: openingHoursSchema.nullable().catch(null).default(null),
   venueTitle: z.string().nullable(),
   document: z.object({ prefix: z.string(), manifest: documentManifestSchema }).nullable(),
 });
@@ -55,6 +59,9 @@ export function contentUnits(
     facts.push(`Fecha: ${formatEventSchedule(source.schedule)}.`);
   }
   if (source.kind === "event" && source.venueTitle) facts.push(`Lugar: ${source.venueTitle}.`);
+  if (source.kind === "destination" && source.hours) {
+    facts.push(`Horario de atención: ${openingHoursText(source.hours)}.`);
+  }
   const blocks = [
     ...(source.summary.trim() !== "" ? [paragraph(source.summary)] : []),
     ...(facts.length > 0 ? [paragraph(facts.join(" "))] : []),

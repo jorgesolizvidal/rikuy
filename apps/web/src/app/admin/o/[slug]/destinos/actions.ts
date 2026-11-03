@@ -15,6 +15,7 @@ import {
   saveEventDraft,
   type ConfirmImageUploadResult,
   type DestinationIssue,
+  type OpeningHours,
   type OrganizationMembership,
   type RequestImageUploadResult,
 } from "@rikuy/core";
@@ -110,6 +111,8 @@ export interface DestinationPayload {
     readonly version: number;
     readonly alt: string;
   }[];
+  /** Destinations only: opening hours (ADR-039), validated by the use case and the database. */
+  readonly hours?: OpeningHours | null;
   /** Events only. */
   readonly schedule?: {
     readonly allDay: boolean;
@@ -163,6 +166,8 @@ export async function saveDestinationAction(
       cover: payload.cover,
       gallery: payload.gallery,
     };
+    // Without hours the key is left out: the document is the same as before this step.
+    const destination = payload.hours ? { ...base, hours: payload.hours } : base;
     const { membership, session } = access;
     const publish = payload.intent === "publish";
 
@@ -188,7 +193,7 @@ export async function saveDestinationAction(
           ? await publishDestination(
               membership,
               payload.contentId,
-              base,
+              destination,
               payload.expectedEdit,
               session.content,
               mediaAdmin(),
@@ -196,7 +201,7 @@ export async function saveDestinationAction(
           : await saveDestinationDraft(
               membership,
               payload.contentId,
-              base,
+              destination,
               payload.expectedEdit,
               session.content,
             );

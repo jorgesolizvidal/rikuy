@@ -46,6 +46,8 @@ export interface MapCanvasProps {
   readonly onStopFollowing?: (() => void) | undefined;
   /** The style or WebGL could not load: the page keeps working without the map. */
   readonly onFailure?: (() => void) | undefined;
+  /** A route (ADR-039): the points, in their order, joined by a straight line. */
+  readonly route?: boolean | undefined;
 }
 
 const SPANISH = {
@@ -64,6 +66,50 @@ const SPANISH = {
 let workerConfigured = false;
 
 const VISITOR_SOURCE = "rikuy-visitor-accuracy";
+const ROUTE_SOURCE = "rikuy-route";
+
+/** The route's line, in the order of the stops (straight lines: the page says so). */
+function showRoute(instance: MapLibre, points: readonly MapPointDto[]) {
+  const ordered = points
+    .filter((point) => point.order !== undefined)
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  const data = {
+    type: "FeatureCollection" as const,
+    features:
+      ordered.length < 2
+        ? []
+        : [
+            {
+              type: "Feature" as const,
+              properties: {},
+              geometry: {
+                type: "LineString" as const,
+                coordinates: ordered.map((point) => [point.lng, point.lat]),
+              },
+            },
+          ],
+  };
+  const source = instance.getSource<GeoJSONSource>(ROUTE_SOURCE);
+  if (source) {
+    source.setData(data);
+    return;
+  }
+  instance.addSource(ROUTE_SOURCE, { type: "geojson", data });
+  const brand =
+    getComputedStyle(instance.getContainer()).getPropertyValue("--brand").trim() || "#1f6f4a";
+  instance.addLayer({
+    id: `${ROUTE_SOURCE}-line`,
+    type: "line",
+    source: ROUTE_SOURCE,
+    layout: { "line-cap": "round", "line-join": "round" },
+    paint: {
+      "line-color": brand,
+      "line-width": 4,
+      "line-opacity": 0.8,
+      "line-dasharray": [2, 1.5],
+    },
+  });
+}
 const FROM_VISITOR = { fromVisitor: true } as const;
 
 /** The accuracy circle: a translucent area that says how sure the device is. */
@@ -131,7 +177,7 @@ function markerElement(point: MapPointDto, interactive: boolean): HTMLElement {
     (element as HTMLButtonElement).type = "button";
     element.setAttribute(
       "aria-label",
-      `${point.kind === "event" ? "Evento" : "Destino"}: ${point.title}`,
+      `${point.order !== undefined ? `Parada ${point.order} · ` : ""}${point.kind === "event" ? "Evento" : "Destino"}: ${point.title}`,
     );
   } else {
     element.setAttribute("aria-hidden", "true");
@@ -139,6 +185,13 @@ function markerElement(point: MapPointDto, interactive: boolean): HTMLElement {
   // MapLibre positions the element with its own transform; the pin shape is a child.
   const pin = document.createElement("span");
   pin.className = "map-marker-pin";
+  if (point.order !== undefined) {
+    element.dataset.order = String(point.order);
+    const number = document.createElement("span");
+    number.className = "map-marker-number";
+    number.textContent = String(point.order);
+    pin.append(number);
+  }
   element.append(pin);
   return element;
 }
@@ -155,6 +208,7 @@ export default function MapCanvas({
   onFailure,
   visitor,
   onStopFollowing,
+  route = false,
 }: MapCanvasProps) {
   const container = useRef<HTMLDivElement>(null);
   const map = useRef<MapLibre | null>(null);
@@ -320,6 +374,12 @@ export default function MapCanvas({
       placed.set(point.key, marker);
     }
   }, [points, interactive]);
+
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !styleReady || !route) return;
+    showRoute(instance, points);
+  }, [points, route, styleReady]);
 
   // A new requested area (e.g. "Ver todos") moves the camera.
   useEffect(() => {

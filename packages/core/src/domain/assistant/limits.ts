@@ -9,4 +9,7 @@ export const ASSISTANT_LIMITS = {
   /** Passages the model reads, and how much of each. */
   passages: 4,
   passageCharacters: 1200,
+  /** Plans (ADR-039): distances the phone may send, rounded to this many meters. */
+  distances: 60,
+  distanceStep: 100,
 } as const;

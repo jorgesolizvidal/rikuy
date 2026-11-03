@@ -16,6 +16,7 @@ import { platformSettings, publishedContentReader } from "@/server/platform";
 
 import { SignOutButton } from "../../../../sign-out-button";
 import { DestinationEditor, type EditorValues } from "./destination-editor";
+import { toHoursValues } from "./hours-values";
 import type { EditorImage } from "./image-fields";
 import { PortalShare } from "./portal-share";
 import { RevisionHistory } from "./revision-history";
@@ -78,6 +79,7 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
     location: document.location,
     cover: document.cover ? withPreview(document.cover) : null,
     gallery: document.gallery.map(withPreview),
+    hours: toHoursValues(document.hours),
   };
   const published = record.history.find(
     (entry) => entry.revisionId === record.published?.revisionId,

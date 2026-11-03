@@ -1,4 +1,5 @@
 import type { GeoPoint } from "../../contracts/destination";
+import type { OpeningHours } from "../plan/hours";
 
 /**
  * The sample content of a commercial demo (ADR-034): generic places and events of no real
@@ -22,6 +23,8 @@ export interface SampleDestination {
   readonly scene: SampleScene;
   readonly alt: string;
   readonly galleryAlt: string;
+  /** Opening hours (ADR-039); without them, «sin horario publicado». */
+  readonly hours?: OpeningHours;
 }
 
 export interface SampleEvent {
@@ -60,6 +63,7 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     scene: "plaza",
     alt: "Ilustración de muestra: plaza con edificios bajos y montañas al fondo",
     galleryAlt: "Ilustración de muestra: la plaza al atardecer",
+    hours: { mode: "always", note: "Espacio público" },
   },
   {
     slug: "mirador-del-valle",
@@ -76,6 +80,7 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     scene: "mirador",
     alt: "Ilustración de muestra: vista del valle desde un mirador",
     galleryAlt: "Ilustración de muestra: cerros y nubes desde el mirador",
+    hours: { mode: "always", note: "Al aire libre" },
   },
   {
     slug: "museo-comunitario",
@@ -91,6 +96,19 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     scene: "museo",
     alt: "Ilustración de muestra: edificio del museo con columnas",
     galleryAlt: "Ilustración de muestra: entrada del museo",
+    hours: {
+      mode: "weekly",
+      days: [
+        [],
+        [["09:00", "17:00"]],
+        [["09:00", "17:00"]],
+        [["09:00", "17:00"]],
+        [["09:00", "17:00"]],
+        [["09:00", "17:00"]],
+        [["09:00", "17:00"]],
+      ],
+      note: "Horario de muestra",
+    },
   },
   {
     slug: "mercado-central",
@@ -107,6 +125,11 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     scene: "mercado",
     alt: "Ilustración de muestra: puestos del mercado con toldos de colores",
     galleryAlt: "Ilustración de muestra: pasillo del mercado",
+    hours: {
+      mode: "weekly",
+      days: Array.from({ length: 7 }, () => [["06:00", "13:00"]] as const),
+      note: "Horario de muestra",
+    },
   },
   {
     slug: "sendero-del-rio",

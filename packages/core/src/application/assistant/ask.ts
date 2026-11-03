@@ -14,6 +14,8 @@ import {
   type AssistantSite,
 } from "../../domain/assistant/prompts";
 import { parseAssistantRequest, type AssistantRequest } from "../../domain/assistant/request";
+import type { PlanIntent } from "../../domain/plan/engine";
+import { detectPlanIntent } from "../../domain/plan/intent";
 import {
   AiStepFailed,
   estimateTokens,
@@ -23,6 +25,7 @@ import {
 } from "../ai/gateway";
 import { aiNotice, portalSectionLinks, type AiNotice } from "../ai/notices";
 import { publicCitation } from "../knowledge/search";
+import { answerPlan, type AssistantPlaces, type AssistantPlan } from "./plan";
 
 /**
  * The visitor's assistant (ADR-038): one question is one request of the gateway — rephrase
@@ -53,6 +56,8 @@ export interface AssistantDeps {
   search(tenantId: string, query: string, limit: number): Promise<KnowledgePassage[]>;
   /** The published destination, event or tour the visitor is on; null if none. */
   page(tenantId: string, page: AssistantPage): Promise<AssistantPageItem | null>;
+  /** Published destinations (with hours) and upcoming events, for plans (ADR-039). */
+  places(tenantId: string): Promise<AssistantPlaces>;
   readonly now: () => Date;
 }
 
@@ -80,6 +85,8 @@ export type AssistantReply =
       readonly abstained: boolean;
       readonly links: readonly AssistantLink[];
       readonly contact: { readonly phone?: string; readonly email?: string } | null;
+      /** «Qué hay cerca», «plan para hoy», «ruta sugerida»: the stops, decided by the engine. */
+      readonly plan?: AssistantPlan;
     }
   | { readonly status: "notice"; readonly lang: AssistantLanguage; readonly notice: AiNotice }
   | { readonly status: "invalid" };
@@ -99,6 +106,8 @@ export interface AssistantTrace {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly latencyMs: number;
+  /** A plan's intent, outcome and stops (`kind:slug`), in order. */
+  readonly plan?: { readonly intent: PlanIntent; readonly stops: readonly string[] };
 }
 
 export interface AssistantResult {
@@ -158,6 +167,10 @@ export async function askAssistant(
 
   const persona = assistantPersona(tenant.presentation);
   const lang = detectLanguage(request.question);
+
+  // A plan: the engine decides, the model explains (ADR-039).
+  const intent = request.intent ?? detectPlanIntent(request.question);
+  if (intent) return askPlan(tenant, request, intent, lang, persona, visitor, deps);
   const item = pageHasItem(request.page.kind)
     ? await deps.page(tenant.tenantId, request.page).catch(() => null)
     : null;
@@ -285,5 +298,65 @@ export async function askAssistant(
           : null,
     },
     trace,
+  };
+}
+
+async function askPlan(
+  tenant: AssistantTenant,
+  request: AssistantRequest,
+  intent: PlanIntent,
+  lang: AssistantLanguage,
+  persona: ReturnType<typeof assistantPersona>,
+  visitor: string | null,
+  deps: AssistantDeps,
+): Promise<AssistantResult> {
+  const started = Date.now();
+  let answer;
+  try {
+    answer = await answerPlan(
+      {
+        tenantId: tenant.tenantId,
+        timezone: tenant.timezone,
+        siteName: tenant.presentation.identity.siteName,
+        hasTours: tenant.hasTours,
+      },
+      { request, intent, lang, persona, today: today(deps.now(), tenant.timezone), visitor },
+      deps,
+    );
+  } catch {
+    const notice = aiNotice("provider_error", {
+      assistantName: persona.name,
+      contact: tenant.presentation.contact,
+      hasTours: tenant.hasTours,
+      lang,
+    });
+    return { reply: { status: "notice", lang, notice }, trace: null };
+  }
+  return {
+    reply: {
+      status: "answered",
+      lang,
+      speaker: persona.name,
+      blocks: answer.blocks,
+      sources: [],
+      abstained: false,
+      links: answer.links,
+      contact: null,
+      plan: answer.plan,
+    },
+    trace: {
+      lang,
+      planned: false,
+      query: "",
+      retrieved: [],
+      cited: [],
+      invalidCitations: 0,
+      usedSite: false,
+      wellFormed: answer.explained,
+      inputTokens: answer.inputTokens,
+      outputTokens: answer.outputTokens,
+      latencyMs: Date.now() - started,
+      plan: { intent, stops: answer.keys },
+    },
   };
 }

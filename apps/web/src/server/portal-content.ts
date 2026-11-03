@@ -3,6 +3,7 @@ import "server-only";
 import {
   formatEventSchedule,
   imageCandidates,
+  loadAssistantPlaces,
   mapPlacePath,
   PORTAL_PATHS,
   type PortalMapPlace,
@@ -62,6 +63,19 @@ export const portalDestination = cache(async (view: PortalView, slug: string) =>
   publishedContentReader().find(view.context.tenant.tenantId, slug),
 );
 
+/** Opening hours of the published destinations that have them, by slug (ADR-039). */
+export const portalOpeningHours = cache(async (view: PortalView) =>
+  publishedContentReader().openingHours(view.context.tenant.tenantId),
+);
+
+/** What a plan of the assistant may include: destinations with hours and upcoming events. */
+export const portalPlanPlaces = cache(async (view: PortalView) =>
+  loadAssistantPlaces(view.context.tenant.tenantId, {
+    destinations: publishedContentReader(),
+    events: publishedEventReader(),
+  }),
+);
+
 /** Absolute public origin of this portal (its canonical host). */
 export function portalOrigin(view: PortalView): string {
   return platformSettings().portalOrigin(view.context.tenant.canonicalHost ?? view.context.host);
@@ -104,6 +118,8 @@ export interface MapPointDto {
   readonly detail: string;
   readonly lat: number;
   readonly lng: number;
+  /** Its number in a route of the assistant (`/mapa?ruta=…`, ADR-039). */
+  readonly order?: number;
 }
 
 export function toMapPoint(place: PortalMapPlace): MapPointDto {

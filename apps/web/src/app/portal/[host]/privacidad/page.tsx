@@ -116,6 +116,14 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               responder. No se envían tu nombre ni tu ubicación.
             </li>
             <li>
+              «¿Qué hay cerca?», «Plan para hoy» y «Ruta sugerida» arman la lista con los horarios y
+              las fechas publicados. Si usas tu ubicación, tu teléfono mide la distancia en línea
+              recta a cada lugar del portal y envía solo esas distancias, redondeadas a 100 metros,
+              nunca tus coordenadas. Con varias distancias se podría estimar dónde estás, con un
+              margen de unos cien metros: por eso no se guardan ni se envían a Groq, que recibe solo
+              los lugares elegidos.
+            </li>
+            <li>
               Ni {siteName} ni la plataforma guardan el texto de las preguntas o las respuestas:
               solo cuántas se responden, cuánto tardan y cuánto cuestan. Para limitar el uso a 10
               preguntas por hora, se cuenta tu dirección IP con una huella que cambia cada día.

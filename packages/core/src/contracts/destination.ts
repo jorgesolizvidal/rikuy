@@ -1,5 +1,6 @@
 import { z } from "zod";
 
+import { OPENING_HOURS_LIMITS } from "../domain/plan/hours";
 import { richTextSchema, type RichText } from "./rich-text";
 
 /**
@@ -42,6 +43,44 @@ export const geoPointSchema = z.strictObject({
 });
 export type GeoPoint = z.infer<typeof geoPointSchema>;
 
+const OPEN_TIME = /^(?:[01]\d|2[0-3]):[0-5]\d$/u;
+const CLOSE_TIME = /^(?:(?:[01]\d|2[0-3]):[0-5]\d|24:00)$/u;
+
+/** Opening hours (ADR-039); mirrors `private.is_valid_opening_hours`. */
+export const openingHoursSchema = z.discriminatedUnion("mode", [
+  z.strictObject({
+    mode: z.literal("always"),
+    note: line(0, OPENING_HOURS_LIMITS.note),
+  }),
+  z
+    .strictObject({
+      mode: z.literal("weekly"),
+      days: z
+        .array(
+          z
+            .array(z.tuple([z.string().regex(OPEN_TIME), z.string().regex(CLOSE_TIME)]))
+            .max(OPENING_HOURS_LIMITS.rangesPerDay),
+        )
+        .length(OPENING_HOURS_LIMITS.days),
+      note: line(0, OPENING_HOURS_LIMITS.note),
+    })
+    .superRefine((hours, context) => {
+      let ranges = 0;
+      hours.days.forEach((day, index) => {
+        let previous: string | null = null;
+        for (const [open, close] of day) {
+          // "HH:MM" strings compare as times.
+          if (open >= close || (previous !== null && open <= previous)) {
+            context.addIssue({ code: "custom", path: ["days", index], message: "order" });
+          }
+          previous = close;
+          ranges += 1;
+        }
+      });
+      if (ranges === 0) context.addIssue({ code: "custom", path: ["days"], message: "required" });
+    }),
+]);
+
 export const destinationDocumentSchema = z.strictObject({
   title: line(1, DESTINATION_LIMITS.title),
   summary: line(0, DESTINATION_LIMITS.summary),
@@ -49,6 +88,8 @@ export const destinationDocumentSchema = z.strictObject({
   location: geoPointSchema.nullable(),
   cover: imageReferenceSchema.nullable(),
   gallery: z.array(imageReferenceSchema).max(DESTINATION_LIMITS.gallery),
+  /** Optional: without it (or null) the place has no published hours. */
+  hours: openingHoursSchema.nullable().optional(),
 });
 export type DestinationDocument = z.infer<typeof destinationDocumentSchema>;
 

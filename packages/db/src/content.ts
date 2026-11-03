@@ -3,10 +3,12 @@ import {
   destinationDocumentSchema,
   eventDocumentSchema,
   eventScheduleSchema,
+  openingHoursSchema,
   richTextSchema,
   type ContentRecord,
   type ContentRepository,
   type ContentStatus,
+  type OpeningHours,
   type PublishedDestinationReader,
   type PublishedEventReader,
   type PublishedMapReader,
@@ -403,6 +405,21 @@ export function createSupabasePublishedContentReader(
           publishedAt: row.published_at,
           updatedAt: row.updated_at,
         }));
+    },
+
+    async openingHours(tenantId) {
+      const { data, error } = await client
+        .rpc("portal_opening_hours", { p_tenant_id: tenantId })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (error) throw unexpected("Reading opening hours", error);
+      const rows = z.array(z.object({ slug: z.string(), hours: z.unknown() })).parse(data);
+      const hours = new Map<string, OpeningHours>();
+      for (const row of rows) {
+        // The database validated them; a shape this build does not know is left out.
+        const parsed = openingHoursSchema.safeParse(row.hours);
+        if (parsed.success) hours.set(row.slug, parsed.data);
+      }
+      return hours;
     },
 
     async find(tenantId, slug) {
