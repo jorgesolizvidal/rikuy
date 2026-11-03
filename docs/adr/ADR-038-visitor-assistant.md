@@ -42,7 +42,7 @@ Decisiones del usuario (2026-11-02):
 
 ## Consecuencias
 
-- (+) La mayoría de las primeras preguntas en español cuestan una sola llamada (unos 2.000–3.000 tokens).
+- (+) La mayoría de las primeras preguntas en español cuestan una sola llamada. En el gold con el modelo real (2026-11-03), una pregunta costó en promedio unos 725 tokens (de 506 a 1.110, con o sin reformular).
 - (+) Una cita inventada o un enlace externo nunca llegan al visitante.
 - (+) El municipio cambia el nombre, el saludo y el tono sin tocar código.
 - (−) Una pregunta en inglés o de seguimiento hace dos llamadas: algo más de tokens y medio segundo más.

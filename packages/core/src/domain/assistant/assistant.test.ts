@@ -219,6 +219,27 @@ describe("parseAnswer", () => {
     expect(parseAnswer("Llama al teléfono.\nFUENTES: M", passages).abstained).toBe(false);
   });
 
+  it("reads «FUENTES:» also at the end of the last sentence (seen with the real model)", () => {
+    const parsed = parseAnswer(
+      "El pueblo nació a orillas del río como lugar de descanso de los arrieros. FUENTES: F1",
+      passages,
+    );
+    expect(parsed.text).toBe(
+      "El pueblo nació a orillas del río como lugar de descanso de los arrieros.",
+    );
+    expect(parsed.passages.map((p) => p.slug)).toEqual(["lugar-1"]);
+    expect(parsed).toMatchObject({ wellFormed: true, abstained: false, invalidCitations: 0 });
+    // In English; and the word «fuentes» in the text (lowercase) is not the mark.
+    expect(
+      parseAnswer("Buses leave every 30 minutes. SOURCES: F2", passages).passages.map(
+        (p) => p.slug,
+      ),
+    ).toEqual(["lugar-2"]);
+    const word = parseAnswer("Hay dos fuentes: una en la plaza.\nFUENTES: F1", passages);
+    expect(word.text).toBe("Hay dos fuentes: una en la plaza.");
+    expect(word.passages).toHaveLength(1);
+  });
+
   it("never lets a link or markup through", () => {
     expect(
       cleanAnswerText(

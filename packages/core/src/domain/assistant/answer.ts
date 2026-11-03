@@ -38,11 +38,15 @@ export interface ParsedAnswer {
   readonly usedSite: boolean;
   /** Neither a published text nor the portal's data backs it: «sin datos publicados». */
   readonly abstained: boolean;
-  /** The model ended with «FUENTES:» as asked. */
+  /** The model wrote «FUENTES:» (on its own line or at the end of the text). */
   readonly wellFormed: boolean;
 }
 
-const SOURCES_LINE = /^[\s>*_-]*(?:FUENTES|SOURCES)\s*:?\s*(.*)$/imu;
+/**
+ * «FUENTES: …», on its own line as asked or — as the model sometimes writes it — at the end
+ * of the last sentence. The last one counts; everything from it on is not shown.
+ */
+const SOURCES_MARK = /(?<![\p{L}\p{N}])(?:FUENTES|SOURCES)\s*:/gu;
 
 /** Removes what the visitor must never see from the model: links, labels and markup. */
 export function cleanAnswerText(text: string): string {
@@ -88,17 +92,11 @@ export function answerBlocks(text: string): AnswerBlock[] {
 }
 
 export function parseAnswer(text: string, passages: readonly KnowledgePassage[]): ParsedAnswer {
-  const lines = text.split("\n");
-  let sourcesIndex = -1;
-  for (let index = lines.length - 1; index >= 0; index -= 1) {
-    if (SOURCES_LINE.test(lines[index] ?? "")) {
-      sourcesIndex = index;
-      break;
-    }
-  }
-  const labelsText =
-    sourcesIndex >= 0 ? (SOURCES_LINE.exec(lines[sourcesIndex] ?? "")?.[1] ?? "") : "";
-  const body = sourcesIndex >= 0 ? lines.slice(0, sourcesIndex).join("\n") : text;
+  const marks = [...text.matchAll(SOURCES_MARK)];
+  const mark = marks.at(-1);
+  const at = mark?.index ?? -1;
+  const labelsText = mark ? (text.slice(at + mark[0].length).split("\n")[0] ?? "") : "";
+  const body = mark ? text.slice(0, at).replace(/[\s>*_-]+$/u, "") : text;
   const labels = [...labelsText.toUpperCase().matchAll(/\b(F\d{1,2}|M)\b/gu)].map(
     (m) => m[1] ?? "",
   );
@@ -122,6 +120,6 @@ export function parseAnswer(text: string, passages: readonly KnowledgePassage[])
     invalidCitations: invalid,
     usedSite: labels.includes("M"),
     abstained: checked.valid.length === 0 && !labels.includes("M"),
-    wellFormed: sourcesIndex >= 0,
+    wellFormed: mark !== undefined,
   };
 }
