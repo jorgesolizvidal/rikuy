@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 3 — asistente del visitante en el portal (2026-11-02; falta correr el gold con el modelo real en producción)
-- **Rama:** `feat/p5-step3-visitor-assistant` → PR hacia `main`
+- **Último paso completado:** P5 · Paso 3 — asistente del visitante en el portal (gold con el modelo real: 38 de 40, y 40 de 40 con la corrección `fix/assistant-inline-sources`, 2026-11-03)
+- **Rama:** `fix/assistant-inline-sources` → PR hacia `main`
 
 ## Historial
 
@@ -1152,7 +1152,7 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - Entre publicar y terminar la indexación (segundos), la versión nueva aún no aparece.
 - Un documento retirado deja de usarse pero no se borra; los fragmentos de versiones viejas quedan. Registrado en «Pendientes».
 
-### P5 · Paso 3 — asistente del visitante en el portal ✅ (falta el gold con el modelo real)
+### P5 · Paso 3 — asistente del visitante en el portal ✅
 
 - Decisiones del usuario ([ADR-038](../adr/ADR-038-visitor-assistant.md)), 2026-11-02:
   - el asistente se abre con un **botón flotante** en todas las páginas: pantalla completa en el celular, panel lateral en la PC;
@@ -1197,21 +1197,23 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - «Qué hay cerca», «plan para hoy» y «ruta sugerida» (Paso 4), la guía dentro del tour (Paso 5) y la voz (Paso 6) no son parte de este paso.
 - Al tocar la página, el mapa pequeño de la ficha se activa (como antes): abrir el asistente desde una ficha también lo despierta.
 
+**Gold con el modelo real (2026-11-03):** el usuario creó en producción la demo comercial «Demo Valle» (`rikuy-demo-valle.vercel.app`), cargó el contenido de muestra (9 publicaciones leídas, 20 pasajes) y corrió las 40 preguntas en «Evaluar el asistente», con Groq (`openai/gpt-oss-120b`).
+
+- **38 de 40 bien**, con 28.972 tokens en total: unos 725 por pregunta (de 506 a 1.110), muy por debajo de lo estimado. Respuestas en 0,4–1,7 s.
+- Todas las preguntas sobre lugares, eventos y la guía citaron su fuente esperada. Inglés, seguimientos y preguntas desde una ficha reformularon y acertaron. Las 4 sin respuesta publicada y los 2 intentos de cambiar las reglas se abstuvieron sin citar nada. Ninguna cita inventada.
+- **Las 2 que fallaron (G23, G26) eran el mismo error del lector, no del modelo:** el modelo escribió «FUENTES: F1» al final de la última oración, no en su propia línea. El lector solo la buscaba al principio de una línea, así que la respuesta quedó sin su cita y el visitante habría visto «FUENTES: F1» en el texto.
+
+**Corrección posterior (`fix/assistant-inline-sources`):** `parseAnswer` reconoce la marca «FUENTES:» o «SOURCES:» (en mayúsculas, como se le pide) también al final del texto; cuenta la última y no muestra nada desde ella. Una palabra «fuentes» del texto no es la marca. Con las dos respuestas reales del gold como pruebas: con esto, las 40 pasan.
+
 ## Cómo verificarlo
 
-1. Después del merge, «Deploy database» aplica la migración. Con la IA activa, todos los portales muestran el botón «Asistente».
-2. En Ucureña: panel → «Marca del portal» → «Asistente del portal»: nombre «Chaski», su saludo y el tono → «Publicar». El botón del portal dice «Chaski». Como Ucureña todavía no tiene contenido publicado, responderá que no tiene esa información y ofrecerá el contacto.
-3. **Gold con el modelo real** sobre una demo con el contenido de muestra (Demo Valle o una nueva):
-   - si la demo se cargó antes de este paso, «Contenido de muestra» → «Cargar contenido de muestra» agrega la guía del asistente;
-   - `/plataforma/cuotas`: sube la cuota de IA de la demo a 200 (miles) por ese día;
-   - `/plataforma` → «Evaluar el asistente» → 8 tandas de 5 (cada una ~1,5 min) → «Copiar resultados» y pegarlos en el chat;
-   - vuelve a bajar la cuota.
+1. Después del merge, en `/plataforma` → «Evaluar el asistente» → Demo Valle, «Desde el caso» `21` y luego `26`: G23 y G26 quedan «Bien», sin «FUENTES: F1» en la respuesta y con la guía citada.
+2. Al terminar, la cuota de IA de Demo Valle vuelve a `40` en `/plataforma/cuotas`.
 
 ## Siguiente paso
 
 1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
-2. **Resultados del gold con el modelo real** (después del merge): revisarlos, corregir lo que falle (instrucciones, búsqueda o casos) y marcar el P5 · Paso 3 ✅ en el roadmap.
-3. **P5 · Paso 4 — «qué hay cerca», «plan para hoy» y «ruta sugerida»** (requiere autorización): motor determinista (distancia, horario, vigencia) que el modelo solo explica; 0 eventos o lugares vencidos recomendados como vigentes.
+2. **P5 · Paso 4 — «qué hay cerca», «plan para hoy» y «ruta sugerida»** (requiere autorización): motor determinista (distancia, horario, vigencia) que el modelo solo explica; 0 eventos o lugares vencidos recomendados como vigentes.
 
 ## Decisiones pendientes del usuario
 
