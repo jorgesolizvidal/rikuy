@@ -23,6 +23,7 @@ export default async function SamplePage({ params }: SamplePageProps) {
   const session = await adminSession();
   const status = await loadSampleContentStatus(membership, {
     content: session.content,
+    knowledge: session.knowledge,
     tours: session.tours,
     panoramas: session.panoramas,
   });

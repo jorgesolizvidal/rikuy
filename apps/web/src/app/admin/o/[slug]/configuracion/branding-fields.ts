@@ -1,5 +1,8 @@
 import {
+  ASSISTANT_TONES,
   NEARBY_RADIUS,
+  PRESENTATION_LIMITS,
+  type AssistantTone,
   SOCIAL_NETWORKS,
   type PresentationIssue,
   type SocialNetwork,
@@ -23,6 +26,10 @@ export interface BrandingValues {
   description: string;
   /** «Estás cerca de…» radius in meters; empty: the default (150 m). */
   nearbyRadius: string;
+  /** The visitor assistant's name; empty (and no greeting): the neutral assistant. */
+  assistantName: string;
+  assistantGreeting: string;
+  assistantTone: AssistantTone;
   social: Record<SocialNetwork, string>;
   /** Logo reference (hidden fields `logo.assetId` / `logo.version`); empty: no logo. */
   logoAssetId: string;
@@ -52,6 +59,9 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     address: presentation.contact.address ?? "",
     description: presentation.seo.description,
     nearbyRadius: presentation.visitors ? String(presentation.visitors.nearbyRadius) : "",
+    assistantName: presentation.assistant?.name ?? "",
+    assistantGreeting: presentation.assistant?.greeting ?? "",
+    assistantTone: presentation.assistant?.tone ?? "warm",
     social,
     logoAssetId: presentation.logo?.assetId ?? "",
     logoVersion: presentation.logo ? String(presentation.logo.version) : "",
@@ -91,6 +101,22 @@ export function presentationInputFromForm(formData: FormData) {
     seo: { description: text(formData, "description") },
     ...logoFromForm(formData),
     ...visitorsFromForm(formData),
+    ...assistantFromForm(formData),
+  };
+}
+
+function assistantFromForm(formData: FormData) {
+  const name = text(formData, "assistantName");
+  const greeting = text(formData, "assistantGreeting");
+  if (name === "" && greeting === "") return {};
+  const tone = text(formData, "assistantTone");
+  // A greeting without a name fails validation on the name (never a silent neutral name).
+  return {
+    assistant: {
+      name,
+      greeting,
+      tone: (ASSISTANT_TONES as readonly string[]).includes(tone) ? tone : "warm",
+    },
   };
 }
 
@@ -120,6 +146,10 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   "contact.phone": "phone",
   "contact.address": "address",
   "seo.description": "description",
+  assistant: "assistantName",
+  "assistant.name": "assistantName",
+  "assistant.greeting": "assistantGreeting",
+  "assistant.tone": "assistantTone",
   visitors: "nearbyRadius",
   "visitors.nearbyRadius": "nearbyRadius",
   logo: "logo",
@@ -139,6 +169,9 @@ const MESSAGES: Readonly<Record<string, string>> = {
   address: "La dirección admite una línea de hasta 160 caracteres.",
   description: "La descripción admite hasta 160 caracteres, en una línea.",
   nearbyRadius: `Escribe un número entero de metros entre ${NEARBY_RADIUS.min} y ${NEARBY_RADIUS.max}, o déjalo vacío para usar ${NEARBY_RADIUS.default} m.`,
+  assistantName: `Escribe el nombre del asistente en una línea, hasta ${PRESENTATION_LIMITS.assistantName} caracteres (también si escribiste un saludo).`,
+  assistantGreeting: `El saludo admite una línea de hasta ${PRESENTATION_LIMITS.assistantGreeting} caracteres.`,
+  assistantTone: "Elige «Cercano» o «Formal».",
   social: "Pega el enlace completo de la página, empezando por https://.",
   logo: "Este logo ya no se puede usar. Sube otro o quítalo para publicar sin logo.",
 };

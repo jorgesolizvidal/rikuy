@@ -49,6 +49,7 @@ async function upload(url: string, bytes: Uint8Array, mime: string): Promise<boo
 function deps(session: Awaited<ReturnType<typeof adminSession>>) {
   return {
     content: session.content,
+    knowledge: session.knowledge,
     media: session.media,
     admin: mediaAdmin(),
     processor: imageProcessor(),

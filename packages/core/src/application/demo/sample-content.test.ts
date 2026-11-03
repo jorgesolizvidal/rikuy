@@ -8,6 +8,7 @@ import {
   offsetPoint,
   SAMPLE_DESTINATIONS,
   SAMPLE_EVENTS,
+  SAMPLE_KNOWLEDGE,
   SAMPLE_TOUR_DESTINATION,
   sampleEventDate,
 } from "../../domain/demo/sample-template";
@@ -85,6 +86,7 @@ describe("sample content use cases", () => {
         listDestinations: vi.fn(async () => []),
         listEvents: vi.fn(async () => []),
       },
+      knowledge: { list: vi.fn(async () => []) },
       tours: { list: vi.fn(async () => []) },
       panoramas: { list: vi.fn(async () => []) },
     };
@@ -119,6 +121,9 @@ describe("sample content use cases", () => {
     d.content.listDestinations.mockResolvedValue(all.slice(0, 5) as never);
     d.content.listEvents.mockResolvedValue(all.slice(5) as never);
     d.panoramas.list.mockResolvedValue([{ status: "processing" }, { status: "ready" }] as never);
+    // A demo loaded before the assistant's guide existed: loading again adds it.
+    expect((await loadSampleContentStatus(demoOwner, d))?.partial).toBe(true);
+    d.knowledge.list.mockResolvedValue([{ slug: SAMPLE_KNOWLEDGE.slug }] as never);
     expect(await loadSampleContentStatus(demoOwner, d)).toEqual({
       loaded: true,
       partial: false,

@@ -1,0 +1,315 @@
+/* The visitor assistant's panel (ADR-038), loaded only with the panel. Colors come from the
+   municipality's palette (CSS variables of .portal), like the rest of the portal. */
+
+.assistant {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  width: 100%;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  display: none;
+  flex-direction: column;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.assistant[open] {
+  display: flex;
+}
+
+.assistant::backdrop {
+  background: color-mix(in srgb, var(--fg) 45%, transparent);
+}
+
+@media (min-width: 48rem) {
+  .assistant {
+    left: auto;
+    width: min(26rem, 100vw);
+    border-left: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+    box-shadow: -0.5rem 0 2rem color-mix(in srgb, var(--fg) 15%, transparent);
+  }
+}
+
+.assistant-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+  background: var(--surface);
+}
+
+.assistant-header h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  line-height: 1.2;
+}
+
+.assistant-subtitle {
+  margin: 0.125rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.assistant-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+.assistant-quiet,
+.assistant-close {
+  min-height: 2.75rem;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-quiet {
+  padding: 0 0.75rem;
+}
+
+.assistant-close {
+  width: 2.75rem;
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.assistant-quiet:hover,
+.assistant-close:hover {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.assistant-log {
+  flex: 1;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding: 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.assistant-message {
+  max-width: 92%;
+  padding: 0.625rem 0.875rem;
+  border-radius: 1rem;
+  line-height: 1.45;
+  overflow-wrap: anywhere;
+}
+
+.assistant-message p,
+.assistant-message ul {
+  margin: 0;
+}
+
+.assistant-message > * + * {
+  margin-top: 0.5rem;
+}
+
+.assistant-message ul {
+  padding-left: 1.25rem;
+}
+
+.assistant-from-assistant {
+  align-self: flex-start;
+  background: var(--surface);
+  border: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  border-bottom-left-radius: 0.25rem;
+}
+
+.assistant-from-visitor {
+  align-self: flex-end;
+  background: var(--brand);
+  color: var(--on-brand);
+  border-bottom-right-radius: 0.25rem;
+}
+
+.assistant-problem {
+  border-color: color-mix(in srgb, var(--accent) 60%, transparent);
+}
+
+.assistant-abstained {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.assistant-sources {
+  padding-top: 0.5rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 10%, transparent);
+  font-size: 0.875rem;
+}
+
+.assistant-sources-title {
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.assistant-sources ul {
+  list-style: none;
+  padding: 0;
+  display: grid;
+  gap: 0.25rem;
+  margin-top: 0.25rem;
+}
+
+.assistant-source-kind {
+  display: inline-block;
+  padding: 0 0.375rem;
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--brand) 12%, transparent);
+  color: var(--fg);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.assistant-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.assistant-links a,
+.assistant-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  padding: 0.25rem 0.75rem;
+  border: 1.5px solid var(--brand);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.875rem;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.assistant-suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.assistant-chip {
+  text-align: left;
+  min-height: 2.75rem;
+}
+
+.assistant-chip:hover,
+.assistant-links a:hover {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.assistant-contact {
+  font-size: 0.875rem;
+}
+
+.assistant-typing {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.assistant-dots {
+  display: inline-flex;
+  gap: 0.2rem;
+}
+
+.assistant-dots span {
+  width: 0.4rem;
+  height: 0.4rem;
+  border-radius: 50%;
+  background: currentColor;
+  opacity: 0.6;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .assistant-dots span {
+    animation: assistant-dot 1s infinite ease-in-out;
+  }
+  .assistant-dots span:nth-child(2) {
+    animation-delay: 0.15s;
+  }
+  .assistant-dots span:nth-child(3) {
+    animation-delay: 0.3s;
+  }
+}
+
+@keyframes assistant-dot {
+  0%,
+  100% {
+    opacity: 0.25;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+.assistant-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem 0.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.assistant-form textarea {
+  flex: 1;
+  min-width: 0;
+  min-height: 2.75rem;
+  max-height: 8rem;
+  padding: 0.625rem 0.875rem;
+  border: 1.5px solid color-mix(in srgb, var(--fg) 35%, transparent);
+  border-radius: 1.375rem;
+  background: var(--bg);
+  color: var(--fg);
+  font: inherit;
+  /* 16 px or more: phones do not zoom in when the field gets the focus. */
+  font-size: 1rem;
+  line-height: 1.4;
+  resize: none;
+  field-sizing: content;
+}
+
+.assistant-send {
+  min-height: 2.75rem;
+  padding: 0 1.125rem;
+  border: 0;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-send:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.assistant-note {
+  margin: 0;
+  padding: 0.375rem 1rem max(0.75rem, env(safe-area-inset-bottom));
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.4;
+}

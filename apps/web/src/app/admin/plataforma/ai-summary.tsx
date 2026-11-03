@@ -83,6 +83,14 @@ export function AiSummary({
           </p>
           <AiProbeForm tenants={tenants} />
         </li>
+        <li className="usage-card">
+          <h3>Evaluar el asistente</h3>
+          <p className="field-hint">
+            Las 40 preguntas del gold, con el modelo real, sobre una demo con el contenido de
+            muestra.
+          </p>
+          <Link href="/plataforma/asistente">Evaluar el asistente</Link>
+        </li>
       </ul>
     </section>
   );

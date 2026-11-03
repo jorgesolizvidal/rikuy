@@ -175,6 +175,41 @@ export const SAMPLE_EVENTS: readonly SampleEvent[] = [
   },
 ];
 
+/**
+ * Sample knowledge for the assistant (ADR-038): what a visitor asks and no page answers —
+ * how to get there, services, weather, a little history. Generic, with `{municipio}`.
+ */
+export interface SampleKnowledge {
+  readonly slug: string;
+  readonly title: string;
+  readonly summary: string;
+  readonly body: string;
+}
+
+export const SAMPLE_KNOWLEDGE: SampleKnowledge = {
+  slug: "guia-para-visitantes",
+  title: "Guía para visitantes",
+  summary: "Cómo llegar, servicios, clima e historia de {municipio}, para el asistente del portal.",
+  body: [
+    "*Texto de muestra: reemplázalo con la información real del municipio.*",
+    "## Cómo llegar",
+    "{municipio} queda a una hora y media en bus desde la terminal principal de la ciudad más cercana. Los buses salen cada 30 minutos, entre las 6:00 y las 20:00, y dejan a los pasajeros a una cuadra de la plaza principal.",
+    "## Oficina de información turística",
+    "La oficina de información turística está en la plaza principal y atiende de lunes a sábado, de 8:30 a 16:30. Ahí se consiguen mapas impresos y se reservan los guías locales para la caminata al mirador.",
+    "## Servicios",
+    "- Cajero automático: junto a la alcaldía, en la plaza principal",
+    "- Farmacia: frente al mercado central, abierta todos los días hasta las 21:00",
+    "- Wifi gratuito: en la plaza principal",
+    "- Baños públicos: en el mercado central",
+    "## Comida típica",
+    "El plato más pedido es la sopa de maní, que se sirve en el mercado central al mediodía. Los domingos hay pan recién horneado en horno de barro en los puestos de la plaza.",
+    "## Clima y qué llevar",
+    "Los días son templados y las noches frías durante todo el año. Entre diciembre y marzo es temporada de lluvias. Conviene llevar abrigo, protector solar y agua.",
+    "## Historia",
+    "El pueblo nació a orillas del río como lugar de descanso de los arrieros que cruzaban el valle con sus mulas. Su feria de los domingos reúne desde entonces a las comunidades de los alrededores.",
+  ].join("\n\n"),
+};
+
 /** The destination whose tour the sample builds. */
 export const SAMPLE_TOUR_DESTINATION = "plaza-principal";
 

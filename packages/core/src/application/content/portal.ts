@@ -31,6 +31,8 @@ export const PORTAL_PATHS = {
   tourData: "/recorrido/datos",
   map: "/mapa",
   mapPlaces: "/mapa/lugares",
+  /** The visitor assistant's questions (POST, ADR-038). */
+  assistant: "/asistente",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;

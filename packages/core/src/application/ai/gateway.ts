@@ -1,5 +1,6 @@
 import {
   AI_PROFILE_SETTINGS,
+  type AiUsageCount,
   type AiMessage,
   type AiProfile,
   type AiRefusal,
@@ -120,7 +121,8 @@ export interface AiGatewayDeps {
 
 /** Retried: the provider may answer on a second try. Not a 429: retrying makes it worse. */
 const RETRYABLE = new Set<AiExecution["status"]>(["timeout", "unavailable"]);
-const MAX_ATTEMPTS = 2;
+/** ai_api.finish_request records at most 3 calls per request. */
+export const MAX_AI_CALLS = 3;
 
 function failureOf(error: unknown): { status: AiExecution["status"]; httpStatus: number | null } {
   if (error instanceof AiProviderError) return { status: error.kind, httpStatus: error.httpStatus };
@@ -131,12 +133,59 @@ function failureOf(error: unknown): { status: AiExecution["status"]; httpStatus:
   return { status: "unavailable", httpStatus: null };
 }
 
-export async function runAiRequest(input: AiRequestInput, deps: AiGatewayDeps): Promise<AiResult> {
+/** One call of a session: its messages, and how much of the profile's answer it may use. */
+export interface AiStep {
+  readonly messages: readonly AiMessage[];
+  /** At most the profile's maximum. */
+  readonly maxOutputTokens?: number;
+  /** Calls this step may make (a retry when the provider is down). Default 2. */
+  readonly attempts?: 1 | 2;
+}
+
+/** A step got no answer: the work may go on without it (or let it end the request). */
+export class AiStepFailed extends Error {
+  constructor(readonly outcome: "provider_unavailable" | "provider_error") {
+    super(`AI step failed: ${outcome}`);
+    this.name = "AiStepFailed";
+  }
+}
+
+export interface AiSessionInput {
+  readonly tenantId: string;
+  readonly profile: AiProfile;
+  /** Every step's estimated input plus its most output: what the request sets aside. */
+  readonly reserveTokens: number;
+  readonly visitor?: string | null;
+  readonly actorId?: string | null;
+}
+
+export type AiSessionResult<T> =
+  | {
+      readonly outcome: "answered";
+      readonly requestId: string;
+      readonly value: T;
+      readonly model: string;
+      readonly usage: AiUsageCount;
+      readonly latencyMs: number;
+    }
+  | { readonly outcome: AiRefusal; readonly requestId: string | null };
+
+export type AiCall = (step: AiStep) => Promise<AiCompletion>;
+
+/**
+ * One request of the gateway that may call the model more than once (ADR-038: rephrase,
+ * then answer): one reservation, one count against the visitor's hourly limit, and one
+ * settlement with every call it made. A step that fails throws AiStepFailed; the work may
+ * catch it and go on. Without a single answered call, the request is not answered.
+ */
+export async function runAiSession<T>(
+  input: AiSessionInput,
+  deps: AiGatewayDeps,
+  work: (call: AiCall) => Promise<T>,
+): Promise<AiSessionResult<T>> {
   const settings = AI_PROFILE_SETTINGS[input.profile];
-  if (input.messages.length === 0) throw new RangeError("an AI request needs messages");
-  const estimate = estimateTokens(input.messages);
-  if (estimate > settings.maxInputTokens) {
-    throw new RangeError(`AI request too large for ${input.profile}: ~${estimate} tokens`);
+  if (!Number.isInteger(input.reserveTokens) || input.reserveTokens < 1) {
+    throw new RangeError("an AI request reserves a positive whole number of tokens");
   }
   if (deps.ledger === null || deps.provider === null) {
     return { outcome: "not_configured", requestId: null };
@@ -149,7 +198,7 @@ export async function runAiRequest(input: AiRequestInput, deps: AiGatewayDeps): 
     begun = await deps.ledger.begin({
       tenantId: input.tenantId,
       profile: input.profile,
-      reserveTokens: estimate + settings.maxOutputTokens,
+      reserveTokens: input.reserveTokens,
       visitor: input.visitor ?? null,
       actorId: input.actorId ?? null,
     });
@@ -164,77 +213,129 @@ export async function runAiRequest(input: AiRequestInput, deps: AiGatewayDeps): 
   }
 
   const executions: AiExecution[] = [];
-  let answer: { text: string; inputTokens: number; outputTokens: number; model: string } | null =
-    null;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS && answer === null; attempt += 1) {
-    const started = now();
-    try {
-      const completion = await provider.complete(
-        {
-          messages: input.messages,
-          maxOutputTokens: settings.maxOutputTokens,
-          temperature: settings.temperature,
-        },
-        AbortSignal.timeout(settings.timeoutMs),
-      );
-      executions.push({
-        provider: provider.name,
-        model: completion.model,
-        status: "ok",
-        inputTokens: completion.inputTokens,
-        outputTokens: completion.outputTokens,
-        latencyMs: Math.max(0, Math.round(now() - started)),
-        httpStatus: 200,
-      });
-      answer = completion;
-    } catch (error) {
-      const failure = failureOf(error);
-      executions.push({
-        provider: provider.name,
-        model: provider.model,
-        status: failure.status,
-        inputTokens: 0,
-        outputTokens: 0,
-        latencyMs: Math.max(0, Math.round(now() - started)),
-        httpStatus: failure.httpStatus,
-      });
-      if (!RETRYABLE.has(failure.status)) break;
+  let model: string | null = null;
+  const call: AiCall = async (step) => {
+    const estimate = estimateTokens(step.messages);
+    if (step.messages.length === 0) throw new RangeError("an AI step needs messages");
+    if (estimate > settings.maxInputTokens) {
+      throw new RangeError(`AI step too large for ${input.profile}: ~${estimate} tokens`);
+    }
+    const maxOutputTokens = Math.min(
+      step.maxOutputTokens ?? settings.maxOutputTokens,
+      settings.maxOutputTokens,
+    );
+    const attempts = step.attempts ?? 2;
+    let last: AiExecution["status"] = "unavailable";
+    for (let attempt = 1; attempt <= attempts && executions.length < MAX_AI_CALLS; attempt += 1) {
+      const started = now();
+      try {
+        const completion = await provider.complete(
+          { messages: step.messages, maxOutputTokens, temperature: settings.temperature },
+          AbortSignal.timeout(settings.timeoutMs),
+        );
+        executions.push({
+          provider: provider.name,
+          model: completion.model,
+          status: "ok",
+          inputTokens: completion.inputTokens,
+          outputTokens: completion.outputTokens,
+          latencyMs: Math.max(0, Math.round(now() - started)),
+          httpStatus: 200,
+        });
+        model = completion.model;
+        return completion;
+      } catch (error) {
+        const failure = failureOf(error);
+        executions.push({
+          provider: provider.name,
+          model: provider.model,
+          status: failure.status,
+          inputTokens: 0,
+          outputTokens: 0,
+          latencyMs: Math.max(0, Math.round(now() - started)),
+          httpStatus: failure.httpStatus,
+        });
+        last = failure.status;
+        if (!RETRYABLE.has(failure.status)) break;
+      }
+    }
+    throw new AiStepFailed(last === "error" ? "provider_error" : "provider_unavailable");
+  };
+
+  let value: { readonly result: T } | null = null;
+  let failed: AiStepFailed["outcome"] = "provider_unavailable";
+  try {
+    value = { result: await work(call) };
+  } catch (error) {
+    if (error instanceof AiStepFailed) failed = error.outcome;
+    else if (error instanceof RangeError) throw error;
+    else {
+      // A mistake in the work, not in the provider: settle what was used and say no answer.
+      deps.logger?.event("ai.work_failed", { profile: input.profile, error: errorName(error) });
+      failed = "provider_error";
     }
   }
-
-  const last = executions.at(-1);
-  const outcome: AiFinishOutcome =
-    answer !== null
-      ? "answered"
-      : last?.status === "error"
-        ? "provider_error"
-        : "provider_unavailable";
+  const answered = value !== null && executions.some((execution) => execution.status === "ok");
+  const outcome: AiFinishOutcome = answered ? "answered" : failed;
   try {
     await deps.ledger.finish(begun.requestId, outcome, executions);
   } catch (error) {
     // The reservation expires on its own and counts as used (ADR-036): the answer stands.
     deps.logger?.event("ai.finish_failed", { profile: input.profile, error: errorName(error) });
   }
+  const latencyMs = executions.reduce((sum, execution) => sum + execution.latencyMs, 0);
   deps.logger?.event("ai.finished", {
     profile: input.profile,
     outcome,
     attempts: executions.length,
-    latencyMs: executions.reduce((sum, execution) => sum + execution.latencyMs, 0),
+    latencyMs,
   });
-
-  if (answer === null) {
-    // Without an answer the outcome is never "answered"; the check only narrows the type.
+  if (!answered || value === null || model === null) {
     return {
       outcome: outcome === "answered" ? "provider_error" : outcome,
       requestId: begun.requestId,
     };
   }
+  const ok = executions.filter((execution) => execution.status === "ok");
   return {
     outcome: "answered",
     requestId: begun.requestId,
-    text: answer.text,
-    model: answer.model,
-    usage: { inputTokens: answer.inputTokens, outputTokens: answer.outputTokens },
-    latencyMs: executions.reduce((sum, execution) => sum + execution.latencyMs, 0),
+    value: value.result,
+    model,
+    usage: {
+      inputTokens: ok.reduce((sum, execution) => sum + execution.inputTokens, 0),
+      outputTokens: ok.reduce((sum, execution) => sum + execution.outputTokens, 0),
+    },
+    latencyMs,
+  };
+}
+
+/** A request with one call (and its retry): «Probar la IA» and the simplest uses. */
+export async function runAiRequest(input: AiRequestInput, deps: AiGatewayDeps): Promise<AiResult> {
+  const settings = AI_PROFILE_SETTINGS[input.profile];
+  if (input.messages.length === 0) throw new RangeError("an AI request needs messages");
+  const estimate = estimateTokens(input.messages);
+  if (estimate > settings.maxInputTokens) {
+    throw new RangeError(`AI request too large for ${input.profile}: ~${estimate} tokens`);
+  }
+  const result = await runAiSession(
+    {
+      tenantId: input.tenantId,
+      profile: input.profile,
+      reserveTokens: estimate + settings.maxOutputTokens,
+      visitor: input.visitor ?? null,
+      actorId: input.actorId ?? null,
+    },
+    deps,
+    async (call) => (await call({ messages: input.messages })).text,
+  );
+  if (result.outcome !== "answered") return result;
+  return {
+    outcome: "answered",
+    requestId: result.requestId,
+    text: result.value,
+    model: result.model,
+    usage: result.usage,
+    latencyMs: result.latencyMs,
   };
 }

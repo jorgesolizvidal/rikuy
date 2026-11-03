@@ -1,6 +1,8 @@
-import type { AiBeginOutcome, AiLedger } from "@rikuy/core";
+import type { AiBeginOutcome, AiLedger, KnowledgePassage } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
+
+import { mapPassageRow } from "./knowledge-rows";
 
 /**
  * The AI gateway's ledger (migration 20261101000100, ADR-036): a direct PostgreSQL
@@ -21,6 +23,11 @@ export interface PostgresAiLedgerOptions {
 }
 
 export interface PostgresAiLedger extends AiLedger {
+  /**
+   * ai_api.search_knowledge (ADR-037): what this municipality has published now, best first.
+   * Nothing for a municipality that is not online.
+   */
+  searchKnowledge(tenantId: string, query: string, limit: number): Promise<KnowledgePassage[]>;
   close(): Promise<void>;
 }
 
@@ -70,6 +77,13 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
           ${sql.json(executions.map((execution) => ({ ...execution })))}::jsonb
         )
       `;
+    },
+
+    async searchKnowledge(tenantId, query, limit) {
+      const rows = await sql`
+        select * from ai_api.search_knowledge(${tenantId}::uuid, ${query}, ${limit}::integer)
+      `;
+      return rows.map((row) => mapPassageRow({ ...row }));
     },
 
     async close() {

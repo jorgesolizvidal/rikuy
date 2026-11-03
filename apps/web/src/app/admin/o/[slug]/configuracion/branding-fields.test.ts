@@ -102,4 +102,32 @@ describe("branding form mapping", () => {
         expect(fieldErrors(result.issues, []).nearbyRadius).toMatch(/entre 50 y 1000/u);
     }
   });
+
+  it("keeps the assistant optional, with a fixed tone, and explains a missing name", () => {
+    expect("assistant" in presentationInputFromForm(form(filled))).toBe(false);
+    const input = presentationInputFromForm(
+      form({ ...filled, assistantName: " Guía ", assistantGreeting: "", assistantTone: "formal" }),
+    );
+    expect(input.assistant).toEqual({ name: "Guía", greeting: "", tone: "formal" });
+    const result = validatePresentation(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(valuesFromPresentation(result.value)).toMatchObject({
+        assistantName: "Guía",
+        assistantTone: "formal",
+      });
+    }
+    // A tone outside the options becomes the default; it never reaches the contract.
+    expect(
+      presentationInputFromForm(form({ ...filled, assistantName: "Guía", assistantTone: "pirata" }))
+        .assistant?.tone,
+    ).toBe("warm");
+    const orphan = validatePresentation(
+      presentationInputFromForm(form({ ...filled, assistantGreeting: "Hola" })),
+    );
+    expect(orphan.ok).toBe(false);
+    if (!orphan.ok) {
+      expect(fieldErrors(orphan.issues, []).assistantName).toMatch(/nombre del asistente/u);
+    }
+  });
 });

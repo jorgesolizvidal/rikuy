@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./assistant-client": "./src/assistant-client.ts",
     "./geo": "./src/geo.ts",
     "./testing": "./src/testing.ts",
     "./tour-viewer": "./src/tour-viewer.ts"

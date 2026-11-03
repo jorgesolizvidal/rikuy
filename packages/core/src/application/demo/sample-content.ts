@@ -8,6 +8,7 @@ import {
   offsetPoint,
   SAMPLE_DESTINATIONS,
   SAMPLE_EVENTS,
+  SAMPLE_KNOWLEDGE,
   SAMPLE_PANORAMAS,
   SAMPLE_TOUR_DESTINATION,
   sampleEventDate,
@@ -16,6 +17,8 @@ import {
 import { parseCoordinates } from "../../domain/geo/coordinates";
 import { createDestination, publishDestination } from "../content/destinations";
 import { createEvent, publishEvent } from "../content/events";
+import { createKnowledge, publishKnowledge } from "../knowledge/knowledge";
+import type { KnowledgeRepository } from "../knowledge/ports";
 import type { ContentRepository } from "../content/ports";
 import { confirmContentImageUpload, requestContentImageUpload } from "../media/content-images";
 import { requestPanoramaUpload, submitPanorama, type PanoramaRepository } from "../media/panoramas";
@@ -48,6 +51,8 @@ export type SampleUploader = (url: string, bytes: Uint8Array, mime: string) => P
 
 export interface SampleContentDeps {
   readonly content: ContentRepository;
+  /** The assistant's sample guide (ADR-038). */
+  readonly knowledge: KnowledgeRepository;
   readonly media: MediaRepository;
   readonly admin: MediaAdmin;
   readonly processor: ImageProcessor;
@@ -65,6 +70,8 @@ export type SampleContentResult =
       readonly destinations: number;
       readonly events: number;
       readonly panoramas: number;
+      /** The assistant's guide was published now (1) or already there (0). */
+      readonly knowledge: number;
     }
   | { readonly status: "over_quota"; readonly resource: UsageResource }
   | {
@@ -238,11 +245,43 @@ export async function loadSampleContent(
       createdEvents += 1;
     }
 
-    return { status: "loaded", destinations, events: createdEvents, panoramas };
+    const knowledge = await loadSampleKnowledge(membership, name, deps.knowledge);
+    return { status: "loaded", destinations, events: createdEvents, panoramas, knowledge };
   } catch (error) {
     if (error instanceof SampleStop) return error.result;
     throw error;
   }
+}
+
+/** The assistant's sample guide, published once (by address). */
+async function loadSampleKnowledge(
+  membership: OrganizationMembership,
+  name: string,
+  repository: KnowledgeRepository,
+): Promise<number> {
+  const existing = await repository.list(membership.tenantId);
+  if (existing.some((entry) => entry.slug === SAMPLE_KNOWLEDGE.slug)) return 0;
+  const created = await createKnowledge(
+    membership,
+    { title: SAMPLE_KNOWLEDGE.title, slug: SAMPLE_KNOWLEDGE.slug },
+    repository,
+  );
+  if (created.status !== "created") throw new SampleStop({ status: "failed" });
+  const draft = await repository.find(membership.tenantId, created.contentId);
+  const published = await publishKnowledge(
+    membership,
+    created.contentId,
+    {
+      title: SAMPLE_KNOWLEDGE.title,
+      summary: fillSampleText(SAMPLE_KNOWLEDGE.summary, name),
+      body: richText(SAMPLE_KNOWLEDGE.body, name),
+      document: null,
+    },
+    draft?.draft?.editCount ?? null,
+    repository,
+  );
+  if (published.status !== "published") throw new SampleStop({ status: "failed" });
+  return 1;
 }
 
 /** Where the demo stands, for the panel card. */
@@ -263,19 +302,21 @@ export async function loadSampleContentStatus(
   membership: OrganizationMembership,
   deps: {
     readonly content: Pick<ContentRepository, "listDestinations" | "listEvents">;
+    readonly knowledge: Pick<KnowledgeRepository, "list">;
     readonly tours: Pick<TourRepository, "list">;
     readonly panoramas: Pick<PanoramaRepository, "list">;
   },
 ): Promise<SampleContentStatus | null> {
   if (mayLoad(membership) !== "ok") return null;
-  const [destinations, events, tours, panoramas] = await Promise.all([
+  const [destinations, events, knowledge, tours, panoramas] = await Promise.all([
     deps.content.listDestinations(membership.tenantId),
     deps.content.listEvents(membership.tenantId),
+    deps.knowledge.list(membership.tenantId),
     deps.tours.list(membership.tenantId),
     deps.panoramas.list(membership.tenantId),
   ]);
-  const slugs = new Set([...destinations, ...events].map((entry) => entry.slug));
-  const all = [...SAMPLE_DESTINATIONS, ...SAMPLE_EVENTS].map((item) => item.slug);
+  const slugs = new Set([...destinations, ...events, ...knowledge].map((entry) => entry.slug));
+  const all = [...SAMPLE_DESTINATIONS, ...SAMPLE_EVENTS, SAMPLE_KNOWLEDGE].map((item) => item.slug);
   const present = all.filter((slug) => slugs.has(slug)).length;
   const hasPlace = slugs.has(SAMPLE_TOUR_DESTINATION);
   const built = tours.some(

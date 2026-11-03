@@ -1,6 +1,7 @@
 import { PORTAL_PATHS } from "@rikuy/core";
 import { notFound } from "next/navigation";
 
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { portalDestinations, portalEvents, portalTourIndex } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
@@ -33,13 +34,11 @@ const TOURS_SOON = {
   text: "Recorre los sitios desde el celular antes de viajar.",
 } as const;
 
-/** What the platform will bring to every portal (P5). */
-const UPCOMING = [
-  {
-    title: "Guía local",
-    text: "Pregunta qué hacer y recibe respuestas basadas en la información del municipio.",
-  },
-] as const;
+/** The assistant, until this deployment has AI (then it is the floating button). */
+const ASSISTANT_SOON = {
+  title: "Guía local",
+  text: "Pregunta qué hacer y recibe respuestas basadas en la información del municipio.",
+} as const;
 
 export default async function PortalHomePage({ params }: PortalPageProps) {
   const view = await portalView((await params).host);
@@ -56,7 +55,7 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
     ...(destinations.length > 0 ? [] : [PLACES_SOON]),
     ...(events.length > 0 ? [] : [AGENDA_SOON]),
     ...(tours.length > 0 ? [] : [TOURS_SOON]),
-    ...UPCOMING,
+    ...(aiGatewayStatus().configured ? [] : [ASSISTANT_SOON]),
   ];
 
   return (
@@ -118,17 +117,19 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
         </section>
       ) : null}
 
-      <section className="portal-upcoming" aria-labelledby="pronto">
-        <h2 id="pronto">Muy pronto en este portal</h2>
-        <ul>
-          {upcoming.map((item) => (
-            <li key={item.title}>
-              <h3>{item.title}</h3>
-              <p>{item.text}</p>
-            </li>
-          ))}
-        </ul>
-      </section>
+      {upcoming.length > 0 ? (
+        <section className="portal-upcoming" aria-labelledby="pronto">
+          <h2 id="pronto">Muy pronto en este portal</h2>
+          <ul>
+            {upcoming.map((item) => (
+              <li key={item.title}>
+                <h3>{item.title}</h3>
+                <p>{item.text}</p>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </>
   );
 }
