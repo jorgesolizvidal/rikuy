@@ -12,10 +12,12 @@ import { AiProbeForm } from "./ai-probe-form";
  */
 export function AiSummary({
   ai,
+  voice,
   status,
   tenants,
 }: {
   readonly ai: OperationsSnapshot["ai"];
+  readonly voice: OperationsSnapshot["voice"];
   readonly status: AiGatewayStatus;
   readonly tenants: readonly { readonly tenantId: string; readonly displayName: string }[];
 }) {
@@ -26,7 +28,7 @@ export function AiSummary({
         ? "Sin configurar en este despliegue: el portal funciona igual y el asistente muestra su aviso."
         : status.provider === "simulated"
           ? `Modelo simulado (${status.model}), solo para desarrollo: no llama a ningún proveedor.`
-          : `Conectado a Groq con ${status.model}.`;
+          : `Conectado a Groq con ${status.model} (dictado por voz con ${status.transcriptionModel}).`;
   return (
     <section aria-labelledby="ia" className="operations">
       <h2 id="ia">Asistente con IA</h2>
@@ -73,6 +75,37 @@ export function AiSummary({
               del proveedor.
             </p>
             <Link href="/plataforma/cuotas">Cuotas de IA por municipio</Link>
+          </li>
+        ) : null}
+        {voice ? (
+          <li className="usage-card">
+            <h3>Dictado por voz hoy</h3>
+            <p className="field-hint">
+              Los segundos de voz que dictan los visitantes de todos los municipios, contra el tope
+              de la plataforma (el 90 % de lo que da el plan gratuito de Groq por día). Cada dictado
+              cuenta al menos 10 s. En las últimas 24 h:{" "}
+              {voice.transcribed24h === 1
+                ? "1 pasado a texto"
+                : `${formatTokens(voice.transcribed24h)} pasados a texto`}
+              ,{" "}
+              {voice.refused24h === 1
+                ? "1 rechazado"
+                : `${formatTokens(voice.refused24h)} rechazados`}{" "}
+              por un límite y{" "}
+              {voice.failed24h === 1 ? "1 sin texto" : `${formatTokens(voice.failed24h)} sin texto`}{" "}
+              del proveedor.
+            </p>
+            <UsageBar
+              meter={meter({
+                resource: "ai_audio_seconds",
+                limit: voice.limit,
+                consumed: voice.used,
+                reserved: 0,
+                periodStart: null,
+                periodEnd: null,
+              })}
+              label="Dictado por voz de la plataforma hoy"
+            />
           </li>
         ) : null}
         <li className="usage-card">

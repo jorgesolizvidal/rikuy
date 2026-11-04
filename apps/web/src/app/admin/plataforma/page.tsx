@@ -84,6 +84,7 @@ export default async function PlatformPage() {
 
       <AiSummary
         ai={operations?.snapshot.ai}
+        voice={operations?.snapshot.voice}
         status={aiGatewayStatus()}
         tenants={tenants
           .filter((tenant) => tenant.status !== "suspended")

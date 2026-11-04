@@ -156,6 +156,7 @@ describe("AI usage and alerts", () => {
         answeredToday: 12,
         refusedToday: 1,
       }),
+      tenantVoiceUsage: async () => null,
     });
     expect(usage.meter).toMatchObject({ resource: "ai_tokens", level: "near", available: 8_000 });
     expect(usage.answeredToday).toBe(12);
@@ -189,6 +190,25 @@ describe("AI usage and alerts", () => {
       ["ai_quota", "warning"],
     ]);
     expect(alerts[0]?.message).toContain("175.000 de 180.000 tokens");
+  });
+
+  it("alerts when the platform's dictation or a municipality's is close to its limit", () => {
+    const alerts = operationsAlerts({
+      ...base,
+      voice: {
+        used: 21_000,
+        limit: 25_900,
+        transcribed24h: 900,
+        refused24h: 3,
+        failed24h: 0,
+        quotas: [{ tenant: "Municipio Demo Sur", slug: "demo-sur", used: 1_750, limit: 1_800 }],
+      },
+    });
+    expect(alerts.map((alert) => [alert.code, alert.level])).toEqual([
+      ["voice_quota", "critical"],
+      ["voice_platform", "warning"],
+    ]);
+    expect(alerts[0]?.message).toContain("29,2 min de 30 min");
   });
 
   it("stays quiet with AI well within its limits, or without the AI key at all", () => {

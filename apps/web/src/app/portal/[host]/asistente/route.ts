@@ -1,4 +1,5 @@
 import { askPortalAssistant } from "@/server/portal-assistant";
+import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalView } from "@/server/portal-view";
 
 interface AssistantContext {
@@ -21,15 +22,7 @@ export async function POST(request: Request, { params }: AssistantContext) {
   if (view === null)
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
 
-  const origin = request.headers.get("origin");
-  const host = request.headers.get("host");
-  let sameOrigin = false;
-  try {
-    sameOrigin = origin !== null && host !== null && new URL(origin).host === host;
-  } catch {
-    sameOrigin = false;
-  }
-  if (!sameOrigin)
+  if (!fromSamePortal(request))
     return Response.json({ status: "forbidden" }, { status: 403, headers: NO_STORE });
   if (!(request.headers.get("content-type") ?? "").startsWith("application/json")) {
     return Response.json({ status: "invalid" }, { status: 415, headers: NO_STORE });
@@ -45,12 +38,7 @@ export async function POST(request: Request, { params }: AssistantContext) {
     body = null;
   }
 
-  // The visitor's limit counts by address; the database keeps only a daily-salted hash.
-  const visitor =
-    request.headers.get("x-real-ip")?.trim() ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    null;
-  const { reply } = await askPortalAssistant(view, body, visitor?.slice(0, 64) ?? null);
+  const { reply } = await askPortalAssistant(view, body, visitorKey(request));
   return Response.json(reply, {
     status: reply.status === "invalid" ? 400 : 200,
     headers: NO_STORE,

@@ -8,11 +8,18 @@ import type { AiRequestInput } from "./gateway";
 /** A municipality's AI usage, with the signed-in user's session (any member). */
 export interface AiUsageRepository {
   tenantAiUsage(tenantId: string): Promise<AiUsageView>;
+  /**
+   * Dictation today (ADR-041): «answered» counts transcriptions. Null on a database without
+   * dictation yet (a deployment may reach it before its migration).
+   */
+  tenantVoiceUsage(tenantId: string): Promise<AiUsageView | null>;
 }
 
 /** Every municipality's AI usage; null without access (the database checks the 2nd factor). */
 export interface PlatformAiUsageRepository {
   list(): Promise<PlatformAiUsageRow[] | null>;
+  /** Every municipality's dictation today; null without access or without dictation yet. */
+  listVoice(): Promise<PlatformAiUsageRow[] | null>;
 }
 
 export interface AiUsageMeter {
@@ -21,10 +28,13 @@ export interface AiUsageMeter {
   readonly refusedToday: number;
 }
 
-function toMeter(view: AiUsageView): AiUsageMeter {
+function toMeter(
+  view: AiUsageView,
+  resource: "ai_tokens" | "ai_audio_seconds" = "ai_tokens",
+): AiUsageMeter {
   return {
     meter: meter({
-      resource: "ai_tokens",
+      resource,
       limit: view.limit,
       reserved: view.reserved,
       consumed: view.consumed,
@@ -43,6 +53,15 @@ export async function loadAiUsage(
   return toMeter(await usage.tenantAiUsage(membership.tenantId));
 }
 
+/** The municipality's dictation today (ADR-041); null without dictation in the database. */
+export async function loadVoiceUsage(
+  membership: OrganizationMembership,
+  usage: AiUsageRepository,
+): Promise<AiUsageMeter | null> {
+  const view = await usage.tenantVoiceUsage(membership.tenantId);
+  return view === null ? null : toMeter(view, "ai_audio_seconds");
+}
+
 export interface PlatformAiUsageMeter extends AiUsageMeter {
   readonly row: PlatformAiUsageRow;
 }
@@ -54,6 +73,15 @@ export async function loadPlatformAiUsage(
   if ((await platform.operatorAccess()) !== "ok") return null;
   const rows = await usage.list();
   return rows?.map((row) => ({ row, ...toMeter(row) })) ?? null;
+}
+
+export async function loadPlatformVoiceUsage(
+  platform: Pick<PlatformRepository, "operatorAccess">,
+  usage: PlatformAiUsageRepository,
+): Promise<readonly PlatformAiUsageMeter[] | null> {
+  if ((await platform.operatorAccess()) !== "ok") return null;
+  const rows = await usage.listVoice();
+  return rows?.map((row) => ({ row, ...toMeter(row, "ai_audio_seconds") })) ?? null;
 }
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;

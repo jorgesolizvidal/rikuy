@@ -32,8 +32,22 @@ describe("AI gateway", () => {
       invalidKeys: [],
       provider: null,
       model: null,
+      transcriptionModel: null,
     });
     expect(await gateway.runAi(REQUEST)).toEqual({ outcome: "not_configured", requestId: null });
+    // Dictation too: a message, never an error, and the visitor types.
+    const audio = new Uint8Array(2048);
+    audio.set([0x1a, 0x45, 0xdf, 0xa3]);
+    expect(
+      (
+        await gateway.transcribeAudio({
+          tenantId: REQUEST.tenantId,
+          audio,
+          visitor: null,
+          prompt: null,
+        })
+      ).reply.status,
+    ).toBe("notice");
   });
 
   it("names the variable when a password symbol makes the address unreadable", async () => {

@@ -183,9 +183,9 @@ Sin esto no hay IA y el portal funciona igual: el asistente muestra su aviso ([A
    - `AI_DATABASE_URL`: la cadena del paso 3;
    - `GROQ_API_KEY`: la clave del paso 1.
 
-   `AI_PROVIDER` (por defecto `groq`) y `AI_MODEL` (por defecto `openai/gpt-oss-120b`) no hace falta definirlas. Luego _Redeploy_ de producción.
+   `AI_PROVIDER` (por defecto `groq`), `AI_MODEL` (por defecto `openai/gpt-oss-120b`) y `AI_TRANSCRIPTION_MODEL` (el dictado por voz, por defecto `whisper-large-v3-turbo`, [ADR-041](adr/ADR-041-assistant-voice.md)) no hace falta definirlas. Luego _Redeploy_ de producción.
 
-5. **Comprobar:** `/plataforma` → «Asistente con IA» dice «Conectado a Groq con openai/gpt-oss-120b». Elige un municipio y pulsa «Probar la IA»: debe responder «listo» en uno o dos segundos. La prueba cuenta en la cuota de ese municipio (unos 100 tokens).
+5. **Comprobar:** `/plataforma` → «Asistente con IA» dice «Conectado a Groq con openai/gpt-oss-120b (dictado por voz con whisper-large-v3-turbo)». Elige un municipio y pulsa «Probar la IA»: debe responder «listo» en uno o dos segundos. La prueba cuenta en la cuota de ese municipio (unos 100 tokens). El dictado por voz se prueba en el portal, desde un celular (con https): en el asistente, el botón del micrófono pasa tu voz a texto. Cada dictado cuenta al menos 10 s en «Uso del plan» → «Dictado por voz».
 
 **Si no funciona:**
 

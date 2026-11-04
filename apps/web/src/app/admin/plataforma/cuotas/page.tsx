@@ -1,8 +1,10 @@
 import {
+  AI_PLATFORM_AUDIO_DAILY_LIMIT,
   AI_PLATFORM_DAILY_LIMIT,
   meter,
   QUOTA_DEFAULTS,
   USAGE_RESOURCES,
+  type PlatformAiUsageRow,
   type PlatformUsageRow,
 } from "@rikuy/core";
 import type { Metadata } from "next";
@@ -27,25 +29,32 @@ export default async function QuotasPage() {
   if (gate.status === "denied") notFound();
   if (gate.status !== "granted") redirect("/plataforma");
 
-  const [usage, ai] = await Promise.all([
+  const [usage, ai, voice] = await Promise.all([
     session.platformUsage.list(),
     session.platformAiUsage.list(),
+    session.platformAiUsage.listVoice(),
   ]);
-  // AI has its own reading (ADR-036): one more resource per municipality.
-  const rows: PlatformUsageRow[] = [
-    ...usage,
-    ...(ai ?? []).map((row) => ({
+  // AI (ADR-036) and dictation (ADR-041) have their own readings: one more resource each.
+  const asRows = (
+    rows: readonly PlatformAiUsageRow[] | null,
+    resource: "ai_tokens" | "ai_audio_seconds",
+  ): PlatformUsageRow[] =>
+    (rows ?? []).map((row) => ({
       tenantId: row.tenantId,
       slug: row.slug,
       displayName: row.displayName,
-      resource: "ai_tokens" as const,
+      resource,
       limit: row.limit,
       isDefault: row.isDefault,
       reserved: row.reserved,
       consumed: row.consumed,
       periodStart: row.periodStart,
       periodEnd: row.periodEnd,
-    })),
+    }));
+  const rows: PlatformUsageRow[] = [
+    ...usage,
+    ...asRows(ai, "ai_tokens"),
+    ...asRows(voice, "ai_audio_seconds"),
   ];
   const tenants = new Map<string, PlatformUsageRow[]>();
   for (const row of rows) tenants.set(row.tenantId, [...(tenants.get(row.tenantId) ?? []), row]);
@@ -67,15 +76,18 @@ export default async function QuotasPage() {
           Cuánto puede usar cada municipio. Por defecto:{" "}
           {formatAmount("storage_bytes", QUOTA_DEFAULTS.storage_bytes)} de almacenamiento y{" "}
           {formatAmount("media_compute_seconds", QUOTA_DEFAULTS.media_compute_seconds)} de
-          procesamiento de medios por mes y {formatAmount("ai_tokens", QUOTA_DEFAULTS.ai_tokens)} de
-          IA por día. Bajar un límite no borra nada: solo frena las subidas nuevas o las respuestas
-          de la IA. Cada cambio queda auditado.
+          procesamiento de medios por mes, {formatAmount("ai_tokens", QUOTA_DEFAULTS.ai_tokens)} de
+          IA por día y {formatAmount("ai_audio_seconds", QUOTA_DEFAULTS.ai_audio_seconds)} de
+          dictado por voz por día. Bajar un límite no borra nada: solo frena las subidas nuevas, las
+          respuestas de la IA o el dictado. Cada cambio queda auditado.
         </p>
         <p className="field-hint">
           Almacenamiento usado entre todos: {formatAmount("storage_bytes", total)}. El plan gratuito
           de Supabase tiene 1 GB para todo el proyecto. La IA de todos los municipios junta tiene un
           tope de {formatAmount("ai_tokens", AI_PLATFORM_DAILY_LIMIT)} por día (el 90 % del plan
-          gratuito de Groq), así que conviene que la suma de las cuotas de IA no lo pase mucho.
+          gratuito de Groq), así que conviene que la suma de las cuotas de IA no lo pase mucho. El
+          dictado de todos los municipios junto tiene un tope de{" "}
+          {formatAmount("ai_audio_seconds", AI_PLATFORM_AUDIO_DAILY_LIMIT)} por día.
         </p>
       </div>
 

@@ -128,6 +128,7 @@ describe("environment contract", () => {
       ...groq,
       AI_PROVIDER: "groq",
       AI_MODEL: "openai/gpt-oss-120b",
+      AI_TRANSCRIPTION_MODEL: "whisper-large-v3-turbo",
     });
     expect(
       parseAiEnv({
@@ -148,6 +149,9 @@ describe("environment contract", () => {
     expect(invalid({ GROQ_API_KEY: groq.GROQ_API_KEY })).toEqual(["AI_DATABASE_URL"]);
     expect(invalid({ AI_DATABASE_URL: groq.AI_DATABASE_URL })).toEqual(["GROQ_API_KEY"]);
     expect(invalid({ ...groq, AI_MODEL: "gpt oss" })).toEqual(["AI_MODEL"]);
+    expect(invalid({ ...groq, AI_TRANSCRIPTION_MODEL: "whisper large" })).toEqual([
+      "AI_TRANSCRIPTION_MODEL",
+    ]);
     expect(
       invalid({
         AI_DATABASE_URL: groq.AI_DATABASE_URL,

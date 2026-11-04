@@ -306,6 +306,92 @@
   cursor: not-allowed;
 }
 
+/* Voice (ADR-041): dictation and reading aloud. */
+.assistant-mic {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: 1.5px solid var(--brand);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--brand);
+  cursor: pointer;
+}
+
+.assistant-mic:hover {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
+.assistant-mic[data-recording] {
+  border-color: var(--brand);
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.assistant-mic:disabled {
+  opacity: 0.55;
+  cursor: progress;
+}
+
+.assistant-voice {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0.25rem 1rem 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+/* Empty, it takes no room but stays a live region (hidden ones are not announced). */
+.assistant-voice:empty {
+  padding: 0;
+}
+
+.assistant-rec {
+  flex: none;
+  width: 0.625rem;
+  height: 0.625rem;
+  border-radius: 50%;
+  background: #c62828;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .assistant-rec {
+    animation: assistant-rec 1.2s infinite ease-in-out;
+  }
+}
+
+@keyframes assistant-rec {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.assistant-read {
+  display: inline-flex;
+  align-items: center;
+  min-height: 2.25rem;
+  margin-top: 0.25rem;
+  padding: 0 0.75rem;
+  border: 1.5px solid color-mix(in srgb, var(--brand) 60%, transparent);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--brand);
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-read:hover,
+.assistant-read[aria-pressed="true"] {
+  background: color-mix(in srgb, var(--brand) 10%, transparent);
+}
+
 .assistant-note {
   margin: 0;
   padding: 0.375rem 1rem max(0.75rem, env(safe-area-inset-bottom));

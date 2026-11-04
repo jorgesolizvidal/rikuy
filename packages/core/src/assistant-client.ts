@@ -12,3 +12,4 @@ export type { AssistantPlan, AssistantPlanStop } from "./application/assistant/p
 export type { PlanIntent } from "./domain/plan/engine";
 export type { AiNotice } from "./application/ai/notices";
 export type { PublicCitation } from "./contracts/knowledge";
+export * from "./contracts/voice";

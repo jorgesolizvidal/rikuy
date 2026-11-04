@@ -183,6 +183,7 @@ export function parseMailEnv(
  * - AI_PROVIDER: "groq" (default) or "simulated" (no network or key; never in production).
  * - GROQ_API_KEY: the platform's single key (Groq limits are per organization, not per key).
  * - AI_MODEL: the model of every profile (the pilot uses one, D4).
+ * - AI_TRANSCRIPTION_MODEL: the speech model of dictation (ADR-041), same key and provider.
  * - AI_DATABASE_ROLE: local development only, to act as rikuy_ai when connecting as
  *   `postgres` to the local stack.
  */
@@ -199,6 +200,10 @@ export const aiEnvSchema = z
       .string()
       .regex(/^[A-Za-z0-9._:/-]{1,100}$/u, "must be a model name")
       .default("openai/gpt-oss-120b"),
+    AI_TRANSCRIPTION_MODEL: z
+      .string()
+      .regex(/^[A-Za-z0-9._:/-]{1,100}$/u, "must be a model name")
+      .default("whisper-large-v3-turbo"),
     VERCEL_ENV: z.string().optional(),
   })
   .refine((env) => env.AI_PROVIDER !== "groq" || env.GROQ_API_KEY !== undefined, {
@@ -219,6 +224,7 @@ const AI_KEYS = [
   "AI_PROVIDER",
   "GROQ_API_KEY",
   "AI_MODEL",
+  "AI_TRANSCRIPTION_MODEL",
 ] as const;
 
 /** The AI gateway's settings, or null when none is set (AI is optional). */

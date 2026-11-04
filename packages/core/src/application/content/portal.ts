@@ -35,6 +35,8 @@ export const PORTAL_PATHS = {
   assistant: "/asistente",
   /** The places a plan can include, with coordinates, for distances on the phone (ADR-039). */
   assistantPlaces: "/asistente/lugares",
+  /** POST: one dictation of the assistant, as text to review (ADR-041). */
+  assistantDictation: "/asistente/dictado",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;

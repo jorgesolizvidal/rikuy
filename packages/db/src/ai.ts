@@ -6,3 +6,9 @@ export { createPostgresAiLedger } from "./ai-ledger";
 export type { PostgresAiLedger, PostgresAiLedgerOptions } from "./ai-ledger";
 export { createGroqProvider, groqFailureKind, GROQ_CHAT_COMPLETIONS } from "./groq-provider";
 export type { GroqProviderOptions } from "./groq-provider";
+export {
+  createGroqTranscriber,
+  GROQ_DEFAULT_TRANSCRIPTION_MODEL,
+  GROQ_TRANSCRIPTIONS,
+} from "./groq-transcriber";
+export type { GroqTranscriberOptions } from "./groq-transcriber";

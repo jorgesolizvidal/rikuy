@@ -39,6 +39,20 @@ export const operationsSnapshotSchema = z.object({
       ),
     })
     .optional(),
+  // ADR-041: today's dictated seconds of the platform (UTC) and the municipalities at 80 %
+  // of their daily dictation. Optional: a database without dictation yet has no such key.
+  voice: z
+    .object({
+      used: count,
+      limit: count,
+      transcribed24h: count,
+      refused24h: count,
+      failed24h: count,
+      quotas: z.array(
+        z.object({ tenant: z.string(), slug: z.string(), used: count, limit: count }),
+      ),
+    })
+    .optional(),
   at: z.string(),
 });
 export type OperationsSnapshot = z.infer<typeof operationsSnapshotSchema>;
@@ -51,7 +65,15 @@ export type OperationsReport = z.infer<typeof operationsReportSchema>;
 export interface OperationsAlert {
   readonly level: "warning" | "critical";
   readonly code:
-    "storage" | "database" | "failed_jobs" | "queue_stuck" | "quota" | "ai_platform" | "ai_quota";
+    | "storage"
+    | "database"
+    | "failed_jobs"
+    | "queue_stuck"
+    | "quota"
+    | "ai_platform"
+    | "ai_quota"
+    | "voice_platform"
+    | "voice_quota";
   readonly message: string;
 }
 
@@ -71,6 +93,12 @@ export function formatTokens(tokens: number): string {
   return new Intl.NumberFormat("es", { maximumFractionDigits: 0, useGrouping: true }).format(
     tokens,
   );
+}
+
+/** Seconds of dictation as "12,5 min" (or "40 s" under a minute). */
+export function formatAudioSeconds(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)} s`;
+  return `${new Intl.NumberFormat("es", { maximumFractionDigits: 1 }).format(seconds / 60)} min`;
 }
 
 function share(used: number, limit: number): number {
@@ -141,6 +169,24 @@ export function operationsAlerts(snapshot: OperationsSnapshot): OperationsAlert[
         level: level(ratio),
         code: "ai_quota",
         message: `${quota.tenant} usa el ${percent(ratio)} de su cuota de IA de hoy: ${formatTokens(quota.used)} de ${formatTokens(quota.limit)} tokens.`,
+      });
+    }
+  }
+  if (snapshot.voice !== undefined) {
+    const voice = share(snapshot.voice.used, snapshot.voice.limit);
+    if (voice >= 0.8) {
+      alerts.push({
+        level: level(voice),
+        code: "voice_platform",
+        message: `El dictado por voz de la plataforma va por el ${percent(voice)} de su tope de hoy: ${formatAudioSeconds(snapshot.voice.used)} de ${formatAudioSeconds(snapshot.voice.limit)}. Al llegar al tope, los visitantes solo pueden escribir hasta mañana.`,
+      });
+    }
+    for (const quota of snapshot.voice.quotas) {
+      const ratio = share(quota.used, quota.limit);
+      alerts.push({
+        level: level(ratio),
+        code: "voice_quota",
+        message: `${quota.tenant} usa el ${percent(ratio)} de su dictado por voz de hoy: ${formatAudioSeconds(quota.used)} de ${formatAudioSeconds(quota.limit)}.`,
       });
     }
   }

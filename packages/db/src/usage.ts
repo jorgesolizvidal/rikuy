@@ -129,12 +129,28 @@ function mapAiUsage(row: z.infer<typeof aiRowSchema>): AiUsageView {
   };
 }
 
+// Dictation (migration 20261104000100, ADR-041): transcriptions count as «answered».
+const voiceRowSchema = aiRowSchema
+  .omit({ answered_today: true })
+  .extend({ transcribed_today: amount })
+  .transform(({ transcribed_today, ...row }) => ({ ...row, answered_today: transcribed_today }));
+
+/** PostgREST's «function not found»: a deployment reached a database without dictation yet. */
+const missingFunction = (code: string | undefined) => code === "PGRST202" || code === "42883";
+
 export function createAiUsageRepository(client: SessionClient): AiUsageRepository {
   return {
     async tenantAiUsage(tenantId) {
       const { data, error } = await client.rpc("tenant_ai_usage", { p_tenant_id: tenantId });
       if (error) throw new Error(`Reading AI usage failed (${error.code || "unknown"})`);
       return mapAiUsage(z.tuple([aiRowSchema]).parse(data)[0]);
+    },
+
+    async tenantVoiceUsage(tenantId) {
+      const { data, error } = await client.rpc("tenant_voice_usage", { p_tenant_id: tenantId });
+      if (missingFunction(error?.code)) return null;
+      if (error) throw new Error(`Reading voice usage failed (${error.code || "unknown"})`);
+      return mapAiUsage(z.tuple([voiceRowSchema]).parse(data)[0]);
     },
   };
 }
@@ -147,6 +163,18 @@ const platformAiRowSchema = aiRowSchema.extend({
   is_default: z.boolean(),
 });
 
+const platformVoiceRowSchema = aiRowSchema
+  .omit({ answered_today: true })
+  .extend({
+    transcribed_today: amount,
+    tenant_id: z.uuid(),
+    slug: z.string(),
+    display_name: z.string(),
+    status: z.enum(["provisioning", "active", "suspended"]),
+    is_default: z.boolean(),
+  })
+  .transform(({ transcribed_today, ...row }) => ({ ...row, answered_today: transcribed_today }));
+
 export function createPlatformAiUsageRepository(client: SessionClient): PlatformAiUsageRepository {
   return {
     async list(): Promise<PlatformAiUsageRow[] | null> {
@@ -155,6 +183,24 @@ export function createPlatformAiUsageRepository(client: SessionClient): Platform
       if (error) throw new Error(`Reading platform AI usage failed (${error.code || "unknown"})`);
       return z
         .array(platformAiRowSchema)
+        .parse(data)
+        .map((row) => ({
+          ...mapAiUsage(row),
+          tenantId: row.tenant_id,
+          slug: row.slug,
+          displayName: row.display_name,
+          status: row.status,
+          isDefault: row.is_default,
+        }));
+    },
+
+    async listVoice(): Promise<PlatformAiUsageRow[] | null> {
+      const { data, error } = await client.rpc("platform_voice_usage");
+      if (error?.code === "42501" || missingFunction(error?.code)) return null;
+      if (error)
+        throw new Error(`Reading platform voice usage failed (${error.code || "unknown"})`);
+      return z
+        .array(platformVoiceRowSchema)
         .parse(data)
         .map((row) => ({
           ...mapAiUsage(row),
