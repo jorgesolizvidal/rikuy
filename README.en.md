@@ -13,7 +13,7 @@
 
 | What                             | Address                                                                                  | What to look at                                                                     |
 | -------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Demo portal                      | [rikuy-demo-norte.vercel.app](https://rikuy-demo-norte.vercel.app)                       | Places, events, the map with "Use my location", and the 360° tours                  |
+| Demo portal                      | [rikuy-demo-norte.vercel.app](https://rikuy-demo-norte.vercel.app)                       | Places, events, the map with "Use my location", the 360° tours and the "Asistente"  |
 | A 360° tour                      | [Mirador del Valle](https://rikuy-demo-norte.vercel.app/destinos/mirador-del-valle/tour) | Two scenes linked by arrows, a 3D model loaded on demand and a jump to another tour |
 | General tour                     | [/recorrido](https://rikuy-demo-norte.vercel.app/recorrido)                              | Every tour of the municipality in a single viewer, with the "Tours" menu            |
 | Another municipality, same build | [rikuy-demo-sur.vercel.app](https://rikuy-demo-sur.vercel.app)                           | A different brand, colors and content, without a single line of different code      |
@@ -35,6 +35,7 @@ The interface is in Spanish, the language of the municipalities it serves.
 - 360° tours with four kinds of points (information with photos, go to another scene, 3D model, go to another tour) and a general tour that jumps between tours without leaving the viewer.
 - 3D models that download only when asked for, with an image and a description as an alternative.
 - The tour also as text, for screen readers and phones without WebGL.
+- An AI assistant on every page: it answers only from what the municipality published and cites its sources, in Spanish or English; it builds "what's nearby", "plan for today" and "suggested route" with distances and opening hours; it guides inside the tour ("What am I looking at?"); and it takes a dictated question and reads the answer aloud. Without AI or without quota, the portal works the same.
 
 **For the municipality (admin panel):**
 
@@ -42,13 +43,14 @@ The interface is in Spanish, the language of the municipalities it serves.
 - Editorial publishing: draft → publish → roll back to any earlier version, with an audit trail.
 - A tour editor: scenes, starting view, points placed on the panorama, the general tour's order, and QR codes.
 - Panorama (up to 16K) and GLB uploads, processed in the background: tiling, Meshopt compression and KTX2 textures with a color check.
-- Members with roles (owner, admin, editor, analyst), email invitations, and storage and processing quotas.
+- Members with roles (owner, admin, editor, analyst), email invitations, and quotas for storage, processing, AI and dictation.
+- The assistant's knowledge: the municipality's texts and PDF documents, opening hours of its places, the assistant's name, greeting and tone, and "Test the search" to see what it would read.
 
 **For the platform operator:** onboarding municipalities behind two-factor authentication, sales demos with generated sample content, a job queue with retries, and the platform's status (storage, database, jobs and quotas).
 
 ## Status
 
-Phases P1 to P4 are done: foundation, media, portal and tours. The current milestone is **Demo / Portfolio**: Ucureña ready for its content, sales demos, running on free plans, and this README. Next is **P5**: an AI tourist assistant (one conversation across the portal and the tours, with cited sources and voice). Details in the [roadmap](docs/roadmap.md) and the [checkpoint](docs/progress/CHECKPOINT.md) (in Spanish).
+Phases P1 to P4 and the **Demo / Portfolio** milestone are done: foundation, media, portal, tours, Ucureña ready for its content, sales demos, and a week running on free plans without outages. In **P5**, the visitor assistant is already in production (a conversation with cited sources, plans, a tour guide and voice); the admin Copilot for municipalities is next. Details in the [roadmap](docs/roadmap.md) and the [checkpoint](docs/progress/CHECKPOINT.md) (in Spanish).
 
 ## Architecture
 
@@ -77,7 +79,7 @@ More in [architecture](docs/architecture.md) (in Spanish).
 
 ## Key decisions
 
-All 35 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish). Some of them:
+All 41 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish). Some of them:
 
 | ADR                                                        | Decision                                                                                      |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -91,6 +93,8 @@ All 35 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish).
 | [030](docs/adr/ADR-030-tour-publication.md)                | Publishing a tour copies its public media first, then seals                                   |
 | [033](docs/adr/ADR-033-tour-models.md)                     | In a tour, a 3D model is an image first; the viewer and the GLB load only on request          |
 | [035](docs/adr/ADR-035-free-plan-operations.md)            | Running on free plans: a daily check, email alerts and automatic cleanup                      |
+| [036](docs/adr/ADR-036-ai-gateway.md)                      | All AI goes through a gateway that reserves the quota before calling the model                |
+| [038](docs/adr/ADR-038-visitor-assistant.md)               | The assistant answers only from published passages and drops any made-up citation             |
 
 ## Real numbers
 
@@ -119,20 +123,22 @@ CLS is 0 on every page. Initial JavaScript is about 150 KB per page; the map and
 
 **Tests** (all of them on every PR):
 
-- 506 unit tests and 790 pgTAP assertions on RLS, isolation and invariants.
+- 679 unit tests and 1,006 pgTAP assertions on RLS, isolation and invariants.
 - Integration against the real Supabase stack: Data API, Storage, queues, email and a per-role access matrix.
 - End-to-end in a real browser:
   - portals (161 checks);
   - regression contracts RC-09/10/11/12 (189): no overflow from 360 to 1280 px, no serious axe findings, no broken links, and SEO per municipality;
   - location RC-06 (35), with the position never leaving the phone;
   - tours RC-01/07/08: full walkthroughs, late responses and the 3D viewer's memory;
-  - a color comparison of the 3D models.
+  - a color comparison of the 3D models;
+  - the assistant (6 cases): sources from its own municipality, made-up citations dropped, plans without coordinates, an exhausted quota and dictation with a fake microphone.
+- The assistant evaluated with the real model (Groq) on a demo in production: 38 of 40 on the gold questions (the other 2 failed when reading the answer, since fixed) and 11 of 11 on plans and the tour guide, with no made-up citations.
 - Lighthouse with a budget on every PR, and on production after every merge.
 - A daily check on production.
 
 ## Stack
 
-Next.js 16 · React 19 · strict TypeScript · Supabase (PostgreSQL 17, PostGIS, Auth, Storage, pg_cron, pg_net, Vault) · Photo Sphere Viewer 5 · three.js · MapLibre + OpenFreeMap · sharp · glTF Transform (Meshopt, KTX2) · Zod · Vitest · pgTAP · Playwright · Lighthouse · axe · GitHub Actions · Vercel · pnpm monorepo.
+Next.js 16 · React 19 · strict TypeScript · Supabase (PostgreSQL 17, PostGIS, Auth, Storage, pg_cron, pg_net, Vault) · Photo Sphere Viewer 5 · three.js · MapLibre + OpenFreeMap · sharp · glTF Transform (Meshopt, KTX2) · Groq (gpt-oss-120b, Whisper) · Zod · Vitest · pgTAP · Playwright · Lighthouse · axe · GitHub Actions · Vercel · pnpm monorepo.
 
 ## Running it
 

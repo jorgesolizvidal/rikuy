@@ -13,7 +13,7 @@
 
 | Qué                         | Dirección                                                                                | Qué mirar                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| Portal de demostración      | [rikuy-demo-norte.vercel.app](https://rikuy-demo-norte.vercel.app)                       | Destinos, agenda, mapa con «Usar mi ubicación» y los tours 360°                               |
+| Portal de demostración      | [rikuy-demo-norte.vercel.app](https://rikuy-demo-norte.vercel.app)                       | Destinos, agenda, mapa con «Usar mi ubicación», los tours 360° y el «Asistente»               |
 | Un tour 360°                | [Mirador del Valle](https://rikuy-demo-norte.vercel.app/destinos/mirador-del-valle/tour) | Dos escenas unidas por flechas, un modelo 3D que se abre a pedido y el salto a otro recorrido |
 | Recorrido general           | [/recorrido](https://rikuy-demo-norte.vercel.app/recorrido)                              | Todos los tours del municipio en un solo visor, con el menú «Tours»                           |
 | Otro municipio, mismo build | [rikuy-demo-sur.vercel.app](https://rikuy-demo-sur.vercel.app)                           | Otra marca, otros colores y otros contenidos, sin una línea de código distinta                |
@@ -33,6 +33,7 @@ El panel de administración ([rikuy-app-admin.vercel.app](https://rikuy-app-admi
 - Tours 360° con cuatro tipos de puntos (información con fotos, ir a otra escena, modelo 3D, ir a otro recorrido) y un recorrido general que salta entre tours sin salir del visor.
 - Modelos 3D que se descargan solo al pedirlos, con una imagen y una descripción como alternativa.
 - El tour también como texto, para lectores de pantalla y teléfonos sin WebGL.
+- Un asistente con IA en todas las páginas: responde solo con lo que publicó el municipio y cita sus fuentes, en español o en inglés; arma «qué hay cerca», «plan para hoy» y «ruta sugerida» con distancias y horarios; guía dentro del tour («¿Qué estoy viendo?»); acepta la pregunta dictada y lee la respuesta en voz alta. Sin IA o sin cuota, el portal funciona igual.
 
 **Para el municipio (panel):**
 
@@ -40,13 +41,14 @@ El panel de administración ([rikuy-app-admin.vercel.app](https://rikuy-app-admi
 - Publicación editorial: borrador → publicar → volver a cualquier versión anterior, con auditoría.
 - Editor de tours: escenas, vista inicial, puntos colocados sobre el panorama, orden del recorrido general y QR.
 - Subida de panoramas (hasta 16K) y modelos GLB, procesados en segundo plano: teselas, compresión Meshopt y texturas KTX2 con verificación de color.
-- Miembros con roles (propietario, administrador, editor, analista), invitación por correo y cuotas de almacenamiento y procesamiento.
+- Miembros con roles (propietario, administrador, editor, analista), invitación por correo y cuotas de almacenamiento, procesamiento, IA y dictado.
+- Conocimiento del asistente: textos y documentos PDF del municipio, horario de atención de los destinos, nombre, saludo y tono del asistente, y «Probar la búsqueda» para ver qué leería.
 
 **Para el operador de la plataforma:** alta de municipios con verificación en dos pasos, demos comerciales con contenido de muestra generado, cola de trabajos con reintentos y el estado de la plataforma (espacio, base de datos, trabajos y cuotas).
 
 ## Estado
 
-Fases P1 a P4 terminadas: fundación, medios, portal y tours. Ahora corre el **Hito Demo / Portafolio**: Ucureña lista para cargar su contenido, demos comerciales, operación con planes gratuitos y este README. Sigue **P5**: el asistente turístico con IA (una conversación en el portal y en los tours, con fuentes citadas y voz). Detalle en el [roadmap](docs/roadmap.md) y el [checkpoint](docs/progress/CHECKPOINT.md).
+Fases P1 a P4 y el **Hito Demo / Portafolio** terminados: fundación, medios, portal, tours, Ucureña lista para cargar su contenido, demos comerciales y una semana de operación con planes gratuitos sin caídas. En **P5**, el asistente del visitante ya está en producción (conversación con fuentes citadas, planes, guía en el tour y voz); falta el Copilot del panel para el municipio. Detalle en el [roadmap](docs/roadmap.md) y el [checkpoint](docs/progress/CHECKPOINT.md).
 
 ## Arquitectura
 
@@ -75,7 +77,7 @@ Más detalle en [arquitectura](docs/architecture.md).
 
 ## Decisiones clave
 
-Las 35 decisiones están registradas como ADR ([índice](docs/adr/README.md)). Algunas:
+Las 41 decisiones están registradas como ADR ([índice](docs/adr/README.md)). Algunas:
 
 | ADR                                                        | Decisión                                                                                         |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -89,6 +91,8 @@ Las 35 decisiones están registradas como ADR ([índice](docs/adr/README.md)). A
 | [030](docs/adr/ADR-030-tour-publication.md)                | Al publicar un tour, primero se copian los medios públicos y después se sella                    |
 | [033](docs/adr/ADR-033-tour-models.md)                     | En el tour, el modelo 3D primero es una imagen; el visor y el GLB solo a pedido                  |
 | [035](docs/adr/ADR-035-free-plan-operations.md)            | Operación con planes gratuitos: control diario, avisos por correo y limpieza automática          |
+| [036](docs/adr/ADR-036-ai-gateway.md)                      | Toda la IA pasa por un gateway que reserva la cuota antes de llamar al modelo                    |
+| [038](docs/adr/ADR-038-visitor-assistant.md)               | El asistente responde solo con pasajes publicados y descarta cualquier cita inventada            |
 
 ## Métricas reales
 
@@ -117,20 +121,22 @@ CLS 0 en todas. JavaScript inicial de unos 150 KB por página; el mapa y los vis
 
 **Pruebas** (todas en cada PR):
 
-- 506 tests unitarios y 790 aserciones pgTAP de RLS, aislamiento e invariantes.
+- 679 tests unitarios y 1.006 aserciones pgTAP de RLS, aislamiento e invariantes.
 - Integración contra la pila real de Supabase: Data API, Storage, colas, correo y una matriz de acceso por rol.
 - E2E en un navegador real:
   - portales (161 verificaciones);
   - contratos de regresión RC-09/10/11/12 (189): sin desbordes de 360 a 1280 px, axe sin hallazgos graves, ningún enlace roto y SEO por municipio;
   - ubicación RC-06 (35), sin que la posición salga del teléfono;
   - tours RC-01/07/08: recorridos completos, respuestas tardías y la memoria del visor 3D;
-  - comparación de color de los modelos 3D.
+  - comparación de color de los modelos 3D;
+  - asistente (6 casos): fuentes de su municipio, citas inventadas descartadas, planes sin coordenadas, cuota agotada y dictado con un micrófono simulado.
+- Evaluación del asistente con el modelo real (Groq), sobre una demo en producción: 38 de 40 en el gold de preguntas (las otras 2 fallaron al leer la respuesta, ya corregido) y 11 de 11 en planes y guía del tour, sin citas inventadas.
 - Lighthouse con presupuesto en cada PR y sobre producción después de cada merge.
 - Un control diario en producción.
 
 ## Stack
 
-Next.js 16 · React 19 · TypeScript estricto · Supabase (PostgreSQL 17, PostGIS, Auth, Storage, pg_cron, pg_net, Vault) · Photo Sphere Viewer 5 · three.js · MapLibre + OpenFreeMap · sharp · glTF Transform (Meshopt, KTX2) · Zod · Vitest · pgTAP · Playwright · Lighthouse · axe · GitHub Actions · Vercel · monorepo pnpm.
+Next.js 16 · React 19 · TypeScript estricto · Supabase (PostgreSQL 17, PostGIS, Auth, Storage, pg_cron, pg_net, Vault) · Photo Sphere Viewer 5 · three.js · MapLibre + OpenFreeMap · sharp · glTF Transform (Meshopt, KTX2) · Groq (gpt-oss-120b, Whisper) · Zod · Vitest · pgTAP · Playwright · Lighthouse · axe · GitHub Actions · Vercel · monorepo pnpm.
 
 ## Cómo correrlo
 
