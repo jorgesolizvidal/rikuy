@@ -4,6 +4,7 @@ import type { Actor } from "@rikuy/core";
 import {
   createAiUsageRepository,
   createContentRepository,
+  createCopilotRepository,
   createMediaRepository,
   createMembershipReader,
   createSessionClient,
@@ -68,6 +69,7 @@ export const adminSession = cache(async () => {
     mfa: createMfaGateway(client),
     media: createMediaRepository(client),
     content: createContentRepository(client),
+    copilot: createCopilotRepository(client),
     knowledge: createKnowledgeRepository(client),
     panoramas: createPanoramaRepository(client),
     models: createModelRepository(client),

@@ -12,12 +12,14 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings, publishedContentReader } from "@/server/platform";
 
 import { SignOutButton } from "../../../../sign-out-button";
 import { DestinationEditor, type EditorValues } from "../../destinos/[id]/destination-editor";
 import type { EditorImage } from "../../destinos/[id]/image-fields";
+import { CopilotProposeLink } from "../../copilot/copilot-link";
 import { PortalShare } from "../../destinos/[id]/portal-share";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
 import type { VenueOption } from "../../destinos/[id]/schedule-field";
@@ -132,6 +134,12 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
           timezoneNote="Escribe la fecha y la hora del municipio."
         />
         <aside className="history">
+          {editor.canEdit && aiGatewayStatus().configured ? (
+            <CopilotProposeLink
+              org={membership.slug}
+              target={{ type: "content", contentId: record.contentId }}
+            />
+          ) : null}
           {editor.portalPath ? (
             <PortalShare
               url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}

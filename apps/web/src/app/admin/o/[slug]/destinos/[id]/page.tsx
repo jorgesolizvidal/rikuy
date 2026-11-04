@@ -11,6 +11,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings, publishedContentReader } from "@/server/platform";
 
@@ -18,6 +19,7 @@ import { SignOutButton } from "../../../../sign-out-button";
 import { DestinationEditor, type EditorValues } from "./destination-editor";
 import { toHoursValues } from "./hours-values";
 import type { EditorImage } from "./image-fields";
+import { CopilotProposeLink } from "../../copilot/copilot-link";
 import { PortalShare } from "./portal-share";
 import { RevisionHistory } from "./revision-history";
 
@@ -126,6 +128,12 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
           mapCenter={center}
         />
         <aside className="history">
+          {editor.canEdit && aiGatewayStatus().configured ? (
+            <CopilotProposeLink
+              org={membership.slug}
+              target={{ type: "content", contentId: record.contentId }}
+            />
+          ) : null}
           {editor.portalPath ? (
             <PortalShare
               url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}

@@ -43,7 +43,7 @@ Estados: ✅ hecho · 🔜 planificado (fase · paso) · ➕ mejora sobre el sis
 | Métricas del asistente (consultas, latencia, historial)            | 🔜 P5 sobre `ai_requests`/`ai_executions`. ➕ Sin guardar el texto ni la ubicación de los turistas por defecto          |
 | Reportes con exportación CSV/XLSX/PDF                              | 🔜 E2. ➕ Mismos filtros en pantalla y archivo; celdas neutralizadas contra fórmulas                                    |
 | Campañas de newsletter y envío de push                             | 🔜 E2                                                                                                                   |
-| —                                                                  | 🔜 P5 · Copilot V1/V2 para el personal del municipio (nuevo; no existía)                                                |
+| —                                                                  | ✅ P5 · Copilot V1/V2 para el personal del municipio (nuevo; no existía, [ADR-042](adr/ADR-042-copilot.md))             |
 
 ## Fallos del sistema anterior que Rikuy no repite
 

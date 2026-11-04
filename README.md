@@ -43,12 +43,13 @@ El panel de administración ([rikuy-app-admin.vercel.app](https://rikuy-app-admi
 - Subida de panoramas (hasta 16K) y modelos GLB, procesados en segundo plano: teselas, compresión Meshopt y texturas KTX2 con verificación de color.
 - Miembros con roles (propietario, administrador, editor, analista), invitación por correo y cuotas de almacenamiento, procesamiento, IA y dictado.
 - Conocimiento del asistente: textos y documentos PDF del municipio, horario de atención de los destinos, nombre, saludo y tono del asistente, y «Probar la búsqueda» para ver qué leería.
+- Copilot: revisa con reglas fijas lo que le falta a cada destino, evento y escena, responde preguntas sobre el contenido (borradores incluidos) y propone textos con un diff que se acepta campo por campo como borrador. Nunca publica solo.
 
 **Para el operador de la plataforma:** alta de municipios con verificación en dos pasos, demos comerciales con contenido de muestra generado, cola de trabajos con reintentos y el estado de la plataforma (espacio, base de datos, trabajos y cuotas).
 
 ## Estado
 
-Fases P1 a P4 y el **Hito Demo / Portafolio** terminados: fundación, medios, portal, tours, Ucureña lista para cargar su contenido, demos comerciales y una semana de operación con planes gratuitos sin caídas. En **P5**, el asistente del visitante ya está en producción (conversación con fuentes citadas, planes, guía en el tour y voz); falta el Copilot del panel para el municipio. Detalle en el [roadmap](docs/roadmap.md) y el [checkpoint](docs/progress/CHECKPOINT.md).
+Fases P1 a P4 y el **Hito Demo / Portafolio** terminados: fundación, medios, portal, tours, Ucureña lista para cargar su contenido, demos comerciales y una semana de operación con planes gratuitos sin caídas. **P5** terminada: el asistente del visitante (conversación con fuentes citadas, planes, guía en el tour y voz) y el Copilot del panel para el equipo del municipio. Sigue **P6**, el gate del piloto SaaS. Detalle en el [roadmap](docs/roadmap.md) y el [checkpoint](docs/progress/CHECKPOINT.md).
 
 ## Arquitectura
 
@@ -77,7 +78,7 @@ Más detalle en [arquitectura](docs/architecture.md).
 
 ## Decisiones clave
 
-Las 41 decisiones están registradas como ADR ([índice](docs/adr/README.md)). Algunas:
+Las 42 decisiones están registradas como ADR ([índice](docs/adr/README.md)). Algunas:
 
 | ADR                                                        | Decisión                                                                                         |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -121,7 +122,7 @@ CLS 0 en todas. JavaScript inicial de unos 150 KB por página; el mapa y los vis
 
 **Pruebas** (todas en cada PR):
 
-- 679 tests unitarios y 1.006 aserciones pgTAP de RLS, aislamiento e invariantes.
+- 702 tests unitarios y 1.063 aserciones pgTAP de RLS, aislamiento e invariantes.
 - Integración contra la pila real de Supabase: Data API, Storage, colas, correo y una matriz de acceso por rol.
 - E2E en un navegador real:
   - portales (161 verificaciones);

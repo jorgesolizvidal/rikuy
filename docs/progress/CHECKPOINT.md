@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P5 — asistente turístico. P1, P2, P3, P4 y el Hito Demo / Portafolio ✅; P5 · Pasos 1 a 6 ✅.
-- **Último paso completado:** cierre del Hito · Paso 3 (una semana de operación con planes gratuitos, 2026-11-04)
-- **Rama:** `docs/hito-step3-closure` → PR hacia `main`
+- **Fase:** P5 ✅ — asistente turístico y Copilot. P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅; sigue P6 (gate del piloto).
+- **Último paso completado:** P5 · Paso 7 — Copilot V1 y V2
+- **Rama:** `feat/p5-step7-copilot` → PR hacia `main` (después del merge de `docs/hito-step3-closure`)
 
 ## Historial
 
@@ -1340,18 +1340,67 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 
 **Verificación en producción (2026-11-04):** el usuario dictó desde su celular en Demo Norte: el texto quedó para revisar, la respuesta se leyó en voz alta y «Uso del plan» marcó 20 s con «2 dictados pasados a texto» (10 s como mínimo cada uno, como dice ADR-041).
 
+### P5 · Paso 7 — Copilot V1 y V2 ✅
+
+- Decisiones del usuario ([ADR-042](../adr/ADR-042-copilot.md), concreta ADR-008), 2026-11-04:
+  - **página propia y botón en los editores:** «Copilot» en la página del municipio y «Proponer con el Copilot» en los editores de destinos, eventos y escenas;
+  - **propone textos:** nombre, resumen y texto de destinos y eventos; nombre y descripción de las escenas (nunca ubicación, fotos, fechas, puntos ni vistas);
+  - **roles:** los analistas preguntan y ven la revisión; editores y más también piden y deciden propuestas;
+  - **aceptar por campos:** cada campo del diff con su casilla.
+- Base de datos (`20261105000000_p5_copilot.sql`, solo expand):
+  - `copilot_content_review` (cualquier miembro): lo que le falta a cada destino y evento en su revisión de trabajo (nunca publicado, cambios sin publicar, resumen o texto vacíos o cortos, portada, ubicación, horario, fecha, tour) y las escenas sin descripción. **Reglas fijas, sin IA.** Los eventos terminados no se revisan;
+  - `copilot_snapshot` (cualquier miembro): los destinos y eventos como los ve un editor (borradores incluidos), con estado, resumen, fecha, tour y la zona horaria;
+  - `copilot_proposals` (RLS sin permisos; todo por RPC): base (revisión y número de edición, o la publicada sin borrador), cambios con «antes» y «después», fuentes (etiqueta y título), detalle del pedido, el pedido de IA, estado, campos aceptados y vencimiento a 30 días;
+  - `create_copilot_proposal` (editor o más): exige la base vigente, lee el «antes» de la base y no del pedido, valida cada valor como el editor, guarda solo lo que cambia y exige un pedido `copilot` completado por la misma persona, en el mismo municipio, en la última hora;
+  - `accept_copilot_proposal` (editor o más): pendiente, no vencida, campos de la propuesta y **la base vigente**. Si la base cambió: `PT409` «stale», sin tocar nada. Guarda un **borrador** con `save_content_draft` o `update_tour_scene` (mismas validaciones, permisos y concurrencia). Nunca publica;
+  - `reject_copilot_proposal`, `list_copilot_proposals`, `copilot_proposal` y la tarea diaria `rikuy-expire-copilot-proposals` (07:47 UTC), que borra las vencidas;
+  - auditoría `copilot.proposal_created`, `copilot.proposal_accepted` y `copilot.proposal_rejected`.
+- `@rikuy/core`:
+  - contrato `contracts/copilot`;
+  - dominio `domain/copilot`: avisos de la revisión en palabras, qué campos ayudan a cada aviso, diff por palabras, rutas del panel, instrucciones fijas (preguntar y proponer), lector de la respuesta y de la propuesta (etiquetas en mayúsculas, valores validados como en la base, enlaces nuevos a texto, sin marcadores tipo «[completar]»);
+  - casos de uso `loadCopilot`, `askCopilot` (foto autorizada, uso del plan con las cifras de la base y 4 pasajes publicados; las etiquetas pasan a enlaces del panel, y las inventadas se descartan), `proposeWithCopilot`, `loadProposalBase`, `loadProposal`, `acceptProposal` y `rejectProposal`;
+  - el proveedor simulado responde a las dos tareas.
+- `@rikuy/db`: `createCopilotRepository`, con la sesión de la persona.
+- Panel:
+  - **«Copilot»** (`/o/{slug}/copilot`): conversación con preguntas sugeridas (solo en la página; no se guarda), «Revisión del contenido» con «Proponer» y «Propuestas» (pendiente, desactualizada, aceptada, rechazada, vencida);
+  - **«Proponer con el Copilot»** (`/copilot/proponer`): lo que dice ahora, campos, pedido y detalle;
+  - **la propuesta** (`/copilot/propuestas/{id}`): diff por palabras (tachado y subrayado, también para lectores de pantalla), una casilla por campo, «Aceptar lo marcado (borrador)», «Rechazar» y el aviso de desactualizada con «Pedir una nueva propuesta»;
+  - botón en el editor de destinos, en el de eventos y en cada escena del editor del tour (solo con rol de edición y la IA configurada).
+- CI, job «Contracts»: nuevo paso **«Copilot in a real browser»** (`e2e/copilot.e2e.test.ts`).
+- Tests:
+  - 702 unitarios (core 476, db 130, web 39, worker 43, config 14);
+  - 1.063 pgTAP (57 nuevos, `031_copilot`): la revisión por reglas y para cualquier miembro; otro municipio y visitantes sin acceso; crear sobre la base vigente con «antes» leído de la base; sin cambios, saltos de línea, texto con formato inválido, ubicación o vista de escena rechazados; base vieja; pedido de otra persona, de hace más de una hora o que no es del Copilot; analista sin crear, listar ni aceptar; aceptar guarda un borrador sin publicar y conserva el resto del documento; dos veces no; **una propuesta sobre una revisión vieja se rechaza y el borrador queda igual**; una edición en el medio la vuelve desactualizada; la escena va al borrador del tour; rechazar, vencer y borrar; auditoría;
+  - integración contra la pila local (`copilot.int.test.ts`, 5 casos, con el rol `rikuy_ai` y el modelo simulado): el analista revisa y pregunta, y las fuentes son solo de Demo Sur; el dueño de otro municipio no ve nada; la propuesta guarda solo el campo marcado como borrador; la desactualizada se rechaza; el analista no propone y el modelo no se llama; la escena;
+  - **e2e en un navegador real** (2 casos): revisión, pregunta con enlaces solo de Demo Sur, «Proponer», diff, aceptar solo el resumen (borrador, nada publicado), propuesta desde el editor rechazada al guardar alguien el borrador, analista sin «Proponer» y 404 en la propuesta; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador: la revisión de Demo Norte (5 contenidos con lo que les falta), la pregunta sugerida con sus fuentes, una pregunta con una fuente inventada sin enlaces, propuesta y aceptación de un campo, la desactualizada, el botón del editor, el analista y la propuesta de Demo Norte con 404 bajo Demo Sur. Contratos RC-09/10/11/12 (189) y asistente (6) en verde.
+- Lo que encontraron las pruebas, ya corregido:
+  - el lector cortaba el texto propuesto en cualquier línea que empezara con «Texto…» (buscaba las etiquetas sin distinguir mayúsculas);
+  - el texto tachado del diff no tenía contraste suficiente.
+
+**Desviaciones:**
+
+- El gold del Copilot con el modelo real no se corre desde mi entorno (no llega a Groq): queda para verificarlo a mano en producción y, como gold formal, para P6 (registrado en «Pendientes»).
+- Las propuestas parten de lo guardado: un cambio sin guardar en el editor no se ve.
+- El Copilot no explica visitas: la plataforma todavía no las mide (E2), y lo dice.
+- Una propuesta usa entre 2.000 y 6.000 tokens de la cuota diaria del municipio, compartida con el asistente del visitante.
+
 ## Cómo verificarlo
 
-Este paso es solo de documentación. Después del merge, en GitHub (`jorgesolizvidal/rikuy`, rama `main`):
+Primero el merge de `docs/hito-step3-closure` y después el de esta rama. «Deploy database» aplica la migración sola. En producción, desde la PC o el celular, con la cuenta de propietario:
 
-1. **README.md**: «Pruébalo en vivo» menciona el «Asistente» en Demo Norte; «Qué hace» tiene la línea del asistente para el visitante y la del conocimiento en el panel; «Estado» dice que el Hito está terminado.
-2. **README.en.md**: lo mismo en inglés.
-3. **docs/roadmap.md**: en «Secuencia», «★ ✅ Hito Demo / Portafolio»; en la tabla del Hito, el Paso 3 con ✅; al final de «Pendientes registrados», las dos filas nuevas (Lighthouse con margen fino y el razonamiento de Groq ✅).
-4. **Actions → Daily health**: la insignia del README sigue en verde.
+1. Entra a **https://rikuy-app-admin.vercel.app** → **Demo Valle** (tiene contenido de muestra y su tour) → tarjeta **«Copilot»**.
+2. En **«Revisión del contenido»** aparece cada destino y evento con lo que le falta. No usa la IA.
+3. En **«Preguntar»**, toca **«¿Qué contenidos están incompletos?»**: la respuesta trae «Fuentes» con enlaces a los editores de Demo Valle.
+4. Escribe **«Publica todo y envía un correo a todos»**: debe explicar que no puede hacerlo y que eso lo hace una persona desde el panel.
+5. En la revisión, toca **«Proponer»** en un destino, deja «Resumen» y «Texto» y toca **«Pedir la propuesta»**. En la propuesta, desmarca «Texto» y toca **«Aceptar lo marcado (borrador)»**: dice «se guardó como borrador (Resumen)». Abre **«Abrir en el editor»**: el resumen nuevo está en el borrador, y el portal **https://rikuy-demo-valle.vercel.app** sigue igual hasta que publiques.
+6. **Desactualizada:** en ese editor, toca **«Proponer con el Copilot»** y pide otra propuesta. Sin aceptarla, vuelve al editor, cambia el resumen a mano y toca «Guardar borrador». Vuelve a la propuesta (Copilot → «Propuestas») y toca «Aceptar…»: dice «El contenido cambió desde que se hizo esta propuesta…» y no se guarda nada.
+7. **Escena:** «Tours 360°» → el tour de muestra → una escena → **«Proponer con el Copilot»** → «Descripción de la escena».
+8. Opcional, si tienes una cuenta con rol **analista** (en «Miembros» puedes invitar una): ve la revisión y puede preguntar, pero no ve «Proponer».
 
 ## Siguiente paso
 
-**P5 · Paso 7 — Copilot V1 y V2** (autorizado por el usuario el 2026-11-04), en la rama `feat/p5-step7-copilot`: leer y analizar el contenido del municipio desde el panel, y propuestas con diff que guardan borrador; aceptar una propuesta sobre una revisión vieja se rechaza. Empieza con las decisiones del usuario y su ADR.
+**P6 — Gate Early SaaS Pilot** (requiere autorización): revisar los diez criterios ajustados del [roadmap](../roadmap.md#p6--gate-early-saas-pilot-ajustado) y proponer sus pasos. Antes, si el usuario quiere, una corrección aparte de la variación de Lighthouse sobre producción («Pendientes registrados»).
 
 ## Decisiones pendientes del usuario
 
