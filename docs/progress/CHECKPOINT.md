@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 6 — voz del asistente (dictado y lectura en voz alta)
-- **Rama:** `feat/p5-step6-voice` → PR hacia `main`
+- **Fase:** P5 — asistente turístico. P1, P2, P3, P4 y el Hito Demo / Portafolio ✅; P5 · Pasos 1 a 6 ✅.
+- **Último paso completado:** cierre del Hito · Paso 3 (una semana de operación con planes gratuitos, 2026-11-04)
+- **Rama:** `docs/hito-step3-closure` → PR hacia `main`
 
 ## Historial
 
@@ -981,7 +981,7 @@ Comprobado desde fuera:
 - La invitación llegó a la carpeta de spam. La persona entró con el código que envía Supabase por el mismo SMTP, aceptó y ya es administradora activa.
 - Mientras no haya dominio propio, el correo puede caer en spam: sale de una cuenta de Gmail nueva, sin un dominio con SPF/DKIM propios. Se mitiga pidiendo marcarlo como «No es spam». Se resuelve con el dominio del municipio y un proveedor con dominio verificado (ADR-034).
 
-### ★ Hito · Paso 3 — operación con planes gratuitos ✅ (falta confirmarlo en producción)
+### ★ Hito · Paso 3 — operación con planes gratuitos ✅
 
 - Decisiones del usuario ([ADR-035](../adr/ADR-035-free-plan-operations.md)):
   - limpieza **automática**, solo de fotos y logos sin uso por más de 7 días; panoramas, modelos y copias públicas nunca;
@@ -1040,6 +1040,14 @@ Comprobado desde fuera:
 El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-budget.md)).
 
 **Corrección posterior (`fix/lighthouse-empty-portals`):** con Ucureña en `LIGHTHOUSE_ORIGINS`, «Lighthouse on production» falló por su SEO (69 < 95). Ucureña todavía no tiene nada publicado, así que lleva `noindex` a propósito (Hito · Paso 1), y Lighthouse lo cuenta como falla. Ahora el medidor reconoce un portal vacío por su sitemap (sin destinos ni eventos) y juzga su SEO sin la auditoría de rastreo; un portal con contenido sigue fallando si aparece con `noindex`. Contra producción: Ucureña con SEO 100 en sus 4 páginas y Demo Sur medido con todas las auditorías.
+
+**Cierre (2026-11-04, `docs/hito-step3-closure`):** se cumple el criterio del paso.
+
+- «Daily health» en verde **8 de 8 días**: del 28 de octubre al 3 de noviembre por su horario, y el 4 a mano (salió en verde). GitHub atrasa las corridas programadas varias horas (12:23 UTC → 17:00–22:00 UTC), pero ninguna se saltó.
+- **El proyecto no se pausó:** desde el 28, la tarea `rikuy-job-runner` corrió cada minuto (11.099 veces seguidas, sin errores). `rikuy-daily-report`, `rikuy-expire-abandoned-uploads` y `rikuy-remove-unused-media` corrieron 8 de 8 días sin errores, y `rikuy-expire-ai-requests` cada 15 min desde el 1 (consulta de solo lectura a `cron.job_run_details`).
+- **Lighthouse sobre producción, con margen fino:** desde el 1 de noviembre, 4 de 8 corridas fallaron por 20–85 ms sobre el límite de LCP. `/destinos` y `/agenda` de Ucureña (vacías) miden 1,4–2,0 s o 2,4–2,6 s con el mismo HTML; el tour, 2,4–2,6 s y una vez 3,03 s (la vista previa tardó 1,3 s en bajar, cuando suele tardar 0,1 s). En el Android real el tour muestra su primera escena en 1,46 s. Anotado en «Pendientes registrados» para una corrección aparte.
+- **La IA en producción:** la primera prueba (87 tokens de entrada y 38 de salida) confirmó que el razonamiento de `gpt-oss` cuenta dentro del máximo de salida, como suponía ADR-036. Anotado como resuelto en «Pendientes registrados».
+- README (español e inglés) al día: el asistente para el visitante y su conocimiento en el panel, el estado (Hito ✅, P5 en producción salvo el Copilot), 41 ADR con 036 y 038 en la tabla, 679 unitarios y 1.006 pgTAP, el e2e del asistente, el gold con el modelo real y Groq en el stack.
 
 ### ★ Hito · Paso 4 — README de portafolio ✅
 
@@ -1330,21 +1338,20 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - La calidad de la lectura depende de las voces del dispositivo; sin voz en español, se usa la voz por defecto.
 - Whisper detecta el idioma solo; una pregunta en inglés muy corta podría transcribirse como español.
 
+**Verificación en producción (2026-11-04):** el usuario dictó desde su celular en Demo Norte: el texto quedó para revisar, la respuesta se leyó en voz alta y «Uso del plan» marcó 20 s con «2 dictados pasados a texto» (10 s como mínimo cada uno, como dice ADR-041).
+
 ## Cómo verificarlo
 
-Después del merge, en producción, desde tu celular (la voz necesita https):
+Este paso es solo de documentación. Después del merge, en GitHub (`jorgesolizvidal/rikuy`, rama `main`):
 
-1. Abre **https://rikuy-demo-norte.vercel.app/** → botón «Asistente» abajo a la derecha. Junto a «Enviar» aparece el **botón del micrófono**. La primera vez el navegador pide permiso: acéptalo.
-2. Tócalo y di «¿Qué lugares puedo visitar?». Debajo dice «Escuchando… n s de 30». Tócalo otra vez: tu pregunta aparece escrita en el campo con «Revisa el texto y pulsa «Enviar»». No se envía sola.
-3. Pulsa «Enviar»: la respuesta se lee en voz alta sola. «Detener la lectura» la corta; «Escuchar» la vuelve a leer. Una pregunta escrita no se lee sola.
-4. Prueba un nombre propio («¿Cómo llego al Mirador del Valle?»): debe escribirse bien.
-5. En el panel: **https://rikuy-app-admin.vercel.app/o/demo-norte/uso** → «Dictado por voz» muestra los segundos usados hoy (cada dictado cuenta al menos 10 s). En `/plataforma` → «Asistente con IA» → «Dictado por voz hoy».
-6. En el navegador del celular, quita el permiso del micrófono para el sitio y vuelve a tocar el micrófono: dice «Sin permiso para usar el micrófono. Puedes escribir tu pregunta.» y se sigue escribiendo.
+1. **README.md**: «Pruébalo en vivo» menciona el «Asistente» en Demo Norte; «Qué hace» tiene la línea del asistente para el visitante y la del conocimiento en el panel; «Estado» dice que el Hito está terminado.
+2. **README.en.md**: lo mismo en inglés.
+3. **docs/roadmap.md**: en «Secuencia», «★ ✅ Hito Demo / Portafolio»; en la tabla del Hito, el Paso 3 con ✅; al final de «Pendientes registrados», las dos filas nuevas (Lighthouse con margen fino y el razonamiento de Groq ✅).
+4. **Actions → Daily health**: la insignia del README sigue en verde.
 
 ## Siguiente paso
 
-1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
-2. **P5 · Paso 7 — Copilot V1 y V2** (requiere autorización): leer y analizar el contenido del municipio, y propuestas con diff que guardan borrador; aceptar una propuesta sobre una revisión vieja se rechaza.
+**P5 · Paso 7 — Copilot V1 y V2** (autorizado por el usuario el 2026-11-04), en la rama `feat/p5-step7-copilot`: leer y analizar el contenido del municipio desde el panel, y propuestas con diff que guardan borrador; aceptar una propuesta sobre una revisión vieja se rechaza. Empieza con las decisiones del usuario y su ADR.
 
 ## Decisiones pendientes del usuario
 
