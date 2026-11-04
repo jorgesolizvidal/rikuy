@@ -9,13 +9,18 @@
  * invented citation and a web address never reach the visitor; a question in English is
  * answered in English; the conversation stays in this browser (24 h) until «Nueva
  * conversación»; a plan (P5 · Paso 4) sends distances, never the visitor's position, and
- * opens its route on the map; the endpoint refuses another origin; with the AI quota used up the visitor
+ * opens its route on the map; a dictated question (P5 · Paso 6) waits in the field to be
+ * reviewed, its answer is read aloud, and without permission, quota or provider the visitor
+ * types; the endpoint refuses another origin; with the AI quota used up the visitor
  * gets a notice and the portal; and the panel works by keyboard, on a phone, without axe
  * findings.
  *
  *   SUPABASE_DB_URL=… pnpm --filter @rikuy/web test:e2e-assistant
  */
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import http from "node:http";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { drainJobs } from "@rikuy/core";
 import { createPostgresJobLedger } from "@rikuy/db/worker";
@@ -54,6 +59,46 @@ async function serious(page: Page): Promise<string[]> {
       .map((violation) => violation.id);
   });
 }
+
+/** A mono 16 kHz WAV with a soft tone: what the fake microphone plays in a loop. */
+function toneWav(seconds: number): Buffer {
+  const rate = 16_000;
+  const samples = rate * seconds;
+  const wav = Buffer.alloc(44 + samples * 2);
+  wav.write("RIFF", 0);
+  wav.writeUInt32LE(36 + samples * 2, 4);
+  wav.write("WAVEfmt ", 8);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(rate, 24);
+  wav.writeUInt32LE(rate * 2, 28);
+  wav.writeUInt16LE(2, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write("data", 36);
+  wav.writeUInt32LE(samples * 2, 40);
+  for (let index = 0; index < samples; index += 1) {
+    wav.writeInt16LE(
+      Math.round(Math.sin((2 * Math.PI * 440 * index) / rate) * 8000),
+      44 + index * 2,
+    );
+  }
+  return wav;
+}
+
+/** The browser's voice, recorded in window.__spoken instead of spoken. */
+const SPEECH_STUB = `
+  window.__spoken = [];
+  if ("speechSynthesis" in window) {
+    const synth = window.speechSynthesis;
+    synth.getVoices = () => [];
+    synth.cancel = () => {};
+    synth.speak = (utterance) => {
+      window.__spoken.push(utterance.text);
+      setTimeout(() => utterance.dispatchEvent(new Event("end")), 50);
+    };
+  }
+`;
 
 async function ask(page: Page, question: string) {
   const before = await page.locator(".assistant-from-assistant").count();
@@ -326,6 +371,218 @@ describe("the visitor's assistant (simulated model)", () => {
     expect(await page.locator(".portal-route-stops li").count()).toBe(1);
     expect(await serious(page)).toEqual([]);
     await context.close();
+  });
+
+  it("voice (ADR-041): a dictated question is reviewed before sending, its answer is read aloud, and text stays when the microphone or the provider fails", async () => {
+    // A clean hour for this visitor: the earlier cases asked questions from the same address.
+    await db`delete from public.ai_executions where tenant_id = ${SUR}`;
+    await db`delete from public.ai_requests where tenant_id = ${SUR}`;
+    // A microphone that "says" a 3 s tone (the simulated transcriber hears its question in it).
+    const folder = mkdtempSync(join(tmpdir(), "rikuy-voice-"));
+    const tone = join(folder, "tone.wav");
+    writeFileSync(tone, toneWav(3));
+    const voiceBrowser = await chromium.launch({
+      executablePath: CHROME,
+      args: [
+        "--host-resolver-rules=MAP *.localhost 127.0.0.1",
+        "--use-fake-ui-for-media-stream",
+        "--use-fake-device-for-media-stream",
+        `--use-file-for-fake-audio-capture=${tone}`,
+      ],
+    });
+    try {
+      const context = await voiceBrowser.newContext({ viewport: { width: 1280, height: 900 } });
+      await context.grantPermissions(["microphone"], { origin: PORTAL });
+      // The browser's voice, recorded instead of spoken (headless has no speakers).
+      await context.addInitScript(SPEECH_STUB);
+      const page = await context.newPage();
+      // (Playwright does not see a Blob body: the server's records show what arrived.)
+      const sent: { url: string; type: string | null }[] = [];
+      page.on("request", (request) => {
+        if (request.method() === "POST") {
+          sent.push({
+            url: new URL(request.url()).pathname,
+            type: request.headers()["content-type"] ?? null,
+          });
+        }
+      });
+      await page.goto(`${PORTAL}/`);
+      await page.getByRole("button", { name: /hacer una pregunta/u }).click();
+      const dialog = page.getByRole("dialog");
+      await dialog.waitFor();
+      const field = page.getByLabel(/Tu pregunta para/u);
+      const status = page.locator(".assistant-voice");
+
+      // Dictate: listening, then the text appears in the field — and nothing is asked yet.
+      await page.getByRole("button", { name: "Dictar la pregunta" }).click();
+      await status.getByText(/Escuchando/u).waitFor();
+      await page.waitForTimeout(1500);
+      await page.getByRole("button", { name: "Terminar de dictar" }).click();
+      await page.waitForFunction(
+        () => (document.querySelector(".assistant-form textarea") as HTMLTextAreaElement)?.value,
+      );
+      expect(await field.inputValue()).toBe("¿Qué lugares puedo visitar?");
+      expect(await status.innerText()).toBe("Revisa el texto y pulsa «Enviar».");
+      expect(await page.evaluate(() => document.activeElement?.tagName)).toBe("TEXTAREA");
+      expect(sent.map((request) => request.url)).toEqual(["/asistente/dictado"]);
+      expect(sent[0]?.type).toMatch(/^audio\/(webm|ogg|mp4)/u);
+      expect(await serious(page)).toEqual([]);
+
+      // Sent by the visitor; the answer to a dictated question is read aloud by itself.
+      const before = await page.locator(".assistant-from-assistant").count();
+      await page.keyboard.press("Enter");
+      await page.waitForFunction(
+        (count) =>
+          document.querySelectorAll(".assistant-from-assistant").length > count &&
+          !document.querySelector(".assistant-typing"),
+        before,
+      );
+      const answer = page.locator(".assistant-from-assistant").last();
+      await page.waitForFunction(
+        () => (window as unknown as { __spoken: string[] }).__spoken.length > 0,
+      );
+      const spoken = await page.evaluate(
+        () => (window as unknown as { __spoken: string[] }).__spoken,
+      );
+      // The answer's own words (whatever the simulated model said), never its sources.
+      const said = await answer.locator("p:not(.visually-hidden)").first().innerText();
+      expect(spoken.join(" ")).toContain(said.replace(/\s+/gu, " ").trim().slice(0, 40));
+      expect(spoken.join(" ")).not.toMatch(/https?:|Fuentes/u);
+      // «Escuchar» again, by hand, on any answer.
+      await answer.getByRole("button", { name: "Escuchar" }).waitFor();
+      await answer.getByRole("button", { name: "Escuchar" }).click();
+      await page.waitForFunction(
+        () => (window as unknown as { __spoken: string[] }).__spoken.length > 1,
+      );
+      // A typed question is not read aloud.
+      await page.evaluate(() => ((window as unknown as { __spoken: string[] }).__spoken = []));
+      await ask(page, "¿Qué es la laguna espejo?");
+      await page.waitForTimeout(2000);
+      expect(
+        await page.evaluate(() => (window as unknown as { __spoken: string[] }).__spoken),
+      ).toEqual([]);
+
+      // Counted in seconds: one dictation, billed at least 10 s, no audio nor text kept.
+      const [dictation] = await db`
+        select status, outcome, audio_seconds, reserved_tokens from public.ai_requests
+        where tenant_id = ${SUR} and profile = 'dictation'
+      `;
+      expect(dictation).toMatchObject({
+        status: "completed",
+        outcome: "transcribed",
+        reserved_tokens: "0",
+      });
+      expect(Number(dictation?.audio_seconds)).toBeGreaterThanOrEqual(10);
+
+      // Escape while listening throws the recording away and keeps the panel open.
+      await field.fill("");
+      await page.getByRole("button", { name: "Dictar la pregunta" }).click();
+      await status.getByText(/Escuchando/u).waitFor();
+      await page.keyboard.press("Escape");
+      await page.getByRole("button", { name: "Dictar la pregunta" }).waitFor();
+      expect(await dialog.isVisible()).toBe(true);
+      await page.waitForTimeout(500);
+      expect(sent.filter((request) => request.url === "/asistente/dictado")).toHaveLength(1);
+
+      // The provider down, or nothing said: a message, and the field stays for typing.
+      const post = (marker: string) =>
+        page.evaluate(async (text) => {
+          const bytes = new Uint8Array(4096);
+          bytes.set(new TextEncoder().encode("RIFF"), 0);
+          bytes.set(new TextEncoder().encode("WAVE"), 8);
+          bytes.set(new TextEncoder().encode(text), 64);
+          const response = await fetch("/asistente/dictado", {
+            method: "POST",
+            headers: { "content-type": "audio/wav" },
+            body: bytes,
+          });
+          return {
+            status: response.status,
+            body: (await response.json()) as { status: string; message?: string },
+          };
+        }, marker);
+      expect(await post("[simular:caida]")).toEqual({
+        status: 200,
+        body: {
+          status: "notice",
+          message: "No pude pasar tu voz a texto en este momento. Puedes escribir tu pregunta.",
+        },
+      });
+      expect((await post("[simular:silencio]")).body.status).toBe("empty");
+      // Not audio: refused before any quota.
+      const html = await page.evaluate(async () => {
+        const response = await fetch("/asistente/dictado", {
+          method: "POST",
+          headers: { "content-type": "audio/webm" },
+          body: "<!doctype html><html>".repeat(100),
+        });
+        return response.status;
+      });
+      expect(html).toBe(400);
+
+      // The municipality's dictation used up: a message by the field, and typing still answers.
+      await db`
+        insert into public.tenant_quotas (tenant_id, resource, limit_amount)
+        values (${SUR}, 'ai_audio_seconds', 0)
+        on conflict (tenant_id, resource) do update set limit_amount = 0
+      `;
+      await db`
+        update public.usage_buckets set limit_amount = 0
+        where tenant_id = ${SUR} and resource = 'ai_audio_seconds' and period_end > now()
+      `;
+      await page.getByRole("button", { name: "Dictar la pregunta" }).click();
+      await status.getByText(/Escuchando/u).waitFor();
+      await page.waitForTimeout(1000);
+      await page.getByRole("button", { name: "Terminar de dictar" }).click();
+      await status
+        .getByText("El dictado por voz ya no está disponible por hoy. Puedes escribir tu pregunta.")
+        .waitFor();
+      expect(await field.inputValue()).toBe("");
+      const typed = await ask(page, "¿Qué es la laguna espejo?");
+      expect(await typed.getAttribute("class")).not.toContain("assistant-problem");
+      await context.close();
+
+      // Without permission for the microphone: a message, and the field.
+      const denied = await voiceBrowser.newContext({ viewport: { width: 390, height: 844 } });
+      await denied.addInitScript(() => {
+        navigator.mediaDevices.getUserMedia = () =>
+          Promise.reject(new DOMException("denied", "NotAllowedError"));
+      });
+      const deniedPage = await denied.newPage();
+      await deniedPage.goto(`${PORTAL}/`);
+      await deniedPage.getByRole("button", { name: /hacer una pregunta/u }).click();
+      await deniedPage.getByRole("button", { name: "Dictar la pregunta" }).click();
+      await deniedPage
+        .locator(".assistant-voice")
+        .getByText("Sin permiso para usar el micrófono. Puedes escribir tu pregunta.")
+        .waitFor();
+      expect(await deniedPage.getByLabel(/Tu pregunta para/u).isEditable()).toBe(true);
+      expect(await serious(deniedPage)).toEqual([]);
+      expect(
+        await deniedPage.evaluate(() => document.documentElement.scrollWidth > window.innerWidth),
+      ).toBe(false);
+      await denied.close();
+
+      // A browser that cannot record: no microphone button, the rest as always.
+      const unable = await voiceBrowser.newContext({ viewport: { width: 1280, height: 900 } });
+      await unable.addInitScript(() => {
+        delete (window as unknown as { MediaRecorder?: unknown }).MediaRecorder;
+      });
+      const unablePage = await unable.newPage();
+      await unablePage.goto(`${PORTAL}/`);
+      await unablePage.getByRole("button", { name: /hacer una pregunta/u }).click();
+      await unablePage.getByRole("dialog").waitFor();
+      expect(await unablePage.locator(".assistant-mic").count()).toBe(0);
+      await unable.close();
+    } finally {
+      await db`delete from public.tenant_quotas where tenant_id = ${SUR} and resource = 'ai_audio_seconds'`;
+      await db`
+        update public.usage_buckets set limit_amount = private.quota_limit(${SUR}, 'ai_audio_seconds')
+        where tenant_id = ${SUR} and resource = 'ai_audio_seconds' and period_end > now()
+      `;
+      await voiceBrowser.close();
+      rmSync(folder, { recursive: true, force: true });
+    }
   });
 
   it("with the AI quota used up, the visitor gets a notice and the portal keeps working", async () => {

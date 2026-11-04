@@ -2,16 +2,20 @@ import "server-only";
 
 import {
   askAssistant,
+  dictationPrompt,
+  type DictationResult,
   type AssistantPage,
   type AssistantPageItem,
   type AssistantResult,
   type AssistantTenant,
 } from "@rikuy/core";
 
-import { aiTourContext, runAiWork, searchAiKnowledge } from "./ai-gateway";
+import { aiTourContext, runAiWork, searchAiKnowledge, transcribeAudio } from "./ai-gateway";
 import {
   portalDestination,
+  portalDestinations,
   portalEvent,
+  portalEvents,
   portalPlanPlaces,
   portalTourIndex,
 } from "./portal-content";
@@ -58,5 +62,29 @@ export async function askPortalAssistant(
     places: () => portalPlanPlaces(view),
     tourContext: aiTourContext,
     now: () => new Date(),
+  });
+}
+
+/**
+ * One dictation for this portal (ADR-041). The provider is told how the municipality and its
+ * published places are spelled — plain names, never instructions — so «Ucureña» is not heard
+ * as something else. Without them (a read fails), the municipality's name alone.
+ */
+export async function transcribePortalDictation(
+  view: PortalView,
+  audio: Uint8Array,
+  visitor: string | null,
+): Promise<DictationResult> {
+  const places = await Promise.all([portalDestinations(view), portalEvents(view)])
+    .then(([destinations, events]) => [
+      ...destinations.map((destination) => destination.title),
+      ...events.map((event) => event.title),
+    ])
+    .catch(() => []);
+  return transcribeAudio({
+    tenantId: view.context.tenant.tenantId,
+    audio,
+    visitor,
+    prompt: dictationPrompt(view.resolved.presentation.identity.siteName, places),
   });
 }

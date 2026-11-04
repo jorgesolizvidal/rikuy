@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 5 — guía dentro del tour 360° (RC-05)
-- **Rama:** `feat/p5-step5-tour-guide` → PR hacia `main`
+- **Último paso completado:** P5 · Paso 6 — voz del asistente (dictado y lectura en voz alta)
+- **Rama:** `feat/p5-step6-voice` → PR hacia `main`
 
 ## Historial
 
@@ -1284,16 +1284,67 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - Las demos creadas antes de este paso (Demo Valle) conservan su tour de muestra sin descripciones de escena: la guía responde con el punto de información y la plaza.
 - La redacción y «no decir que ve» se miden con el modelo real en «Evaluar el asistente», desde el caso 47 (5 preguntas).
 
+**Verificación en producción (2026-11-03):** el usuario probó «¿Qué estoy viendo?», «Preguntar al asistente sobre esto» y la pantalla completa en Demo Norte y Demo Valle (tras «Armar el tour de muestra»). En una escena sin texto («Museo 2»), la guía dijo que no tenía información y ofreció las secciones y el contacto, sin inventar. En «Evaluar el asistente» → Demo Valle, **G41–G51: 11 de 11 bien** con el modelo real (6.236 tokens), incluido G51, el pedido de describir colores y personas «que ves», donde no describió la imagen.
+
+### P5 · Paso 6 — voz del asistente ✅
+
+- Decisiones del usuario ([ADR-041](../adr/ADR-041-assistant-voice.md)), 2026-11-03:
+  - **Groq Whisper** (`whisper-large-v3-turbo`, la misma clave) transcribe el dictado;
+  - **el texto queda para revisar** en el campo de la pregunta; nunca se envía solo;
+  - **«Escuchar»** en cada respuesta, y lectura automática si la pregunta se dictó (voz del navegador, sin costo);
+  - **30 min de dictado por día por municipio**, tope de la plataforma 25.900 s por día (90 % de los 28.800 del plan gratuito de Groq), 10 dictados por hora por visitante y 30 s por dictado.
+- Base de datos (`20261104000000_p5_voice_enum.sql` y `20261104000100_p5_voice.sql`, solo expand):
+  - recurso de cuota `ai_audio_seconds`, diario en la hora del municipio (1.800 s por defecto); el tope de la plataforma, en `ai_platform_days` (`limit_audio_seconds`, `audio_reserved`, `audio_consumed`);
+  - `tenant_usage`, `platform_tenant_usage` y las cuotas del resumen de operaciones **nombran** almacenamiento y procesamiento, así ningún recurso nuevo llega al panel ya desplegado;
+  - un dictado es un pedido de perfil `dictation` en `ai_requests` (`reserved_seconds`, `audio_seconds`; la base revalida que cuente segundos y no tokens). `ai_api.begin_dictation` (municipio en línea, 10 dictados por hora por visitante aparte de sus preguntas, segundos del municipio y de la plataforma; atómico) y `ai_api.finish_dictation` (liquida con lo cobrado; idempotente), solo para `rikuy_ai`. `finish_request` rechaza un dictado y `finish_dictation` una pregunta. Las reservas abiertas más de 10 min se cuentan como usadas;
+  - `tenant_ai_usage`, `platform_ai_usage` y el resumen de la IA cuentan solo las preguntas; el dictado tiene `tenant_voice_usage`, `platform_voice_usage` y la clave `voice` del resumen.
+  - Ni el audio ni el texto se guardan.
+- `@rikuy/core`:
+  - contrato `contracts/voice` (límites, formatos, respuesta);
+  - `transcribeDictation`: reconoce el audio por sus bytes (webm, ogg, mp4, wav, mp3, flac), rechaza lo que no es audio o pasa de 2 MB antes de reservar, reserva 30 s, llama al proveedor (un reintento si está caído o lento) y liquida con lo cobrado (mínimo 10 s);
+  - `dictationText` quita los segmentos sin voz, las frases que Whisper inventa en el silencio y el texto de ayuda leído de vuelta, y recorta a 500 caracteres;
+  - `dictationPrompt`: solo nombres (el sitio y lo publicado) como ayuda de ortografía;
+  - transcriptor simulado (marcas `[simular:caida]`, `[simular:rechazo]`, `[simular:silencio]` dentro del audio);
+  - `loadVoiceUsage` / `loadPlatformVoiceUsage`, avisos `voice_platform` y `voice_quota` en el informe diario, y `ai_audio_seconds` en las cuotas (minutos por día).
+- `@rikuy/db`: `createGroqTranscriber` (multipart, `verbose_json`, sin SDK; la clave solo en la cabecera), `beginDictation` / `finishDictation` en la conexión de la IA, y lecturas de uso del dictado (devuelven «sin dictado» si la base aún no tiene la migración).
+- `@rikuy/config`: `AI_TRANSCRIPTION_MODEL` (opcional, por defecto `whisper-large-v3-turbo`).
+- Web:
+  - **`POST /asistente/dictado`** en el host del portal: mismo control de origen que `/asistente`, solo `audio/*`, hasta 2 MB leídos por partes, `no-store`;
+  - en el panel del asistente (se sigue descargando al abrirlo): **botón del micrófono** (solo si el navegador puede grabar), «Escuchando… n s de 30», tocar otra vez para terminar o Escape para descartar; el texto llega al campo con «Revisa el texto y pulsa «Enviar»»; mensajes junto al campo sin permiso, sin micrófono, sin cuota o con el proveedor caído;
+  - **«Escuchar» / «Detener la lectura»** en cada respuesta y aviso, con la voz del dispositivo en el idioma de la respuesta (español de Bolivia o Latinoamérica primero), en partes cortas, sin fuentes ni enlaces; la respuesta a una pregunta dictada se lee sola;
+  - `Permissions-Policy: microphone=(self)`;
+  - panel: «Dictado por voz» en «Uso del plan», en «Cuotas por municipio» (minutos por día) y en «Asistente con IA» de `/plataforma`;
+  - privacidad: qué se graba, a quién va, que no se guarda, el límite de 10 dictados por hora y que la lectura no sale del dispositivo.
+- Tests:
+  - 679 unitarios (core 453, db 130, web 39, worker 43, config 14);
+  - 1.006 pgTAP (40 nuevos, `030_voice`: quién llega, reservar y liquidar en segundos sin tokens, liquidar dos veces, fallo del proveedor, cada perfil con su liquidación, el décimo dictado pasa y el undécimo no mientras el visitante sigue preguntando por escrito, cuota del municipio y tope de la plataforma devolviendo la reserva, municipio no en línea, reservas abandonadas, lecturas por municipio y las existentes sin voz);
+  - integración contra PostgreSQL real con `rikuy_ai` (`voice.int.test.ts`): un dictado liquidado en 10 s, **8 dictados a la vez con cupo para 3 → exactamente 3**, y con la cuota agotada el proveedor nunca se llama;
+  - **e2e en un navegador real con micrófono simulado** (nuevo caso en `assistant.e2e.test.ts`, 6 en total): dictar → el texto en el campo sin preguntar nada → enviar → la respuesta se lee sola (sin fuentes) → «Escuchar» a mano → una pregunta escrita no se lee; un dictado en la base con al menos 10 s; Escape descarta la grabación; proveedor caído, silencio y algo que no es audio; con la cuota en 0, el mensaje y la pregunta escrita sigue respondiendo; sin permiso, el mensaje y el campo; un navegador que no graba no muestra el micrófono; axe sin hallazgos.
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador (390 y 1280 px): grabando, revisando y con la respuesta leída; «Dictado por voz» en «Uso del plan», `/plataforma` y «Cuotas por municipio» (cambiar a 5 min por día); axe sin hallazgos críticos ni graves y sin desbordes; contratos RC-09/10/11/12 (189), portales (161), ubicación RC-06 (35), tour (9) y asistente (6) en verde; Lighthouse de las 12 páginas dentro del presupuesto, JS inicial sin cambios (146–148 KB).
+- Lo que encontraron las pruebas, ya corregido: la cabecera `Permissions-Policy` bloqueaba el micrófono en todo el sitio; las lecturas de uso existentes habrían devuelto el recurso nuevo al panel ya desplegado.
+
+**Desviaciones:**
+
+- El dictado no tiene una prueba propia en `/plataforma` («Probar la IA» sigue siendo de texto): se prueba en el portal, desde un celular con https.
+- La calidad de la lectura depende de las voces del dispositivo; sin voz en español, se usa la voz por defecto.
+- Whisper detecta el idioma solo; una pregunta en inglés muy corta podría transcribirse como español.
+
 ## Cómo verificarlo
 
-1. Después del merge, en el portal de Demo Valle → «Tours 360°»: en la barra, «¿Qué estoy viendo?» responde con la escena y cita el tour; el punto «Sobre este lugar» tiene «Preguntar al asistente sobre esto».
-2. En pantalla completa, «¿Qué estoy viendo?» abre la conversación encima del tour.
-3. En `/plataforma` → «Evaluar el asistente» → Demo Valle, «Desde el caso» `41`, luego `46` y luego `51`: G41–G51 «Bien».
+Después del merge, en producción, desde tu celular (la voz necesita https):
+
+1. Abre **https://rikuy-demo-norte.vercel.app/** → botón «Asistente» abajo a la derecha. Junto a «Enviar» aparece el **botón del micrófono**. La primera vez el navegador pide permiso: acéptalo.
+2. Tócalo y di «¿Qué lugares puedo visitar?». Debajo dice «Escuchando… n s de 30». Tócalo otra vez: tu pregunta aparece escrita en el campo con «Revisa el texto y pulsa «Enviar»». No se envía sola.
+3. Pulsa «Enviar»: la respuesta se lee en voz alta sola. «Detener la lectura» la corta; «Escuchar» la vuelve a leer. Una pregunta escrita no se lee sola.
+4. Prueba un nombre propio («¿Cómo llego al Mirador del Valle?»): debe escribirse bien.
+5. En el panel: **https://rikuy-app-admin.vercel.app/o/demo-norte/uso** → «Dictado por voz» muestra los segundos usados hoy (cada dictado cuenta al menos 10 s). En `/plataforma` → «Asistente con IA» → «Dictado por voz hoy».
+6. En el navegador del celular, quita el permiso del micrófono para el sitio y vuelve a tocar el micrófono: dice «Sin permiso para usar el micrófono. Puedes escribir tu pregunta.» y se sigue escribiendo.
 
 ## Siguiente paso
 
 1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
-2. **P5 · Paso 6 — voz** (requiere autorización): dictado con cuota de segundos y lectura en voz alta del navegador; sin micrófono o con el proveedor caído, el asistente sigue por texto.
+2. **P5 · Paso 7 — Copilot V1 y V2** (requiere autorización): leer y analizar el contenido del municipio, y propuestas con diff que guardan borrador; aceptar una propuesta sobre una revisión vieja se rechaza.
 
 ## Decisiones pendientes del usuario
 

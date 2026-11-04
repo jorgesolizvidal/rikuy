@@ -58,13 +58,18 @@ export async function loadUsage(
   });
 }
 
-/** Operator input: megabytes for storage, minutes for compute, thousands of tokens for AI. */
+/**
+ * Operator input: megabytes for storage, minutes for compute, thousands of tokens for AI and
+ * minutes for dictation.
+ */
 export const QUOTA_UNITS: Readonly<
   Record<UsageResource, { readonly factor: number; readonly max: number }>
 > = {
   storage_bytes: { factor: 1024 * 1024, max: 1024 * 1024 },
   media_compute_seconds: { factor: 60, max: 100_000 },
   ai_tokens: { factor: 1000, max: 10_000 },
+  // Minutes of dictation per day.
+  ai_audio_seconds: { factor: 60, max: 1440 },
 };
 
 export function parseQuotaInput(

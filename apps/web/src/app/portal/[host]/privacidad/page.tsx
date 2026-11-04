@@ -102,7 +102,7 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
           <h2 id="asistente">El asistente ({assistant})</h2>
           <p>
             El botón «{assistant}» abre un asistente que responde tus preguntas con lo que{" "}
-            {siteName} publicó en este portal. Solo funciona si le escribes.
+            {siteName} publicó en este portal. Solo funciona si le escribes o le dictas.
           </p>
           <ul>
             <li>
@@ -128,6 +128,18 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               Ni {siteName} ni la plataforma guardan el texto de las preguntas o las respuestas:
               solo cuántas se responden, cuánto tardan y cuánto cuestan. Para limitar el uso a 10
               preguntas por hora, se cuenta tu dirección IP con una huella que cambia cada día.
+            </li>
+            <li>
+              Si tocas el micrófono para dictar, el navegador te pide permiso y graba solo mientras
+              lo tienes activado, hasta 30 segundos. La grabación se envía al portal y de ahí a
+              Groq, que la pasa a texto; ese texto aparece en el campo de la pregunta para que lo
+              revises antes de enviarlo. Ni la grabación ni el texto se guardan. Para limitar el uso
+              a 10 dictados por hora, se cuenta tu dirección IP con la misma huella diaria.
+            </li>
+            <li>
+              «Escuchar» lee la respuesta en voz alta con una voz de tu propio dispositivo: el texto
+              no sale del navegador. Si la pregunta fue dictada, la respuesta se lee sola; puedes
+              detenerla cuando quieras.
             </li>
             <li>
               Las respuestas las genera una inteligencia artificial y pueden tener errores. Cada

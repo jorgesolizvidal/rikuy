@@ -1,5 +1,6 @@
 import type { AiMessage } from "../../contracts/ai";
 import { ANSWER_TAG, EXPLAIN_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
+import type { SpeechTranscriber } from "./dictation";
 import { AiProviderError, estimateTokens, type AiProvider } from "./gateway";
 
 /**
@@ -106,3 +107,35 @@ export const PROBE_MESSAGES: readonly AiMessage[] = [
   { role: "system", content: "Responde solo con la palabra: listo" },
   { role: "user", content: "¿Estás disponible?" },
 ];
+
+/** What the simulated transcriber hears in any recording (ADR-041). */
+export const SIMULATED_DICTATION = "¿Qué lugares puedo visitar?";
+export const SIMULATED_TRANSCRIBER_MODEL = "simulated/whisper-1";
+
+/**
+ * A speech provider without network or key (AI_PROVIDER=simulated). Any recording says
+ * SIMULATED_DICTATION, lasting 1 s per 16 KB. Bytes of a marker inside the recording (a
+ * test writes them into a WAV) fail on purpose: «[simular:caida]», «[simular:rechazo]» and
+ * «[simular:silencio]» (nothing said).
+ */
+export function createSimulatedTranscriber(): SpeechTranscriber {
+  return {
+    name: "simulated",
+    model: SIMULATED_TRANSCRIBER_MODEL,
+    async transcribe(request) {
+      const bytes = new TextDecoder("latin1").decode(request.audio);
+      if (bytes.includes("[simular:caida]")) throw new AiProviderError("unavailable", 503);
+      if (bytes.includes("[simular:rechazo]")) throw new AiProviderError("error", 400);
+      const silent = bytes.includes("[simular:silencio]");
+      const text = silent
+        ? "Subtítulos realizados por la comunidad de Amara.org"
+        : SIMULATED_DICTATION;
+      return {
+        text,
+        durationSeconds: Math.max(1, Math.round(request.audio.length / 16_384)),
+        segments: [{ text, noSpeechProb: silent ? 0.9 : 0.01 }],
+        model: SIMULATED_TRANSCRIBER_MODEL,
+      };
+    },
+  };
+}

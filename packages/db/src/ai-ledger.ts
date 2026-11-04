@@ -1,4 +1,10 @@
-import type { AiBeginOutcome, AiLedger, KnowledgePassage, TourGuideContext } from "@rikuy/core";
+import type {
+  AiBeginOutcome,
+  AiLedger,
+  DictationLedger,
+  KnowledgePassage,
+  TourGuideContext,
+} from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
 
@@ -22,7 +28,7 @@ export interface PostgresAiLedgerOptions {
   readonly maxConnections?: number;
 }
 
-export interface PostgresAiLedger extends AiLedger {
+export interface PostgresAiLedger extends AiLedger, DictationLedger {
   /**
    * ai_api.search_knowledge (ADR-037): what this municipality has published now, best first.
    * Nothing for a municipality that is not online.
@@ -99,6 +105,25 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
     async finish(requestId, outcome, executions) {
       await sql`
         select ai_api.finish_request(
+          ${requestId}::uuid, ${outcome},
+          ${sql.json(executions.map((execution) => ({ ...execution })))}::jsonb
+        )
+      `;
+    },
+
+    async beginDictation(input) {
+      const rows = await sql`
+        select * from ai_api.begin_dictation(
+          ${input.tenantId}::uuid, ${input.reserveSeconds}::integer, ${input.visitor}::text
+        )
+      `;
+      const row = beginRowSchema.parse(rows[0]);
+      return { requestId: row.request_id, outcome: row.outcome satisfies AiBeginOutcome };
+    },
+
+    async finishDictation(requestId, outcome, executions) {
+      await sql`
+        select ai_api.finish_dictation(
           ${requestId}::uuid, ${outcome},
           ${sql.json(executions.map((execution) => ({ ...execution })))}::jsonb
         )

@@ -1,4 +1,4 @@
-import { loadAiUsage, loadUsage } from "@rikuy/core";
+import { loadAiUsage, loadUsage, loadVoiceUsage } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -18,9 +18,10 @@ interface UsagePageProps {
 export default async function UsagePage({ params }: UsagePageProps) {
   const membership = await requireOrganization((await params).slug);
   const session = await adminSession();
-  const [meters, ai] = await Promise.all([
+  const [meters, ai, voice] = await Promise.all([
     loadUsage(membership, session.usage),
     loadAiUsage(membership, session.aiUsage),
+    loadVoiceUsage(membership, session.aiUsage),
   ]);
 
   return (
@@ -83,6 +84,33 @@ export default async function UsagePage({ params }: UsagePageProps) {
             </p>
           ) : null}
         </li>
+        {voice ? (
+          <li className="usage-card">
+            <h2>{RESOURCE_LABELS.ai_audio_seconds}</h2>
+            <p className="field-hint">{RESOURCE_DETAILS.ai_audio_seconds}</p>
+            <UsageBar meter={voice.meter} />
+            <p className="field-hint">
+              Hoy:{" "}
+              {voice.answeredToday === 1
+                ? "1 dictado pasado a texto"
+                : `${voice.answeredToday} dictados pasados a texto`}
+              {voice.refusedToday > 0
+                ? ` y ${voice.refusedToday === 1 ? "1 rechazado" : `${voice.refusedToday} rechazados`} por un límite`
+                : ""}
+              . Se renueva cada día a medianoche.
+            </p>
+            {voice.meter.level === "full" ? (
+              <p className="notice" role="status">
+                Usó su dictado de hoy: los visitantes pueden seguir escribiendo sus preguntas y
+                escuchando las respuestas hasta medianoche.
+              </p>
+            ) : voice.meter.level === "near" ? (
+              <p className="notice" role="status">
+                Ya usa más del 80 % de su dictado de hoy.
+              </p>
+            ) : null}
+          </li>
+        ) : null}
       </ul>
       <p className="field-hint">
         Lo «reservado» es una estimación de lo que están subiendo o procesando ahora; se ajusta a lo

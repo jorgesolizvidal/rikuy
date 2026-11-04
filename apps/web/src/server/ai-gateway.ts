@@ -3,6 +3,7 @@ import "server-only";
 import { EnvValidationError, parseAiEnv, type AiEnv } from "@rikuy/config/env";
 import {
   createSimulatedAiProvider,
+  createSimulatedTranscriber,
   runAiRequest,
   runAiSession,
   type AiCall,
@@ -12,16 +13,25 @@ import {
   type AiResult,
   type AiSessionInput,
   type AiSessionResult,
+  type DictationInput,
+  type DictationResult,
   type KnowledgePassage,
+  type SpeechTranscriber,
   type TourGuideContext,
+  transcribeDictation,
 } from "@rikuy/core";
-import { createGroqProvider, createPostgresAiLedger, type PostgresAiLedger } from "@rikuy/db/ai";
+import {
+  createGroqProvider,
+  createGroqTranscriber,
+  createPostgresAiLedger,
+  type PostgresAiLedger,
+} from "@rikuy/db/ai";
 
 /**
  * The AI gateway (ADR-036). The only module that opens the AI workload's database
  * connection (role rikuy_ai) and holds the provider key: ESLint forbids both anywhere else.
- * Every request — the visitor's assistant (P5 · Paso 3), the staff's (Paso 7) and the
- * operator's «Probar la IA» — goes through runAi.
+ * Every request — the visitor's assistant (P5 · Paso 3), its dictation (Paso 6), the staff's
+ * (Paso 7) and the operator's «Probar la IA» — goes through this module.
  *
  * Without its settings there is no AI and nothing else changes: the result says so and the
  * portal shows its notice.
@@ -65,17 +75,29 @@ export interface AiGatewayStatus {
   readonly invalidKeys: readonly string[];
   readonly provider: string | null;
   readonly model: string | null;
+  /** The speech model of dictation (ADR-041). */
+  readonly transcriptionModel: string | null;
 }
 
 export function aiGatewayStatus(): AiGatewayStatus {
   const { env, invalidKeys } = settings();
   if (env === null)
-    return { configured: false, invalidKeys: invalidKeys ?? [], provider: null, model: null };
+    return {
+      configured: false,
+      invalidKeys: invalidKeys ?? [],
+      provider: null,
+      model: null,
+      transcriptionModel: null,
+    };
   return {
     configured: true,
     invalidKeys: [],
     provider: env.AI_PROVIDER,
     model: env.AI_PROVIDER === "simulated" ? createSimulatedAiProvider().model : env.AI_MODEL,
+    transcriptionModel:
+      env.AI_PROVIDER === "simulated"
+        ? createSimulatedTranscriber().model
+        : env.AI_TRANSCRIPTION_MODEL,
   };
 }
 
@@ -102,9 +124,20 @@ function providerFor(env: AiEnv): AiProvider | null {
     : null;
 }
 
-function depsFor(env: AiEnv): { ledger: PostgresAiLedger; provider: AiProvider | null } | null {
+function transcriberFor(env: AiEnv): SpeechTranscriber | null {
+  if (env.AI_PROVIDER === "simulated") return createSimulatedTranscriber();
+  return env.GROQ_API_KEY
+    ? createGroqTranscriber({ apiKey: env.GROQ_API_KEY, model: env.AI_TRANSCRIPTION_MODEL })
+    : null;
+}
+
+function depsFor(env: AiEnv): {
+  ledger: PostgresAiLedger;
+  provider: AiProvider | null;
+  transcriber: SpeechTranscriber | null;
+} | null {
   try {
-    return { ledger: ledgerFor(env), provider: providerFor(env) };
+    return { ledger: ledgerFor(env), provider: providerFor(env), transcriber: transcriberFor(env) };
   } catch (error) {
     // Whatever the configuration, the AI never breaks the page that asked: no AI this time.
     jsonAiLogger.event("ai.setup_failed", {
@@ -121,6 +154,17 @@ export async function runAi(input: AiRequestInput): Promise<AiResult> {
   const deps = env === null ? null : depsFor(env);
   if (deps === null) return { outcome: "not_configured", requestId: null };
   return runAiRequest(input, { ...deps, logger: jsonAiLogger });
+}
+
+/** One dictation of the visitor's assistant (ADR-041): seconds of audio, then text. */
+export async function transcribeAudio(input: DictationInput): Promise<DictationResult> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  return transcribeDictation(input, {
+    ledger: deps?.ledger ?? null,
+    transcriber: deps?.transcriber ?? null,
+    logger: jsonAiLogger,
+  });
 }
 
 /** A request that may call the model more than once (the visitor's assistant, ADR-038). */

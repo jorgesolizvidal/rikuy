@@ -4,6 +4,7 @@ import "./assistant.css";
 
 import {
   ASSISTANT_LIMITS,
+  DICTATION_LIMITS,
   assistantPageFromPath,
   detectPlanIntent,
   type AnswerBlock,
@@ -14,18 +15,34 @@ import {
   type PublicCitation,
 } from "@rikuy/core/assistant-client";
 import { distanceMeters, type PositionFix } from "@rikuy/core/geo";
-import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
+import {
+  useCallback,
+  useEffect,
+  useId,
+  useRef,
+  useState,
+  useSyncExternalStore,
+  type FormEvent,
+} from "react";
 
 import { tourAssistantContext, type TourAssistantContext } from "@/lib/assistant-context";
 import { useVisitorLocation } from "@/lib/use-visitor-location";
 
+import {
+  dictationSupported,
+  speak,
+  speechSupported,
+  stopSpeaking,
+  useDictation,
+} from "./assistant-voice";
 import { LocationButton } from "./visitor-location";
 
 /**
  * The assistant's conversation (ADR-038), loaded only when the visitor opens it. A modal
  * on a phone (it covers the page), a side panel on a wider screen (the page stays usable).
  * The conversation lives in this browser for up to 24 hours (ADR-022): the server gets the
- * last messages with each question and keeps none of them.
+ * last messages with each question and keeps none of them. The visitor may dictate a
+ * question (reviewed before sending) and hear the answers (ADR-041).
  */
 
 const STORAGE_KEY = "rikuy.assistant.v1";
@@ -138,6 +155,20 @@ function history(messages: readonly Message[]) {
     .slice(-ASSISTANT_LIMITS.historyMessages);
 }
 
+/** What is read aloud: the answer and its plan's stops, never the sources or the links. */
+function spoken(reply: Shown): string {
+  if (reply.status === "notice") return reply.notice.message;
+  const stops =
+    reply.plan && !reply.plan.needsLocation
+      ? reply.plan.stops.map(
+          (stop) => `${stop.position}. ${stop.title}${stop.time ? `, ${stop.time}` : ""}.`,
+        )
+      : [];
+  return [plain(reply.blocks), ...stops].join(" ");
+}
+
+const noSubscription = () => () => undefined;
+
 let counter = 0;
 const nextId = () => `m${Date.now().toString(36)}${(counter += 1)}`;
 
@@ -181,6 +212,36 @@ export default function AssistantPanel({
   const fix = location.fix;
   /** A plan that asked for the location: asked again once the phone knows where it is. */
   const waiting = useRef<{ text: string; intent: PlanIntent } | null>(null);
+  // Voice (ADR-041): what the browser can do, decided once it runs.
+  const canDictate = useSyncExternalStore(noSubscription, dictationSupported, () => false);
+  const canSpeak = useSyncExternalStore(noSubscription, speechSupported, () => false);
+  const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
+  const [speaking, setSpeaking] = useState<string | null>(null);
+  /** The question in the field came (at least partly) from dictation: read its answer. */
+  const fromVoice = useRef(false);
+  const dictation = useDictation({
+    onText: (text) => {
+      fromVoice.current = true;
+      setQuestion((current) => (current.trim() ? `${current.trim()} ${text}` : text));
+      input.current?.focus();
+    },
+    onMessage: setVoiceMessage,
+  });
+  const cancelDictation = dictation.cancel;
+  const recording = dictation.state.phase === "recording" || dictation.state.phase === "starting";
+  const transcribing = dictation.state.phase === "sending";
+
+  const read = useCallback((id: string, reply: Shown) => {
+    setSpeaking(id);
+    void speak(spoken(reply), reply.lang, () =>
+      setSpeaking((current) => (current === id ? null : current)),
+    );
+  }, []);
+
+  const quiet = useCallback(() => {
+    stopSpeaking();
+    setSpeaking(null);
+  }, []);
 
   // Open as a modal on a phone, as a panel beside the page on a wider screen.
   useEffect(() => {
@@ -193,8 +254,13 @@ export default function AssistantPanel({
       if (window.matchMedia(WIDE).matches && !over) element.show();
       else element.showModal();
       input.current?.focus();
-    } else if (!open && element.open) element.close();
-  }, [open]);
+    } else if (!open && element.open) {
+      element.close();
+      // Closing the panel stops the microphone and the voice.
+      cancelDictation();
+      stopSpeaking();
+    }
+  }, [open, cancelDictation]);
 
   useEffect(() => {
     save(messages, startedAt);
@@ -211,6 +277,10 @@ export default function AssistantPanel({
       const asked = text.replace(/\s+/gu, " ").trim();
       if (asked.length < 2 || busy) return;
       const context = history(messages);
+      const dictated = fromVoice.current;
+      fromVoice.current = false;
+      setVoiceMessage(null);
+      quiet();
       if (!again) {
         setMessages((current) => [...current, { id: nextId(), role: "user", text: asked }]);
       }
@@ -236,7 +306,10 @@ export default function AssistantPanel({
         });
         const reply = (await response.json()) as AssistantReply;
         if (!response.ok || reply.status === "invalid") throw new Error(String(response.status));
-        setMessages((current) => [...current, { id: nextId(), role: "assistant", reply }]);
+        const id = nextId();
+        setMessages((current) => [...current, { id, role: "assistant", reply }]);
+        // A question asked by voice is answered aloud too (ADR-041).
+        if (dictated && speechSupported()) read(id, reply);
         // Asked again once the location is known — only if it was not known this time.
         if (reply.status === "answered" && reply.plan?.needsLocation && distances === null) {
           waiting.current = { text: asked, intent: reply.plan.intent };
@@ -255,7 +328,7 @@ export default function AssistantPanel({
         input.current?.focus();
       }
     },
-    [busy, messages, fix],
+    [busy, messages, fix, quiet, read],
   );
 
   // A question from the page (the tour's «¿Qué estoy viendo?»): asked once it is open.
@@ -281,6 +354,10 @@ export default function AssistantPanel({
 
   function restart() {
     waiting.current = null;
+    fromVoice.current = false;
+    dictation.cancel();
+    quiet();
+    setVoiceMessage(null);
     setMessages([]);
     setStartedAt(Date.now());
     input.current?.focus();
@@ -304,7 +381,9 @@ export default function AssistantPanel({
       onKeyDown={(event) => {
         if (event.key === "Escape") {
           event.preventDefault();
-          onClose();
+          // Escape first throws the recording away; then it closes the panel.
+          if (recording) dictation.cancel();
+          else onClose();
         }
       }}
     >
@@ -354,7 +433,17 @@ export default function AssistantPanel({
           </div>
         ) : null}
         {messages.map((message) => (
-          <MessageView key={message.id} message={message} name={name} />
+          <MessageView
+            key={message.id}
+            message={message}
+            name={name}
+            speaking={speaking === message.id}
+            onRead={
+              canSpeak && message.role === "assistant"
+                ? () => (speaking === message.id ? quiet() : read(message.id, message.reply))
+                : null
+            }
+          />
         ))}
         {busy ? (
           <p className="assistant-typing">
@@ -394,7 +483,10 @@ export default function AssistantPanel({
           placeholder="Escribe tu pregunta"
           value={question}
           enterKeyHint="send"
-          onChange={(event) => setQuestion(event.target.value)}
+          onChange={(event) => {
+            setQuestion(event.target.value);
+            if (!event.target.value.trim()) fromVoice.current = false;
+          }}
           onKeyDown={(event) => {
             if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
               event.preventDefault();
@@ -402,14 +494,42 @@ export default function AssistantPanel({
             }
           }}
         />
+        {canDictate ? (
+          <button
+            type="button"
+            className="assistant-mic"
+            data-recording={recording ? "" : undefined}
+            disabled={transcribing}
+            aria-describedby={`${ids}-voice`}
+            onClick={() => (recording ? dictation.stop() : void dictation.start())}
+          >
+            <MicIcon />
+            <span className="visually-hidden">
+              {recording ? "Terminar de dictar" : "Dictar la pregunta"}
+            </span>
+          </button>
+        ) : null}
         <button
           type="submit"
           className="assistant-send"
-          disabled={busy || question.trim().length < 2}
+          disabled={busy || recording || transcribing || question.trim().length < 2}
         >
           Enviar
         </button>
       </form>
+      <p id={`${ids}-voice`} className="assistant-voice" role="status">
+        {dictation.state.phase === "recording" ? (
+          <>
+            <span className="assistant-rec" aria-hidden="true" />
+            Escuchando… {dictation.state.seconds} s de {DICTATION_LIMITS.maxSeconds}. Toca el
+            micrófono cuando termines.
+          </>
+        ) : transcribing ? (
+          "Pasando tu voz a texto…"
+        ) : (
+          voiceMessage
+        )}
+      </p>
       <p id={`${ids}-note`} className="assistant-note">
         Responde con inteligencia artificial a partir de lo publicado en este portal y puede
         equivocarse. La conversación se guarda solo en este dispositivo.{" "}
@@ -502,7 +622,45 @@ function Sources({
   );
 }
 
-function MessageView({ message, name }: { readonly message: Message; readonly name: string }) {
+function MicIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      <path
+        fill="currentColor"
+        d="M12 14a3 3 0 0 0 3-3V5a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"
+      />
+    </svg>
+  );
+}
+
+function ReadButton({
+  speaking,
+  lang,
+  onRead,
+}: {
+  readonly speaking: boolean;
+  readonly lang: "es" | "en";
+  readonly onRead: () => void;
+}) {
+  const en = lang === "en";
+  return (
+    <button type="button" className="assistant-read" aria-pressed={speaking} onClick={onRead}>
+      {speaking ? (en ? "Stop reading" : "Detener la lectura") : en ? "Listen" : "Escuchar"}
+    </button>
+  );
+}
+
+function MessageView({
+  message,
+  name,
+  speaking,
+  onRead,
+}: {
+  readonly message: Message;
+  readonly name: string;
+  readonly speaking: boolean;
+  readonly onRead: (() => void) | null;
+}) {
   if (message.role === "user") {
     return (
       <div className="assistant-message assistant-from-visitor">
@@ -536,6 +694,7 @@ function MessageView({ message, name }: { readonly message: Message; readonly na
           label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
         />
         <Contact contact={reply.notice.contact} lang={reply.lang} />
+        {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
       </div>
     );
   }
@@ -555,6 +714,7 @@ function MessageView({ message, name }: { readonly message: Message; readonly na
         label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
       />
       <Contact contact={reply.contact} lang={reply.lang} />
+      {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
     </div>
   );
 }
