@@ -16,6 +16,7 @@ import {
 import { distanceMeters, type PositionFix } from "@rikuy/core/geo";
 import { useCallback, useEffect, useId, useRef, useState, type FormEvent } from "react";
 
+import { tourAssistantContext, type TourAssistantContext } from "@/lib/assistant-context";
 import { useVisitorLocation } from "@/lib/use-visitor-location";
 
 import { LocationButton } from "./visitor-location";
@@ -140,6 +141,14 @@ function history(messages: readonly Message[]) {
 let counter = 0;
 const nextId = () => `m${Date.now().toString(36)}${(counter += 1)}`;
 
+/** A question asked by another part of the page: the tour's guide buttons (ADR-040). */
+export interface AssistantRequestFromPage {
+  readonly id: number;
+  readonly question: string;
+  readonly intent: "guide";
+  readonly tour: TourAssistantContext;
+}
+
 export interface AssistantPanelProps {
   readonly name: string;
   readonly named: boolean;
@@ -147,6 +156,7 @@ export interface AssistantPanelProps {
   readonly siteName: string;
   readonly open: boolean;
   readonly onClose: () => void;
+  readonly request?: AssistantRequestFromPage | null;
 }
 
 export default function AssistantPanel({
@@ -156,6 +166,7 @@ export default function AssistantPanel({
   siteName,
   open,
   onClose,
+  request = null,
 }: AssistantPanelProps) {
   const ids = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -176,7 +187,10 @@ export default function AssistantPanel({
     const element = dialog.current;
     if (!element) return;
     if (open && !element.open) {
-      if (window.matchMedia(WIDE).matches) element.show();
+      // Over a fullscreen tour or a point's dialog, only a modal dialog is visible and usable.
+      const over =
+        document.fullscreenElement !== null || document.querySelector("dialog:modal") !== null;
+      if (window.matchMedia(WIDE).matches && !over) element.show();
       else element.showModal();
       input.current?.focus();
     } else if (!open && element.open) element.close();
@@ -188,7 +202,12 @@ export default function AssistantPanel({
   }, [messages, startedAt]);
 
   const ask = useCallback(
-    async (text: string, intent: PlanIntent | null = null, again = false) => {
+    async (
+      text: string,
+      intent: PlanIntent | "guide" | null = null,
+      again = false,
+      tourContext: TourAssistantContext | null = null,
+    ) => {
       const asked = text.replace(/\s+/gu, " ").trim();
       if (asked.length < 2 || busy) return;
       const context = history(messages);
@@ -199,7 +218,9 @@ export default function AssistantPanel({
       setBusy(true);
       try {
         // Distances only for a plan, and only when the visitor shares the location.
-        const plan = intent ?? detectPlanIntent(asked);
+        const plan = intent === "guide" ? null : (intent ?? detectPlanIntent(asked));
+        // Inside a tour: the scene and the point on screen, as IDs (ADR-040).
+        const tour = tourContext ?? tourAssistantContext();
         const distances = plan && fix ? await distancesFrom(fix) : null;
         const response = await fetch(ENDPOINT, {
           method: "POST",
@@ -207,7 +228,8 @@ export default function AssistantPanel({
           body: JSON.stringify({
             question: asked,
             history: context,
-            page: assistantPageFromPath(window.location.pathname),
+            page: tour?.page ?? assistantPageFromPath(window.location.pathname),
+            ...(tour ? { tour: { sceneId: tour.sceneId, hotspotId: tour.hotspotId } } : {}),
             ...(intent ? { intent } : {}),
             ...(distances && Object.keys(distances).length > 0 ? { distances } : {}),
           }),
@@ -235,6 +257,14 @@ export default function AssistantPanel({
     },
     [busy, messages, fix],
   );
+
+  // A question from the page (the tour's «¿Qué estoy viendo?»): asked once it is open.
+  const answered = useRef(0);
+  useEffect(() => {
+    if (!open || !request || request.id === answered.current || busy) return;
+    answered.current = request.id;
+    void ask(request.question, request.intent, false, request.tour);
+  }, [open, request, busy, ask]);
 
   // The visitor shared the location after a plan asked for it: the same plan, now with it.
   useEffect(() => {

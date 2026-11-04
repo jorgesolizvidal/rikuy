@@ -43,3 +43,4 @@ Las ADR-001 a ADR-018 provienen de la auditoría y del cierre de decisiones de s
 | 037 | [Conocimiento del asistente: fragmentos de lo publicado, búsqueda en español y citas](ADR-037-assistant-knowledge.md)               | Aceptada (2026-10-31)                                                       |
 | 038 | [Asistente del visitante en el portal: buscar y responder en una sola pregunta, con citas validadas](ADR-038-visitor-assistant.md)  | Aceptada (2026-11-02)                                                       |
 | 039 | [Planes del asistente con un motor determinista y horario de atención](ADR-039-assistant-plans.md)                                  | Aceptada (2026-11-03)                                                       |
+| 040 | [Guía dentro del tour 360°: escena y punto resueltos en el servidor, en la misma conversación](ADR-040-tour-guide.md)               | Aceptada (2026-11-03)                                                       |

@@ -13,7 +13,11 @@ import {
   type AnswerContext,
   type AssistantSite,
 } from "../../domain/assistant/prompts";
-import { parseAssistantRequest, type AssistantRequest } from "../../domain/assistant/request";
+import {
+  isTourPage,
+  parseAssistantRequest,
+  type AssistantRequest,
+} from "../../domain/assistant/request";
 import type { PlanIntent } from "../../domain/plan/engine";
 import { detectPlanIntent } from "../../domain/plan/intent";
 import {
@@ -58,7 +62,32 @@ export interface AssistantDeps {
   page(tenantId: string, page: AssistantPage): Promise<AssistantPageItem | null>;
   /** Published destinations (with hours) and upcoming events, for plans (ADR-039). */
   places(tenantId: string): Promise<AssistantPlaces>;
+  /**
+   * Inside a tour (ADR-040): the scene and point the browser names, resolved against the
+   * published tour of that item (ai_api.tour_context); null when there is no such tour.
+   */
+  tourContext(
+    tenantId: string,
+    item: { readonly kind: "destination" | "event"; readonly slug: string },
+    sceneId: string | null,
+    hotspotId: string | null,
+  ): Promise<TourGuideContext | null>;
   readonly now: () => Date;
+}
+
+/** What the server resolved inside a tour (ADR-040); editorial names are data. */
+export interface TourGuideContext {
+  readonly tourTitle: string;
+  readonly scene: {
+    readonly sceneId: string;
+    readonly title: string;
+    /** requested: the one asked for; entry: none was asked; unknown: asked, not in the tour. */
+    readonly status: "requested" | "entry" | "unknown";
+  };
+  readonly hotspot: { readonly hotspotId: string; readonly title: string } | null;
+  readonly hotspotStatus: "none" | "requested" | "unknown";
+  /** The scene's point first, then the scene, its other points and the place. */
+  readonly passages: readonly KnowledgePassage[];
 }
 
 export interface AssistantPageItem {
@@ -106,6 +135,11 @@ export interface AssistantTrace {
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly latencyMs: number;
+  /** Inside a tour: how the scene and the point were resolved (ADR-040). */
+  readonly guide?: {
+    readonly scene: TourGuideContext["scene"]["status"];
+    readonly hotspot: TourGuideContext["hotspotStatus"];
+  };
   /** A plan's intent, outcome and stops (`kind:slug`), in order. */
   readonly plan?: { readonly intent: PlanIntent; readonly stops: readonly string[] };
 }
@@ -147,13 +181,24 @@ function siteOf(tenant: AssistantTenant): AssistantSite {
 }
 
 /** The most the answer step may read: everything known now, plus full passages. */
-function answerReservation(context: AnswerContext): number {
+function answerReservation(context: AnswerContext, passages: number): number {
   const base = estimateTokens(answerMessages(context, []));
-  return base + ASSISTANT_LIMITS.passages * Math.ceil(PASSAGE_BLOCK_MAX / 3 + 4) + ANSWER_OUTPUT;
+  return base + passages * Math.ceil(PASSAGE_BLOCK_MAX / 3 + 4) + ANSWER_OUTPUT;
 }
 
-function bestPassages(passages: readonly KnowledgePassage[]): KnowledgePassage[] {
-  return passages.slice(0, ASSISTANT_LIMITS.passages);
+/** Inside a tour the guide reads one more passage: the scene's, its point's and the place's. */
+const GUIDE_PASSAGES = ASSISTANT_LIMITS.passages + 1;
+
+/** The scene's passages first, then what the search found, without repeating one. */
+function bestPassages(
+  found: readonly KnowledgePassage[],
+  guide: TourGuideContext | null,
+): KnowledgePassage[] {
+  if (!guide) return found.slice(0, ASSISTANT_LIMITS.passages);
+  const seen = new Set<string>();
+  return [...guide.passages, ...found]
+    .filter((passage) => !seen.has(passage.chunkId) && seen.add(passage.chunkId))
+    .slice(0, GUIDE_PASSAGES);
 }
 
 export async function askAssistant(
@@ -169,11 +214,33 @@ export async function askAssistant(
   const lang = detectLanguage(request.question);
 
   // A plan: the engine decides, the model explains (ADR-039).
-  const intent = request.intent ?? detectPlanIntent(request.question);
-  if (intent) return askPlan(tenant, request, intent, lang, persona, visitor, deps);
-  const item = pageHasItem(request.page.kind)
-    ? await deps.page(tenant.tenantId, request.page).catch(() => null)
-    : null;
+  const planIntent =
+    request.intent === "guide" ? null : (request.intent ?? detectPlanIntent(request.question));
+  if (planIntent) return askPlan(tenant, request, planIntent, lang, persona, visitor, deps);
+
+  // Inside a tour: the scene and the point on screen, checked by the server (ADR-040).
+  const tourItem =
+    isTourPage(request.page) && request.page.slug !== null
+      ? {
+          kind: request.page.kind === "event_tour" ? ("event" as const) : ("destination" as const),
+          slug: request.page.slug,
+        }
+      : null;
+  const [item, guide] = await Promise.all([
+    pageHasItem(request.page.kind)
+      ? deps.page(tenant.tenantId, request.page).catch(() => null)
+      : Promise.resolve(null),
+    tourItem
+      ? deps
+          .tourContext(
+            tenant.tenantId,
+            tourItem,
+            request.tour?.sceneId ?? null,
+            request.tour?.hotspotId ?? null,
+          )
+          .catch(() => null)
+      : Promise.resolve(null),
+  ]);
   const page = item?.label ?? null;
   const context: AnswerContext = {
     persona,
@@ -183,13 +250,29 @@ export async function askAssistant(
     page,
     history: request.history,
     question: request.question,
+    guide: guide
+      ? {
+          tour: guide.tourTitle,
+          scene: guide.scene.title,
+          sceneReplaced: guide.scene.status === "unknown",
+          point: guide.hotspot?.title ?? null,
+        }
+      : null,
   };
+  // «¿Qué estoy viendo?» (the tour's buttons): the scene's passages are enough, no search.
+  const guideOnly = guide !== null && request.intent === "guide";
   // Rephrase only when the question cannot be searched as it is (ADR-038).
   const plan =
-    lang === "en" || request.history.length > 0 || page !== null
-      ? planMessages({ page, history: request.history, question: request.question })
+    !guideOnly && (lang === "en" || request.history.length > 0 || page !== null || guide !== null)
+      ? planMessages({
+          page: page ?? (guide ? `Recorrido 360° de «${guide.tourTitle}»` : null),
+          history: request.history,
+          question: request.question,
+        })
       : null;
-  const reserve = (plan ? estimateTokens(plan) + PLAN_OUTPUT : 0) + answerReservation(context);
+  const reserve =
+    (plan ? estimateTokens(plan) + PLAN_OUTPUT : 0) +
+    answerReservation(context, guide ? GUIDE_PASSAGES : ASSISTANT_LIMITS.passages);
 
   const session = await deps.session(
     {
@@ -200,6 +283,14 @@ export async function askAssistant(
     },
     async (call) => {
       let query = request.question;
+      if (guideOnly && guide) {
+        const passages = bestPassages([], guide);
+        const answer = await call({
+          messages: answerMessages(context, passages),
+          maxOutputTokens: ANSWER_OUTPUT,
+        });
+        return { query: "", passages, parsed: parseAnswer(answer.text, passages) };
+      }
       if (plan) {
         try {
           query =
@@ -212,14 +303,15 @@ export async function askAssistant(
         }
       }
       // Asked from a place's page: its name joins the search («¿qué hay aquí?»).
-      if (item && !query.toLocaleLowerCase("es").includes(item.title.toLocaleLowerCase("es"))) {
-        query = `${query} ${item.title}`;
+      const place = item?.title ?? guide?.tourTitle ?? null;
+      if (place && !query.toLocaleLowerCase("es").includes(place.toLocaleLowerCase("es"))) {
+        query = `${query} ${place}`;
       }
       let found = await deps.search(tenant.tenantId, query, SEARCH_RESULTS);
       if (found.length === 0 && query !== request.question) {
         found = await deps.search(tenant.tenantId, request.question, SEARCH_RESULTS);
       }
-      const passages = bestPassages(found);
+      const passages = bestPassages(found, guide);
       const answer = await call({
         messages: answerMessages(context, passages),
         maxOutputTokens: ANSWER_OUTPUT,
@@ -253,6 +345,7 @@ export async function askAssistant(
     inputTokens: session.usage.inputTokens,
     outputTokens: session.usage.outputTokens,
     latencyMs: session.latencyMs,
+    ...(guide ? { guide: { scene: guide.scene.status, hotspot: guide.hotspotStatus } } : {}),
   };
   if (parsed.text === "") {
     // The model wrote nothing usable (its whole budget went to reasoning): no answer.

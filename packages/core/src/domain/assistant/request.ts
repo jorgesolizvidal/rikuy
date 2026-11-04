@@ -26,14 +26,36 @@ const requestSchema = z.object({
       slug: z.string().max(200).nullable().optional(),
     })
     .optional(),
-  /** A plan asked with the panel's buttons (ADR-039). */
-  intent: z.enum(["nearby", "today", "route"]).nullable().optional(),
+  /** A plan asked with the panel's buttons (ADR-039), or the tour's guide button (ADR-040). */
+  intent: z.enum(["nearby", "today", "route", "guide"]).nullable().optional(),
+  /**
+   * Inside a 360° tour (ADR-040): the scene on screen and the point open, as IDs only. The
+   * server checks them against the published tour; nothing else of the tour comes from here.
+   */
+  tour: z
+    .object({
+      sceneId: z.string().max(64).nullable().optional(),
+      hotspotId: z.string().max(64).nullable().optional(),
+    })
+    .optional(),
   /**
    * Straight-line meters from the visitor to each place («destination:slug», «event:slug»),
    * computed on their phone. Never coordinates: the position stays on the device.
    */
   distances: z.record(z.string().max(100), z.number()).optional(),
 });
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+const uuidOrNull = (value: string | null | undefined) =>
+  typeof value === "string" && UUID.test(value) ? value : null;
+
+/** A tour's page: the guide can use the scene and the point there. */
+export function isTourPage(page: AssistantPage): boolean {
+  return (page.kind === "destination_tour" || page.kind === "event_tour") && page.slug !== null;
+}
+
+/** The buttons' intents: a plan (ADR-039) or the tour's guide (ADR-040). */
+export type AssistantIntent = PlanIntent | "guide";
 
 /** Place keys the phone may send distances for. */
 const PLACE_KEY = /^(?:destination|event):[a-z0-9]+(?:-[a-z0-9]+)*$/u;
@@ -42,7 +64,9 @@ export interface AssistantRequest {
   readonly question: string;
   readonly history: readonly AssistantTurn[];
   readonly page: AssistantPage;
-  readonly intent: PlanIntent | null;
+  readonly intent: AssistantIntent | null;
+  /** Only on a tour's page; IDs as sent (UUIDs), never trusted until the server checks them. */
+  readonly tour: { readonly sceneId: string | null; readonly hotspotId: string | null } | null;
   /** Rounded to ASSISTANT_LIMITS.distanceStep; at most ASSISTANT_LIMITS.distances entries. */
   readonly distances: ReadonlyMap<string, number>;
 }
@@ -81,5 +105,15 @@ export function parseAssistantRequest(raw: unknown): AssistantRequest | null {
     const step = ASSISTANT_LIMITS.distanceStep;
     distances.set(key, Math.round(meters / step) * step);
   }
-  return { question, history, page, intent: parsed.data.intent ?? null, distances };
+  const tour =
+    isTourPage(page) && parsed.data.tour
+      ? {
+          sceneId: uuidOrNull(parsed.data.tour.sceneId),
+          hotspotId: uuidOrNull(parsed.data.tour.hotspotId),
+        }
+      : null;
+  // The guide's button only makes sense inside a tour.
+  const intent =
+    parsed.data.intent === "guide" && !isTourPage(page) ? null : (parsed.data.intent ?? null);
+  return { question, history, page, intent, tour, distances };
 }

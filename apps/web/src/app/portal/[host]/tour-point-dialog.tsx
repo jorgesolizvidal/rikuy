@@ -22,9 +22,14 @@ export type OpenPoint = Extract<TourPointDto, { kind: "info" | "model" }>;
 export function PointDialog({
   point,
   onClose,
+  assistant,
+  onAsk,
 }: {
   readonly point: OpenPoint | null;
   readonly onClose: () => void;
+  /** «a Chaski» / «al asistente» (ADR-040): «Preguntar a Chaski sobre esto». */
+  readonly assistant?: string;
+  readonly onAsk?: (point: OpenPoint, from: HTMLElement) => void;
 }) {
   const dialog = useRef<HTMLDialogElement>(null);
   const [photo, setPhoto] = useState(0);
@@ -107,6 +112,17 @@ export function PointDialog({
           ) : (
             <TourModel key={point.id} point={point} />
           )}
+          {assistant && onAsk ? (
+            <p className="tour-dialog-ask">
+              <button
+                type="button"
+                className="portal-button"
+                onClick={(event) => onAsk(point, event.currentTarget)}
+              >
+                Preguntar {assistant} sobre esto
+              </button>
+            </p>
+          ) : null}
         </div>
       ) : null}
     </dialog>

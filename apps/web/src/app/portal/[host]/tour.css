@@ -613,3 +613,25 @@
   min-height: 2.75rem;
   font-weight: 600;
 }
+
+/* The guide (ADR-040): «¿Qué estoy viendo?» in the bar, «Preguntar sobre esto» in a point. */
+.tour-bar-guide span[aria-hidden="true"] {
+  display: grid;
+  place-items: center;
+  width: 1.375rem;
+  height: 1.375rem;
+  border: 2px solid currentColor;
+  border-radius: 50%;
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.tour-dialog-ask {
+  margin: 1rem 0 0;
+}
+
+/* On a tour the bar's «¿Qué estoy viendo?» opens the assistant: the floating button would
+   cover the bar's buttons on a phone. */
+.portal-assistant-launcher {
+  display: none;
+}

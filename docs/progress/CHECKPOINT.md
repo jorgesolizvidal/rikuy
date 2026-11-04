@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P5 — asistente turístico. P1, P2, P3 y P4 ✅; Hito Demo / Portafolio ✅ salvo el cierre del Paso 3 (semana de control diario, 4 de noviembre).
-- **Último paso completado:** P5 · Paso 4 — planes del asistente («qué hay cerca», «plan para hoy», «ruta sugerida») y horario de atención de los destinos
-- **Rama:** `feat/p5-step4-plans` → PR hacia `main`
+- **Último paso completado:** P5 · Paso 5 — guía dentro del tour 360° (RC-05)
+- **Rama:** `feat/p5-step5-tour-guide` → PR hacia `main`
 
 ## Historial
 
@@ -1247,16 +1247,53 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - Las demos creadas antes de este paso (Demo Valle) no tienen horarios hasta que se editen sus destinos o se cree otra demo.
 - Los casos del gold de planes con el modelo real se corren después del merge, desde el caso 41 (6 preguntas, ~1.000 tokens en total).
 
+### P5 · Paso 5 — guía dentro del tour 360° ✅
+
+- Decisiones del usuario ([ADR-040](../adr/ADR-040-tour-guide.md)), 2026-11-03:
+  - **botón y puntos:** «¿Qué estoy viendo?» en la barra del tour y «Preguntar … sobre esto» en los diálogos de los puntos; las preguntas escritas también saben la escena;
+  - **escena, puntos y lugar:** responde con el texto de la escena, sus puntos y lo publicado del destino o evento; sin texto, lo dice y no inventa;
+  - **encima de la pantalla completa:** la conversación aparece sobre el tour sin salir de ella.
+- Base de datos (`20261103200000_p5_tour_guide.sql`, solo expand): `ai_api.tour_context` (solo `rikuy_ai`):
+  - resuelve la escena y el punto que nombra el navegador contra el **tour publicado ahora** de ese destino o evento, en un municipio en línea. Una escena que ese tour no tiene (borrador, otro tour, otro municipio) se cambia por la de entrada y queda marcada `unknown`; un punto de otra escena se ignora;
+  - devuelve los pasajes con la misma forma que la búsqueda: el punto, la escena, otro punto de la escena y dos secciones del lugar.
+- `@rikuy/core`:
+  - la pregunta acepta `tour: { sceneId, hotspotId }` (solo UUID y solo en la página de un tour) e `intent: "guide"`;
+  - `askAssistant` lee el contexto junto con la página. Con `intent: "guide"`, una sola llamada con los pasajes de la escena, sin reformular ni buscar; una pregunta escrita en el tour busca y suma primero la escena (hasta 5 pasajes);
+  - regla fija de la guía en las instrucciones («No puedes ver la imagen…»); los nombres de escena y punto van como datos en el mensaje del visitante;
+  - el tour de muestra suma descripciones a sus dos escenas;
+  - **gold de 51 casos**: G47–G51 de la guía (español, inglés, pregunta escrita, escena inexistente y un pedido de describir «lo que ves»), calificados por la cita, por reconocer el tour y por **no decir que ve la imagen**.
+- `@rikuy/db`: `tourContext` en la conexión de la IA.
+- Web:
+  - `lib/assistant-context.ts`: el tour publica su página, la escena en pantalla y el punto abierto (solo IDs); el panel los manda con cada pregunta. En `/recorrido` sigue al tour actual;
+  - barra del tour: **«¿Qué estoy viendo?»**; diálogos de información y de modelo: **«Preguntar al asistente sobre esto»** (o «a {nombre}» si la marca le da uno). Al cerrar el asistente, el foco vuelve al botón que preguntó;
+  - el panel se abre como diálogo modal cuando el tour está en pantalla completa o hay un punto abierto, así se ve y se usa encima;
+  - en las páginas de tour se oculta el botón flotante (tapaba los botones de la barra en el celular);
+  - privacidad: dentro de un tour también se envían la escena y el punto abiertos.
+- Tests:
+  - 661 unitarios (core 438, db 127, web 39, worker 43, config 14);
+  - 966 pgTAP (20 nuevos, `029_tour_guide`: contexto conocido, ausente y malicioso, escena de borrador, punto de otra escena, misma dirección en otro municipio, solo `rikuy_ai`, municipio suspendido, instrucciones dentro de un texto publicado);
+  - integración (`demo.int.test.ts`): G47–G51 con el tour de muestra real, el indexador real y la búsqueda real;
+  - **RC-05 en un navegador real** (nuevo caso en `tour.e2e.test.ts`, 9 en total): la escena en pantalla sale como ID y la respuesta cita este tour; el punto abierto también, con el asistente encima de su diálogo; en pantalla completa el asistente aparece encima; una escena de otro tour, un ID inventado o texto en lugar de un ID responden desde la entrada de este tour, sin nada del otro.
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador: botón en la barra a 360 y 1280 px, «Preguntar … sobre esto» en el diálogo, la respuesta con su fuente «Tour 360°» y la conversación encima de la pantalla completa; axe sin hallazgos críticos ni graves y sin desbordes; contratos RC-09/10/11/12 (189), portales (161), ubicación RC-06 (35) y asistente (5) en verde; Lighthouse de tours 73–74 (LCP 2,5–2,6 s, CLS 0,042), dentro de su presupuesto.
+- Lo que encontraron las pruebas, ya corregido: el compilador de React dejaba sin optimizar todo el explorador del tour por una propiedad (`scene.id`) en la lista de dependencias de un efecto; el botón flotante tapaba los botones de la barra del tour en el celular.
+
+**Desviaciones:**
+
+- La guía no ve la imagen: con una escena sin texto ni puntos con texto, solo puede decirlo y hablar del lugar.
+- Las demos creadas antes de este paso (Demo Valle) conservan su tour de muestra sin descripciones de escena: la guía responde con el punto de información y la plaza.
+- La redacción y «no decir que ve» se miden con el modelo real en «Evaluar el asistente», desde el caso 47 (5 preguntas).
+
 ## Cómo verificarlo
 
-1. Después del merge, en el panel, abrir un destino de Demo Valle → «Horario de atención» → «Por días», ajustar y publicar; la ficha muestra «Horario» y «Abierto ahora» o «Cerrado».
-2. En el portal de Demo Valle, abrir el asistente y tocar «Plan para hoy», «Ruta sugerida» y «¿Qué hay cerca?» (en el celular, con «Usar mi ubicación»); «Ver la ruta en el mapa» abre los puntos numerados.
-3. En `/plataforma` → «Evaluar el asistente» → Demo Valle, «Desde el caso» `41`: G41–G46 «Bien».
+1. Después del merge, en el portal de Demo Valle → «Tours 360°»: en la barra, «¿Qué estoy viendo?» responde con la escena y cita el tour; el punto «Sobre este lugar» tiene «Preguntar al asistente sobre esto».
+2. En pantalla completa, «¿Qué estoy viendo?» abre la conversación encima del tour.
+3. En `/plataforma` → «Evaluar el asistente» → Demo Valle, «Desde el caso» `41`, luego `46` y luego `51`: G41–G51 «Bien».
 
 ## Siguiente paso
 
 1. **Cierre del Hito · Paso 3** (4 de noviembre): con la semana de «Daily health» en verde, marcarlo ✅ y anotar en «Pendientes registrados» la variación de Lighthouse en la página del tour (LCP de 2,4–3,0 s en el laboratorio, 1,46 s en el Android real). Anotar también la primera prueba de la IA en producción: 87 + 38 tokens, el razonamiento cuenta dentro de la salida.
-2. **P5 · Paso 5 — guía dentro del tour 360°** (requiere autorización): escena y hotspot resueltos en el servidor, en la misma conversación; RC-05 con contexto conocido, ausente y malicioso.
+2. **P5 · Paso 6 — voz** (requiere autorización): dictado con cuota de segundos y lectura en voz alta del navegador; sin micrófono o con el proveedor caído, el asistente sigue por texto.
 
 ## Decisiones pendientes del usuario
 

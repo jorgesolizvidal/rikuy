@@ -304,6 +304,8 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
             history: gold.history ?? [],
             page: gold.page ?? { kind: "home" },
             ...(gold.distances ? { distances: gold.distances } : {}),
+            ...(gold.intent ? { intent: gold.intent } : {}),
+            ...(gold.tour ? { tour: gold.tour } : {}),
           },
           null,
           {
@@ -314,10 +316,18 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
                 ? { label: `Lugar «${page.slug}»`, title: page.slug.replaceAll("-", " ") }
                 : null,
             places: (id) => loadAssistantPlaces(id, readers),
+            tourContext: (id, item, scene, hotspot) => ai.tourContext(id, item, scene, hotspot),
             now: () => new Date(),
           },
         );
         expect(result.reply.status, gold.id).toBe("answered");
+        if (gold.expect.kind === "guide") {
+          // The guide (ADR-040): the sample tour's scene reaches the model and is cited.
+          expect(result.trace?.guide, gold.id).toBeDefined();
+          expect(result.trace?.retrieved, gold.id).toContain("destination_tour:plaza-principal");
+          expect(gradeAssistantCase(gold, result).problems, gold.id).toEqual([]);
+          continue;
+        }
         if (gold.expect.kind === "plan") {
           // Plans (ADR-039): the engine's list, graded like in production.
           expect(gradeAssistantCase(gold, result).problems, gold.id).toEqual([]);

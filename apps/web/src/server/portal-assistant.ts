@@ -8,7 +8,7 @@ import {
   type AssistantTenant,
 } from "@rikuy/core";
 
-import { runAiWork, searchAiKnowledge } from "./ai-gateway";
+import { aiTourContext, runAiWork, searchAiKnowledge } from "./ai-gateway";
 import {
   portalDestination,
   portalEvent,
@@ -56,6 +56,7 @@ export async function askPortalAssistant(
     search: searchAiKnowledge,
     page: (_tenantId, page) => pageItem(view, page),
     places: () => portalPlanPlaces(view),
+    tourContext: aiTourContext,
     now: () => new Date(),
   });
 }
