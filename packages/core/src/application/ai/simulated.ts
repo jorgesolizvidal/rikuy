@@ -1,5 +1,6 @@
 import type { AiMessage } from "../../contracts/ai";
 import { ANSWER_TAG, EXPLAIN_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
+import { COPILOT_ASK_TAG, COPILOT_PROPOSE_TAG } from "../../domain/copilot/prompts";
 import type { SpeechTranscriber } from "./dictation";
 import { AiProviderError, estimateTokens, type AiProvider } from "./gateway";
 
@@ -38,13 +39,17 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
         });
       }
       const system = request.messages.find((message) => message.role === "system")?.content ?? "";
-      const answer = system.startsWith(PLAN_TAG)
-        ? simulatedPlan(text)
-        : system.startsWith(ANSWER_TAG)
-          ? simulatedAssistantAnswer(text)
-          : system.startsWith(EXPLAIN_TAG)
-            ? simulatedExplanation(text)
-            : simulatedAnswer(text);
+      const answer = system.startsWith(COPILOT_ASK_TAG)
+        ? simulatedCopilotAnswer(text)
+        : system.startsWith(COPILOT_PROPOSE_TAG)
+          ? simulatedProposal(system, text)
+          : system.startsWith(PLAN_TAG)
+            ? simulatedPlan(text)
+            : system.startsWith(ANSWER_TAG)
+              ? simulatedAssistantAnswer(text)
+              : system.startsWith(EXPLAIN_TAG)
+                ? simulatedExplanation(text)
+                : simulatedAnswer(text);
       return {
         text: answer,
         inputTokens: estimateTokens(request.messages),
@@ -56,6 +61,64 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
       };
     },
   };
+}
+
+/**
+ * The Copilot's answer: how many items the snapshot has and the first one, citing it and
+ * the plan's usage. «[simular:cita-inventada]» cites labels that do not exist.
+ */
+function simulatedCopilotAnswer(text: string): string {
+  const items = [...text.matchAll(/^\[(C\d+)\] (.+?) ·/gmu)];
+  const first = items[0];
+  if (text.includes("[simular:cita-inventada]")) {
+    return "Respuesta simulada del Copilot con fuentes que no existen.\nFUENTES: C99, F9";
+  }
+  const lines = [
+    `Respuesta simulada del Copilot: el municipio tiene ${items.length} contenido${items.length === 1 ? "" : "s"}.`,
+  ];
+  if (first) lines.push(`- ${first[2]} es el primero de la lista.`);
+  lines.push(`FUENTES: ${first ? `${first[1]}, ` : ""}U`);
+  return lines.join("\n");
+}
+
+/**
+ * A proposal with exactly the fields asked (read from the format in the instructions).
+ * «[simular:sin-cambios]» proposes the current values back (nothing new to save).
+ */
+function simulatedProposal(system: string, text: string): string {
+  const target = /^\[A\] (.+)$/mu.exec(text)?.[1] ?? "el contenido";
+  const same = text.includes("[simular:sin-cambios]");
+  const current = (label: string) =>
+    new RegExp(`^${label} actual: (.*)$`, "mu").exec(text)?.[1] ?? "";
+  const lines: string[] = [];
+  if (/^NOMBRE: </mu.test(system)) lines.push(`NOMBRE: ${current("Nombre")}`);
+  if (/^RESUMEN: </mu.test(system)) {
+    lines.push(
+      same
+        ? `RESUMEN: ${current("Resumen")}`
+        : `RESUMEN: Resumen propuesto por el Copilot para ${target}: un lugar para visitar con calma y conocer su historia.`,
+    );
+  }
+  if (/^DESCRIPCION: </mu.test(system)) {
+    lines.push(
+      same
+        ? `DESCRIPCION: ${current("Descripcion")}`
+        : `DESCRIPCION: Descripción propuesta por el Copilot para la ${target}, con lo que cuentan sus textos publicados.`,
+    );
+  }
+  if (/^TEXTO:$/mu.test(system)) {
+    lines.push(
+      "TEXTO:",
+      "## Qué ver",
+      `Texto propuesto por el Copilot para ${target}.`,
+      "",
+      "- Un recorrido tranquilo",
+      "- Fotos al atardecer",
+      "FIN_TEXTO",
+    );
+  }
+  lines.push(`FUENTES: A${text.includes("[F1]") ? ", F1" : ""}`);
+  return lines.join("\n");
 }
 
 function simulatedAnswer(question: string): string {

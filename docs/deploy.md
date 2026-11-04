@@ -89,12 +89,13 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 
 Lo que corre solo cada día ([ADR-035](adr/ADR-035-free-plan-operations.md)), sin configuración nueva más allá de las variables de GitHub:
 
-| Hora (Bolivia) | Qué                                                     | Dónde                                      | Si algo falla                                                                             |
-| -------------- | ------------------------------------------------------- | ------------------------------------------ | ----------------------------------------------------------------------------------------- |
-| 03:37          | Limpieza de fotos y logos sin uso por más de 7 días     | Supabase (`rikuy-remove-unused-media`)     | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
-| 07:07          | Informe interno: espacio, base, trabajos y cuotas       | Supabase (`rikuy-daily-report`) → ejecutor | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
-| 08:23          | Control externo: inicio y `/mapa` de cada portal, panel | GitHub Actions («Daily health»)            | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
-| Cada 15 min    | Reservas de IA abandonadas (más de 10 min abiertas)     | Supabase (`rikuy-expire-ai-requests`)      | Se cuentan como usadas; también borra pedidos de más de 90 días                           |
+| Hora (Bolivia) | Qué                                                     | Dónde                                       | Si algo falla                                                                             |
+| -------------- | ------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 03:37          | Limpieza de fotos y logos sin uso por más de 7 días     | Supabase (`rikuy-remove-unused-media`)      | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
+| 07:07          | Informe interno: espacio, base, trabajos y cuotas       | Supabase (`rikuy-daily-report`) → ejecutor  | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
+| 08:23          | Control externo: inicio y `/mapa` de cada portal, panel | GitHub Actions («Daily health»)             | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
+| Cada 15 min    | Reservas de IA abandonadas (más de 10 min abiertas)     | Supabase (`rikuy-expire-ai-requests`)       | Se cuentan como usadas; también borra pedidos de más de 90 días                           |
+| 03:47          | Propuestas del Copilot vencidas (30 días)               | Supabase (`rikuy-expire-copilot-proposals`) | Las borra; la auditoría conserva lo que se aceptó o rechazó                               |
 
 - **La pausa de Supabase:** el plan gratuito pausa el proyecto tras 7 días con poca actividad. «Daily health» pide `/mapa`, que lee la base en cada visita, así que mientras corra el proyecto no se pausa. GitHub desactiva los workflows programados de un repositorio sin commits en 60 días: si llega ese aviso, se vuelve a activar en Actions.
 - **Probarlo a mano:** Actions → «Daily health» → _Run workflow_. La tabla del resumen dice qué respondió cada portal y con qué versión.

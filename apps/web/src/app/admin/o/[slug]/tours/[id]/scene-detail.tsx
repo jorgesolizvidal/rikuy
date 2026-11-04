@@ -1,6 +1,7 @@
 "use client";
 
 import { normalizeHotspotPosition, TOUR_LIMITS, type HotspotKind } from "@rikuy/core";
+import Link from "next/link";
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
 import { hotspotKindLabel, type HotspotMarker } from "@/components/panorama-viewer/hotspot-markers";
@@ -65,6 +66,7 @@ export function SceneDetail({
   models,
   targets,
   canEdit,
+  copilotHref,
   pending,
   onSave,
   onAddHotspot,
@@ -77,6 +79,8 @@ export function SceneDetail({
   readonly models: readonly EditorModelOption[];
   readonly targets: readonly EditorTargetOption[];
   readonly canEdit: boolean;
+  /** «Proponer con el Copilot» for this scene (ADR-042), when the person can edit. */
+  readonly copilotHref?: string | null;
   readonly pending: boolean;
   readonly onSave: (changes: Record<string, unknown>) => Promise<SceneEditState | null>;
   readonly onAddHotspot: (
@@ -503,9 +507,16 @@ export function SceneDetail({
               asistente del recorrido.
             </p>
           </div>
-          <button type="submit" className="button" disabled={!dirty || pending}>
-            Guardar nombre y descripción
-          </button>
+          <div className="form-actions">
+            <button type="submit" className="button" disabled={!dirty || pending}>
+              Guardar nombre y descripción
+            </button>
+            {copilotHref ? (
+              <Link href={copilotHref} className="button button-quiet">
+                Proponer con el Copilot
+              </Link>
+            ) : null}
+          </div>
         </form>
       ) : scene.description ? (
         <p>{scene.description}</p>

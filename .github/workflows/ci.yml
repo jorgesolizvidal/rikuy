@@ -283,6 +283,17 @@ jobs:
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-assistant 2>&1 | tee ../../assistant.log
 
+      # P5 · Paso 7 (ADR-042): the staff's Copilot in the panel — the review by fixed rules, a
+      # question answered with this municipality's pages only, a proposal accepted field by
+      # field into a draft (nothing published), a stale proposal refused, and an analyst who
+      # cannot ask for proposals.
+      - name: Copilot in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-copilot 2>&1 | tee ../../copilot.log
+
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
       - name: GLB colors in a real browser
@@ -307,7 +318,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

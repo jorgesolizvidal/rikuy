@@ -45,12 +45,13 @@ The interface is in Spanish, the language of the municipalities it serves.
 - Panorama (up to 16K) and GLB uploads, processed in the background: tiling, Meshopt compression and KTX2 textures with a color check.
 - Members with roles (owner, admin, editor, analyst), email invitations, and quotas for storage, processing, AI and dictation.
 - The assistant's knowledge: the municipality's texts and PDF documents, opening hours of its places, the assistant's name, greeting and tone, and "Test the search" to see what it would read.
+- A Copilot: it checks with fixed rules what each place, event and scene lacks, answers questions about the content (drafts included), and proposes texts with a diff that is accepted field by field as a draft. It never publishes by itself.
 
 **For the platform operator:** onboarding municipalities behind two-factor authentication, sales demos with generated sample content, a job queue with retries, and the platform's status (storage, database, jobs and quotas).
 
 ## Status
 
-Phases P1 to P4 and the **Demo / Portfolio** milestone are done: foundation, media, portal, tours, Ucureña ready for its content, sales demos, and a week running on free plans without outages. In **P5**, the visitor assistant is already in production (a conversation with cited sources, plans, a tour guide and voice); the admin Copilot for municipalities is next. Details in the [roadmap](docs/roadmap.md) and the [checkpoint](docs/progress/CHECKPOINT.md) (in Spanish).
+Phases P1 to P4 and the **Demo / Portfolio** milestone are done: foundation, media, portal, tours, Ucureña ready for its content, sales demos, and a week running on free plans without outages. **P5** is done: the visitor assistant (a conversation with cited sources, plans, a tour guide and voice) and the admin Copilot for the municipality's team. Next is **P6**, the SaaS pilot gate. Details in the [roadmap](docs/roadmap.md) and the [checkpoint](docs/progress/CHECKPOINT.md) (in Spanish).
 
 ## Architecture
 
@@ -79,7 +80,7 @@ More in [architecture](docs/architecture.md) (in Spanish).
 
 ## Key decisions
 
-All 41 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish). Some of them:
+All 42 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish). Some of them:
 
 | ADR                                                        | Decision                                                                                      |
 | ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
@@ -123,7 +124,7 @@ CLS is 0 on every page. Initial JavaScript is about 150 KB per page; the map and
 
 **Tests** (all of them on every PR):
 
-- 679 unit tests and 1,006 pgTAP assertions on RLS, isolation and invariants.
+- 702 unit tests and 1,063 pgTAP assertions on RLS, isolation and invariants.
 - Integration against the real Supabase stack: Data API, Storage, queues, email and a per-role access matrix.
 - End-to-end in a real browser:
   - portals (161 checks);

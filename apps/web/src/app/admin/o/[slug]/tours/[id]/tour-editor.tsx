@@ -1,6 +1,6 @@
 "use client";
 
-import { TOUR_LIMITS, type TourPublicationIssue } from "@rikuy/core";
+import { COPILOT_PATHS, TOUR_LIMITS, type TourPublicationIssue } from "@rikuy/core";
 import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
@@ -38,6 +38,8 @@ export interface EditorHistoryEntry {
 export interface TourEditorProps {
   readonly org: string;
   readonly tourId: string;
+  /** The Copilot is available (AI configured, ADR-042). */
+  readonly copilot?: boolean;
   readonly contentTitle: string;
   readonly editCount: number | null;
   readonly entrySceneId: string | null;
@@ -335,6 +337,15 @@ export function TourEditor(props: TourEditorProps) {
             models={props.models}
             targets={props.targets}
             canEdit={props.canEdit}
+            copilotHref={
+              props.canEdit && props.copilot
+                ? COPILOT_PATHS.propose(props.org, {
+                    type: "scene",
+                    tourId: props.tourId,
+                    sceneId: scene.sceneId,
+                  })
+                : null
+            }
             pending={pending}
             onAddHotspot={(hotspot, title) =>
               perform(

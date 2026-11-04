@@ -5,6 +5,7 @@ import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { platformSettings } from "@/server/platform";
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
 
 import { SignOutButton } from "../../../../sign-out-button";
@@ -80,6 +81,7 @@ export default async function TourPage({ params }: TourPageProps) {
       <TourEditor
         org={membership.slug}
         tourId={record.tourId}
+        copilot={aiGatewayStatus().configured}
         contentTitle={record.content.title}
         editCount={editor.editCount}
         entrySceneId={revision.entrySceneId}
