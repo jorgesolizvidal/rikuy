@@ -1,4 +1,4 @@
-import type { AiBeginOutcome, AiLedger, KnowledgePassage } from "@rikuy/core";
+import type { AiBeginOutcome, AiLedger, KnowledgePassage, TourGuideContext } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
 
@@ -28,8 +28,34 @@ export interface PostgresAiLedger extends AiLedger {
    * Nothing for a municipality that is not online.
    */
   searchKnowledge(tenantId: string, query: string, limit: number): Promise<KnowledgePassage[]>;
+  /**
+   * ai_api.tour_context (ADR-040): the scene and point named by the browser, resolved against
+   * the published tour of that destination or event; null when it has none.
+   */
+  tourContext(
+    tenantId: string,
+    item: { readonly kind: "destination" | "event"; readonly slug: string },
+    sceneId: string | null,
+    hotspotId: string | null,
+  ): Promise<TourGuideContext | null>;
   close(): Promise<void>;
 }
+
+const tourContextSchema = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("ok"),
+    tour: z.object({ title: z.string() }),
+    scene: z.object({
+      sceneId: z.uuid(),
+      title: z.string(),
+      status: z.enum(["requested", "entry", "unknown"]),
+    }),
+    hotspot: z.object({ hotspotId: z.uuid(), title: z.string() }).nullable(),
+    hotspotStatus: z.enum(["none", "requested", "unknown"]),
+    passages: z.array(z.unknown()),
+  }),
+  z.object({ status: z.enum(["not_found", "no_tour"]) }),
+]);
 
 const beginRowSchema = z.object({
   request_id: z.uuid(),
@@ -84,6 +110,22 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
         select * from ai_api.search_knowledge(${tenantId}::uuid, ${query}, ${limit}::integer)
       `;
       return rows.map((row) => mapPassageRow({ ...row }));
+    },
+
+    async tourContext(tenantId, item, sceneId, hotspotId) {
+      const [row] = await sql`
+        select ai_api.tour_context(${tenantId}::uuid, ${item.kind}, ${item.slug},
+          ${sceneId}::uuid, ${hotspotId}::uuid) as context
+      `;
+      const context = tourContextSchema.parse(row?.context);
+      if (context.status !== "ok") return null;
+      return {
+        tourTitle: context.tour.title,
+        scene: context.scene,
+        hotspot: context.hotspot,
+        hotspotStatus: context.hotspotStatus,
+        passages: context.passages.map((passage) => mapPassageRow(passage)),
+      };
     },
 
     async close() {

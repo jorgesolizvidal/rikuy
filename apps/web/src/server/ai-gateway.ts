@@ -13,6 +13,7 @@ import {
   type AiSessionInput,
   type AiSessionResult,
   type KnowledgePassage,
+  type TourGuideContext,
 } from "@rikuy/core";
 import { createGroqProvider, createPostgresAiLedger, type PostgresAiLedger } from "@rikuy/db/ai";
 
@@ -143,4 +144,17 @@ export async function searchAiKnowledge(
   const deps = env === null ? null : depsFor(env);
   if (deps === null) return [];
   return deps.ledger.searchKnowledge(tenantId, query, limit);
+}
+
+/** ai_api.tour_context (ADR-040): the tour's scene and point, checked against what is published. */
+export async function aiTourContext(
+  tenantId: string,
+  item: { readonly kind: "destination" | "event"; readonly slug: string },
+  sceneId: string | null,
+  hotspotId: string | null,
+): Promise<TourGuideContext | null> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return null;
+  return deps.ledger.tourContext(tenantId, item, sceneId, hotspotId);
 }

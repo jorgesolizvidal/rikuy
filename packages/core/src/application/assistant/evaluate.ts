@@ -66,6 +66,8 @@ export async function evaluateAssistantGold(
       history: gold.history ?? [],
       page: gold.page ?? { kind: "home" },
       ...(gold.distances ? { distances: gold.distances } : {}),
+      ...(gold.intent ? { intent: gold.intent } : {}),
+      ...(gold.tour ? { tour: gold.tour } : {}),
     });
     const grade = gradeAssistantCase(gold, result);
     const reply = result.reply;

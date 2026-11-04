@@ -111,9 +111,10 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
             </li>
             <li>
               Con cada pregunta se envían al portal la pregunta, los últimos mensajes de la
-              conversación y la página donde estás. El portal busca la respuesta en lo publicado y
-              la redacta con un modelo de inteligencia artificial de Groq, que recibe ese texto para
-              responder. No se envían tu nombre ni tu ubicación.
+              conversación y la página donde estás (dentro de un tour 360°, también qué escena y qué
+              punto tienes abiertos). El portal busca la respuesta en lo publicado y la redacta con
+              un modelo de inteligencia artificial de Groq, que recibe ese texto para responder. No
+              se envían tu nombre ni tu ubicación.
             </li>
             <li>
               «¿Qué hay cerca?», «Plan para hoy» y «Ruta sugerida» arman la lista con los horarios y

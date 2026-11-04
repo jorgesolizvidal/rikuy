@@ -1,11 +1,12 @@
 import "server-only";
 import "./tour.css";
 
-import { PORTAL_PATHS, tourPath, type TourContentKind } from "@rikuy/core";
+import { assistantPersona, PORTAL_PATHS, tourPath, type TourContentKind } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { preload } from "react-dom";
 
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { portalTour, portalTourIndex } from "@/server/portal-content";
 import { tourData, tourMenu } from "@/server/portal-tours";
 import type { PortalView } from "@/server/portal-view";
@@ -55,6 +56,13 @@ export async function tourMetadata(
   };
 }
 
+/** «a Chaski» / «al asistente», for the guide's buttons (ADR-040); null without AI. */
+function assistantTarget(view: PortalView): string | null {
+  if (!aiGatewayStatus().configured) return null;
+  const persona = assistantPersona(view.resolved.presentation);
+  return persona.named ? `a ${persona.name}` : "al asistente";
+}
+
 /** The explorer with one tour and the general tour's menu. */
 export async function TourArticle({
   view,
@@ -73,6 +81,7 @@ export async function TourArticle({
         menu={tourMenu(await portalTourIndex(view))}
         dataPath={PORTAL_PATHS.tourData}
         siteName={view.resolved.presentation.identity.siteName}
+        assistant={assistantTarget(view)}
       />
     </article>
   );

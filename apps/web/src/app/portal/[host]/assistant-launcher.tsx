@@ -3,6 +3,10 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 
+import { ASSISTANT_ASK_EVENT, type AssistantAskDetail } from "@/lib/assistant-context";
+
+import type { AssistantRequestFromPage } from "./assistant-panel";
+
 /**
  * The assistant's floating button (ADR-038), on every page of the portal. Only the button
  * is in the page: the panel (and everything it needs) is downloaded when the visitor opens
@@ -22,7 +26,28 @@ export interface AssistantLauncherProps {
 export function AssistantLauncher(props: AssistantLauncherProps) {
   const [open, setOpen] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  /** A question another part of the page asked (the tour's guide buttons, ADR-040). */
+  const [request, setRequest] = useState<AssistantRequestFromPage | null>(null);
   const button = useRef<HTMLButtonElement>(null);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  useEffect(() => {
+    let count = 0;
+    const asked = (event: Event) => {
+      const detail = (event as CustomEvent<AssistantAskDetail>).detail;
+      returnFocus.current = detail.returnFocus ?? null;
+      count += 1;
+      setRequest({
+        id: count,
+        question: detail.question,
+        intent: detail.intent,
+        tour: detail.tour,
+      });
+      setLoaded(true);
+      setOpen(true);
+    };
+    window.addEventListener(ASSISTANT_ASK_EVENT, asked);
+    return () => window.removeEventListener(ASSISTANT_ASK_EVENT, asked);
+  }, []);
   const preload = useCallback(() => {
     void loadPanel();
   }, []);
@@ -30,7 +55,12 @@ export function AssistantLauncher(props: AssistantLauncherProps) {
   // Back to the button once it is visible again (it is hidden while the panel is open).
   const wasOpen = useRef(false);
   useEffect(() => {
-    if (wasOpen.current && !open) button.current?.focus();
+    if (wasOpen.current && !open) {
+      const back = returnFocus.current;
+      returnFocus.current = null;
+      if (back?.isConnected) back.focus();
+      else button.current?.focus();
+    }
     wasOpen.current = open;
   }, [open]);
 
@@ -46,6 +76,7 @@ export function AssistantLauncher(props: AssistantLauncherProps) {
         onPointerEnter={preload}
         onFocus={preload}
         onClick={() => {
+          returnFocus.current = null;
           setLoaded(true);
           setOpen(true);
         }}
@@ -62,7 +93,7 @@ export function AssistantLauncher(props: AssistantLauncherProps) {
         <span>{props.name}</span>
         <span className="visually-hidden">: hacer una pregunta</span>
       </button>
-      {loaded ? <AssistantPanel {...props} open={open} onClose={close} /> : null}
+      {loaded ? <AssistantPanel {...props} open={open} onClose={close} request={request} /> : null}
     </>
   );
 }

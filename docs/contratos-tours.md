@@ -1,4 +1,4 @@
-# Contratos de los tours (RC-01, RC-02, RC-07, RC-08)
+# Contratos de los tours (RC-01, RC-02, RC-05, RC-07, RC-08)
 
 Registro de los contratos de regresión de P4 según la auditoría `14-regression-contracts-evals` (§1, reglas de evidencia). Cada contrato dice de dónde viene, con qué datos se prueba, dónde corre, qué se comprobó y qué queda fuera.
 
@@ -38,6 +38,21 @@ Los archivos reales del usuario (panoramas DJI, `horno.glb`, `monumento.glb`, la
   - base de datos (`018_tours`): la entrada es una columna de la revisión con FK compuesta a una escena de la misma revisión (una sola referencia por construcción); sellar sin entrada falla; entrada de otro tour, rechazada; reordenar no la cambia; quitar la entrada pasa a la primera escena; volver a la versión 1 restaura escenas, orden y entrada; `019_hotspots` y `020_tour_publication`: volver a la versión 1 restaura sus puntos y su propio manifiesto;
   - Supabase real (`tours.int.test.ts`): dos escenas → cuatro → volver a dos con su entrada, en Demo Sur; el analista solo lee y el propietario de otro municipio no ve nada.
 - **Limitación:** es un contrato de datos y se prueba en la base y la API, no en el navegador (el botón «Usar como entrada» del panel se verificó a mano en P4 · Paso 1).
+
+## RC-05 — la guía dentro del tour
+
+- **Fuente:** en el sistema anterior, la guía del tour aceptaba como contexto los datos que mandaba el navegador y buscaba el punto por su título; en producción respondía con errores genéricos (auditorías 01 y 06).
+- **Contrato:** pregunta sobre un punto con contexto conocido, sin contexto y con contexto malicioso; versión, idioma y municipio correctos; citar y abstenerse si falta; no atribuir visión del objeto al texto editorial ([ADR-040](adr/ADR-040-tour-guide.md)).
+- **Dónde se prueba:**
+  - base de datos (`029_tour_guide`): la escena y el punto pedidos se resuelven contra el tour publicado; sin escena, la de entrada; una escena de borrador, un punto de otra escena o una escena de otro municipio con la misma dirección se ignoran; solo el rol `rikuy_ai`, solo municipios en línea; un texto publicado con instrucciones vuelve como pasaje, nunca como reglas;
+  - `@rikuy/core` (`ask.test.ts`): la regla de la guía es código (el nombre de la escena y su texto van en el mensaje del visitante); «¿Qué estoy viendo?» hace una sola llamada sin búsqueda; el navegador no puede mandar texto ni IDs que no sean UUID, ni fuera de un tour;
+  - integración (`demo.int.test.ts`): los casos G47–G51 del gold con el tour de muestra real y la búsqueda real;
+  - **navegador** (`apps/web/e2e/tour.e2e.test.ts`, «RC-05: the guide knows the scene and the point…»):
+    1. «¿Qué estoy viendo?» envía la escena en pantalla como ID y la respuesta cita el tour, con enlace a él y nunca al carnaval;
+    2. «Preguntar … sobre esto» en el punto «Arados antiguos» envía su ID, se abre encima del diálogo y la respuesta habla de ese punto; Escape cierra solo el asistente;
+    3. en pantalla completa, la conversación aparece encima sin salir de ella;
+    4. una escena de otro tour, un ID inventado y texto en lugar de un ID responden igual desde la escena de entrada de **este** tour, sin nada del otro.
+- **Limitaciones:** en el CI el modelo es el simulado: comprueba qué llega al modelo y qué se cita, no la redacción. La redacción y «no decir que ve» se miden con el modelo real en «Evaluar el asistente» (G47–G51).
 
 ## RC-07 — recorrer los tours de referencia
 

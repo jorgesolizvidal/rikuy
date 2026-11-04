@@ -60,6 +60,7 @@ describe.runIf(stackAvailable)("plans with the portal's published data", () => {
       search: async () => [],
       page: async () => null,
       places: (id) => loadAssistantPlaces(id, readers),
+      tourContext: async () => null,
       now: () => new Date(),
     };
     for (const intent of ["nearby", "today", "route"] as const) {

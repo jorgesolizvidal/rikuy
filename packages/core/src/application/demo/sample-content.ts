@@ -28,6 +28,7 @@ import {
   addTourScene,
   createTour,
   publishTour,
+  updateTourScene,
   type TourRepository,
 } from "../tours/tours";
 
@@ -347,6 +348,12 @@ export type SampleTourResult =
       readonly status: "not_demo" | "forbidden" | "no_place" | "exists" | "rate_limited" | "failed";
     };
 
+/** What each scene of the sample tour shows, for the guide inside the tour (ADR-040). */
+const SAMPLE_SCENE_DESCRIPTIONS = [
+  "Texto de muestra. Estás en el centro de la plaza principal de {municipio}: al frente está la iglesia, a los lados los portales con cafés y tiendas de artesanía, y en medio la pileta donde se juntan las familias los domingos.",
+  "Texto de muestra. Desde lo alto del mirador se ve todo el valle de {municipio}: los techos del pueblo, los campos de cultivo y los cerros que lo rodean. Al atardecer la luz tiñe todo de naranja.",
+];
+
 const SAMPLE_INFO = [
   "*Texto de muestra.* En cada escena se pueden poner puntos con información, fotos, modelos 3D o enlaces a otros recorridos.",
 ].join("\n\n");
@@ -409,6 +416,25 @@ export async function buildSampleTour(
     const scenes = record?.draft?.scenes ?? [];
     const [first, second] = scenes;
     if (!first || !second) return { status: "failed" };
+    for (const [index, scene] of [first, second].entries()) {
+      const described = await updateTourScene(
+        membership,
+        {
+          tourId,
+          expectedEdit: edit,
+          sceneId: scene.sceneId,
+          changes: {
+            description: fillSampleText(
+              SAMPLE_SCENE_DESCRIPTIONS[index] ?? "",
+              membership.displayName,
+            ),
+          },
+        },
+        deps.tours,
+      );
+      if (described.status !== "saved") return { status: "failed" };
+      edit = described.editCount;
+    }
     const points = [
       {
         sceneId: first.sceneId,

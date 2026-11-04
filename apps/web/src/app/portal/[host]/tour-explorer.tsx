@@ -6,6 +6,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 
 import type { HotspotMarker } from "@/components/panorama-viewer/hotspot-markers";
 import {
+  requestAssistant,
+  setTourAssistantContext,
+  type TourAssistantContext,
+} from "@/lib/assistant-context";
+import {
   TourViewer,
   type TourCanvasHandle,
   type TourCanvasScene,
@@ -47,6 +52,8 @@ export interface TourExplorerProps {
   readonly dataPath: string;
   /** For the page title after a jump: "Tour 360° de X | {siteName}". */
   readonly siteName: string;
+  /** «a Chaski» / «al asistente» when the portal has an assistant (ADR-040): the guide's buttons. */
+  readonly assistant?: string | null;
 }
 
 /** What only the browser knows; null while rendering on the server and hydrating. */
@@ -127,7 +134,13 @@ function plainClick(event: React.MouseEvent): boolean {
   return !(event.metaKey || event.ctrlKey || event.shiftKey || event.altKey || event.button !== 0);
 }
 
-export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourExplorerProps) {
+export function TourExplorer({
+  tour: initial,
+  menu,
+  dataPath,
+  siteName,
+  assistant = null,
+}: TourExplorerProps) {
   const [tour, setTour] = useState(initial);
   const { scenes, entrySceneId, title } = tour;
   const model = useMemo(() => ({ entrySceneId, scenes }), [entrySceneId, scenes]);
@@ -189,6 +202,28 @@ export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourEx
   const { previous, next } = neighbourScenes(model, scene.id);
   const position = scenes.findIndex((item) => item.id === scene.id) + 1;
   const currentKey = tourKey(tour);
+
+  // The assistant knows the tour, the scene and the open point (ADR-040): IDs only.
+  const guideKind = tour.kind === "event" ? "event_tour" : "destination_tour";
+  const guideSlug = tour.slug;
+  const openId = open?.id ?? null;
+  const sceneId = scene.id;
+  useEffect(() => {
+    setTourAssistantContext({
+      page: { kind: guideKind, slug: guideSlug },
+      sceneId,
+      hotspotId: openId,
+    });
+  }, [guideKind, guideSlug, sceneId, openId]);
+  useEffect(() => () => setTourAssistantContext(null), []);
+  function askGuide(question: string, hotspotId: string | null, from: HTMLElement) {
+    const context: TourAssistantContext = {
+      page: { kind: guideKind, slug: guideSlug },
+      sceneId,
+      hotspotId,
+    };
+    requestAssistant({ question, intent: "guide", tour: context, returnFocus: from });
+  }
   const others = menu.filter((item) => tourKey(item) !== currentKey);
 
   // The address names the scene, so a shared link opens it.
@@ -475,6 +510,17 @@ export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourEx
             <span aria-hidden="true">›</span>
             {next ? <span className="visually-hidden">: {next.title}</span> : null}
           </button>
+          {assistant ? (
+            <button
+              type="button"
+              className="tour-bar-button tour-bar-guide"
+              onClick={(event) => askGuide("¿Qué estoy viendo?", null, event.currentTarget)}
+            >
+              <span aria-hidden="true">?</span>
+              <span className="tour-bar-label">¿Qué estoy viendo?</span>
+              <span className="visually-hidden">: pregúntale {assistant}</span>
+            </button>
+          ) : null}
           {fullscreen === "unsupported" ? null : (
             <button
               type="button"
@@ -510,7 +556,23 @@ export function TourExplorer({ tour: initial, menu, dataPath, siteName }: TourEx
             </a>
           </p>
         ) : null}
-        <PointDialog point={open} onClose={() => setOpen(null)} />
+        <PointDialog
+          point={open}
+          onClose={() => setOpen(null)}
+          {...(assistant
+            ? {
+                assistant,
+                onAsk: (point: OpenPoint, from: HTMLElement) =>
+                  askGuide(
+                    point.kind === "model"
+                      ? `Cuéntame sobre el modelo «${point.title}».`
+                      : `Cuéntame sobre «${point.title}».`,
+                    point.id,
+                    from,
+                  ),
+              }
+            : {})}
+        />
       </section>
 
       <div className="tour-guide">
