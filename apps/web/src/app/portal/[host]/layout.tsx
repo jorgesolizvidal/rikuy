@@ -141,12 +141,14 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           )}
           <span className="portal-brand-name">{identity.siteName}</span>
         </a>
+        {/* Outside the navigation: on a phone it shares the name's row, whose height is fixed,
+            so its late appearance (when the browser offers to install) moves nothing below. */}
+        <InstallButton siteName={identity.siteName} />
         <nav aria-label="Principal" className="portal-nav">
           <a href={PORTAL_PATHS.destinations}>Destinos</a>
           <a href={PORTAL_PATHS.agenda}>Agenda</a>
           <a href={PORTAL_PATHS.map}>Mapa</a>
           {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
-          <InstallButton siteName={identity.siteName} />
         </nav>
       </header>
 

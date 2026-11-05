@@ -282,6 +282,39 @@ if (origins.size > 0 || SET === "tours") {
   await new Promise((resolve) => setTimeout(resolve, 5_000));
 }
 
+/**
+ * The page's result over all its runs: the run with the median performance score represents
+ * it (its report, its category scores, as Lighthouse CI does), and each timing is the median of
+ * every run, so a single slow simulation never decides the LCP alone.
+ */
+function evaluate(page, runs) {
+  const target = median(runs.map((r) => r.scores.performance));
+  const representative = runs.find((r) => r.scores.performance === target) ?? runs[0];
+  const chosen = {
+    ...representative,
+    lcpMs: median(runs.map((r) => r.lcpMs)),
+    tbtMs: median(runs.map((r) => r.tbtMs)),
+    cls: median(runs.map((r) => r.cls)),
+  };
+  const limits = budget.pages[page.kind];
+  const fail = [];
+  if (limits.performance !== null && chosen.scores.performance < limits.performance) {
+    fail.push(`performance ${chosen.scores.performance} < ${limits.performance}`);
+  }
+  for (const [id, min] of Object.entries(budget.categories)) {
+    if (chosen.scores[id] < min) fail.push(`${id} ${chosen.scores[id]} < ${min}`);
+  }
+  if (limits.lcpMs !== null && chosen.lcpMs > limits.lcpMs) {
+    fail.push(`LCP ${chosen.lcpMs} ms > ${limits.lcpMs} ms`);
+  }
+  if (limits.cls !== null && chosen.cls > limits.cls)
+    fail.push(`CLS ${chosen.cls} > ${limits.cls}`);
+  if (limits.scriptKb !== null && chosen.scriptKb > limits.scriptKb) {
+    fail.push(`JS ${chosen.scriptKb} KB > ${limits.scriptKb} KB`);
+  }
+  return { chosen, fail };
+}
+
 await mkdir(OUT, { recursive: true });
 const rows = [];
 const problems = [];
@@ -292,32 +325,33 @@ const problems = [];
       const result = await runOnce(page);
       runs.push({ lhr: result.lhr, report: result.report, ...measure(result.lhr, page) });
     }
-    // The run with the median performance score represents the page (as Lighthouse CI does).
-    const target = median(runs.map((r) => r.scores.performance));
-    const chosen = runs.find((r) => r.scores.performance === target) ?? runs[0];
+    let { chosen, fail } = evaluate(page, runs);
+    // Lighthouse simulates the slow phone from what it observed in one real load, so the same
+    // page can come out ~1 s apart (Hito · Paso 3: Ucureña's /destinos measured 1.2–2.7 s with
+    // the same HTML and the same LCP element). A page over its budget is measured `recheck`
+    // more times and judged on all its runs: one unlucky run never fails it alone, and a page
+    // that is really slow still fails.
+    const rechecked = fail.length > 0 && budget.recheck > 0;
+    if (rechecked) {
+      console.log(`… ${page.label}: ${fail.join(", ")}; measuring ${budget.recheck} more times`);
+      for (let run = 0; run < budget.recheck; run += 1) {
+        const result = await runOnce(page);
+        runs.push({ lhr: result.lhr, report: result.report, ...measure(result.lhr, page) });
+      }
+      ({ chosen, fail } = evaluate(page, runs));
+    }
     await writeFile(
       new URL(`${page.label.replace(/[^a-z0-9]+/giu, "_")}.json`, OUT),
       chosen.report,
     );
-
-    const limits = budget.pages[page.kind];
-    const fail = [];
-    if (limits.performance !== null && chosen.scores.performance < limits.performance) {
-      fail.push(`performance ${chosen.scores.performance} < ${limits.performance}`);
-    }
-    for (const [id, min] of Object.entries(budget.categories)) {
-      if (chosen.scores[id] < min) fail.push(`${id} ${chosen.scores[id]} < ${min}`);
-    }
-    if (limits.lcpMs !== null && chosen.lcpMs > limits.lcpMs) {
-      fail.push(`LCP ${chosen.lcpMs} ms > ${limits.lcpMs} ms`);
-    }
-    if (limits.cls !== null && chosen.cls > limits.cls)
-      fail.push(`CLS ${chosen.cls} > ${limits.cls}`);
-    if (limits.scriptKb !== null && chosen.scriptKb > limits.scriptKb) {
-      fail.push(`JS ${chosen.scriptKb} KB > ${limits.scriptKb} KB`);
-    }
     if (fail.length > 0) problems.push(`${page.label}: ${fail.join(", ")}`);
-    rows.push({ page, chosen, runs: runs.map((r) => r.scores.performance), ok: fail.length === 0 });
+    rows.push({
+      page,
+      chosen,
+      runs: runs.map((r) => r.scores.performance),
+      lcps: runs.map((r) => r.lcpMs),
+      ok: fail.length === 0,
+    });
     console.log(
       `${fail.length === 0 ? "✓" : "✗"} ${page.label} perf ${chosen.scores.performance} [${runs
         .map((r) => r.scores.performance)
@@ -331,7 +365,7 @@ const problems = [];
 }
 
 const table = [
-  "| Página | Rendimiento (3 corridas) | Accesibilidad | Buenas prácticas | SEO | LCP | TBT | CLS | JS | |",
+  "| Página | Rendimiento (corridas) | Accesibilidad | Buenas prácticas | SEO | LCP | TBT | CLS | JS | |",
   "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
   ...rows.map(
     ({ page, chosen, runs, ok }) =>
@@ -356,8 +390,8 @@ if (process.env.GITHUB_STEP_SUMMARY) {
 annotate(
   rows
     .map(
-      ({ page, chosen, runs }) =>
-        `${page.label} perf ${chosen.scores.performance} [${runs.join(", ")}] LCP ${chosen.lcpMs} TTFB ${chosen.ttfbMs} TBT ${chosen.tbtMs} · ${chosen.lcpPhases}`,
+      ({ page, chosen, runs, lcps }) =>
+        `${page.label} perf ${chosen.scores.performance} [${runs.join(", ")}] LCP ${chosen.lcpMs} [${lcps.join(", ")}] TTFB ${chosen.ttfbMs} TBT ${chosen.tbtMs} · ${chosen.lcpPhases}`,
     )
     .join("\n"),
   "notice",

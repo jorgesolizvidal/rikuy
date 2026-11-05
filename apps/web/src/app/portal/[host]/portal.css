@@ -320,8 +320,14 @@
   font-size: 0.9375rem;
 }
 
+/* After the navigation on wide screens; on a phone, in the name's row (see below). */
 .portal-install {
   position: relative;
+  order: 3;
+}
+
+.portal-nav {
+  order: 2;
 }
 
 .portal-install-steps {
@@ -698,22 +704,33 @@
   background: var(--surface);
 }
 
-/* Narrow screens: the navigation gets its own row (same height with or without "Instalar"),
-   so the municipality's name keeps its room. */
+/* Narrow screens: the navigation gets its own row and «Instalar» goes in the name's row,
+   which is always as tall as the button: when the browser offers to install (late, while the
+   visitor reads), nothing below moves (CLS). Inside the navigation it used to push the links
+   to a second row (+40 px on 360–412 px phones). */
 @media (max-width: 30rem) {
   .portal-header {
     flex-wrap: wrap;
     row-gap: 0.25rem;
   }
 
-  .portal-nav {
-    width: 100%;
-    flex-wrap: wrap;
-    gap: 0 1.25rem;
+  /* A zero basis: the name gives way to the button (its text wraps or clamps) instead of the
+     button wrapping to a row of its own. */
+  .portal .portal-brand {
+    flex: 1 1 0;
+    min-height: 2.75rem;
   }
 
   .portal-install {
+    order: 2;
     margin-left: auto;
+  }
+
+  .portal-nav {
+    order: 3;
+    width: 100%;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
   }
 }
 

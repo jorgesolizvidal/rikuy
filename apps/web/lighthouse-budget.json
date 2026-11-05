@@ -1,6 +1,7 @@
 {
-  "$comment": "Performance budget enforced in CI (docs/performance-budget.md). Mobile, simulated 4G and CPU x4. Each page runs `runs` times and the median run counts.",
+  "$comment": "Performance budget enforced in CI (docs/performance-budget.md). Mobile, simulated 4G and CPU x4. Each page runs `runs` times: the run with the median score gives the scores, and each timing (LCP, TBT, CLS) is the median of all runs. A page over its budget is measured `recheck` more times and judged on all its runs.",
   "runs": 3,
+  "recheck": 2,
   "categories": { "accessibility": 95, "best-practices": 95, "seo": 95 },
   "pages": {
     "home": { "performance": 90, "lcpMs": 2500, "cls": 0.1, "scriptKb": 170 },

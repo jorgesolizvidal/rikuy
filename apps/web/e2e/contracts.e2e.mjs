@@ -411,6 +411,36 @@ async function checkAdminNotIndexed(context, pages) {
   await page.close();
 }
 
+// ── RC-09 · «Instalar» appears late and moves nothing (CLS) ───────────────────────
+// The browser offers to install the portal (beforeinstallprompt) whenever it likes, often
+// while the visitor reads: the button must appear without moving the content below. Inside
+// the navigation it used to push the links to a second row on phones (+40 px, CLS 0.041 in
+// Lighthouse on production).
+async function checkInstallDoesNotShift(portal) {
+  for (const width of [360, 390, 412, 1280]) {
+    await check(`RC-09 · ${portal.host}: «Instalar» at ${width}px moves nothing`, async () => {
+      const context = await newContext(width);
+      const page = await context.newPage();
+      await page.goto(`http://${portal.host}:${port}/destinos`, { waitUntil: "networkidle" });
+      const top = () =>
+        page.evaluate(() => document.querySelector("main")?.getBoundingClientRect().top);
+      const before = await top();
+      await page.evaluate(() => {
+        const offer = new Event("beforeinstallprompt", { cancelable: true });
+        Object.assign(offer, {
+          prompt: async () => undefined,
+          userChoice: Promise.resolve({ outcome: "dismissed" }),
+        });
+        window.dispatchEvent(offer);
+      });
+      await page.getByRole("button", { name: "Instalar" }).waitFor();
+      assert.equal(await top(), before);
+      assert.equal(await overflowing(page), null);
+      await context.close();
+    });
+  }
+}
+
 // ── Run ────────────────────────────────────────────────────────────────────────
 const portalList = PORTALS.flatMap(portalPages);
 
@@ -424,6 +454,7 @@ for (const portal of PORTALS) {
   await checkKeyboard(`http://${portal.host}:${port}/`, portal.host);
   await checkReducedMotion(portal);
   await checkMapAlternative(portal);
+  await checkInstallDoesNotShift(portal);
   await checkSeo(portal);
   await check(`RC-11 · ${portal.host}: every internal link resolves`, async () => {
     const context = await newContext();

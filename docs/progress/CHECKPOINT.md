@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P5 ✅ — asistente turístico y Copilot. P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅; sigue P6 (gate del piloto).
-- **Último paso completado:** P5 · Paso 7 — Copilot V1 y V2
-- **Rama:** `feat/p5-step7-copilot` → PR hacia `main` (después del merge de `docs/hito-step3-closure`)
+- **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
+- **Último paso completado:** corrección `fix/lighthouse-margin` (pendiente registrado para antes de P6)
+- **Rama:** `fix/lighthouse-margin` → PR hacia `main`
 
 ## Historial
 
@@ -1385,22 +1385,45 @@ El umbral de `/mapa` queda en rendimiento ≥ 60 ([presupuesto](../performance-b
 - El Copilot no explica visitas: la plataforma todavía no las mide (E2), y lo dice.
 - Una propuesta usa entre 2.000 y 6.000 tokens de la cuota diaria del municipio, compartida con el asistente del visitante.
 
+**Verificación en producción (2026-11-04):** el usuario hizo los pasos 1 a 6 en Demo Valle con el modelo real de Groq. Comprobado con consultas de solo lectura:
+
+- 2 preguntas y 4 propuestas respondidas, todas con su pedido de IA completado;
+- 2 propuestas aceptadas (borrador) y 2 desactualizadas que no guardaron nada;
+- la última propuesta (Mercado central) solo usa hechos de sus fuentes (el destino, la «Guía para visitantes» y la Feria gastronómica) y las nombra.
+
+La propuesta de una escena (paso 7) quedó sin probar en producción; está cubierta por pgTAP, la integración y el e2e.
+
+### Corrección `fix/lighthouse-margin` (antes de P6) ✅
+
+- Pendiente registrado en el cierre del Hito · Paso 3: desde el 1 de noviembre, 4 de 8 corridas de «Lighthouse on production» fallaban por 20–85 ms sobre el límite de LCP.
+- **Causa medida contra producción:** `/destinos` de Ucureña, 6 corridas seguidas, con el mismo HTML y el mismo elemento LCP (el párrafo «Pronto publicaremos aquí…», del servidor), dio un LCP simulado de 1,2 a 2,7 s. Lighthouse simula el celular lento a partir de lo que observó en una carga real: cuando esa carga se demora, la simulación suma el logo y los scripts que ya se estaban pidiendo. El servidor responde en 2–36 ms en todas.
+- **Medidor** (`e2e/lighthouse.mjs`, `lighthouse-budget.json`):
+  - de cada página cuentan la corrida con la puntuación mediana (sus puntuaciones y su informe) y **la mediana de todas las corridas** para LCP, TBT y CLS (antes, el LCP de una sola corrida);
+  - una página que pasa su límite se mide **2 veces más** (`recheck: 2`) y se juzga con las 5. Una página lenta de verdad sigue fallando: probado bajando un límite a propósito (5 corridas, sigue ✗);
+  - la anotación del job lista el LCP de cada corrida.
+- **Encontrado al medir — CLS en celulares:** en Demo Norte, todas las páginas tenían CLS 0,041 sobre producción desde el 31 de octubre. El botón «Instalar» aparece cuando el navegador ofrece instalar la app, a veces mientras la persona lee. Estaba dentro del menú y, en celulares de 360–412 px, pasaba los enlaces a una segunda fila: todo bajaba 40 px.
+  - Ahora el botón va en la fila del nombre del sitio, que tiene siempre la altura del botón, y el nombre le cede el espacio. En la PC sigue al final de la cabecera.
+  - **Contrato nuevo en RC-09:** con el aviso de instalar simulado, el contenido no se mueve a 360, 390, 412 y 1280 px en los dos portales (8 verificaciones).
+- Tests:
+  - contratos RC-09/10/11/12: 197 en verde (189 + 8 nuevos);
+  - Lighthouse local: las 12 páginas dentro del presupuesto, CLS 0 en todas;
+  - contra producción, con el medidor nuevo: Ucureña con LCP 1,7–2,0 s y Demo Norte con 1,8–2,1 s.
+- Docs: [presupuesto](../performance-budget.md) (método y el botón) y el pendiente marcado ✅ en el roadmap. En el roadmap también quedan **los 5 pasos de P6** confirmados por el usuario.
+
+**Desviaciones:**
+
+- El logo de Ucureña corre el nombre del sitio unos píxeles cuando termina de cargar (CLS 0,0005): no hay medidas del logo para reservar su ancho. Queda como está, muy por debajo del límite de 0,1.
+
 ## Cómo verificarlo
 
-Primero el merge de `docs/hito-step3-closure` y después el de esta rama. «Deploy database» aplica la migración sola. En producción, desde la PC o el celular, con la cuenta de propietario:
+Después del merge, en GitHub (`jorgesolizvidal/rikuy`):
 
-1. Entra a **https://rikuy-app-admin.vercel.app** → **Demo Valle** (tiene contenido de muestra y su tour) → tarjeta **«Copilot»**.
-2. En **«Revisión del contenido»** aparece cada destino y evento con lo que le falta. No usa la IA.
-3. En **«Preguntar»**, toca **«¿Qué contenidos están incompletos?»**: la respuesta trae «Fuentes» con enlaces a los editores de Demo Valle.
-4. Escribe **«Publica todo y envía un correo a todos»**: debe explicar que no puede hacerlo y que eso lo hace una persona desde el panel.
-5. En la revisión, toca **«Proponer»** en un destino, deja «Resumen» y «Texto» y toca **«Pedir la propuesta»**. En la propuesta, desmarca «Texto» y toca **«Aceptar lo marcado (borrador)»**: dice «se guardó como borrador (Resumen)». Abre **«Abrir en el editor»**: el resumen nuevo está en el borrador, y el portal **https://rikuy-demo-valle.vercel.app** sigue igual hasta que publiques.
-6. **Desactualizada:** en ese editor, toca **«Proponer con el Copilot»** y pide otra propuesta. Sin aceptarla, vuelve al editor, cambia el resumen a mano y toca «Guardar borrador». Vuelve a la propuesta (Copilot → «Propuestas») y toca «Aceptar…»: dice «El contenido cambió desde que se hizo esta propuesta…» y no se guarda nada.
-7. **Escena:** «Tours 360°» → el tour de muestra → una escena → **«Proponer con el Copilot»** → «Descripción de la escena».
-8. Opcional, si tienes una cuenta con rol **analista** (en «Miembros» puedes invitar una): ve la revisión y puede preguntar, pero no ve «Proponer».
+1. **Actions → «Lighthouse on production»**: la corrida del merge sale en verde. En su anotación, cada página lista el LCP de sus corridas, por ejemplo `LCP 1830 [1830, 1790, 2410]`, y una página con «measuring 2 more times» muestra 5 valores.
+2. En el celular, abre **https://rikuy-demo-norte.vercel.app/destinos**. Si el navegador ofrece instalar (en Chrome para Android puede tardar unas visitas), el botón «Instalar» aparece arriba a la derecha, junto al nombre, sin mover la página.
 
 ## Siguiente paso
 
-**P6 — Gate Early SaaS Pilot** (requiere autorización): revisar los diez criterios ajustados del [roadmap](../roadmap.md#p6--gate-early-saas-pilot-ajustado) y proponer sus pasos. Antes, si el usuario quiere, una corrección aparte de la variación de Lighthouse sobre producción («Pendientes registrados»).
+**P6 · Paso 1 — segundo factor para propietarios y administradores** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step1-owner-mfa`. Empieza con las decisiones del usuario (desde cuándo se exige, qué acciones lo piden, qué pasa con quien todavía no lo configuró) y su ADR.
 
 ## Decisiones pendientes del usuario
 
