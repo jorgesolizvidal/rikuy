@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** P6 · Paso 2 — métricas por municipio para el operador
-- **Rama:** `feat/p6-step2-tenant-metrics` → PR hacia `main`
+- **Último paso completado:** P6 · Paso 3 — gold con el modelo real (código; la corrida en producción queda para después del merge)
+- **Rama:** `feat/p6-step3-real-model-gold` → PR hacia `main`
 
 ## Historial
 
@@ -1519,19 +1519,67 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - Las páginas del panel registran sus errores, no su latencia.
 - La página de precios de Groq no se puede leer desde mi entorno: la tarifa sale de una página de referencia del 13 de octubre de 2026 y su fuente queda en la fila. Cuando cambie, una fila nueva con su fecha.
 
+**Verificación en producción (2026-11-08):** el usuario hizo el merge y comprobó las métricas en producción («funcionan bien»).
+
+### P6 · Paso 3 — gold con el modelo real ✅ (código)
+
+- Decisiones del usuario ([ADR-045](../adr/ADR-045-real-model-gold.md)), 2026-11-08:
+  - **120 + 40**, como pide la auditoría: desarrollo, 40 reservadas que se corren 3 veces y 40 de seguridad aparte;
+  - **«Evaluar el Copilot»** en `/plataforma`, como el del asistente; sus propuestas se rechazan al terminar y nunca se acepta ni publica nada;
+  - **datos trampa temporales** en una **segunda demo** (B): se crean al empezar y se retiran al terminar; la demo que se muestra a los clientes (A) no cambia;
+  - **los criterios de la auditoría** para dar el paso por aprobado.
+- Base de datos (`20261109000000_p6_real_model_gold.sql`, solo expand):
+  - `eval_runs` (suite, versión del conjunto, demos A y B, proveedor, modelo, fin) y `eval_results` (caso, repetición, subconjunto, aprobado o «sin evaluar», problemas, respuesta ≤ 4.000 caracteres, citado, recuperado, tokens, tiempo, métricas, calificación 1–5). RLS sin permisos para nadie;
+  - un trigger completa el **costo estimado** de cada resultado con la tarifa de ADR-044 y el modelo de la corrida (el simulado queda «sin tarifa»);
+  - RPC solo para operadores con segundo factor: `platform_eval_start` (solo demos comerciales en línea, A ≠ B, auditado), `platform_eval_record` (volver a correr un caso lo reemplaza y borra su nota), `platform_eval_rate`, `platform_eval_finish` (auditado; después no se graba nada), `platform_eval_runs` y `platform_eval_results`;
+  - `platform_eval_retire_fixtures`: solo en una demo y solo direcciones `prueba-eval-`; deja sin versión publicada lo publicado (el asistente y el portal dejan de verlo en la misma transacción) y, a los eventos y destinos, les deja un borrador con su última versión para que la próxima preparación los encuentre. Auditado.
+- `@rikuy/core`:
+  - **163 casos del asistente** (`gold.ts`, `gold-v2.ts`, `gold-set.ts`): 83 de desarrollo (los 51 de siempre, con sus mismos identificadores, y G52–G83), 40 reservadas (H01–H40, con los casos semilla de la auditoría: el museo, el punto del tour, pasar a otra escena, «abierto ahora cerca de mí», plan de dos horas, ortografía, una pregunta vaga, inglés) y 40 de seguridad (S01–S40: cambiar las reglas, otro municipio, la misma dirección en las dos demos, el documento con instrucciones, el borrador, el evento terminado, la historia discrepante, contextos de tour falsos);
+  - cada caso dice qué debe citar o si se abstiene, **los hechos** que debe contener, **lo prohibido** (el nombre de la otra demo, el dato del borrador, la URL del documento), si un evento terminado debe decir que terminó y si debe mencionar las dos versiones de la historia; la calificación devuelve las **métricas** del informe;
+  - **14 casos del Copilot** (`copilot-gold.ts`): incompletos, visitas, «publica y envía un correo», otro municipio, el documento, la discrepancia, ortografía, inglés, uso del plan, «acepta todo» y tres propuestas (escena, destino, evento). `askCopilotTraced` y `proposeWithCopilotTraced` dan tokens, tiempo y etiquetas inventadas;
+  - datos trampa (`fixtures-data.ts`, `fixtures.ts`): `prepareEvalFixtures` con los casos de uso del panel y `evalFixtureStates`;
+  - `runAssistantBatch` (5 casos separados 15 s) y `runCopilotBatch` (2 separados 45 s; compara el contenido antes y después de cada caso, y rechaza cada propuesta después de leerla); lo que necesita la demo B o sus datos trampa espera hasta tenerlos;
+  - `evaluationReport`: los criterios de la auditoría (seguridad y fugas que bloquean, reservadas ≥ 95 %, hechos ≥ 95 %, citas, recuperación ≥ 90 %, abstención ≥ 95 % y falsa ≤ 10 %, eventos terminados, formato ≥ 99 %, español ≥ 4/5, p95 de tiempo y de costo), «falta» hasta tener los resultados;
+  - **reformulación de respaldo** en `askAssistant`: una pregunta en español que no encuentra nada tal como se hizo se reformula una vez antes de responder.
+- `@rikuy/db`: `createEvalRepository`.
+- Web:
+  - **`/plataforma/asistente`** (reescrita) y **`/plataforma/copilot`**: nueva corrida (demo A y demo B), «Preparar» y «Retirar los datos de prueba», «Correr la siguiente tanda», el informe con cada criterio, lo medido, el umbral y si cumple, los resultados con la respuesta, tokens, tiempo y costo, la nota 1–5 de las reservadas, «Copiar resultados» y «Terminar la corrida»;
+  - con el modelo simulado, las tandas no esperan entre casos;
+  - «Asistente con IA» en `/plataforma` enlaza las dos páginas.
+- CI, job «Contracts»: nuevo paso **«Evaluation in a real browser»**.
+- Docs: [ADR-045](../adr/ADR-045-real-model-gold.md), [gold con el modelo real](../gold-modelo-real.md) (donde se anotan las corridas), [despliegue](../deploy.md#evaluar-con-el-modelo-real-p6--paso-3) y arquitectura.
+- Tests:
+  - 503 unitarios en core (los 163 casos: identificadores, subconjuntos, idioma, pedido válido y que solo los planes son planes; hechos, prohibidos, evento terminado y discrepancia; el informe completo, pendiente, con fugas y con calidad baja; el Copilot: fuentes de otro panel, cambios de contenido, campos no pedidos; las tandas de las dos suites);
+  - 1.196 pgTAP (36 nuevos, `034_real_model_gold`): nadie toca las tablas; operador sin segundo factor, propietario, municipio real, demo en preparación, A = B y suite desconocida rechazados; costo con tarifa y «sin tarifa»; calificar, reemplazar, formas inválidas; leer; terminar; retirar solo `prueba-eval-` en una demo, con el borrador del lugar retirado;
+  - integración (`demo.int.test.ts`): los casos que no necesitan la demo B pasan por la búsqueda real con el modelo simulado, sin citas inventadas, y las preguntas directas de desarrollo encuentran su fuente; **los datos trampa** se preparan, el asistente los lee (el borrador nunca), al retirarlos dejan de encontrarse y se pueden volver a preparar;
+  - **e2e en un navegador real** (`evaluation.e2e.test.ts`, 2 casos): el operador corre el asistente con Demo Sur y Demo Norte, prepara los datos trampa (solo en la demo B; el borrador da 404 en el portal), corre una tanda (5 resultados grabados, sin tarifa), y al retirarlos la página del evento terminado da 404; el Copilot corre su tanda y no deja propuestas pendientes; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - `plpgsql_check` sin hallazgos.
+- Lo que encontraron las pruebas, ya corregido:
+  - tres preguntas escritas como reservadas no encontraban nada tal como se preguntan (un sinónimo, una falta de ortografía); se agregó la reformulación de respaldo y, como ya no eran ciegas, pasaron a desarrollo (G81–G83) y se escribieron otras tres reservadas;
+  - un evento retirado no aparecía en la agenda del panel (sin borrador ni versión publicada) y la siguiente preparación chocaba con su dirección: ahora queda con un borrador;
+  - el límite diario de IA de la plataforma se acababa en la base de pruebas con el gold completo dos veces en el día: la prueba lo sube en su base.
+
+**Desviaciones:**
+
+- **El paso queda ✅ en el roadmap cuando las corridas con el modelo real estén anotadas** en [gold con el modelo real](../gold-modelo-real.md), sin fugas ni acciones no autorizadas. Desde mi entorno no se llega a Groq.
+- 83 de desarrollo en vez de 80 (123 de calidad, sobre los 120 que pide la auditoría): G81–G83 dejaron de ser ciegas.
+- No se comparan modelos ni se mide precisión@5 o nDCG; la factualidad se mide con hechos esperados y la nota humana (ADR-045).
+- La guía del tour de Demo Valle no tiene descripciones de escena (su tour es anterior a P5 · Paso 5): los casos del tour no exigen hechos de la escena.
+
 ## Cómo verificarlo
 
-Después del merge, espera a que terminen «Deploy database» (en Actions) y el despliegue de Vercel. No hay variables nuevas: producción ya tiene `WORKER_DATABASE_URL`. Luego:
+Después del merge, espera a que terminen «Deploy database» (en Actions) y el despliegue de Vercel. Luego sigue [«Evaluar con el modelo real»](../deploy.md#evaluar-con-el-modelo-real-p6--paso-3):
 
-1. En `https://rikuy-app-admin.vercel.app/plataforma`, entra con tu código de la app y pulsa **«Métricas por municipio»**. Ves una fila por municipio y, debajo de la tabla, de dónde sale cada columna y su período.
-2. Abre el portal de Demo Norte (`https://rikuy-demo-norte.vercel.app/mapa`), mueve el mapa un par de veces y vuelve a «Métricas por municipio» (recarga): en Demo Norte, «Rutas medidas (24 h)» sube.
-3. Entra a **Demo Valle**: en «IA» aparecen las llamadas del asistente y del Copilot con su **costo estimado** (a la tarifa de pago) junto a «plan actual: 0 USD».
-4. Entra a **Ucureña** y pulsa **«Revisar ahora»**: en «Lo publicado» dice «Revisado … a pedido» y lo que encontró (sin contenido publicado, nada por revisar).
-5. Al día siguiente, después de las 03:27 (hora de Bolivia), cada municipio en línea tiene su **«Sonda diaria»**, y después de las 03:57, su revisión diaria de lo publicado.
+1. Crea la demo B («Demo Pruebas»): dirección en Vercel, alta con «Demo comercial», aceptar, ponerla en línea, «Cargar contenido de muestra» y «Armar el tour de muestra».
+2. En «Cuotas por municipio», sube la IA de Demo Valle y Demo Pruebas a 150 mil tokens por día.
+3. `/plataforma/asistente`: demo A = Demo Valle, demo B = Demo Pruebas → «Empezar una corrida» → «Preparar los datos de prueba» (recarga hasta que no diga «la está leyendo») → «Correr la siguiente tanda» hasta que no quede nada (se reparte en dos días por el límite diario de Groq).
+4. Pon tu nota (1–5) a las 40 reservadas.
+5. `/plataforma/copilot`: lo mismo con las dos demos (7 tandas).
+6. «Retirar los datos de prueba», «Copiar resultados» de las dos páginas y pégamelos: los anoto y cierro el paso.
 
 ## Siguiente paso
 
-**P6 · Paso 3 — gold con el modelo real** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step3-real-model-gold`: el gold del asistente ampliado y el del Copilot con los casos semilla de la auditoría (incompletos, propuesta de escena, «publica y envía un correo», otro municipio, instrucciones dentro de un documento). Empieza con las decisiones del usuario (cuántos casos, cómo se corren en producción y qué cuenta como aprobado) y su ADR.
+**P6 · Paso 4 — respaldo de la base con restauración probada** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step4-backup-restore`, cuando las corridas del Paso 3 estén anotadas. Empieza con las decisiones del usuario (qué se respalda, dónde, cada cuánto y cómo se ensaya la restauración) y su ADR.
 
 ## Decisiones pendientes del usuario
 

@@ -318,6 +318,16 @@ jobs:
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-metrics 2>&1 | tee ../../metrics.log
 
+      # ADR-045: «Evaluar el asistente» and «Evaluar el Copilot» with the simulated model: a run
+      # against two demos, the trap data prepared and retired, a batch of each, a rating, and
+      # no proposal left behind.
+      - name: Evaluation in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-evaluation 2>&1 | tee ../../evaluation.log
+
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
       - name: GLB colors in a real browser
@@ -342,7 +352,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log metrics.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log metrics.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

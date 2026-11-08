@@ -281,6 +281,17 @@ function sourceLinks(
   return links;
 }
 
+/** What happened inside a Copilot request, for the evaluation (ADR-045); never shown. */
+export interface CopilotTrace {
+  readonly inputTokens: number;
+  readonly outputTokens: number;
+  readonly latencyMs: number;
+  /** Labels the model wrote that point nowhere (dropped). */
+  readonly invented: number;
+}
+
+const NO_TRACE: CopilotTrace = { inputTokens: 0, outputTokens: 0, latencyMs: 0, invented: 0 };
+
 /** V1: a question of the staff about their municipality's content. Any member. */
 export async function askCopilot(
   membership: OrganizationMembership,
@@ -288,10 +299,19 @@ export async function askCopilot(
   input: CopilotAskInput,
   deps: CopilotAskDeps,
 ): Promise<CopilotAnswer> {
+  return (await askCopilotTraced(membership, actorId, input, deps)).answer;
+}
+
+export async function askCopilotTraced(
+  membership: OrganizationMembership,
+  actorId: string,
+  input: CopilotAskInput,
+  deps: CopilotAskDeps,
+): Promise<{ readonly answer: CopilotAnswer; readonly trace: CopilotTrace }> {
   const question =
     typeof input.question === "string" ? input.question.replace(/\s+/gu, " ").trim() : "";
   if (question.length < 2 || question.length > COPILOT_LIMITS.question) {
-    return { status: "invalid" };
+    return { answer: { status: "invalid" }, trace: NO_TRACE };
   }
   const history = parseTurns(input.history);
   const now = (deps.now ?? (() => new Date()))();
@@ -321,16 +341,33 @@ export async function askCopilot(
     async (call) => (await call({ messages })).text,
   );
   if (result.outcome !== "answered") {
-    return { status: "notice", message: COPILOT_NOTICES[result.outcome] };
+    return {
+      answer: { status: "notice", message: COPILOT_NOTICES[result.outcome] },
+      trace: NO_TRACE,
+    };
   }
+  const trace = {
+    inputTokens: result.usage.inputTokens,
+    outputTokens: result.usage.outputTokens,
+    latencyMs: result.latencyMs,
+  };
   const parsed = parseCopilotAnswer(result.value);
   if (parsed.blocks.length === 0) {
-    return { status: "notice", message: COPILOT_NOTICES.provider_error };
+    return {
+      answer: { status: "notice", message: COPILOT_NOTICES.provider_error },
+      trace: { ...trace, invented: 0 },
+    };
   }
+  const sources = sourceLinks(membership.slug, parsed.labels, byLabel, passages);
+  const invented = parsed.labels.filter(
+    (label) =>
+      label !== "U" &&
+      !byLabel.has(label) &&
+      !(label.startsWith("F") && passages[Number(label.slice(1)) - 1]),
+  ).length;
   return {
-    status: "answered",
-    blocks: parsed.blocks,
-    sources: sourceLinks(membership.slug, parsed.labels, byLabel, passages),
+    answer: { status: "answered", blocks: parsed.blocks, sources },
+    trace: { ...trace, invented },
   };
 }
 
@@ -500,16 +537,26 @@ export async function proposeWithCopilot(
   input: ProposeInput,
   deps: CopilotProposeDeps,
 ): Promise<ProposeOutcome> {
-  if (!canPropose(membership)) return { status: "forbidden" };
+  return (await proposeWithCopilotTraced(membership, actorId, input, deps)).outcome;
+}
+
+export async function proposeWithCopilotTraced(
+  membership: OrganizationMembership,
+  actorId: string,
+  input: ProposeInput,
+  deps: CopilotProposeDeps,
+): Promise<{ readonly outcome: ProposeOutcome; readonly trace: CopilotTrace }> {
+  const done = (outcome: ProposeOutcome, trace: CopilotTrace = NO_TRACE) => ({ outcome, trace });
+  if (!canPropose(membership)) return done({ status: "forbidden" });
   const fields = parseFields(input.fields, input.target);
   const style = PROPOSAL_STYLES.find((item) => item === input.style) as ProposalStyle | undefined;
   const words = typeof input.words === "string" ? input.words.replace(/\s+/gu, " ").trim() : "";
   if (!fields || !style || words.length > COPILOT_LIMITS.instruction) {
-    return { status: "invalid" };
+    return done({ status: "invalid" });
   }
 
   const base = await loadProposalBase(membership, input.target, deps);
-  if (!base) return { status: "not_found" };
+  if (!base) return done({ status: "not_found" });
   const passages = await deps.knowledge.search(
     membership.tenantId,
     base.search.slice(0, 300),
@@ -544,8 +591,16 @@ export async function proposeWithCopilot(
     async (call) => parseProposal((await call({ messages })).text, fields, { allowedLinks }),
   );
   if (result.outcome !== "answered") {
-    return { status: "notice", message: COPILOT_NOTICES[result.outcome] };
+    return done({ status: "notice", message: COPILOT_NOTICES[result.outcome] });
   }
+  const trace: CopilotTrace = {
+    inputTokens: result.usage.inputTokens,
+    outputTokens: result.usage.outputTokens,
+    latencyMs: result.latencyMs,
+    invented: result.value.labels.filter(
+      (label) => !(label.startsWith("F") && passages[Number(label.slice(1)) - 1]),
+    ).length,
+  };
 
   const changes = Object.fromEntries(
     Object.entries(result.value.values).filter(
@@ -553,7 +608,7 @@ export async function proposeWithCopilot(
     ),
   );
   if (Object.keys(changes).length === 0) {
-    return { status: "notice", message: COPILOT_NOTICES.nothing };
+    return done({ status: "notice", message: COPILOT_NOTICES.nothing }, trace);
   }
   const sources: ProposalSource[] = [];
   for (const label of result.value.labels) {
@@ -577,9 +632,13 @@ export async function proposeWithCopilot(
     instruction: words,
     aiRequestId: result.requestId,
   });
-  if (created.status === "created") return { status: "created", proposalId: created.proposalId };
-  if (created.status === "unchanged") return { status: "notice", message: COPILOT_NOTICES.nothing };
-  return { status: created.status };
+  if (created.status === "created") {
+    return done({ status: "created", proposalId: created.proposalId }, trace);
+  }
+  if (created.status === "unchanged") {
+    return done({ status: "notice", message: COPILOT_NOTICES.nothing }, trace);
+  }
+  return done({ status: created.status }, trace);
 }
 
 export async function loadProposal(
