@@ -54,6 +54,7 @@ flowchart TD
 ### Alta de municipios y miembros
 
 - El **operador de plataforma** (`platform_operators`, separado de las membresías) actúa solo con segundo factor: toda verificación de operador exige `aal2` en el JWT.
+- **Propietarios y administradores** de un municipio también ([ADR-043](adr/ADR-043-staff-second-factor.md)): `private.has_tenant_role` solo cuenta su membresía con `aal2`, así que la regla vale a la vez para las RPC, las tablas y Storage. `my_memberships()` le dice al panel qué municipio pide el código, y `/verificacion` lo configura o lo pide. Editores y analistas no lo necesitan.
 - Alta = una transacción: tenant en `provisioning` + dominio de plataforma + puntero canónico + propietario invitado + auditoría. Pasa a `active` solo cuando el propietario aceptó (la base lo exige). Ningún dato del municipio vive en el código (ZC-01).
 - La cuenta de una persona invitada la crea un adaptador aislado con la clave secreta (`src/server/identity-admin.ts`, único módulo que puede importarla), siempre después de autorizar al que invita. Las personas entran con código por correo y aceptan la invitación en el panel.
 - Propietarios gestionan todos los roles; administradores, solo editores y analistas. Un municipio activo conserva siempre un propietario activo.

@@ -8,9 +8,9 @@ create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
 \set ta 'aaaaaaaa-0000-4000-8000-000000000001'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set a3c '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}'
-\set a4c '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set a3c '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}'
+\set a4c '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated","aal":"aal2"}'
 \set sha '0000000000000000000000000000000000000000000000000000000000000abc'
 \set pano '{"version":1,"projection":"equirectangular","source":{"width":4096,"height":2048,"bytes":9000,"mime":"image/jpeg","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"preview":{"file":"preview.webp","width":1024,"height":512,"bytes":18000},"image":{"file":"image.webp","width":4096,"height":2048,"bytes":1400000},"tiles":null}'
 \set model '{"version":1,"format":"glb","source":{"bytes":482828,"sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","triangles":1200,"vertices":800,"materials":1,"textures":0,"generator":"test","extensions":[]},"model":{"file":"model.glb","bytes":250000,"triangles":1200,"geometry":"meshopt","textures":[]},"colors":{"materials":"unchanged","vertexColors":null,"suspects":[]},"weight":"light","poster":{"file":"poster.webp","width":1280,"height":960,"bytes":40000}}'

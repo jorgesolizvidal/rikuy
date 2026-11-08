@@ -28,7 +28,7 @@ async function requestUpload(
   const sql = postgres(DB_URL, { max: 1, prepare: false, onnotice: () => undefined });
   try {
     return await sql.begin(async (tx) => {
-      await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: OWNER, role: "authenticated" })}, true)`;
+      await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: OWNER, role: "authenticated", aal: "aal2" })}, true)`;
       await tx`set local role authenticated`;
       const [row] = await tx`
         select version_id from public.create_image_upload(${SUR}::uuid, 'content', 'image/jpeg', ${10 * MB})

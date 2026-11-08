@@ -10,6 +10,7 @@ import type {
   PlatformRepository,
   PlatformTenantSummary,
   ProvisionOutcome,
+  SecondFactorResetOutcome,
   TenantMember,
   TenantStatusChangeOutcome,
   TotpEnrollment,
@@ -17,6 +18,7 @@ import type {
 } from "@rikuy/core";
 import { z } from "zod";
 
+import { isMissingFunction } from "./missing-function";
 import type { SessionClient } from "./session-client";
 
 /**
@@ -123,6 +125,16 @@ export function createPlatformRepository(client: SessionClient): PlatformReposit
       }
       throw unexpected("Changing tenant status", error);
     },
+
+    async resetSecondFactor(email): Promise<SecondFactorResetOutcome> {
+      const { data, error } = await client.rpc("platform_second_factor_reset", { p_email: email });
+      if (!error) return { status: "reset", removed: z.number().int().min(0).parse(data) };
+      const { code } = rpcError(error);
+      if (code === "42501") return { status: "forbidden" };
+      if (code === "PT404") return { status: "not_found" };
+      if (code === "PT409") return { status: "self" };
+      throw unexpected("Resetting a second factor", error);
+    },
   };
 }
 
@@ -172,8 +184,23 @@ function memberOutcome(operation: string, error: PostgrestError | null): MemberC
 export function createMemberRepository(client: SessionClient): MemberRepository {
   return {
     async list(tenantId): Promise<TenantMember[]> {
-      const { data, error } = await client.rpc("list_tenant_members", { p_tenant_id: tenantId });
+      const [{ data, error }, factors] = await Promise.all([
+        client.rpc("list_tenant_members", { p_tenant_id: tenantId }),
+        client.rpc("tenant_member_second_factors", { p_tenant_id: tenantId }),
+      ]);
       if (error) throw unexpected("Listing members", error);
+      // Before the migration of ADR-043 is applied the function does not exist yet: the
+      // list still works, without the second-factor column.
+      const configured = new Map<string, boolean>();
+      if (factors.error === null) {
+        for (const row of z
+          .array(z.object({ membership_id: z.uuid(), configured: z.boolean() }))
+          .parse(factors.data)) {
+          configured.set(row.membership_id, row.configured);
+        }
+      } else if (!isMissingFunction(factors.error)) {
+        throw unexpected("Reading second factors", factors.error);
+      }
       return z
         .array(
           z.object({
@@ -197,6 +224,10 @@ export function createMemberRepository(client: SessionClient): MemberRepository 
           invitedAt: row.invited_at,
           acceptedAt: row.accepted_at,
           invitationMailedAt: row.invitation_mailed_at ?? null,
+          secondFactor:
+            row.role === "owner" || row.role === "admin"
+              ? (configured.get(row.membership_id) ?? null)
+              : null,
         }));
     },
     async add(tenantId, userId, role) {

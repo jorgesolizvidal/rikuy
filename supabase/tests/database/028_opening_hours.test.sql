@@ -7,10 +7,10 @@ set local search_path = public, extensions;
 
 \set ta 'aaaaaaaa-0000-4000-8000-000000000001'
 \set tb 'bbbbbbbb-0000-4000-8000-000000000001'
-\set ownera '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set editora '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated"}'
-\set analysta '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}'
-\set ownerb '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}'
+\set ownera '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set editora '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated","aal":"aal2"}'
+\set analysta '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}'
+\set ownerb '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}'
 \set doc '"title":"Museo","summary":"Un museo.","body":[],"location":{"lat":-17.39,"lng":-66.15},"cover":null,"gallery":[]'
 \set weekly '{"mode":"weekly","days":[[["09:00","12:30"],["14:00","18:00"]],[["09:00","18:00"]],[["09:00","18:00"]],[["09:00","18:00"]],[["09:00","18:00"]],[["10:00","24:00"]],[]],"note":"Cerrado los feriados"}'
 

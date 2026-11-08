@@ -11,6 +11,8 @@ import {
 } from "@rikuy/core";
 import { z } from "zod";
 
+import { isMissingFunction } from "./missing-function";
+
 import type { SessionClient } from "./session-client";
 
 /**
@@ -136,7 +138,7 @@ const voiceRowSchema = aiRowSchema
   .transform(({ transcribed_today, ...row }) => ({ ...row, answered_today: transcribed_today }));
 
 /** PostgREST's «function not found»: a deployment reached a database without dictation yet. */
-const missingFunction = (code: string | undefined) => code === "PGRST202" || code === "42883";
+const missingFunction = (code: string | undefined) => isMissingFunction({ code });
 
 export function createAiUsageRepository(client: SessionClient): AiUsageRepository {
   return {

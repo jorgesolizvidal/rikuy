@@ -62,6 +62,11 @@ export default async function AdminHomePage() {
                       En preparación: el portal aún no está en línea
                     </span>
                   ) : null}
+                  {organization.needsSecondFactor ? (
+                    <span className="org-detail org-detail-attention">
+                      Pide verificación en dos pasos
+                    </span>
+                  ) : null}
                 </span>
                 <span className="org-role">{ROLE_LABELS[organization.role]}</span>
               </Link>

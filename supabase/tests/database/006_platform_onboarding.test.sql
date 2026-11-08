@@ -19,12 +19,12 @@ set local search_path = public, extensions;
 \set op_aal2 '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated","aal":"aal2"}'
 \set op2_aal2 '{"sub":"00000000-0000-4000-8000-0000000000f2","role":"authenticated","aal":"aal2"}'
 \set a1_aal2 '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set a2c '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated"}'
-\set a3c '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}'
-\set a4c '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated"}'
-\set n1c '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated"}'
-\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set a2c '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated","aal":"aal2"}'
+\set a3c '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}'
+\set a4c '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated","aal":"aal2"}'
+\set n1c '{"sub":"00000000-0000-4000-8000-0000000000c1","role":"authenticated","aal":"aal2"}'
+\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}'
 \set svc '{"role":"service_role"}'
 
 insert into auth.users (id, email) values

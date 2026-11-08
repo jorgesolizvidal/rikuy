@@ -17,6 +17,7 @@ import {
   operatorGate,
   provisionTenant,
   startOperatorEnrollment,
+  resetSecondFactor,
   suggestPortalHostname,
   verifyOperatorCode,
 } from "./platform";
@@ -43,6 +44,10 @@ function platform(access: OperatorAccess, overrides: Partial<PlatformRepository>
     async setStatus(tenantId, status) {
       calls.push(`status:${tenantId}:${status}`);
       return { status: "updated" };
+    },
+    async resetSecondFactor(email) {
+      calls.push(`reset:${email}`);
+      return { status: "reset", removed: 1 };
     },
     ...overrides,
   };
@@ -300,5 +305,22 @@ describe("members", () => {
     const repo = { listPending: async () => [], accept: async () => "accepted" as const };
     expect(await acceptInvitation(repo, "")).toBe("not_found");
     expect(await acceptInvitation(repo, TENANT)).toBe("accepted");
+  });
+});
+
+describe("resetting a lost second factor (ADR-043)", () => {
+  it("only an operator with a second factor resets, by a normalized email", async () => {
+    for (const access of ["none", "needs_mfa"] as const) {
+      const { repo, calls } = platform(access);
+      expect(await resetSecondFactor(repo, "owner@example.test")).toEqual({ status: "forbidden" });
+      expect(calls).toEqual([]);
+    }
+    const { repo, calls } = platform("ok");
+    expect(await resetSecondFactor(repo, "no es un correo")).toEqual({ status: "invalid_email" });
+    expect(await resetSecondFactor(repo, "  Owner@Example.TEST ")).toEqual({
+      status: "reset",
+      removed: 1,
+    });
+    expect(calls).toEqual(["reset:owner@example.test"]);
   });
 });

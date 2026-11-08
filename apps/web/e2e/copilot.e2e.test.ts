@@ -18,6 +18,8 @@ import { chromium, type Browser, type Page } from "playwright-core";
 import postgres from "postgres";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { passSecondFactor } from "./support/second-factor";
+
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const PORT = Number(process.env.RIKUY_PORT ?? 3000);
 const ADMIN = `http://app.localhost:${PORT}`;
@@ -33,7 +35,7 @@ let contentId = "";
 
 async function asOwner<T>(work: (tx: postgres.TransactionSql) => Promise<T>): Promise<T> {
   return (await db.begin(async (tx) => {
-    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: OWNER_SUR, role: "authenticated" })}, true)`;
+    await tx`select set_config('request.jwt.claims', ${JSON.stringify({ sub: OWNER_SUR, role: "authenticated", aal: "aal2" })}, true)`;
     await tx`set local role authenticated`;
     return work(tx);
   })) as T;
@@ -73,6 +75,7 @@ async function signedIn(email: string): Promise<Page> {
   await page.getByLabel("Código de acceso").fill(await emailCode(email, since));
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  await passSecondFactor(page, ADMIN);
   return page;
 }
 

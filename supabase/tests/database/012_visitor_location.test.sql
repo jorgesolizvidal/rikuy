@@ -34,7 +34,7 @@ select ok(not private.is_valid_presentation((:'base' || ',"visitors":150}')::jso
 
 -- ── Through the draft RPC, as the owner ────────────────────────────────────
 set local role authenticated;
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}';
 select results_eq(
   format('select version, revision from public.save_tenant_config_draft(%L, %L, null)',
     'aaaaaaaa-0000-4000-8000-000000000001', :'base' || ',"visitors":{"nearbyRadius":300}}'),

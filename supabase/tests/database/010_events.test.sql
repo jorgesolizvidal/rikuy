@@ -7,9 +7,9 @@ set local search_path = public, extensions;
 
 \set ta 'aaaaaaaa-0000-4000-8000-000000000001'
 \set tb 'bbbbbbbb-0000-4000-8000-000000000001'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set a2c '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated"}'
-\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set a2c '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated","aal":"aal2"}'
+\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}'
 
 insert into auth.users (id, email) values
   ('00000000-0000-4000-8000-0000000000a1', 'owner.a@example.test'),

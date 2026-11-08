@@ -51,7 +51,17 @@ export interface PlatformRepository {
   listTenants(): Promise<PlatformTenantSummary[]>;
   provision(request: ProvisionRequest): Promise<ProvisionOutcome>;
   setStatus(tenantId: string, status: "active" | "suspended"): Promise<TenantStatusChangeOutcome>;
+  /** Removes the TOTP factors of an owner or admin, audited (ADR-043). */
+  resetSecondFactor(email: string): Promise<SecondFactorResetOutcome>;
 }
+
+export type SecondFactorResetOutcome =
+  | { readonly status: "reset"; readonly removed: number }
+  /** No owner or admin of any municipality with that email. */
+  | { readonly status: "not_found" }
+  /** The operator's own account. */
+  | { readonly status: "self" }
+  | { readonly status: "forbidden" };
 
 /**
  * Isolated identity administration (secret key, server only). Creates a confirmed account
@@ -85,6 +95,11 @@ export interface TenantMember {
   readonly acceptedAt: string | null;
   /** When the email of the current invitation went out (null: not sent, or no SMTP). */
   readonly invitationMailedAt: string | null;
+  /**
+   * Owners and admins: whether they set up the second factor (ADR-043). Null for editors
+   * and analysts, who do not need one, and when the database cannot tell yet.
+   */
+  readonly secondFactor: boolean | null;
 }
 
 export type MemberChangeOutcome =

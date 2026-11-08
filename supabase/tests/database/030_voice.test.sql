@@ -13,8 +13,8 @@ set local search_path = public, extensions;
 \set tb  'bbbbbbbb-0000-4000-8000-000000000001'
 \set tp  'cccccccc-0000-4000-8000-000000000001'
 \set op_aal2 '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated","aal":"aal2"}'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}'
 \set ok_call '[{"provider":"groq","model":"whisper-large-v3-turbo","status":"ok","audioSeconds":12,"latencyMs":400,"httpStatus":200}]'
 \set two_failures '[{"provider":"groq","model":"whisper-large-v3-turbo","status":"unavailable","latencyMs":300,"httpStatus":503},{"provider":"groq","model":"whisper-large-v3-turbo","status":"timeout","latencyMs":20000}]'
 

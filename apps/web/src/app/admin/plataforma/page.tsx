@@ -7,9 +7,10 @@ import { aiGatewayStatus } from "@/server/ai-gateway";
 import { operatorContext } from "@/server/operator";
 import { platformSettings } from "@/server/platform";
 
+import { MfaPanel } from "../mfa-panel";
 import { SignOutButton } from "../sign-out-button";
+import { startEnrollmentAction, verifyOperatorAction } from "./actions";
 import { AiSummary } from "./ai-summary";
-import { MfaPanel } from "./mfa-panel";
 import { OperationsSummary } from "./operations-summary";
 import { TenantStatusButton } from "./tenant-status-button";
 
@@ -45,7 +46,12 @@ export default async function PlatformPage() {
             ? "La administración de la plataforma exige un segundo factor. Configura una app de autenticación (Google Authenticator, Microsoft Authenticator, 1Password…) para continuar."
             : "Escribe el código de 6 dígitos de tu app de autenticación para continuar."}
         </p>
-        <MfaPanel mode={gate.status} factorId={gate.status === "verify" ? gate.factorId : null} />
+        <MfaPanel
+          mode={gate.status}
+          factorId={gate.status === "verify" ? gate.factorId : null}
+          startEnrollment={startEnrollmentAction}
+          verifyCode={verifyOperatorAction}
+        />
       </main>
     );
   }
@@ -74,6 +80,9 @@ export default async function PlatformPage() {
           </Link>{" "}
           <Link href="/plataforma/cuotas" className="button button-quiet">
             Cuotas por municipio
+          </Link>{" "}
+          <Link href="/plataforma/segundo-factor" className="button button-quiet">
+            Restablecer la verificación en dos pasos
           </Link>
         </p>
       </div>

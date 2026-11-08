@@ -77,7 +77,16 @@ export default async function MembersPage({ params }: MembersPageProps) {
               return (
                 <tr key={member.membershipId} data-status={member.status}>
                   <td>{member.email}</td>
-                  <td>{ROLE_LABELS[member.role]}</td>
+                  <td>
+                    {ROLE_LABELS[member.role]}
+                    {member.secondFactor === null || member.status === "revoked" ? null : (
+                      <span className="org-detail">
+                        {member.secondFactor
+                          ? "Con verificación en dos pasos"
+                          : "Sin verificación en dos pasos: se le pedirá al entrar"}
+                      </span>
+                    )}
+                  </td>
                   <td>
                     {STATUS_LABELS[member.status]}
                     {member.status === "invited" ? (

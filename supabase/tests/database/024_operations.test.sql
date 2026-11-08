@@ -10,7 +10,7 @@ set local search_path = public, extensions;
 \set ta  'aaaaaaaa-0000-4000-8000-000000000001'
 \set op_aal2 '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated","aal":"aal2"}'
 \set op_aal1 '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated","aal":"aal1"}'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
 \set sha '0000000000000000000000000000000000000000000000000000000000000abc'
 \set brand '{"identity":{"siteName":"Tenant A","shortName":"A","tagline":""},"theme":{"mode":"light","brand":"#1e3a8a","accent":"#b45309"},"contact":{},"social":[],"seo":{"description":""}}'
 

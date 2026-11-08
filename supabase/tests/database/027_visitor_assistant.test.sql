@@ -41,7 +41,7 @@ select ok(not private.is_valid_presentation((:'base' || ',"assistant":"Guía"}')
 
 -- ── Through the draft RPC ──────────────────────────────────────────────────
 set local role authenticated;
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}';
 select results_eq(
   format('select version, revision from public.save_tenant_config_draft(%L, %L, null)',
     'aaaaaaaa-0000-4000-8000-000000000001',
@@ -60,7 +60,7 @@ select is(
   'Guía', 'the persona is kept in the draft'
 );
 
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, 1)',
     'aaaaaaaa-0000-4000-8000-000000000001',
@@ -68,7 +68,7 @@ select throws_ok(
   '42501', null, 'an editor cannot change the persona (brand is for owners and admins)'
 );
 
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, 1)',
     'aaaaaaaa-0000-4000-8000-000000000001',

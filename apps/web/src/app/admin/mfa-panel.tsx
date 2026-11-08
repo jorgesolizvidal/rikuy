@@ -2,12 +2,22 @@
 
 import { useActionState, useEffect, useState, useTransition } from "react";
 
-import {
-  startEnrollmentAction,
-  verifyOperatorAction,
-  type EnrollState,
-  type VerifyState,
-} from "./actions";
+// Second factor (TOTP) of the signed-in person: the operator on /plataforma and the owners
+// and admins of a municipality on /verificacion (ADR-043). Each page passes its own Server
+// Actions, which re-check who may enroll or verify; none of them redirects.
+
+export type EnrollState =
+  | { readonly status: "idle" | "denied" | "error" }
+  | {
+      readonly status: "enrolling";
+      readonly factorId: string;
+      readonly qrCode: string;
+      readonly secret: string;
+    };
+
+export interface VerifyState {
+  readonly status: "idle" | "verified" | "invalid_code" | "rate_limited" | "unavailable" | "denied";
+}
 
 const VERIFY_MESSAGES: Partial<Record<VerifyState["status"], string>> = {
   invalid_code: "El código no es válido o ya cambió. Escribe el que muestra ahora tu app.",
@@ -19,20 +29,30 @@ const VERIFY_MESSAGES: Partial<Record<VerifyState["status"], string>> = {
 export function MfaPanel({
   mode,
   factorId,
+  startEnrollment,
+  verifyCode,
+  next,
 }: {
   readonly mode: "enroll" | "verify";
   readonly factorId: string | null;
+  readonly startEnrollment: () => Promise<EnrollState>;
+  readonly verifyCode: (previous: VerifyState, formData: FormData) => Promise<VerifyState>;
+  /** Where to go once verified (a path of the panel); without it, the page reloads. */
+  readonly next?: string;
 }) {
   const [enrollment, setEnrollment] = useState<EnrollState>({ status: "idle" });
   const [starting, startTransition] = useTransition();
-  const [state, verify, verifying] = useActionState(verifyOperatorAction, {
+  const [state, verify, verifying] = useActionState(verifyCode, {
     status: "idle",
   } as VerifyState);
 
   useEffect(() => {
-    // The session cookies now carry the second factor: reload through the proxy.
-    if (state.status === "verified") window.location.reload();
-  }, [state]);
+    // The session cookies now carry the second factor: load the page again through the
+    // proxy (a full navigation, so every server component reads the new session).
+    if (state.status !== "verified") return;
+    if (next) window.location.assign(next);
+    else window.location.reload();
+  }, [state, next]);
 
   const activeFactor =
     mode === "verify" ? factorId : enrollment.status === "enrolling" ? enrollment.factorId : null;
@@ -45,9 +65,7 @@ export function MfaPanel({
             type="button"
             className="button"
             disabled={starting}
-            onClick={() =>
-              startTransition(async () => setEnrollment(await startEnrollmentAction()))
-            }
+            onClick={() => startTransition(async () => setEnrollment(await startEnrollment()))}
           >
             {starting ? "Preparando…" : "Configurar la app de autenticación"}
           </button>

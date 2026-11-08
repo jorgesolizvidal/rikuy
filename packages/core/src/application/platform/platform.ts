@@ -7,6 +7,7 @@ import type {
   PlatformRepository,
   PlatformTenantSummary,
   ProvisionOutcome,
+  SecondFactorResetOutcome,
   TenantStatusChangeOutcome,
   TotpEnrollment,
   TotpVerifyOutcome,
@@ -57,6 +58,21 @@ export async function verifyOperatorCode(
     return "invalid_code";
   }
   return mfa.verifyTotp(factorId, normalized);
+}
+
+/**
+ * An owner or admin lost the phone with their authenticator app (ADR-043): the operator,
+ * with their own second factor, removes the person's TOTP factors; the next time they open
+ * their municipality they set up a new one. Audited in each of their municipalities.
+ */
+export async function resetSecondFactor(
+  platform: PlatformRepository,
+  email: unknown,
+): Promise<SecondFactorResetOutcome | { readonly status: "invalid_email" }> {
+  if ((await platform.operatorAccess()) !== "ok") return { status: "forbidden" };
+  const normalized = normalizeEmail(email);
+  if (normalized === null) return { status: "invalid_email" };
+  return platform.resetSecondFactor(normalized);
 }
 
 export async function listPlatformTenants(

@@ -14,8 +14,8 @@ set local search_path = public, extensions;
 \set ts  'dddddddd-0000-4000-8000-000000000001'
 \set op_aal2 '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated","aal":"aal2"}'
 \set op_aal1 '{"sub":"00000000-0000-4000-8000-0000000000f1","role":"authenticated","aal":"aal1"}'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}'
 \set ok_call '[{"provider":"groq","model":"openai/gpt-oss-120b","status":"ok","inputTokens":120,"outputTokens":30,"latencyMs":700,"httpStatus":200}]'
 \set two_failures '[{"provider":"groq","model":"openai/gpt-oss-120b","status":"unavailable","latencyMs":300,"httpStatus":503},{"provider":"groq","model":"openai/gpt-oss-120b","status":"timeout","latencyMs":20000}]'
 

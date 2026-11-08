@@ -97,6 +97,23 @@ describe("platform repository", () => {
       status: "invalid_transition",
     });
   });
+
+  it("resets a second factor and maps who cannot be reset (ADR-043)", async () => {
+    const done = session(() => Response.json(2));
+    expect(await createPlatformRepository(done.client).resetSecondFactor("a@example.test")).toEqual(
+      { status: "reset", removed: 2 },
+    );
+    expect(done.calls[0]?.body).toEqual({ p_email: "a@example.test" });
+    const cases = [
+      [pgError("42501", 403), "forbidden"],
+      [pgError("PT404", 404, "person"), "not_found"],
+      [pgError("PT409", 409, "self"), "self"],
+    ] as const;
+    for (const [response, status] of cases) {
+      const repo = createPlatformRepository(session(() => response.clone()).client);
+      expect(await repo.resetSecondFactor("a@example.test")).toEqual({ status });
+    }
+  });
 });
 
 describe("members and invitations", () => {
@@ -113,6 +130,40 @@ describe("members and invitations", () => {
     await expect(
       createMemberRepository(broken.client).changeRole(TENANT, USER, "editor"),
     ).rejects.toThrow(/XX000/);
+  });
+
+  it("tells which owners and admins set up a second factor, and works before the migration", async () => {
+    const row = (membership: string, role: string) => ({
+      membership_id: membership,
+      user_id: USER,
+      email: `${role}@example.test`,
+      role,
+      status: "active",
+      invited_at: "2026-11-07T00:00:00Z",
+      accepted_at: "2026-11-07T00:00:00Z",
+    });
+    const OWNER = "5eed4000-0000-4000-8000-000000000001";
+    const EDITOR = "5eed4000-0000-4000-8000-000000000002";
+    const members = [row(OWNER, "owner"), row(EDITOR, "editor")];
+    const now = session((url) =>
+      url.pathname.endsWith("/tenant_member_second_factors")
+        ? Response.json([{ membership_id: OWNER, configured: true }])
+        : Response.json(members),
+    );
+    expect(
+      (await createMemberRepository(now.client).list(TENANT)).map((m) => [m.role, m.secondFactor]),
+    ).toEqual([
+      ["owner", true],
+      ["editor", null],
+    ]);
+    const before = session((url) =>
+      url.pathname.endsWith("/tenant_member_second_factors")
+        ? pgError("PGRST202", 404)
+        : Response.json(members),
+    );
+    expect(
+      (await createMemberRepository(before.client).list(TENANT)).map((m) => m.secondFactor),
+    ).toEqual([null, null]);
   });
 
   it("accepts invitations and reports missing ones", async () => {

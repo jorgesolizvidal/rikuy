@@ -13,6 +13,11 @@ export const organizationMembershipSchema = z.object({
   tenantStatus: z.enum(["provisioning", "active"]),
   /** A commercial demo (ADR-034): offers the sample content. Absent means a real one. */
   demo: z.boolean().optional(),
+  /**
+   * Owner or admin whose session has no verified second factor yet (ADR-043): listed, but
+   * the municipality does not open until they verify. Absent means nothing is missing.
+   */
+  needsSecondFactor: z.literal(true).optional(),
 });
 export type OrganizationMembership = z.infer<typeof organizationMembershipSchema>;
 

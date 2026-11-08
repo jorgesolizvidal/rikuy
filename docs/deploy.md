@@ -116,7 +116,7 @@ Ningún dato del municipio entra al código ni a variables de entorno: todo se h
 
    La zona horaria es la de Bolivia (`America/La_Paz`).
 
-3. **Aceptar:** en el inicio del panel aparece la invitación; «Aceptar».
+3. **Aceptar:** en el inicio del panel aparece la invitación; «Aceptar». Al abrir el municipio, el panel pide la verificación en dos pasos (ver la sección siguiente).
 4. **Marca:** en el municipio → «Marca del portal»: nombre, lema, colores, logo, contacto, redes y descripción para buscadores; «Publicar».
 5. **Poner en línea:** en `/plataforma`, «Poner en línea» junto al municipio.
 6. **Comprobar:**
@@ -125,6 +125,32 @@ Ningún dato del municipio entra al código ni a variables de entorno: todo se h
    - al publicar el primer destino o un evento próximo, la etiqueta desaparece sola en la siguiente visita.
 7. **Cuota:** cada municipio empieza con 300 MB de almacenamiento. Un panorama de 8K con sus teselas ocupa unos 17–20 MB. Antes de cargar muchos panoramas, súbela en `/plataforma` → «Cuotas por municipio». El total del plan gratuito de Supabase es de 1 GB para todos los municipios.
 8. **Equipo:** en el municipio → «Miembros», invita a administradores, editores y analistas cuando haga falta. Con SMTP configurado ([«Correo con SMTP gratuito»](#correo-con-smtp-gratuito-gmail)) les llega un correo con la invitación y pueden recibir su código; sin él, solo entran los miembros del equipo de la organización de Supabase.
+
+## Verificación en dos pasos de propietarios y administradores
+
+Desde [ADR-043](adr/ADR-043-staff-second-factor.md), un propietario o administrador entra a su municipio solo con un segundo factor: una app de autenticación (Google Authenticator, Microsoft Authenticator, 1Password…) además del código del correo. Editores y analistas no lo necesitan.
+
+- **La primera vez:**
+  - el inicio del panel muestra «Pide verificación en dos pasos» junto al municipio;
+  - al abrirlo, `/verificacion` muestra un QR y una clave para la app, y pide el código de 6 dígitos;
+  - quien ya configuró la app (por ejemplo, el operador en `/plataforma`) solo escribe el código.
+- **Después:** al iniciar sesión, el código de la app se pide una vez por sesión y vale para todos sus municipios.
+- **En «Miembros»** cada propietario y administrador dice «Con verificación en dos pasos» o «Sin verificación en dos pasos: se le pedirá al entrar».
+- **Perdió el teléfono:**
+  1. el operador confirma que la persona es quien dice ser (por ejemplo, por teléfono);
+  2. en `/plataforma` → «Restablecer la verificación en dos pasos», escribe su correo y confirma;
+  3. la persona configura una app nueva la próxima vez que abre su municipio.
+
+  Queda en la auditoría de cada uno de sus municipios. Las sesiones que ya tenía abiertas siguen abiertas: si alguien más pudo entrar a su cuenta, el propietario le quita el acceso en «Miembros».
+
+- **El operador perdió su propio teléfono:** en Supabase → SQL Editor, con su correo:
+
+  ```sql
+  delete from auth.mfa_factors
+  where user_id = (select id from auth.users where email = 'correo-del-operador@ejemplo.com');
+  ```
+
+  Al volver a `/plataforma`, configura una app nueva. Solo para este caso: para cualquier otra persona, usa la página del operador.
 
 ## Correo con SMTP gratuito (Gmail)
 
