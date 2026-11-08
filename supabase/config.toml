@@ -213,7 +213,9 @@ token_refresh = 150
 # Number of sign up and sign-in requests that can be made in a 5 minute interval per IP address (excludes anonymous users).
 sign_in_sign_ups = 30
 # Number of OTP / Magic link verifications that can be made in a 5 minute interval per IP address.
-token_verifications = 30
+# Rikuy: the integration and browser suites verify an email code AND a TOTP code for each
+# owner sign-in (ADR-043); local and CI only, production is configured in its dashboard.
+token_verifications = 300
 # Number of Web3 logins that can be made in a 5 minute interval per IP address.
 web3 = 30
 

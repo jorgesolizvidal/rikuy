@@ -8,6 +8,7 @@ import { createSupabaseAuthGateway } from "../auth-gateway";
 import { createMembershipReader } from "../membership-reader";
 import { createSessionClient } from "../session-client";
 import { createTenantConfigRepository } from "../tenant-config";
+import { totp } from "./totp";
 
 export const env = {
   url: process.env.SUPABASE_URL ?? "http://127.0.0.1:54321",
@@ -88,7 +89,44 @@ export async function latestCodeFor(
 
 export const pause = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export async function signIn(email: string) {
+/**
+ * TOTP secret of the seeded demo owners (supabase/seed.sql). Synthetic, local only: owners
+ * and admins act only with a second factor (ADR-043).
+ */
+export const SEED_TOTP_SECRET = "JBSWY3DPEHPK3PXP";
+
+/**
+ * Raises a signed-in session to aal2 with the seeded factor, the way the panel does after
+ * the person types the code of their app. Returns false when the user has no factor.
+ */
+export async function passSecondFactor(
+  client: ReturnType<typeof newSession>["client"],
+  secret = SEED_TOTP_SECRET,
+): Promise<boolean> {
+  const { data, error } = await client.auth.mfa.listFactors();
+  if (error) throw new Error(`Listing factors: ${error.message}`);
+  const factor = data.totp[0];
+  if (!factor) return false;
+  // Auth accepts the codes of the windows next to the current one. If a code was already
+  // used in this window (the suites sign the same owner in again within seconds), the
+  // neighbour windows still work.
+  let last = "";
+  for (const offset of [0, 30_000, -30_000]) {
+    const verified = await client.auth.mfa.challengeAndVerify({
+      factorId: factor.id,
+      code: totp(secret, Date.now() + offset),
+    });
+    if (!verified.error) return true;
+    last = verified.error.message;
+  }
+  throw new Error(`Second factor: ${last}`);
+}
+
+/**
+ * Signs in with the email code. People with a factor (the seeded owners) also pass the
+ * second factor unless `secondFactor: false`, to test what a session without it can do.
+ */
+export async function signIn(email: string, options: { readonly secondFactor?: boolean } = {}) {
   const session = newSession();
   // GoTrue enforces a minimum interval between emails to the same address.
   await pause(1_100);
@@ -99,6 +137,7 @@ export async function signIn(email: string) {
   const actor = await session.gateway.currentActor();
   if (actor === null) throw new Error(`No session after verifying the code for ${email}`);
   expect(actor.email).toBe(email);
+  if (options.secondFactor !== false) await passSecondFactor(session.client);
   return { ...session, actor };
 }
 

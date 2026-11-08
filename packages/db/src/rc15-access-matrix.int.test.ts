@@ -4,6 +4,9 @@
  * Norte's private data; nobody outside Demo Norte — another municipality's owner, a revoked
  * member, a visitor — gets anything, and inside it each role gets exactly what it should.
  *
+ * The owner of Demo Norte also appears WITHOUT the second factor (ADR-043): for the
+ * database, that session is an outsider of its own municipality.
+ *
  * Writes use a stale edit count: an allowed role is stopped by the concurrency check
  * (PT409) after passing authorization, a forbidden one by authorization itself (42501).
  * Nothing in the seed changes.
@@ -27,10 +30,17 @@ const VALID_DOCUMENT = {
 };
 const STALE = 999_999;
 
-type Actor = "owner" | "editor" | "revoked" | "otherOwner" | "visitor";
-const ACTORS: readonly Actor[] = ["owner", "editor", "revoked", "otherOwner", "visitor"];
+type Actor = "owner" | "ownerNoFactor" | "editor" | "revoked" | "otherOwner" | "visitor";
+const ACTORS: readonly Actor[] = [
+  "owner",
+  "ownerNoFactor",
+  "editor",
+  "revoked",
+  "otherOwner",
+  "visitor",
+];
 /** The ones that must never see or touch anything private of Demo Norte. */
-const OUTSIDERS: readonly Actor[] = ["revoked", "otherOwner", "visitor"];
+const OUTSIDERS: readonly Actor[] = ["ownerNoFactor", "revoked", "otherOwner", "visitor"];
 
 /** "rows:N", or the error code when the request is refused. */
 async function rows(
@@ -61,6 +71,9 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
       clients[actor] = session.client;
       userIds[actor] = session.actor.userId;
     }
+    const noFactor = await signIn(USERS.ownerNorte, { secondFactor: false });
+    clients.ownerNoFactor = noFactor.client;
+    userIds.ownerNoFactor = noFactor.actor.userId;
     clients.visitor = createClient(env.url, env.publishableKey, {
       auth: { persistSession: false, autoRefreshToken: false },
     });
@@ -122,6 +135,21 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
       .select("status")
       .eq("tenant_id", NORTE);
     expect(data).toEqual([{ status: "revoked" }]);
+    // Without the second factor the owner still sees their own membership (the panel
+    // lists the municipality and asks for the code), and the panel is told so.
+    const own = await clients.ownerNoFactor
+      .from("memberships")
+      .select("role")
+      .eq("tenant_id", NORTE);
+    expect(own.data).toEqual([{ role: "owner" }]);
+    const listed = await clients.ownerNoFactor.rpc("my_memberships");
+    expect(listed.data).toContainEqual(
+      expect.objectContaining({ slug: "demo-norte", role: "owner", needs_second_factor: true }),
+    );
+    const verified = await clients.owner.rpc("my_memberships");
+    expect(verified.data).toContainEqual(
+      expect.objectContaining({ slug: "demo-norte", needs_second_factor: false }),
+    );
   });
 
   it("saving a draft: owner and editor pass authorization, outsiders are refused", async () => {
@@ -137,6 +165,7 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
     );
     expect(result).toEqual({
       owner: "PT409",
+      ownerNoFactor: "42501",
       editor: "PT409",
       revoked: "42501",
       otherOwner: "42501",
@@ -156,6 +185,7 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
     );
     expect(result).toEqual({
       owner: "PT409",
+      ownerNoFactor: "42501",
       editor: "42501",
       revoked: "42501",
       otherOwner: "42501",
@@ -169,6 +199,7 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
     );
     expect(result).toEqual({
       owner: "ok",
+      ownerNoFactor: "42501",
       editor: "42501",
       revoked: "42501",
       otherOwner: "42501",
@@ -197,6 +228,7 @@ describe.runIf(stackAvailable)("RC-15 · access matrix (Data API, RPC, Storage)"
     });
     expect(result).toEqual({
       owner: "signed",
+      ownerNoFactor: "refused",
       editor: "signed",
       revoked: "refused",
       otherOwner: "refused",

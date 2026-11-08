@@ -15,17 +15,10 @@ import { runAi } from "@/server/ai-gateway";
 import { identityAdmin } from "@/server/identity-admin";
 import { platformSettings } from "@/server/platform";
 
+import type { EnrollState, VerifyState } from "../mfa-panel";
+
 // Every action re-checks the operator (and its second factor) through the use cases and
 // again in the database. None of them redirects: the client navigates on success.
-
-export type EnrollState =
-  | { readonly status: "idle" | "denied" | "error" }
-  | {
-      readonly status: "enrolling";
-      readonly factorId: string;
-      readonly qrCode: string;
-      readonly secret: string;
-    };
 
 export async function startEnrollmentAction(): Promise<EnrollState> {
   try {
@@ -36,10 +29,6 @@ export async function startEnrollmentAction(): Promise<EnrollState> {
   } catch {
     return { status: "error" };
   }
-}
-
-export interface VerifyState {
-  readonly status: "idle" | "verified" | "invalid_code" | "rate_limited" | "unavailable" | "denied";
 }
 
 export async function verifyOperatorAction(

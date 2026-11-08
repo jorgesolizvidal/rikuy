@@ -10,16 +10,40 @@ export async function listMyOrganizations(
   return [...memberships].sort((a, b) => a.displayName.localeCompare(b.displayName, "es"));
 }
 
+export type OrganizationAccess =
+  | { readonly status: "open"; readonly membership: OrganizationMembership }
+  /** Owner or admin without a verified second factor in this session (ADR-043). */
+  | { readonly status: "second_factor"; readonly membership: OrganizationMembership }
+  | { readonly status: "not_found" };
+
 /**
- * The actor's membership in the organization identified by `slug`, or null. Callers must
- * treat null as "not found" so the existence of other organizations is never revealed.
- * Membership is read live on every call: a revoked member loses access immediately.
+ * Where the actor stands in the organization `slug`. Membership is read live on every
+ * call: a revoked member loses access immediately. `not_found` never reveals whether the
+ * organization exists.
+ */
+export async function organizationAccess(
+  actor: Actor,
+  slug: string,
+  reader: MembershipReader,
+): Promise<OrganizationAccess> {
+  const memberships = await reader.listActiveMemberships(actor.userId);
+  const membership = memberships.find((entry) => entry.slug === slug);
+  if (!membership) return { status: "not_found" };
+  return membership.needsSecondFactor
+    ? { status: "second_factor", membership }
+    : { status: "open", membership };
+}
+
+/**
+ * The actor's membership in the organization identified by `slug`, or null when they
+ * cannot act in it right now (no membership, or an owner/admin still missing the second
+ * factor). Callers must treat null as "not found"; the database refuses the same cases.
  */
 export async function openOrganization(
   actor: Actor,
   slug: string,
   reader: MembershipReader,
 ): Promise<OrganizationMembership | null> {
-  const memberships = await reader.listActiveMemberships(actor.userId);
-  return memberships.find((membership) => membership.slug === slug) ?? null;
+  const access = await organizationAccess(actor, slug, reader);
+  return access.status === "open" ? access.membership : null;
 }

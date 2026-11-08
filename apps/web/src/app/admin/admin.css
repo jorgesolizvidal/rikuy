@@ -163,6 +163,12 @@ main:focus {
   font-size: 0.875rem;
 }
 
+/* A municipality that asks for the second factor before opening (ADR-043). */
+.org-detail-attention {
+  color: var(--accent);
+  font-weight: 600;
+}
+
 .branding-heading {
   display: grid;
   gap: 0.5rem;

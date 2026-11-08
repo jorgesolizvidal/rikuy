@@ -7,10 +7,10 @@ set local search_path = public, extensions;
 
 \set ta 'aaaaaaaa-0000-4000-8000-000000000001'
 \set tb 'bbbbbbbb-0000-4000-8000-000000000001'
-\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}'
-\set a3c '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}'
-\set a4c '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated"}'
-\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}'
+\set a1c '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}'
+\set a3c '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}'
+\set a4c '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated","aal":"aal2"}'
+\set b1c '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}'
 \set manifest '{"version":1,"projection":"equirectangular","source":{"width":8192,"height":4096,"bytes":9000000,"mime":"image/jpeg","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},"preview":{"file":"preview.webp","width":1024,"height":512,"bytes":18000},"image":{"file":"image.webp","width":4096,"height":2048,"bytes":1400000},"tiles":{"tileSize":512,"format":"webp","levels":[{"width":2048,"height":1024,"cols":4,"rows":2,"dir":"tiles/0"}]}}'
 \set sha '0000000000000000000000000000000000000000000000000000000000000abc'
 

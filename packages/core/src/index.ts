@@ -17,6 +17,7 @@ export * from "./contracts/organization";
 export * from "./application/identity/ports";
 export * from "./application/identity/sign-in";
 export * from "./application/identity/organizations";
+export * from "./application/identity/second-factor";
 export * from "./domain/branding/color";
 export * from "./domain/branding/theme";
 export * from "./contracts/presentation";

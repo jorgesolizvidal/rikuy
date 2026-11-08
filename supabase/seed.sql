@@ -5,8 +5,8 @@
 -- Admin:    http://app.localhost:3000  — sign in with one of the emails below; the code
 --           arrives in Mailpit (http://127.0.0.1:54324). Users have no password.
 --
---   owner@demo-norte.example.test     owner of Demo Norte
---   owner@demo-sur.example.test       owner of Demo Sur
+--   owner@demo-norte.example.test     owner of Demo Norte (second factor: secret below)
+--   owner@demo-sur.example.test       owner of Demo Sur (second factor: secret below)
 --   editor.ambos@example.test         editor in Demo Norte, analyst in Demo Sur
 --   revocado@demo-norte.example.test  admin of Demo Norte whose access was revoked
 --   operador@rikuy.example.test       platform operator (/plataforma; enrolls TOTP on first visit)
@@ -42,6 +42,17 @@ select
 from auth.users u
 where u.id::text like '5eed0000-%'
 on conflict do nothing;
+
+-- Second factor of the two demo owners (ADR-043: owners and admins act only with one). A
+-- verified TOTP factor with a KNOWN, synthetic secret, so local tests and people pass the
+-- second factor with a real code: add JBSWY3DPEHPK3PXP to an authenticator app, or compute
+-- it in tests (packages/db/src/integration/totp.ts). Local seed only; never real accounts.
+-- The operator keeps no factor: the ZC-01 rehearsal enrolls it.
+insert into auth.mfa_factors (id, user_id, friendly_name, factor_type, status, created_at, updated_at, secret)
+values
+  ('5eed0f00-0000-4000-8000-000000000001', '5eed0000-0000-4000-8000-000000000001', 'Rikuy', 'totp', 'verified', now(), now(), 'JBSWY3DPEHPK3PXP'),
+  ('5eed0f00-0000-4000-8000-000000000002', '5eed0000-0000-4000-8000-000000000002', 'Rikuy', 'totp', 'verified', now(), now(), 'JBSWY3DPEHPK3PXP')
+on conflict (id) do nothing;
 
 -- Platform operator (separate from tenant memberships; acts only with a second factor).
 insert into public.platform_operators (user_id) values ('5eed0000-0000-4000-8000-000000000005');

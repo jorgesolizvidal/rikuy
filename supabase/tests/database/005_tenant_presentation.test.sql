@@ -105,29 +105,29 @@ reset role;
 
 -- ── Roles that may not manage the brand ────────────────────────────────────
 set local role authenticated;
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, null)', 'aaaaaaaa-0000-4000-8000-000000000001', :'brand_a2'),
   '42501', null, 'an editor cannot save the brand'
 );
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, null)', 'aaaaaaaa-0000-4000-8000-000000000001', :'brand_a2'),
   '42501', null, 'an analyst cannot save the brand'
 );
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a5","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a5","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, null)', 'aaaaaaaa-0000-4000-8000-000000000001', :'brand_a2'),
   '42501', null, 'a revoked admin cannot save the brand'
 );
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, null)', 'aaaaaaaa-0000-4000-8000-000000000001', :'brand_a2'),
   '42501', null, 'the owner of B cannot save the brand of A'
 );
 
 -- ── Owner of A edits a draft with optimistic concurrency ───────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}';
 select results_eq(
   format('select version, revision from public.save_tenant_config_draft(%L, %L, null)', 'aaaaaaaa-0000-4000-8000-000000000001', :'brand_a2'),
   $$values (2, 1)$$, 'first save creates draft version 2, revision 1'
@@ -150,7 +150,7 @@ select throws_ok(
 );
 
 -- The owner of B cannot see, nor publish, the draft of A.
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000b1","role":"authenticated","aal":"aal2"}';
 select is(
   (select count(*)::int from public.tenant_config_versions where tenant_id = 'aaaaaaaa-0000-4000-8000-000000000001'),
   0, 'B cannot read any configuration of A'
@@ -159,7 +159,7 @@ select throws_ok(
   format('select * from public.publish_tenant_config(%L, (select id from public.tenant_config_versions limit 0), 2)', 'aaaaaaaa-0000-4000-8000-000000000001'),
   '42501', null, 'B cannot publish for A'
 );
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}';
 select is(
   (select count(*)::int from public.tenant_config_versions where state = 'draft'),
   1, 'an editor of A can read the draft of A'
@@ -170,7 +170,7 @@ select throws_ok(
 );
 
 -- ── Admin of A publishes ────────────────────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   $$select * from public.publish_tenant_config('aaaaaaaa-0000-4000-8000-000000000001', (select id from public.tenant_config_versions where state = 'draft'), 1)$$,
   'PT409', null, 'publishing a stale revision is a conflict'
@@ -229,7 +229,7 @@ select is(
   0, 'a suspended tenant serves no presentation'
 );
 set local role authenticated;
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}';
 select throws_ok(
   format('select * from public.save_tenant_config_draft(%L, %L, null)', 'aaaaaaaa-0000-4000-8000-000000000001', :'brand_a2'),
   '42501', null, 'the owner of a suspended tenant cannot change the brand'

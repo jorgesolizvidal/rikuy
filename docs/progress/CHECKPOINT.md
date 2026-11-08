@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** corrección `fix/lighthouse-margin` (pendiente registrado para antes de P6)
-- **Rama:** `fix/lighthouse-margin` → PR hacia `main`
+- **Último paso completado:** P6 · Paso 1 — segundo factor para propietarios y administradores
+- **Rama:** `feat/p6-step1-owner-mfa` → PR hacia `main`
 
 ## Historial
 
@@ -1414,16 +1414,73 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 
 - El logo de Ucureña corre el nombre del sitio unos píxeles cuando termina de cargar (CLS 0,0005): no hay medidas del logo para reservar su ancho. Queda como está, muy por debajo del límite de 0,1.
 
+### P6 · Paso 1 — segundo factor para propietarios y administradores ✅
+
+- Decisiones del usuario ([ADR-043](../adr/ADR-043-staff-second-factor.md)), 2026-11-07:
+  - **todo el panel del municipio:** sin segundo factor, un propietario o administrador no entra a ese municipio;
+  - **desde el despliegue**, sin período de gracia;
+  - **una pantalla para configurarlo** al abrir el municipio (los municipios donde es editor o analista los sigue usando);
+  - **el operador lo restablece** si alguien pierde el teléfono.
+- Base de datos (`20261107000000_p6_staff_second_factor.sql`, solo expand):
+  - `private.has_tenant_role` cuenta una membresía activa de propietario o administrador **solo con `aal2`** en el JWT. Como toda autorización por municipio pasa por ahí, la regla vale a la vez para las RPC, las tablas (RLS) y Storage, sin tocar cada función. Editores y analistas no cambian;
+  - `my_memberships()`: las membresías activas de la persona con `needs_second_factor`, leído del mismo JWT (sin el factor, la fila del municipio no se lee por RLS y el panel no podría listarlo);
+  - `tenant_member_second_factors()` (propietarios y administradores con su factor): quién ya configuró su app;
+  - `platform_second_factor_reset(correo)` (operador con `aal2`): en una transacción borra los factores TOTP de un propietario o administrador (no editores, no el propio operador) y lo audita (`membership.second_factor_reset`) en cada uno de sus municipios. Sin la clave secreta: el dueño de la función puede borrar en `auth.mfa_factors` (comprobado en producción con una consulta de solo lectura de privilegios).
+  - Seed: los dos propietarios de demo con un factor TOTP verificado de clave sintética documentada (`JBSWY3DPEHPK3PXP`), para pasar el segundo factor con un código real de GoTrue en las pruebas. El operador sigue sin factor (el ensayo ZC-01 lo enrola).
+  - `supabase/config.toml` (solo local y CI): `token_verifications` 30 → 300, porque cada entrada de propietario en las pruebas verifica dos códigos.
+- `@rikuy/core`:
+  - `needsSecondFactor` en la membresía;
+  - `organizationAccess` (`open` / `second_factor` / `not_found`); `openOrganization` ya no devuelve un municipio que pide el factor, así las acciones del servidor responden «sin permiso»;
+  - `secondFactorGate`, `startStaffEnrollment`, `verifyStaffCode` y `safePanelPath` (solo rutas del panel después de verificar);
+  - `resetSecondFactor` (operador con segundo factor, correo normalizado).
+- `@rikuy/db`:
+  - el lector de membresías usa `my_memberships()` y, si la base aún no la tiene (la web sale minutos antes que la migración), la consulta de antes;
+  - «Miembros» suma si cada propietario o administrador tiene el factor (vacío antes de la migración);
+  - `resetSecondFactor` en el repositorio de la plataforma; `isMissingFunction` compartido.
+- Panel:
+  - **inicio:** «Pide verificación en dos pasos» junto a cada municipio que lo pide;
+  - **`/verificacion`:** cualquier página del municipio lleva aquí (`?siguiente=/o/{slug}`). Quien no tiene app ve el QR y la clave; quien ya la tiene, el campo del código. Al verificar vuelve al municipio, y la sesión queda verificada para todos sus municipios. A quien no lo necesita lo devuelve a donde iba;
+  - el componente del QR y el código es uno solo para `/plataforma` y `/verificacion`;
+  - **«Miembros»:** «Con verificación en dos pasos» o «Sin verificación en dos pasos: se le pedirá al entrar»;
+  - **`/plataforma/segundo-factor`:** «Restablecer la verificación en dos pasos», con el correo y una confirmación que nombra a la persona.
+- Tests:
+  - 711 unitarios (core 482, db 133, web 39, worker 43, config 14);
+  - 1.108 pgTAP (45 nuevos, `032_staff_second_factor`):
+    - un propietario o administrador sin `aal2` (o sin `aal` en el JWT) no es miembro: no lee el municipio ni a sus miembros (sí su propia membresía), no crea contenido ni sube archivos, no publica lo que creó con el factor, no escribe el original en Storage, no lee el uso;
+    - con `aal2`, sí; editores y analistas, igual que antes; la misma persona editora en uno y administradora en otro;
+    - `my_memberships()` y quién configuró el factor (no editores, no otro municipio);
+    - el restablecimiento: operador sin factor, administrador, analista, correo desconocido y el propio operador rechazados; borra solo los de esa persona y queda auditado;
+  - los tests existentes simulan sesiones con `aal2` (siguen probando lo mismo);
+  - integración: **RC-15** suma «propietaria de Demo Norte sin segundo factor» (sin borradores, sin guardar, sin publicar, sin lista de miembros, sin firmar originales; ve su propia membresía y `my_memberships` le dice que falta el código). El **ensayo ZC-01** ahora pide que la propietaria nueva configure su app antes de invitar a su equipo (antes, «sin permiso»), y el operador se la restablece (la siguiente sesión pide configurarla otra vez). El resto de las pruebas entran como propietario con el código real de su app (`passSecondFactor`);
+  - **e2e en un navegador real** (`second-factor.e2e.test.ts`, nuevo paso del job «Contracts», 3 casos):
+    - un administrador nuevo de Demo Sur ve el aviso, cualquier página del municipio lo lleva a `/verificacion`, configura la app con la clave mostrada, un código equivocado se rechaza, el correcto abre el municipio y «Miembros» lo muestra;
+    - el operador configura su app, no puede restablecer a un editor, restablece al administrador solo tras confirmar, queda auditado y la siguiente sesión pide configurarla;
+    - a un editor nunca se le pide;
+    - axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - contratos RC-09/10/11/12: 202 (5 nuevos, `/verificacion` a 360, 390 y 1280 px); Copilot (2) y tours (9) con el segundo factor;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador (390 y 1280 px): el aviso en el inicio, el QR con la clave y el código equivocado, la verificación que vuelve a la página pedida, «Miembros» y el restablecimiento con su confirmación.
+- Lo que encontraron las pruebas, ya corregido: en el formulario de restablecer, el botón «Restablecer…» y el de confirmar eran, para React, el mismo `<button>` (la condición era el único hijo de su contenedor), así que al pulsarlo pasaba a «submit» en el mismo clic y el navegador enviaba el formulario **sin confirmar**. Ahora cada botón tiene su `key`. Se revisaron las otras confirmaciones del panel («Quitar acceso», «Volver a esta versión», «Reintentar»): tienen otra estructura y no tienen el problema (comprobado en el navegador con «Quitar acceso»).
+
+**Desviaciones:**
+
+- Restablecer no cierra las sesiones que la persona ya tenía abiertas (una sesión verificada conserva su `aal2`). Si se sospecha de una cuenta tomada, el propietario le quita el acceso en «Miembros».
+- Sin códigos de recuperación (Supabase no los trae): si el operador pierde su propio teléfono, se borra su factor con SQL ([despliegue](../deploy.md#verificación-en-dos-pasos-de-propietarios-y-administradores)).
+- Durante los minutos del despliegue, si la base se actualiza antes que la web, los municipios de propietarios y administradores sin el código desaparecen de la lista hasta que sale la web nueva.
+
 ## Cómo verificarlo
 
-Después del merge, en GitHub (`jorgesolizvidal/rikuy`):
+Después del merge, espera a que terminen «Deploy database» (en Actions) y el despliegue de Vercel. Luego:
 
-1. **Actions → «Lighthouse on production»**: la corrida del merge sale en verde. En su anotación, cada página lista el LCP de sus corridas, por ejemplo `LCP 1830 [1830, 1790, 2410]`, y una página con «measuring 2 more times» muestra 5 valores.
-2. En el celular, abre **https://rikuy-demo-norte.vercel.app/destinos**. Si el navegador ofrece instalar (en Chrome para Android puede tardar unas visitas), el botón «Instalar» aparece arriba a la derecha, junto al nombre, sin mover la página.
+1. En `https://rikuy-app-admin.vercel.app`, cierra sesión y vuelve a entrar con tu correo. En el inicio, junto a tus municipios (Ucureña y las demos), debe decir **«Pide verificación en dos pasos»**.
+2. Abre Ucureña: te lleva a «Verificación en dos pasos». Como ya tienes la app configurada por `/plataforma`, solo escribe el código de 6 dígitos de tu app y pulsa «Verificar». Vuelve a Ucureña.
+3. Abre otro municipio (por ejemplo, Demo Norte): ya no pide el código en esta sesión.
+4. En Ucureña → «Miembros»: tu fila dice «Con verificación en dos pasos»; la de la administradora, «Sin verificación en dos pasos: se le pedirá al entrar». Avísale: la próxima vez que abra Ucureña tendrá que configurar una app (Google Authenticator u otra) con el QR que le muestra el panel.
+5. En `/plataforma` aparece el botón «Restablecer la verificación en dos pasos». No hace falta usarlo ahora: es para cuando alguien pierda el teléfono.
 
 ## Siguiente paso
 
-**P6 · Paso 1 — segundo factor para propietarios y administradores** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step1-owner-mfa`. Empieza con las decisiones del usuario (desde cuándo se exige, qué acciones lo piden, qué pasa con quien todavía no lo configuró) y su ADR.
+**P6 · Paso 2 — métricas por municipio para el operador** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step2-tenant-metrics`. Empieza con las decisiones del usuario (qué cifras, de dónde salen, qué período) y su ADR.
 
 ## Decisiones pendientes del usuario
 

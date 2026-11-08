@@ -14,6 +14,7 @@
 //   The admin pages need a sign-in code: from Mailpit (MAILPIT_URL, as in CI) or, against a
 //   local stand-in, a fixed code (E2E_EMAIL_CODE).
 import { strict as assert } from "node:assert";
+import { createHmac } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 
@@ -126,7 +127,50 @@ async function signIn(context, email) {
   await page.getByLabel("Código de acceso").fill(await emailCode(email, since));
   await page.getByRole("button", { name: "Entrar" }).click();
   await page.waitForURL((url) => !url.pathname.startsWith("/login"), { timeout: 15_000 });
+  await passSecondFactor(page);
   return page;
+}
+
+/** RFC 6238 TOTP of a base32 secret (same as e2e/support/second-factor.ts). */
+function totp(secret, now = Date.now()) {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = "";
+  for (const char of secret.replace(/=+$/u, "").toUpperCase()) {
+    bits += alphabet.indexOf(char).toString(2).padStart(5, "0");
+  }
+  const key = Buffer.from((bits.match(/.{8}/gu) ?? []).map((byte) => Number.parseInt(byte, 2)));
+  const counter = Buffer.alloc(8);
+  counter.writeBigUInt64BE(BigInt(Math.floor(now / 1000 / 30)));
+  const hmac = createHmac("sha1", key).update(counter).digest();
+  const offset = hmac[hmac.length - 1] & 0x0f;
+  return String((hmac.readUInt32BE(offset) & 0x7fffffff) % 1_000_000).padStart(6, "0");
+}
+
+/**
+ * Owners and admins act only with a second factor (ADR-043): the seeded owners have a
+ * factor with this synthetic secret (supabase/seed.sql). RC-09/10 also check /verificacion
+ * itself before the code is typed.
+ */
+const SEED_TOTP_SECRET = "JBSWY3DPEHPK3PXP";
+let secondFactorPageChecked = false;
+
+async function passSecondFactor(page) {
+  await page.goto(`${ADMIN}/verificacion?siguiente=%2Fo%2Fdemo-norte`);
+  if (!new URL(page.url()).pathname.startsWith("/verificacion")) return;
+  if (!secondFactorPageChecked) {
+    secondFactorPageChecked = true;
+    await checkSecondFactorPage(page);
+  }
+  for (const offset of [0, 30_000, -30_000]) {
+    await page.getByLabel("Código de 6 dígitos").fill(totp(SEED_TOTP_SECRET, Date.now() + offset));
+    await page.getByRole("button", { name: "Verificar" }).click();
+    const left = await page
+      .waitForURL((url) => !url.pathname.startsWith("/verificacion"), { timeout: 10_000 })
+      .then(() => true)
+      .catch(() => false);
+    if (left) return;
+  }
+  throw new Error("could not pass the second factor");
 }
 
 /** The admin pages of the owner's municipality, with real ids taken from its lists. */
@@ -232,6 +276,27 @@ async function checkAccessibility(pages, context) {
     }
   }
   await page.close();
+}
+
+/** /verificacion before the code (ADR-043): no overflow and no serious axe findings. */
+async function checkSecondFactorPage(page) {
+  const url = page.url();
+  for (const width of [360, 390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await check(`RC-09 · admin/verificacion at ${width}px has no horizontal overflow`, async () => {
+      await page.goto(url, { waitUntil: "networkidle" });
+      assert.equal(await overflowing(page), null);
+    });
+    if (width === 360) continue;
+    await check(
+      `RC-10 · admin/verificacion at ${width}px: no critical or serious axe findings`,
+      async () => {
+        assert.deepEqual(await axeFindings(page), []);
+      },
+    );
+  }
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(url, { waitUntil: "networkidle" });
 }
 
 async function checkKeyboard(url, label, signedIn) {

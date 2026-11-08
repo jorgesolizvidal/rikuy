@@ -294,6 +294,15 @@ jobs:
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-copilot 2>&1 | tee ../../copilot.log
 
+      # ADR-043: an administrator without a second factor cannot open their municipality, sets
+      # up the app (real TOTP with GoTrue), the operator resets it and it is asked again.
+      - name: Second factor in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-second-factor 2>&1 | tee ../../second-factor.log
+
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
       - name: GLB colors in a real browser
@@ -318,7 +327,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

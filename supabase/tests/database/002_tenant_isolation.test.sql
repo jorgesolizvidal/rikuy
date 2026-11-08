@@ -53,7 +53,7 @@ select throws_ok('select id from public.tenant_domains', '42501', null, 'anon ca
 reset role;
 
 -- ── owner of A ──────────────────────────────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a1","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select results_eq('select slug from public.tenants', array['tenant-a'], 'owner A sees only tenant A');
 select is((select count(*)::int from public.memberships), 6, 'owner A sees the full roster of A (6) and nothing of B');
@@ -79,14 +79,14 @@ select throws_ok(
 reset role;
 
 -- ── admin of A ──────────────────────────────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a2","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select is((select count(*)::int from public.memberships), 6, 'admin A sees the roster of A');
 select is((select count(*)::int from public.tenant_domains), 1, 'admin A sees A domains');
 reset role;
 
 -- ── editor of A ─────────────────────────────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a3","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select results_eq('select slug from public.tenants', array['tenant-a'], 'editor A sees tenant A');
 select is((select count(*)::int from public.memberships), 1, 'editor A sees only their own membership');
@@ -95,28 +95,28 @@ select is((select count(*)::int from public.audit_events), 0, 'editor A cannot r
 reset role;
 
 -- ── analyst of A ────────────────────────────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a4","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select is((select count(*)::int from public.memberships), 1, 'analyst A cannot list other members (no emails/roster)');
 select is((select count(*)::int from public.tenant_config_versions), 1, 'analyst A can read A config');
 reset role;
 
 -- ── revoked admin of A: revocation is immediate even with a valid JWT ──────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a5","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000a5","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select is((select count(*)::int from public.tenants), 0, 'revoked member sees no tenant');
 select is((select count(*)::int from public.tenant_domains), 0, 'revoked admin sees no domains');
 reset role;
 
 -- ── member of A (editor) and B (analyst) ────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000ab","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000ab","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select results_eq('select slug from public.tenants order by slug', array['tenant-a', 'tenant-b'], 'member of A and B sees both tenants');
 select is((select count(*)::int from public.memberships), 2, 'member of A and B sees only their two memberships, not either roster');
 reset role;
 
 -- ── outsider ────────────────────────────────────────────────────────────────
-set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000ff","role":"authenticated"}';
+set local request.jwt.claims to '{"sub":"00000000-0000-4000-8000-0000000000ff","role":"authenticated","aal":"aal2"}';
 set local role authenticated;
 select is((select count(*)::int from public.tenants), 0, 'authenticated user without membership sees nothing');
 reset role;

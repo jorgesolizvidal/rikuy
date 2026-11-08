@@ -149,8 +149,67 @@ describe("auth gateway", () => {
 });
 
 describe("membership reader", () => {
-  it("filters by the actor id and active status and hides suspended tenants", async () => {
+  it("reads my_memberships, with the second factor each one needs (ADR-043)", async () => {
+    const h = harness((url, init) => {
+      if (url.pathname === "/rest/v1/rpc/my_memberships" && init.method === "POST") {
+        return json([
+          {
+            tenant_id: "5eed1000-0000-4000-8000-000000000001",
+            slug: "norte",
+            display_name: "Norte",
+            tenant_status: "active",
+            is_demo: false,
+            role: "owner",
+            needs_second_factor: true,
+          },
+          {
+            tenant_id: "5eed1000-0000-4000-8000-000000000002",
+            slug: "sur",
+            display_name: "Sur",
+            tenant_status: "provisioning",
+            is_demo: true,
+            role: "editor",
+            needs_second_factor: false,
+          },
+          {
+            tenant_id: "5eed1000-0000-4000-8000-000000000003",
+            slug: "x",
+            display_name: "X",
+            tenant_status: "suspended",
+            is_demo: false,
+            role: "admin",
+            needs_second_factor: false,
+          },
+        ]);
+      }
+      return json({}, 404);
+    });
+    expect(await createMembershipReader(h.client).listActiveMemberships(USER_ID)).toEqual([
+      {
+        tenantId: "5eed1000-0000-4000-8000-000000000001",
+        slug: "norte",
+        displayName: "Norte",
+        role: "owner",
+        tenantStatus: "active",
+        needsSecondFactor: true,
+      },
+      {
+        tenantId: "5eed1000-0000-4000-8000-000000000002",
+        slug: "sur",
+        displayName: "Sur",
+        role: "editor",
+        tenantStatus: "provisioning",
+        demo: true,
+      },
+    ]);
+    expect(h.requests.some((r) => r.url.pathname === "/rest/v1/memberships")).toBe(false);
+  });
+
+  it("before the migration, reads the table as before (filtered by actor, active, not suspended)", async () => {
     const h = harness((url) => {
+      if (url.pathname === "/rest/v1/rpc/my_memberships") {
+        return json({ code: "PGRST202", message: "Could not find the function" }, 404);
+      }
       if (url.pathname === "/rest/v1/memberships") {
         return json([
           {
