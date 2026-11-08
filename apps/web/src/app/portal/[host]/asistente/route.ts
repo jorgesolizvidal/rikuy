@@ -1,6 +1,7 @@
 import { askPortalAssistant } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalView } from "@/server/portal-view";
+import { measured } from "@/server/measured-route";
 
 interface AssistantContext {
   readonly params: Promise<{ host: string }>;
@@ -17,7 +18,7 @@ const NO_STORE = { "cache-control": "no-store" };
  * comes from the host, never from the body; the request must come from a page of this same
  * portal (Origin), and the answer is never cached.
  */
-export async function POST(request: Request, { params }: AssistantContext) {
+async function handle(request: Request, { params }: AssistantContext) {
   const view = await portalView((await params).host);
   if (view === null)
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
@@ -44,3 +45,6 @@ export async function POST(request: Request, { params }: AssistantContext) {
     headers: NO_STORE,
   });
 }
+
+/** Timed per municipality and hour (ADR-044). */
+export const POST = measured("assistant", handle);

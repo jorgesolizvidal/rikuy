@@ -89,13 +89,16 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 
 Lo que corre solo cada día ([ADR-035](adr/ADR-035-free-plan-operations.md)), sin configuración nueva más allá de las variables de GitHub:
 
-| Hora (Bolivia) | Qué                                                     | Dónde                                       | Si algo falla                                                                             |
-| -------------- | ------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| 03:37          | Limpieza de fotos y logos sin uso por más de 7 días     | Supabase (`rikuy-remove-unused-media`)      | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
-| 07:07          | Informe interno: espacio, base, trabajos y cuotas       | Supabase (`rikuy-daily-report`) → ejecutor  | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
-| 08:23          | Control externo: inicio y `/mapa` de cada portal, panel | GitHub Actions («Daily health»)             | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
-| Cada 15 min    | Reservas de IA abandonadas (más de 10 min abiertas)     | Supabase (`rikuy-expire-ai-requests`)       | Se cuentan como usadas; también borra pedidos de más de 90 días                           |
-| 03:47          | Propuestas del Copilot vencidas (30 días)               | Supabase (`rikuy-expire-copilot-proposals`) | Las borra; la auditoría conserva lo que se aceptó o rechazó                               |
+| Hora (Bolivia) | Qué                                                                               | Dónde                                       | Si algo falla                                                                             |
+| -------------- | --------------------------------------------------------------------------------- | ------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| 03:37          | Limpieza de fotos y logos sin uso por más de 7 días                               | Supabase (`rikuy-remove-unused-media`)      | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
+| 07:07          | Informe interno: espacio, base, trabajos y cuotas                                 | Supabase (`rikuy-daily-report`) → ejecutor  | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
+| 08:23          | Control externo: inicio y `/mapa` de cada portal, panel                           | GitHub Actions («Daily health»)             | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
+| Cada 15 min    | Reservas de IA abandonadas (más de 10 min abiertas)                               | Supabase (`rikuy-expire-ai-requests`)       | Se cuentan como usadas; también borra pedidos de más de 90 días                           |
+| 03:47          | Propuestas del Copilot vencidas (30 días)                                         | Supabase (`rikuy-expire-copilot-proposals`) | Las borra; la auditoría conserva lo que se aceptó o rechazó                               |
+| 03:27          | Sonda de cada portal en línea (inicio, `/mapa` y una imagen)                      | Supabase (`rikuy-probe-portals`) → ejecutor | El resultado, con su motivo si falló, en «Métricas por municipio»                         |
+| 03:57          | Revisión de que lo publicado está completo                                        | Supabase (`rikuy-check-publication`)        | Los problemas, en «Métricas por municipio» → el municipio                                 |
+| 04:07          | Borrado de métricas viejas (errores, tiempos y revisiones a 30 días; sondas a 90) | Supabase (`rikuy-delete-old-metrics`)       | —                                                                                         |
 
 - **La pausa de Supabase:** el plan gratuito pausa el proyecto tras 7 días con poca actividad. «Daily health» pide `/mapa`, que lee la base en cada visita, así que mientras corra el proyecto no se pausa. GitHub desactiva los workflows programados de un repositorio sin commits en 60 días: si llega ese aviso, se vuelve a activar en Actions.
 - **Probarlo a mano:** Actions → «Daily health» → _Run workflow_. La tabla del resumen dice qué respondió cada portal y con qué versión.
@@ -151,6 +154,15 @@ Desde [ADR-043](adr/ADR-043-staff-second-factor.md), un propietario o administra
   ```
 
   Al volver a `/plataforma`, configura una app nueva. Solo para este caso: para cualquier otra persona, usa la página del operador.
+
+## Métricas por municipio
+
+Desde [ADR-044](adr/ADR-044-tenant-metrics.md), `/plataforma` → «Métricas por municipio» (operador con segundo factor) muestra, por municipio, los errores del servidor, los tiempos de las rutas del asistente, el mapa y el recorrido, la sonda diaria, los trabajos, el uso y el costo estimado de la IA y si lo publicado está completo. Cada cifra dice su fuente y su período.
+
+- **No pide configuración nueva:** usa la misma `WORKER_DATABASE_URL` del ejecutor (rol `rikuy_worker`). Sin ella, no se registra nada y el portal funciona igual.
+- **Un visitante o un municipio reporta un error:** la página de error muestra un «Código de referencia». En el municipio (o en «Errores sin municipio»), búscalo en «ID de petición o código de referencia». Cada respuesta lleva también la cabecera `X-Rikuy-Request-Id`.
+- **Costo de la IA:** es una estimación con la tarifa pública de Groq guardada en `ai_prices` (hoy `groq-2026-10`); el plan gratuito cuesta 0. Cuando Groq cambie su tarifa, se agrega una fila nueva con su fecha en una migración; lo ya calculado no cambia.
+- **«Lo publicado está completo» con problemas:** cada problema dice qué falta. «Publicado y todavía sin leer por el asistente» con más de unos minutos indica un `knowledge.index` fallido (míralo en «Trabajos»); un archivo que falta se arregla volviendo a publicar ese contenido o tour.
 
 ## Correo con SMTP gratuito (Gmail)
 

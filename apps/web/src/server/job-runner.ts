@@ -159,6 +159,11 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           documents: ledger.documents,
           pdf: createPdfTextReader(),
           knowledge: ledger.knowledge,
+          probes: ledger.probes,
+          portalProbe: {
+            portalOrigin: platformSettings().portalOrigin,
+            publicMediaBase: platformSettings().env.NEXT_PUBLIC_SUPABASE_URL,
+          },
         }),
       ),
       runnerId,

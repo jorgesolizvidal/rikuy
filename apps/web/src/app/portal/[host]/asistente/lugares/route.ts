@@ -1,5 +1,6 @@
 import { portalPlanPlaces } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
+import { measured } from "@/server/measured-route";
 
 interface PlacesContext {
   readonly params: Promise<{ host: string }>;
@@ -10,7 +11,7 @@ interface PlacesContext {
  * visitor's phone measures its distance to each one: the position never leaves the device,
  * only rounded distances go with the question. Public data of THIS portal (from the host).
  */
-export async function GET(_request: Request, { params }: PlacesContext) {
+async function handle(_request: Request, { params }: PlacesContext) {
   const view = await portalView((await params).host);
   if (view === null) return Response.json({ error: "not_found" }, { status: 404 });
   const { destinations, events } = await portalPlanPlaces(view);
@@ -25,3 +26,6 @@ export async function GET(_request: Request, { params }: PlacesContext) {
   );
   return Response.json({ places }, { headers: { "cache-control": "public, max-age=60" } });
 }
+
+/** Timed per municipality and hour (ADR-044). */
+export const GET = measured("assistant_places", handle);

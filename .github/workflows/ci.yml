@@ -208,10 +208,16 @@ jobs:
           PLATFORM_ADMIN_HOST: app.localhost:3000
           AI_PROVIDER: simulated
           AI_DATABASE_ROLE: rikuy_ai
+          # The workload's connection also writes the telemetry of errors and latency (ADR-044).
+          WORKER_DATABASE_ROLE: rikuy_worker
         run: |
           export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL"
           export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
           export AI_DATABASE_URL="$SUPABASE_DB_URL"
+          export WORKER_DATABASE_URL="$SUPABASE_DB_URL"
+          # Generated for this run only; nothing here calls the runner.
+          JOB_RUNNER_SECRET="$(openssl rand -hex 32)"
+          export JOB_RUNNER_SECRET
           pnpm --filter @rikuy/web build
           cd apps/web
           nohup pnpm exec next start -p 3000 > ../../next.log 2>&1 &
@@ -303,6 +309,15 @@ jobs:
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-second-factor 2>&1 | tee ../../second-factor.log
 
+      # ADR-044: a real server error recorded with its request ID and reference code, a measured
+      # route, and the operator's metrics pages (search by code, «Revisar ahora»).
+      - name: Metrics in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-metrics 2>&1 | tee ../../metrics.log
+
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
       - name: GLB colors in a real browser
@@ -327,7 +342,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log metrics.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

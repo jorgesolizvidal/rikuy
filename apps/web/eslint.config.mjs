@@ -24,17 +24,19 @@ const secretKeyPaths = [
   },
 ];
 
-// The workload's database connection (rikuy_worker) is opened in exactly one module.
+// The workload's database connection (rikuy_worker) is opened in exactly two modules: the
+// job runner and the telemetry of errors and latency (ADR-044).
 const jobRunnerModule = "src/server/job-runner.ts";
+const telemetryModule = "src/server/telemetry.ts";
 const jobRunnerPaths = [
   {
     name: "@rikuy/db/worker",
-    message: `The job runner's connection lives only in ${jobRunnerModule}.`,
+    message: `The workload's connection lives only in ${jobRunnerModule} and ${telemetryModule}.`,
   },
   {
     name: "@rikuy/config/env",
     importNames: ["parseJobRunnerEnv"],
-    message: `The job runner's settings are read only in ${jobRunnerModule}.`,
+    message: `The job runner's settings are read only in ${jobRunnerModule} and ${telemetryModule}.`,
   },
 ];
 
@@ -102,7 +104,7 @@ const config = [
     },
   },
   {
-    files: [jobRunnerModule],
+    files: [jobRunnerModule, telemetryModule],
     rules: {
       "no-restricted-imports": [
         "error",

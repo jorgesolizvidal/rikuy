@@ -7,7 +7,12 @@ import {
 } from "@rikuy/core";
 import { NextResponse, type NextRequest } from "next/server";
 
-import { TENANT_CONTEXT_HEADER, stripInternalHeaders } from "./internal-headers";
+import {
+  REQUEST_ID_HEADER,
+  REQUEST_ID_RESPONSE_HEADER,
+  TENANT_CONTEXT_HEADER,
+  stripInternalHeaders,
+} from "./internal-headers";
 
 export interface PortalProxyDeps {
   readonly hosts: PlatformHosts;
@@ -57,10 +62,21 @@ const ADMIN_HEADERS = {
  * admin host → /admin · platform apex → /platform · portal host → /portal/{host}
  * Unknown portal hosts get 404, an unreachable registry 503, aliases a 308 to the
  * canonical host. X-Forwarded-Host and X-Tenant-* headers are never trusted.
+ *
+ * Every request gets its own ID (ADR-044): forwarded to the app (errors are recorded with
+ * it) and returned as X-Rikuy-Request-Id, also on cached pages and status pages.
  */
 export function createPortalProxy(deps: PortalProxyDeps) {
   return async function portalProxy(request: NextRequest): Promise<NextResponse> {
+    const requestId = crypto.randomUUID();
+    const response = await route(request, requestId);
+    response.headers.set(REQUEST_ID_RESPONSE_HEADER, requestId);
+    return response;
+  };
+
+  async function route(request: NextRequest, requestId: string): Promise<NextResponse> {
     const headers = stripInternalHeaders(request.headers);
+    headers.set(REQUEST_ID_HEADER, requestId);
     const surface = classifyHost(request.headers.get("host"), deps.hosts);
 
     switch (surface.kind) {
@@ -68,6 +84,7 @@ export function createPortalProxy(deps: PortalProxyDeps) {
         return statusPage(400, "Solicitud no válida", "El dominio de la solicitud no es válido.");
       case "admin": {
         const respond = (forwarded: Headers) => {
+          forwarded.set(REQUEST_ID_HEADER, requestId);
           const response = rewrite(request, ROUTES.admin, forwarded);
           for (const [key, value] of Object.entries(ADMIN_HEADERS))
             response.headers.set(key, value);
@@ -111,5 +128,5 @@ export function createPortalProxy(deps: PortalProxyDeps) {
         );
       }
     }
-  };
+  }
 }

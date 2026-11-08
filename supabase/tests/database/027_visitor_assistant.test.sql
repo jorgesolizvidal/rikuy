@@ -82,7 +82,8 @@ select is_empty(
   $$select table_name, column_name from information_schema.columns
     where table_schema in ('public', 'private', 'ai_api')
       and column_name ~* '(question|answer|prompt|message|conversation)'
-      and table_name not in ('job_attempts', 'background_jobs')$$,
+      -- Error messages of jobs and of server errors (cut at «?», ADR-044), never a visitor's text.
+      and table_name not in ('job_attempts', 'background_jobs', 'request_errors')$$,
   'no column stores questions, answers or conversations'
 );
 

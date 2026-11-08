@@ -30,6 +30,11 @@ import {
 } from "./processors/process-panorama";
 import { probeProcessor } from "./processors/probe";
 import {
+  createProbePortalProcessor,
+  createTimedFetch,
+  type ProbePortalDeps,
+} from "./processors/probe-portal";
+import {
   createRemoveUnusedMediaProcessor,
   type RemoveUnusedMediaDeps,
 } from "./processors/remove-unused-media";
@@ -41,7 +46,9 @@ export {
   createMembershipInvitationMailProcessor,
   createProcessModelProcessor,
   createProcessPanoramaProcessor,
+  createProbePortalProcessor,
   createRemoveUnusedMediaProcessor,
+  createTimedFetch,
   probeProcessor,
 };
 export type {
@@ -51,6 +58,7 @@ export type {
   MembershipInvitationMailDeps,
   ProcessModelDeps,
   ProcessPanoramaDeps,
+  ProbePortalDeps,
   RemoveUnusedMediaDeps,
 };
 
@@ -60,6 +68,7 @@ export type ProcessorDeps = ExpireAbandonedUploadDeps &
   Omit<ProcessModelDeps, "media"> &
   MembershipInvitationMailDeps &
   RemoveUnusedMediaDeps &
+  ProbePortalDeps &
   Omit<ExtractDocumentDeps, "media"> &
   Omit<IndexKnowledgeDeps, "media">;
 
@@ -80,5 +89,6 @@ export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
     createRemoveUnusedMediaProcessor(deps),
     createExtractDocumentProcessor(deps),
     createIndexKnowledgeProcessor(deps),
+    createProbePortalProcessor(deps),
   ];
 }

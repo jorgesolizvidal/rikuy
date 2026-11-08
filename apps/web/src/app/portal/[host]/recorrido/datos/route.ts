@@ -1,6 +1,7 @@
 import { portalTour } from "@/server/portal-content";
 import { tourData } from "@/server/portal-tours";
 import { portalView } from "@/server/portal-view";
+import { measured } from "@/server/measured-route";
 
 /**
  * One tour's viewer data (JSON), so the general tour jumps to it without leaving the viewer
@@ -14,7 +15,7 @@ interface TourDataContext {
   readonly params: Promise<{ host: string }>;
 }
 
-export async function GET(request: Request, { params }: TourDataContext) {
+async function handle(request: Request, { params }: TourDataContext) {
   const view = await portalView((await params).host);
   if (view === null) return new Response("Not found", { status: 404 });
   const search = new URL(request.url).searchParams;
@@ -29,3 +30,6 @@ export async function GET(request: Request, { params }: TourDataContext) {
     headers: { "cache-control": "public, max-age=60, s-maxage=120, stale-while-revalidate=300" },
   });
 }
+
+/** Timed per municipality and hour (ADR-044). */
+export const GET = measured("tour_data", handle);

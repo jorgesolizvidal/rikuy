@@ -3,6 +3,7 @@ import { DICTATION_LIMITS, DICTATION_MESSAGES } from "@rikuy/core";
 import { transcribePortalDictation } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalView } from "@/server/portal-view";
+import { measured } from "@/server/measured-route";
 
 interface DictationContext {
   readonly params: Promise<{ host: string }>;
@@ -20,7 +21,7 @@ const NO_STORE = { "cache-control": "no-store" };
  * (never sent as a question by itself), or a short message: the visitor can always type.
  * Neither the audio nor the text is kept.
  */
-export async function POST(request: Request, { params }: DictationContext) {
+async function handle(request: Request, { params }: DictationContext) {
   const view = await portalView((await params).host);
   if (view === null)
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
@@ -78,3 +79,6 @@ async function readAtMost(request: Request, limit: number): Promise<Uint8Array |
   }
   return audio;
 }
+
+/** Timed per municipality and hour (ADR-044). */
+export const POST = measured("dictation", handle);
