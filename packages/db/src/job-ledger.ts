@@ -1,4 +1,5 @@
 import type {
+  PortalProbeStore,
   AbandonedUploadStore,
   ClaimedJob,
   DocumentStore,
@@ -48,6 +49,8 @@ export interface PostgresJobLedger extends JobLedger {
   readonly documents: DocumentStore;
   /** knowledge.index: worker_api.knowledge_source / store_knowledge_chunks. */
   readonly knowledge: KnowledgeIndexStore;
+  /** metrics.probe_portal: worker_api.portal_probe_target / record_portal_probe (ADR-044). */
+  readonly probes: PortalProbeStore;
   /** The daily report (worker_api.operations_report): no lease, changes nothing. */
   operationsReport(): Promise<OperationsReport>;
   close(): Promise<void>;
@@ -210,6 +213,39 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
             select worker_api.claim_unused_media(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as folder
           `;
           return typeof row?.folder === "string" ? row.folder : null;
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    probes: {
+      async target(lease) {
+        try {
+          const rows = await sql`
+            select host, media_path
+            from worker_api.portal_probe_target(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          const row = rows[0];
+          if (!row) return null;
+          const parsed = z
+            .object({ host: z.string().min(1), media_path: z.string().nullable() })
+            .parse(row);
+          return { host: parsed.host, mediaPath: parsed.media_path };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async record(lease, results) {
+        try {
+          await sql`
+            select worker_api.record_portal_probe(
+              ${lease.jobId}::uuid, ${lease.fencingToken}::bigint, ${json(results)}::jsonb
+            )
+          `;
+          return "recorded";
         } catch (error) {
           if (leaseLost(error)) return "lease_lost";
           throw error;

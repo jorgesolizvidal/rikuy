@@ -172,6 +172,30 @@ describe("portal proxy", () => {
     expect(setCookie.toLowerCase()).not.toContain("domain=");
   });
 
+  it("gives every request its own ID, forwarded and returned, and never trusts one sent in", async () => {
+    const spoofed = "11111111-1111-4111-8111-111111111111";
+    for (const url of [
+      "http://norte.localhost:3000/destinos",
+      "http://app.localhost:3000/",
+      "http://localhost:3000/",
+      "http://nadie.localhost:3000/",
+    ]) {
+      const response = await proxy(request(url, { "x-rikuy-request-id": spoofed }));
+      const id = response.headers.get("x-rikuy-request-id");
+      expect(id, url).toMatch(
+        /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+      );
+      expect(id, url).not.toBe(spoofed);
+      if (response.status < 400)
+        expect(forwardedHeader(response, "x-rikuy-request-id"), url).toBe(id);
+    }
+    const first = await proxy(request("http://norte.localhost:3000/"));
+    const second = await proxy(request("http://norte.localhost:3000/"));
+    expect(first.headers.get("x-rikuy-request-id")).not.toBe(
+      second.headers.get("x-rikuy-request-id"),
+    );
+  });
+
   it("marks admin responses as not indexable and not frameable", async () => {
     const response = await proxy(request("http://app.localhost:3000/login"));
     expect(rewrittenPath(response)).toBe("/admin/login");

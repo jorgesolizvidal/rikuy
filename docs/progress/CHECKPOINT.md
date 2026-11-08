@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** P6 · Paso 1 — segundo factor para propietarios y administradores
-- **Rama:** `feat/p6-step1-owner-mfa` → PR hacia `main`
+- **Último paso completado:** P6 · Paso 2 — métricas por municipio para el operador
+- **Rama:** `feat/p6-step2-tenant-metrics` → PR hacia `main`
 
 ## Historial
 
@@ -1468,19 +1468,70 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - Sin códigos de recuperación (Supabase no los trae): si el operador pierde su propio teléfono, se borra su factor con SQL ([despliegue](../deploy.md#verificación-en-dos-pasos-de-propietarios-y-administradores)).
 - Durante los minutos del despliegue, si la base se actualiza antes que la web, los municipios de propietarios y administradores sin el código desaparecen de la lista hasta que sale la web nueva.
 
+**Verificación en producción (2026-11-07):** el usuario cerró sesión y volvió a entrar. Sus municipios decían «Pide verificación en dos pasos»; al abrir Ucureña escribió el código de su app y volvió al municipio; Demo Norte ya no lo pidió en esa sesión; en «Miembros» de Ucureña su fila dice «Con verificación en dos pasos».
+
+### P6 · Paso 2 — métricas por municipio para el operador ✅
+
+- Decisiones del usuario ([ADR-044](../adr/ADR-044-tenant-metrics.md)), 2026-11-07:
+  - **registro propio de errores** en la base, con un ID por petición (en Vercel Hobby los registros duran una hora);
+  - **latencias resumidas por hora** en las rutas que atiende el servidor, más una **sonda diaria** de cada portal;
+  - **costo estimado de la IA** con la tarifa pública de Groq, guardando qué tarifa se usó;
+  - **integridad de lo publicado** cada día y con un botón del operador.
+- Base de datos (`20261108000000_p6_tenant_metrics.sql`, solo expand):
+  - `request_errors` (municipio, superficie, patrón de la ruta, método, ID de petición, `digest`, tipo y mensaje recortado en `?` y a 300 caracteres; sin cuerpos, cabeceras, IP ni correos). Como mucho 1.000 errores por municipio y hora; se conserva 30 días;
+  - `route_latency_hourly`: por municipio, hora y ruta, los pedidos, los errores 5xx, el tiempo total y un histograma de 9 tramos (≤ 50 … 6.400 ms y más). `private.histogram_percentile` da el p50/p95 como **límite superior del tramo**;
+  - `portal_probes` y el trabajo **`metrics.probe_portal`** (cola `system`), que la tarea `rikuy-probe-portals` (07:27 UTC) encola por cada municipio en línea; `worker_api.portal_probe_target` y `record_portal_probe`, solo bajo el arrendamiento;
+  - `ai_prices` (tarifas versionadas, la primera `groq-2026-10`: GPT-OSS 120B a 0,15 / 0,60 USD por millón de tokens y el dictado con Whisper a 0,04 USD por hora de audio) y, en `ai_executions`, `price_version` y `estimated_cost_usd`, que completa un trigger. Las llamadas ya registradas reciben su costo al migrar; el proveedor simulado queda «sin tarifa»;
+  - `private.check_publication`: una sola consulta sobre `storage.objects` que revisa portadas y fotos publicadas, **cada archivo de cada tour** (vista previa, imagen, cada tesela, modelo, poster y fotos de los puntos), el logo de la marca activa y que lo publicado esté leído por el asistente (lo publicado hace menos de 15 min cuenta como «leyéndose»). El resultado va a `publication_checks` (hasta 200 problemas). Tarea diaria `rikuy-check-publication` (07:57 UTC);
+  - `rikuy-delete-old-metrics` (08:07 UTC) borra lo de más de 30 días;
+  - escrituras solo por `worker_api` con el rol `rikuy_worker` (`record_request_error`, `record_route_latency`): ni la clave pública ni la de un usuario pueden escribir métricas;
+  - lecturas solo para operadores con segundo factor: `platform_metrics_overview`, `platform_tenant_metrics`, `platform_tenant_errors` (con búsqueda por ID de petición o código de referencia) y `platform_check_publication` («Revisar ahora»).
+- `@rikuy/core`: contrato de métricas, `describeServerError` (municipio por el contexto del proxy en el portal o por `/o/{slug}` en el panel; superficie por el patrón de la ruta), `cleanErrorMessage`, casos de uso de lectura y «Revisar ahora», y la sonda (`planPortalProbe`, `runPortalProbe`: una falla queda registrada con su motivo, nunca lanza).
+- `@rikuy/db`: `createMetricsRepository` (sesión del operador), `createPostgresTelemetry` (conexión del ejecutor, una sola, en `@rikuy/db/worker`) y el almacén de la sonda en el ledger.
+- `apps/worker`: procesador `metrics.probe_portal`: inicio del portal, `/mapa` y el último archivo público del municipio, con estado, tiempo al primer byte, total, peso y si salió de la caché.
+- Web:
+  - el proxy genera un UUID por petición, lo pasa como cabecera interna (`x-rikuy-request-id`; una entrante se descarta) y lo devuelve como **`X-Rikuy-Request-Id`**, también en las páginas en caché;
+  - `instrumentation.ts` (`onRequestError`) registra todo error del servidor; las páginas de error del portal y del panel muestran el **«Código de referencia»**;
+  - `measured()` mide el asistente, el dictado, los lugares del asistente, los lugares del mapa y los datos del recorrido, y escribe después de responder (`after()`): una falla al escribir no afecta al visitante. Sin `WORKER_DATABASE_URL` no se registra nada;
+  - `src/server/telemetry.ts`, junto con `job-runner.ts`, son los únicos que abren la conexión del ejecutor (ESLint);
+  - **`/plataforma/metricas`** («Métricas por municipio», enlace desde `/plataforma`): una fila por municipio (errores, rutas con su p95, trabajos, IA con su costo estimado, sonda e integridad) y los errores sin municipio;
+  - **`/plataforma/metricas/{slug}`**: errores con su búsqueda, rutas (pedidos, errores, p50/p95), sonda, trabajos por tipo en 7 días (encolados, terminados, fallidos, en curso o esperando, duración p95 de un intento), IA por modelo (llamadas, tokens, audio, costo estimado junto al **plan actual: 0 USD**) e integridad con «Revisar ahora»;
+  - **cada cifra lleva su fuente (tabla) y su período** (24 h o 7 días hasta la hora de la base; la sonda y la integridad, con la hora de su última corrida).
+- CI, job «Contracts»: el servidor arranca con la conexión del ejecutor y un nuevo paso **«Metrics in a real browser»**. El lint de SQL suma el esquema `worker_api`.
+- Tests:
+  - 723 unitarios (core 490, db 133, web 40, worker 46, config 14);
+  - 1.160 pgTAP (52 nuevos, `033_tenant_metrics`): ni visitantes, ni personas, ni la clave secreta escriben métricas y nadie lee sus tablas directamente; rutas y municipios desconocidos ignorados; histograma y percentiles (también «más de 6,4 s»); errores del portal y del panel con su municipio, campos raros saneados, mensaje recortado y tope de 1.000 por hora; una sonda por municipio en línea y por día (no en preparación) con sus resultados; costo de GPT-OSS y de Whisper, ninguna tarifa antes de su fecha y «sin tarifa»; integridad con una foto sin copia pública y una revisión sin leer, y nada cuando están; un propietario o un operador sin segundo factor no revisan ni leen;
+  - integración contra la pila local (`metrics.int.test.ts`, 3 casos, y en `tour-publication.int.test.ts` un caso nuevo: se borra una imagen pública del tour por la API de Storage y la revisión la señala como `tour_file_missing`);
+  - **e2e en un navegador real** (`metrics.e2e.test.ts`, 3 casos): un **error real** en `/mapa` de Demo Sur (la función que lee se renombra un momento) muestra su código de referencia y queda registrado con el mismo ID de petición que llevó la respuesta, su municipio y el patrón de la ruta; una ruta medida suma un pedido en su hora; el operador con segundo factor encuentra el error por su código y pulsa «Revisar ahora»; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - contratos RC-09/10/11/12 (202) y portales (161) en verde;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador: el error real con su código y su ID, las rutas medidas con sus tramos, la sonda corrida por el ejecutor real (inicio y mapa de las dos demos), la búsqueda por código y «Revisar ahora».
+- Lo que encontraron las pruebas, ya corregido:
+  - Next.js informa la dirección que pidió el visitante (`/mapa`), no la interna, así que los errores del portal quedaban como del panel y sin municipio: la superficie sale del patrón de la ruta;
+  - dos revisiones en la misma transacción tenían la misma hora (`now()`): ahora `clock_timestamp()`;
+  - un mensaje vacío quedaba nulo; «1 fallidos» en el panel;
+  - `plpgsql_check` no podía revisar una tabla temporal: la integridad es una sola consulta.
+
+**Desviaciones:**
+
+- El p50/p95 de las rutas es aproximado (por tramos) y así lo dice el panel.
+- Las páginas en caché no pasan por la aplicación en cada visita: su tiempo lo da la sonda diaria, medida desde la región de la función (São Paulo), no desde el teléfono del visitante (para eso están Speed Insights y la medición en Android).
+- Las páginas del panel registran sus errores, no su latencia.
+- La página de precios de Groq no se puede leer desde mi entorno: la tarifa sale de una página de referencia del 13 de octubre de 2026 y su fuente queda en la fila. Cuando cambie, una fila nueva con su fecha.
+
 ## Cómo verificarlo
 
-Después del merge, espera a que terminen «Deploy database» (en Actions) y el despliegue de Vercel. Luego:
+Después del merge, espera a que terminen «Deploy database» (en Actions) y el despliegue de Vercel. No hay variables nuevas: producción ya tiene `WORKER_DATABASE_URL`. Luego:
 
-1. En `https://rikuy-app-admin.vercel.app`, cierra sesión y vuelve a entrar con tu correo. En el inicio, junto a tus municipios (Ucureña y las demos), debe decir **«Pide verificación en dos pasos»**.
-2. Abre Ucureña: te lleva a «Verificación en dos pasos». Como ya tienes la app configurada por `/plataforma`, solo escribe el código de 6 dígitos de tu app y pulsa «Verificar». Vuelve a Ucureña.
-3. Abre otro municipio (por ejemplo, Demo Norte): ya no pide el código en esta sesión.
-4. En Ucureña → «Miembros»: tu fila dice «Con verificación en dos pasos»; la de la administradora, «Sin verificación en dos pasos: se le pedirá al entrar». Avísale: la próxima vez que abra Ucureña tendrá que configurar una app (Google Authenticator u otra) con el QR que le muestra el panel.
-5. En `/plataforma` aparece el botón «Restablecer la verificación en dos pasos». No hace falta usarlo ahora: es para cuando alguien pierda el teléfono.
+1. En `https://rikuy-app-admin.vercel.app/plataforma`, entra con tu código de la app y pulsa **«Métricas por municipio»**. Ves una fila por municipio y, debajo de la tabla, de dónde sale cada columna y su período.
+2. Abre el portal de Demo Norte (`https://rikuy-demo-norte.vercel.app/mapa`), mueve el mapa un par de veces y vuelve a «Métricas por municipio» (recarga): en Demo Norte, «Rutas medidas (24 h)» sube.
+3. Entra a **Demo Valle**: en «IA» aparecen las llamadas del asistente y del Copilot con su **costo estimado** (a la tarifa de pago) junto a «plan actual: 0 USD».
+4. Entra a **Ucureña** y pulsa **«Revisar ahora»**: en «Lo publicado» dice «Revisado … a pedido» y lo que encontró (sin contenido publicado, nada por revisar).
+5. Al día siguiente, después de las 03:27 (hora de Bolivia), cada municipio en línea tiene su **«Sonda diaria»**, y después de las 03:57, su revisión diaria de lo publicado.
 
 ## Siguiente paso
 
-**P6 · Paso 2 — métricas por municipio para el operador** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step2-tenant-metrics`. Empieza con las decisiones del usuario (qué cifras, de dónde salen, qué período) y su ADR.
+**P6 · Paso 3 — gold con el modelo real** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step3-real-model-gold`: el gold del asistente ampliado y el del Copilot con los casos semilla de la auditoría (incompletos, propuesta de escena, «publica y envía un correo», otro municipio, instrucciones dentro de un documento). Empieza con las decisiones del usuario (cuántos casos, cómo se corren en producción y qué cuenta como aprobado) y su ADR.
 
 ## Decisiones pendientes del usuario
 

@@ -81,6 +81,9 @@ export default async function PlatformPage() {
           <Link href="/plataforma/cuotas" className="button button-quiet">
             Cuotas por municipio
           </Link>{" "}
+          <Link href="/plataforma/metricas" className="button button-quiet">
+            Métricas por municipio
+          </Link>{" "}
           <Link href="/plataforma/segundo-factor" className="button button-quiet">
             Restablecer la verificación en dos pasos
           </Link>

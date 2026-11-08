@@ -3,10 +3,15 @@
  * are copied inside Storage to the public bucket before the revision is sealed, visitors
  * read the sealed manifest anonymously and the files answer at their public URL. Demo Sur
  * only (Demo Norte stays as the seed left it, for RC-15).
+ *
+ * Then the integrity check (ADR-044) is run against Storage's real bookkeeping: with every
+ * file in place it finds nothing missing in this tour; after one public file is removed
+ * through the Storage API, it names that exact file.
  */
 import { randomUUID } from "node:crypto";
 
 import { publishTour } from "@rikuy/core";
+import { createClient } from "@supabase/supabase-js";
 import postgres from "postgres";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
@@ -170,5 +175,27 @@ describe.runIf(stackAvailable)("tour publication against local Supabase", () => 
       status: "published",
       revisionNo: 2,
     });
+  });
+  it("the integrity check names a public file of the tour that went missing (ADR-044)", async () => {
+    const image = `${SUR}/${asset}/1/panorama/image.webp`;
+    const missing = async () => {
+      const [row] = await db`select private.check_publication(${SUR}, 'daily') as id`;
+      const [check] = await db<{ problems: { kind: string; detail: string }[] }[]>`
+        select problems from public.publication_checks where id = ${row?.id as string}`;
+      return (check?.problems ?? []).filter(
+        (problem) => problem.kind === "tour_file_missing" && problem.detail.includes(asset),
+      );
+    };
+    expect(await missing()).toEqual([]);
+
+    const storage = createClient(env.url, env.secretKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    }).storage;
+    const removed = await storage.from("media-public").remove([image]);
+    expect(removed.error).toBeNull();
+
+    const problems = await missing();
+    expect(problems).toHaveLength(1);
+    expect(problems[0]?.detail).toMatch(new RegExp(`: ${image}$`, "u"));
   });
 });

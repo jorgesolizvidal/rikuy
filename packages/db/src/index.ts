@@ -59,3 +59,4 @@ export { createSharpSampleImageRenderer, sampleIllustrationSvg } from "./sample-
 export { createOperationsRepository } from "./operations";
 export { createKnowledgeRepository, mapPassageRow } from "./knowledge";
 export { createCopilotRepository } from "./copilot";
+export { createMetricsRepository } from "./metrics";

@@ -3,6 +3,9 @@
  * internal prefix is deleted before ours are set, so clients cannot inject them.
  */
 export const TENANT_CONTEXT_HEADER = "x-rikuy-tenant-context";
+/** One UUID per request (ADR-044): forwarded to the app and returned as X-Rikuy-Request-Id. */
+export const REQUEST_ID_HEADER = "x-rikuy-request-id";
+export const REQUEST_ID_RESPONSE_HEADER = "X-Rikuy-Request-Id";
 
 const INTERNAL_PREFIXES = ["x-rikuy-", "x-tenant"];
 

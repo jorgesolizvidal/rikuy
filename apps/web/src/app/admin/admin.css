@@ -1934,3 +1934,62 @@ a.button-quiet {
   font: inherit;
   margin: 0.5rem 0 0.75rem;
 }
+
+/* ── Plataforma · métricas por municipio (ADR-044) ──────────────────── */
+
+.metrics-section {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 2rem;
+}
+
+.metrics-section h2,
+.metrics-section p {
+  margin: 0;
+}
+
+.metrics-sources {
+  margin: 0;
+  padding-left: 1.1rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+p.metrics-sources {
+  padding-left: 0;
+}
+
+.metrics-list {
+  margin: 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.35rem;
+}
+
+.metrics-table td,
+.metrics-table th[scope="row"] {
+  white-space: nowrap;
+}
+
+.metrics-table th[scope="row"] {
+  font-weight: 600;
+  text-align: left;
+}
+
+.metrics-search {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.metrics-search input {
+  min-width: 0;
+  flex: 1 1 16rem;
+  font: inherit;
+  font-size: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
+  background: var(--bg);
+  color: var(--fg);
+}
