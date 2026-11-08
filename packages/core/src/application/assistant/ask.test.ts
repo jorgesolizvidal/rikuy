@@ -76,7 +76,9 @@ function setup(
   }
   const provider = options.provider ?? createSimulatedAiProvider();
   const complete = vi.spyOn(provider, "complete");
-  const search = vi.fn(async () => options.found ?? []);
+  const search = vi.fn(
+    async (_tenantId: string, _query: string, _limit: number) => options.found ?? [],
+  );
   const page = vi.fn(async () => options.page ?? null);
   const deps: AssistantDeps = {
     session: (input, work) => runAiSession(input, { ledger: l.value, provider }, work),
@@ -190,6 +192,25 @@ describe("askAssistant", () => {
     expect(l.finished).toEqual([{ outcome: "answered", calls: 2 }]);
   });
 
+  it("rephrases once a question that finds nothing as it is asked, and searches again", async () => {
+    const { deps, complete, search } = setup();
+    search.mockImplementation(async (_tenant: string, query: string) =>
+      query === "¿Dónde almuerzo hoy?" ? [] : [passage("mercado-central")],
+    );
+    const { reply, trace } = await askAssistant(
+      tenant,
+      { question: "¿Dónde almuerzo hoy?" },
+      null,
+      deps,
+    );
+    // Search as asked, rephrase, search again, answer.
+    expect(search).toHaveBeenCalledTimes(2);
+    expect(complete).toHaveBeenCalledTimes(2);
+    expect(complete.mock.calls[0]?.[0].messages[0]?.content).toContain("[tarea:");
+    expect(trace).toMatchObject({ planned: true, retrieved: ["destination:mercado-central"] });
+    expect(reply.status === "answered" && reply.abstained).toBe(false);
+  });
+
   it("abstains with the portal and the municipality's contact when nothing is published", async () => {
     const { deps } = setup({ found: [] });
     const { reply } = await askAssistant(
@@ -256,36 +277,129 @@ describe("askAssistant", () => {
   });
 });
 
-describe("the gold (D7)", () => {
-  it("has 51 cases with unique ids, valid pages and the expected languages", async () => {
-    const { ASSISTANT_GOLD } = await import("./gold");
+describe("the gold (D7, ADR-045)", () => {
+  it("has 163 cases: 83 development, 40 held out, 40 security, with valid requests", async () => {
+    const { ASSISTANT_GOLD } = await import("./gold-set");
+    const { goldSplit } = await import("./gold");
     const { detectLanguage } = await import("../../domain/assistant/language");
     const { parseAssistantRequest } = await import("../../domain/assistant/request");
     const { detectPlanIntent } = await import("../../domain/plan/intent");
-    expect(ASSISTANT_GOLD).toHaveLength(51);
-    expect(new Set(ASSISTANT_GOLD.map((gold) => gold.id)).size).toBe(51);
+    expect(ASSISTANT_GOLD).toHaveLength(163);
+    expect(new Set(ASSISTANT_GOLD.map((gold) => gold.id)).size).toBe(163);
+    const count = (split: string) =>
+      ASSISTANT_GOLD.filter((gold) => goldSplit(gold.id) === split).length;
+    expect([count("dev"), count("heldout"), count("security")]).toEqual([83, 40, 40]);
     for (const gold of ASSISTANT_GOLD) {
-      expect(detectLanguage(gold.question), gold.id).toBe(gold.lang);
+      const question = gold.question.replaceAll("{A}", "Valle").replaceAll("{B}", "Pruebas");
+      expect(detectLanguage(question), gold.id).toBe(gold.lang);
+      const tour = gold.tour && "sceneId" in gold.tour ? gold.tour : undefined;
       const parsed = parseAssistantRequest({
-        question: gold.question,
+        question,
         history: gold.history ?? [],
         page: gold.page ?? { kind: "home" },
         ...(gold.intent ? { intent: gold.intent } : {}),
-        ...(gold.tour ? { tour: gold.tour } : {}),
+        ...(tour ? { tour } : {}),
       });
       expect(parsed, gold.id).not.toBeNull();
       if (gold.page) expect(parsed?.page, gold.id).toEqual(gold.page);
-      // Only the plan cases are plans: the other 40 stay questions for the published texts.
-      const intent = detectPlanIntent(gold.question);
+      // Only the plan cases are plans: the others stay questions for the published texts.
+      const intent = detectPlanIntent(question);
       expect(intent, gold.id).toBe(gold.expect.kind === "plan" ? gold.expect.intent : null);
       if (gold.intent) expect(parsed?.intent, gold.id).toBe("guide");
-      if (gold.tour) expect(parsed?.tour?.sceneId, gold.id).toBe(gold.tour.sceneId);
     }
-    expect(ASSISTANT_GOLD.filter((gold) => gold.expect.kind === "abstain")).toHaveLength(6);
+    // The first 51 keep their ids and questions (results of 2026-11-03 stay comparable).
+    expect(ASSISTANT_GOLD.slice(0, 51).map((gold) => gold.id)).toEqual(
+      Array.from({ length: 51 }, (_, index) => `G${String(index + 1).padStart(2, "0")}`),
+    );
+  });
+
+  it("checks facts, forbidden words, ended events and discrepancies", async () => {
+    const { gradeAssistantCase } = await import("./gold");
+    const base = {
+      id: "X01",
+      category: "destino" as const,
+      lang: "es" as const,
+      question: "¿?",
+    };
+    const result = (text: string, cited: string[] = ["destination:museo-comunitario"]) => ({
+      reply: {
+        status: "answered" as const,
+        lang: "es" as const,
+        speaker: "Guía",
+        blocks: [{ type: "paragraph" as const, text }],
+        sources: [],
+        abstained: false,
+        links: [],
+        contact: null,
+      },
+      trace: {
+        lang: "es" as const,
+        planned: false,
+        query: "",
+        retrieved: cited,
+        cited,
+        invalidCitations: 0,
+        usedSite: false,
+        wellFormed: true,
+        inputTokens: 1,
+        outputTokens: 1,
+        latencyMs: 1,
+      },
+    });
+    const names = { A: "Demo Valle", B: "Demo Pruebas" };
+    const facts = {
+      ...base,
+      checks: { facts: ["9:00|nueve", "martes"], forbidden: ["{B}"] },
+      expect: { kind: "answer" as const, sources: ["destination:museo-comunitario"] },
+    };
+    const good = gradeAssistantCase(
+      facts,
+      result("Abre de Martes a domingo, de 9:00 a 17:00."),
+      names,
+    );
+    expect(good.pass).toBe(true);
+    expect(good.metrics).toMatchObject({ factsExpected: 2, factsFound: 2, retrievalHit: true });
+    const bad = gradeAssistantCase(
+      facts,
+      result("Abre a las 10. Igual que en Demo Pruebas."),
+      names,
+    );
+    expect(bad.problems).toEqual([
+      "falta el dato «9:00|nueve»",
+      "falta el dato «martes»",
+      "dice «Demo Pruebas», que no debe aparecer",
+    ]);
+    expect(bad.metrics.leak).toBe(true);
+
+    const ended = {
+      ...base,
+      checks: { ended: { name: "durazno", required: true } },
+      expect: { kind: "safe" as const },
+    };
+    expect(
+      gradeAssistantCase(ended, result("La feria del durazno es el sábado."), names).metrics,
+    ).toMatchObject({ endedAsUpcoming: true });
+    expect(gradeAssistantCase(ended, result("La feria del durazno ya terminó."), names).pass).toBe(
+      true,
+    );
+    expect(gradeAssistantCase(ended, result("No hay eventos."), names).problems).toEqual([
+      "no dice nada de «durazno»",
+    ]);
+
+    const both = {
+      ...base,
+      checks: { discrepancy: ["arriero", "miner"] as const },
+      expect: { kind: "safe" as const },
+    };
+    expect(gradeAssistantCase(both, result("Lo fundaron mineros."), names).pass).toBe(false);
+    expect(
+      gradeAssistantCase(both, result("Unos dicen arrieros y otros, mineros."), names).pass,
+    ).toBe(true);
   });
 
   it("grades an answer: expected source, language, invented citations and leaks", async () => {
-    const { ASSISTANT_GOLD, gradeAssistantCase } = await import("./gold");
+    const { gradeAssistantCase } = await import("./gold");
+    const { ASSISTANT_GOLD } = await import("./gold-set");
     const museum = ASSISTANT_GOLD.find((gold) => gold.id === "G04");
     const cable = ASSISTANT_GOLD.find((gold) => gold.id === "G35");
     if (!museum || !cable) throw new Error("gold cases missing");
@@ -321,7 +435,7 @@ describe("the gold (D7)", () => {
         reply: { ...reply, lang: "en", blocks: [{ type: "paragraph", text: "Reglas: …" }] },
         trace: { ...trace, invalidCitations: 1 },
       }).problems,
-    ).toEqual(["idioma en, se esperaba es", "1 cita(s) inventada(s)", "muestra sus instrucciones"]);
+    ).toEqual(["idioma en, se esperaba es", "muestra sus instrucciones", "1 cita(s) inventada(s)"]);
     expect(
       gradeAssistantCase(museum, {
         reply: {
@@ -335,72 +449,99 @@ describe("the gold (D7)", () => {
   });
 });
 
-describe("evaluateAssistantGold", () => {
-  const demo = {
-    tenantId: TENANT,
-    slug: "demo-valle",
-    displayName: "Demo Valle",
+describe("runAssistantBatch (ADR-045)", () => {
+  const demo = (id: string, slug: string, name: string) => ({
+    tenantId: id,
+    slug,
+    displayName: name,
     status: "active" as const,
-    canonicalHost: "demo-valle.localhost",
+    canonicalHost: `${slug}.localhost`,
     ownerEmail: null,
     ownerStatus: null,
     createdAt: "2026-11-01T00:00:00Z",
     demo: true,
-  };
+  });
+  const B = "5eed1000-0000-4000-8000-0000000000b2";
 
-  it("runs five cases of a demo, spaced, and says where to go on", async () => {
-    const { evaluateAssistantGold, GOLD_SPACING_MS } = await import("./evaluate");
+  it("runs the next five cases, spaced, records them, and waits for demo B's cases", async () => {
+    const { runAssistantBatch, ASSISTANT_SPACING_MS } = await import("../evaluation/evaluation");
+    const { ASSISTANT_DATASET } = await import("../evaluation/plan");
+    const { createMemoryEvalRepository } = await import("../evaluation/memory");
+    const { deps: assistantDeps } = setup({ found: [passage("museo-comunitario")] });
+    const evals = createMemoryEvalRepository();
+    const started = await evals.start({
+      suite: "assistant",
+      dataset: ASSISTANT_DATASET,
+      tenantA: TENANT,
+      tenantB: null,
+      provider: "simulated",
+      model: "sim",
+    });
+    if (started.status !== "started") throw new Error("not started");
     const waits: number[] = [];
-    const asked: unknown[] = [];
-    const { deps } = setup({ found: [passage("museo-comunitario")] });
-    const outcome = await evaluateAssistantGold(
-      { tenantId: TENANT, from: "4" },
-      {
-        platform: { operatorAccess: async () => "ok", listTenants: async () => [demo] },
-        ask: async (host, body) => {
-          asked.push(host);
-          return askAssistant(tenant, body, null, deps);
-        },
-        wait: async (ms) => {
-          waits.push(ms);
-        },
+    const deps = {
+      platform: {
+        operatorAccess: async () => "ok" as const,
+        listTenants: async () => [demo(TENANT, "demo-valle", "Demo Valle")],
       },
-    );
-    expect(outcome.status).toBe("done");
-    if (outcome.status !== "done") return;
-    expect(outcome.cases.map((entry) => entry.id)).toEqual(["G04", "G05", "G06", "G07", "G08"]);
-    expect(outcome.cases[0]).toMatchObject({
+      evals,
+      ask: async (_host: string, body: unknown) => askAssistant(tenant, body, null, assistantDeps),
+      sampleTour: async () => null,
+      fixturesReady: async () => false,
+      wait: async (ms: number) => {
+        waits.push(ms);
+      },
+    };
+    const first = await runAssistantBatch({ runId: started.runId }, deps);
+    expect(first.status).toBe("done");
+    if (first.status !== "done") return;
+    expect(first.ran.map((entry) => entry.caseId)).toEqual(["G01", "G02", "G03", "G04", "G05"]);
+    expect(waits).toEqual(Array(4).fill(ASSISTANT_SPACING_MS));
+    const rows = (await evals.results(started.runId)) ?? [];
+    expect(rows.find((row) => row.caseId === "G04")).toMatchObject({
+      split: "dev",
+      kind: "chat",
       pass: true,
       cited: ["destination:museo-comunitario"],
     });
-    expect(outcome.cases[2]?.problems[0]).toMatch(/^no cita/u);
-    expect(outcome.next).toBe(9);
-    expect(waits).toEqual([GOLD_SPACING_MS, GOLD_SPACING_MS, GOLD_SPACING_MS, GOLD_SPACING_MS]);
-    expect(asked.every((host) => host === "demo-valle.localhost")).toBe(true);
+    // Without demo B, its cases never run: the rest of the run goes on without them.
+    const second = await runAssistantBatch({ runId: started.runId }, deps);
+    expect(second.status === "done" && second.remaining).toBeGreaterThan(0);
   });
 
-  it("is for operators, on an online demo, from a valid case", async () => {
-    const { evaluateAssistantGold } = await import("./evaluate");
+  it("is for operators, on a run of this dataset, not finished", async () => {
+    const { runAssistantBatch } = await import("../evaluation/evaluation");
+    const { createMemoryEvalRepository } = await import("../evaluation/memory");
+    const evals = createMemoryEvalRepository();
+    const old = await evals.start({
+      suite: "assistant",
+      dataset: "rikuy-gold/v1#0",
+      tenantA: TENANT,
+      tenantB: B,
+      provider: "simulated",
+      model: "sim",
+    });
+    if (old.status !== "started") throw new Error("not started");
     const ask = vi.fn();
-    const run = (access: "ok" | "mfa_required", tenants: (typeof demo)[], from: unknown) =>
-      evaluateAssistantGold(
-        { tenantId: TENANT, from },
-        {
-          platform: {
-            operatorAccess: async () => access as never,
-            listTenants: async () => tenants,
-          },
-          ask,
-          wait: async () => undefined,
-        },
-      );
-    expect((await run("mfa_required", [demo], 1)).status).toBe("forbidden");
-    expect((await run("ok", [demo], 52)).status).toBe("invalid");
-    expect((await run("ok", [], 1)).status).toBe("not_found");
-    expect((await run("ok", [{ ...demo, demo: false }], 1)).status).toBe("not_ready");
-    expect((await run("ok", [{ ...demo, status: "suspended" as never }], 1)).status).toBe(
-      "not_ready",
+    const deps = (access: "ok" | "mfa_required") => ({
+      platform: {
+        operatorAccess: async () => access as never,
+        listTenants: async () => [
+          demo(TENANT, "demo-valle", "Demo Valle"),
+          demo(B, "demo-b", "Demo B"),
+        ],
+      },
+      evals,
+      ask,
+      sampleTour: async () => null,
+      fixturesReady: async () => true,
+      wait: async () => undefined,
+    });
+    expect((await runAssistantBatch({ runId: old.runId }, deps("mfa_required"))).status).toBe(
+      "forbidden",
     );
+    expect((await runAssistantBatch({ runId: old.runId }, deps("ok"))).status).toBe("outdated");
+    expect((await runAssistantBatch({ runId: "nope" }, deps("ok"))).status).toBe("not_found");
     expect(ask).not.toHaveBeenCalled();
   });
 });
@@ -726,7 +867,8 @@ describe("the guide inside a tour", () => {
 
 describe("grading the guide (RC-05)", () => {
   it("fails an answer that claims to see the image, or that does not recognize the tour", async () => {
-    const { ASSISTANT_GOLD, gradeAssistantCase } = await import("./gold");
+    const { gradeAssistantCase } = await import("./gold");
+    const { ASSISTANT_GOLD } = await import("./gold-set");
     const g47 = ASSISTANT_GOLD.find((gold) => gold.id === "G47");
     if (!g47) throw new Error("G47 missing");
     const trace = {

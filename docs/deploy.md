@@ -252,3 +252,15 @@ Cada municipio interesado recibe su propia demo, con su nombre y contenido de mu
 5. **A medida:** reemplaza lo que quieras con fotos y textos reales del municipio desde «Destinos», «Agenda», «Panoramas 360°» y «Tours 360°». Todo se edita como cualquier contenido.
 6. **Mostrarla:** comparte el enlace del portal (y el QR del recorrido, en «Tours 360°»).
 7. **Después:** si el municipio contrata, se da de alta su municipio real (como Ucureña, sin «Demo comercial») y la demo se suspende en `/plataforma`. La demo ocupa unos 3–5 MB de la cuota.
+
+## Evaluar con el modelo real (P6 · Paso 3)
+
+`/plataforma/asistente` y `/plataforma/copilot` corren el gold con Groq sobre **dos demos** y guardan cada resultado con su costo estimado ([ADR-045](adr/ADR-045-real-model-gold.md)). Los resultados se anotan en [gold con el modelo real](gold-modelo-real.md).
+
+1. **Demo A:** la demo que se muestra a los clientes (por ejemplo, Demo Valle), en línea, con su contenido de muestra y su tour de muestra. Nunca recibe datos de prueba.
+2. **Demo B:** crea otra demo solo para evaluar (por ejemplo, «Demo Pruebas», con su dirección en Vercel), como en «Demo comercial para un municipio interesado», pasos 1 a 4: contenido de muestra **y** tour de muestra. Tienes que ser propietario de las dos.
+3. **Cuotas:** una corrida completa del asistente usa unos 180.000 tokens; la del Copilot, unos 60.000. En «Cuotas por municipio», sube la cuota de IA de las dos demos (por ejemplo, a 150 mil tokens por día) mientras dure. La plataforma tiene 180.000 por día: la corrida del asistente se reparte en dos días.
+4. **Asistente:** en `/plataforma/asistente` elige demo A y demo B → «Empezar una corrida» → «Preparar los datos de prueba» (y recarga hasta que no diga «la está leyendo») → «Correr la siguiente tanda» hasta terminar (5 casos por tanda, ~1,5 min cada una). Si una tanda se queda sin cuota, esos casos quedan «Sin evaluar» y se repiten solos en la tanda siguiente.
+5. **Calificar:** en «Resultados», pon tu nota (1–5) a las 40 reservadas de la primera repetición: claridad y que suene natural para un visitante.
+6. **Copilot:** en `/plataforma/copilot`, igual (2 casos por tanda; 14 en total). Las propuestas que crea se rechazan solas.
+7. **Al terminar:** «Retirar los datos de prueba», «Copiar resultados» de cada página y «Terminar la corrida». Vuelve las cuotas a sus valores.

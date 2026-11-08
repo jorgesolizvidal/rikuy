@@ -60,3 +60,4 @@ export { createOperationsRepository } from "./operations";
 export { createKnowledgeRepository, mapPassageRow } from "./knowledge";
 export { createCopilotRepository } from "./copilot";
 export { createMetricsRepository } from "./metrics";
+export { createEvalRepository } from "./evaluations";

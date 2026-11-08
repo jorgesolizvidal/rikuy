@@ -1993,3 +1993,25 @@ p.metrics-sources {
   background: var(--bg);
   color: var(--fg);
 }
+
+/* Evaluation with the real model (ADR-045) */
+.eval-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: flex-start;
+}
+
+.eval-fixtures {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.eval-answer {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+
+.eval-table td:nth-child(2) {
+  min-width: 16rem;
+}

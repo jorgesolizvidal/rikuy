@@ -15,7 +15,8 @@
     "test:e2e-assistant": "vitest run --config vitest.e2e.config.ts e2e/assistant.e2e.test.ts",
     "test:e2e-copilot": "vitest run --config vitest.e2e.config.ts e2e/copilot.e2e.test.ts",
     "test:e2e-second-factor": "vitest run --config vitest.e2e.config.ts e2e/second-factor.e2e.test.ts",
-    "test:e2e-metrics": "vitest run --config vitest.e2e.config.ts e2e/metrics.e2e.test.ts"
+    "test:e2e-metrics": "vitest run --config vitest.e2e.config.ts e2e/metrics.e2e.test.ts",
+    "test:e2e-evaluation": "vitest run --config vitest.e2e.config.ts e2e/evaluation.e2e.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

@@ -13,13 +13,18 @@ import {
   createSimulatedAiProvider,
   defaultPresentation,
   drainJobs,
+  evalFixtureStates,
+  fixturesReady,
   gradeAssistantCase,
   loadAssistantPlaces,
   runAiSession,
   loadSampleContent,
   loadSampleContentStatus,
+  needsDemoB,
+  prepareEvalFixtures,
   SAMPLE_DESTINATIONS,
   SAMPLE_EVENTS,
+  TRAP_KEYS,
   type OrganizationMembership,
 } from "@rikuy/core";
 import {
@@ -49,7 +54,7 @@ import { createMemberRepository } from "./platform";
 import { createSharpSampleImageRenderer } from "./sample-images";
 import { createSmtpMailer } from "./smtp-mailer";
 import { createSupabaseTenantDirectory } from "./tenant-directory";
-import { createTourRepository } from "./tours";
+import { createSupabasePublishedTourReader, createTourRepository } from "./tours";
 
 const DB_URL =
   process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
@@ -275,6 +280,13 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       values (${tenantId}, 'ai_tokens', 2000000)
       on conflict (tenant_id, resource) do update set limit_amount = excluded.limit_amount
     `;
+    // The whole gold, more than once a day on a developer's machine: lift the platform's
+    // daily cap of this test database (ADR-036), so a run never ends in «sin cuota».
+    await db`
+      insert into public.ai_platform_days (day, limit_tokens)
+      values ((now() at time zone 'utc')::date, 100000000)
+      on conflict (day) do update set limit_tokens = excluded.limit_tokens
+    `;
 
     const ai = createPostgresAiLedger({ url: DB_URL, role: "rikuy_ai", maxConnections: 2 });
     const provider = createSimulatedAiProvider();
@@ -295,8 +307,31 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
         publishableKey: env.publishableKey,
       }),
     };
+    // The sample tour's scenes, as «Evaluar el asistente» resolves them (ADR-045).
+    const published = await createSupabasePublishedTourReader({
+      url: env.url,
+      publishableKey: env.publishableKey,
+    }).find(tenantId, "destination", "plaza-principal");
+    const manifest = published?.manifest;
+    const entry = manifest?.scenes.find((scene) => scene.sceneId === manifest.entrySceneId);
+    const scenes = {
+      entry: manifest?.entrySceneId ?? "",
+      second: manifest?.scenes.find((scene) => scene.sceneId !== manifest.entrySceneId)?.sceneId,
+      info: entry?.hotspots.find((hotspot) => hotspot.kind === "info")?.hotspotId,
+    };
     try {
-      for (const gold of ASSISTANT_GOLD) {
+      // Cases that need demo B (another municipality, trap data) run in their own test.
+      for (const gold of ASSISTANT_GOLD.filter((entry) => !needsDemoB(entry))) {
+        const ref = gold.tour;
+        const tour =
+          ref === undefined
+            ? undefined
+            : "sceneId" in ref
+              ? ref
+              : {
+                  sceneId: (ref.scene === "second" ? scenes.second : scenes.entry) ?? "",
+                  ...(ref.hotspot === "info" && scenes.info ? { hotspotId: scenes.info } : {}),
+                };
         const result = await askAssistant(
           tenant,
           {
@@ -305,7 +340,7 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
             page: gold.page ?? { kind: "home" },
             ...(gold.distances ? { distances: gold.distances } : {}),
             ...(gold.intent ? { intent: gold.intent } : {}),
-            ...(gold.tour ? { tour: gold.tour } : {}),
+            ...(tour ? { tour } : {}),
           },
           null,
           {
@@ -335,8 +370,15 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
         }
         // Every citation that reaches the visitor is one of the retrieved passages (D5).
         expect(result.trace?.invalidCitations, gold.id).toBe(0);
-        // A question in Spanish, asked as it is: its source is among what the model reads.
-        const direct = gold.lang === "es" && !gold.history && !gold.page;
+        // A development question in Spanish, asked as it is: its source is among what the
+        // model reads. Held-out cases stay blind (ADR-045); a synonym or a typo needs the
+        // real model's rephrasing.
+        const direct =
+          gold.id.startsWith("G") &&
+          gold.lang === "es" &&
+          !gold.history &&
+          !gold.page &&
+          !gold.rephrase;
         if (direct && gold.expect.kind === "answer") {
           const expected = gold.expect.sources;
           if (!result.trace?.retrieved.some((source) => expected.includes(source))) {
@@ -348,6 +390,72 @@ describe.runIf(stackAvailable)("commercial demo against local Supabase", () => {
       await ai.close();
     }
     expect(misses).toEqual([]);
+  });
+
+  it("prepares the trap data, the assistant reads it, and retiring takes it back (ADR-045)", async () => {
+    const d = deps();
+    const fixtureDeps = { content: d.content, knowledge: d.knowledge, admin: d.admin, now: d.now };
+    expect((await prepareEvalFixtures(membership, fixtureDeps)).status).toBe("prepared");
+    const worker = createPostgresJobLedger({
+      url: DB_URL,
+      role: "rikuy_worker",
+      maxConnections: 2,
+    });
+    const index = () =>
+      drainJobs({
+        ledger: worker,
+        processors: [
+          createIndexKnowledgeProcessor({ knowledge: worker.knowledge, media: d.admin }),
+        ],
+        runnerId: "it-eval-fixtures",
+        budgetMs: 30_000,
+        concurrency: 2,
+      });
+    const ai = createPostgresAiLedger({ url: DB_URL, role: "rikuy_ai", maxConnections: 1 });
+    const found = async (query: string) =>
+      (await ai.searchKnowledge(tenantId, query, 8)).map(
+        (passage) => `${passage.kind}:${passage.slug}`,
+      );
+    try {
+      await index();
+      const states = await evalFixtureStates(membership, fixtureDeps);
+      expect(states.map((state) => [state.key, state.status, state.indexed])).toEqual([
+        ["notice", "ready", true],
+        ["history", "ready", true],
+        ["event", "ready", true],
+        ["draft", "ready", null],
+      ]);
+      expect(fixturesReady(states)).toBe(true);
+      expect(await found("biblioteca municipal")).toContain(TRAP_KEYS.notice);
+      expect(await found("mineros plata")).toContain(TRAP_KEYS.history);
+      expect(await found("feria del durazno")).toContain(TRAP_KEYS.event);
+      // The draft is never read, not even by the demo's own assistant.
+      expect(await found("laguna escondida cascada turquesa")).not.toContain(TRAP_KEYS.draft);
+
+      // «Retirar los datos de prueba», as an operator with a second factor.
+      const retired = await db.begin(async (sql) => {
+        await sql`select set_config('request.jwt.claims', ${JSON.stringify({ sub: "5eed0000-0000-4000-8000-000000000005", role: "authenticated", aal: "aal2" })}, true)`;
+        await sql`set local role authenticated`;
+        const [row] = await sql<
+          { n: number }[]
+        >`select public.platform_eval_retire_fixtures(${tenantId}) as n`;
+        return row?.n;
+      });
+      expect(retired).toBe(3);
+      expect(await found("biblioteca municipal")).not.toContain(TRAP_KEYS.notice);
+      expect(await found("feria del durazno")).not.toContain(TRAP_KEYS.event);
+      expect(
+        (await evalFixtureStates(membership, fixtureDeps)).map((state) => state.status),
+      ).toEqual(["retired", "retired", "retired", "ready"]);
+
+      // Preparing again puts them back (a new version), for the next run.
+      expect((await prepareEvalFixtures(membership, fixtureDeps)).status).toBe("prepared");
+      await index();
+      expect(fixturesReady(await evalFixtureStates(membership, fixtureDeps))).toBe(true);
+    } finally {
+      await worker.close();
+      await ai.close();
+    }
   });
 
   it("emails an invitation through SMTP, once", async () => {

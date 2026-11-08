@@ -270,8 +270,15 @@ export async function askAssistant(
           question: request.question,
         })
       : null;
+  // A question asked as it is that finds nothing (another word for the same thing, a typo)
+  // gets one rephrasing before the answer (ADR-045).
+  const fallback =
+    plan === null && !guideOnly
+      ? planMessages({ page: null, history: [], question: request.question })
+      : null;
   const reserve =
     (plan ? estimateTokens(plan) + PLAN_OUTPUT : 0) +
+    (fallback ? estimateTokens(fallback) + PLAN_OUTPUT : 0) +
     answerReservation(context, guide ? GUIDE_PASSAGES : ASSISTANT_LIMITS.passages);
 
   const session = await deps.session(
@@ -289,7 +296,12 @@ export async function askAssistant(
           messages: answerMessages(context, passages),
           maxOutputTokens: ANSWER_OUTPUT,
         });
-        return { query: "", passages, parsed: parseAnswer(answer.text, passages) };
+        return {
+          query: "",
+          passages,
+          parsed: parseAnswer(answer.text, passages),
+          rephrased: false,
+        };
       }
       if (plan) {
         try {
@@ -311,12 +323,28 @@ export async function askAssistant(
       if (found.length === 0 && query !== request.question) {
         found = await deps.search(tenant.tenantId, request.question, SEARCH_RESULTS);
       }
+      let rephrased = false;
+      if (found.length === 0 && fallback) {
+        try {
+          const words = parsePlan(
+            (await call({ messages: fallback, maxOutputTokens: PLAN_OUTPUT, attempts: 1 })).text,
+          );
+          if (words && words !== query) {
+            rephrased = true;
+            found = await deps.search(tenant.tenantId, words, SEARCH_RESULTS);
+            if (found.length > 0) query = words;
+          }
+        } catch (error) {
+          // Nothing found either way: the answer says so.
+          if (!(error instanceof AiStepFailed)) throw error;
+        }
+      }
       const passages = bestPassages(found, guide);
       const answer = await call({
         messages: answerMessages(context, passages),
         maxOutputTokens: ANSWER_OUTPUT,
       });
-      return { query, passages, parsed: parseAnswer(answer.text, passages) };
+      return { query, passages, parsed: parseAnswer(answer.text, passages), rephrased };
     },
   );
 
@@ -332,10 +360,10 @@ export async function askAssistant(
       trace: null,
     };
   }
-  const { parsed, passages, query } = session.value;
+  const { parsed, passages, query, rephrased } = session.value;
   const trace: AssistantTrace = {
     lang,
-    planned: plan !== null,
+    planned: plan !== null || rephrased,
     query,
     retrieved: [...new Set(passages.map(sourceKey))],
     cited: [...new Set(parsed.passages.map(sourceKey))],
