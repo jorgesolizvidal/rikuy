@@ -1584,6 +1584,8 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - **«Correr todas las tandas»** ya no corre dentro de una sola transición de React: el contador de la corrida y los resultados se actualizan después de cada tanda (antes se quedaban en «0 de 243» hasta el final).
 - Tests: core 512 (+7: el eco en el lector y en `askAssistant` en los dos idiomas, respuestas normales que no lo son, la corrida de solo seguridad en el plan, el informe y los casos de uso, una de otra versión no sigue); el e2e de la evaluación suma una corrida de solo seguridad y comprueba que el contador avanza **mientras** corre el bucle.
 
+**Corrección posterior (`fix/eval-e2e-loop`):** el e2e de la corrida de solo seguridad falló en el CI del PR #56 (solo documentación) sin que nada hubiera cambiado. Esperaba ver el contador de la página en 10 o más **mientras** corría el bucle; con el modelo simulado cada tanda tarda milisegundos y cada refresco de la página queda reemplazado por el siguiente antes de mostrarse, así que el contador a veces solo cambiaba al final. En producción una tanda tarda más de un minuto y el refresco siempre llega. Ahora la prueba lee el informe que el propio bucle escribe después de cada tanda («Quedan N. Corriendo la siguiente…»), espera a que se detenga solo y comprueba que la página muestra exactamente lo que quedó grabado.
+
 ### P6 · Paso 4 — respaldo y restauración probada ✅ (código)
 
 - Se adelantó mientras P6 · Paso 3 espera la cuota del día para su corrida con el modelo real (decisión del usuario, 2026-11-08): este paso no depende de esas corridas.
