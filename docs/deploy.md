@@ -33,7 +33,7 @@ Un municipio nuevo con dirección gratuita se da de alta desde `/plataforma/nuev
 
 ### GitHub (Settings → Secrets and variables → Actions)
 
-- _Secrets:_ `SUPABASE_ACCESS_TOKEN` (paso 2) y `SUPABASE_DB_PASSWORD` (paso 1).
+- _Secrets:_ `SUPABASE_ACCESS_TOKEN` (paso 2) y `SUPABASE_DB_PASSWORD` (paso 1). Para el respaldo, además `SUPABASE_SECRET_KEY`, `BACKUP_AGE_IDENTITY` y la variable `BACKUP_AGE_RECIPIENT`: ver [respaldo y restauración](backup.md#activarlo-una-vez).
 - _Variables:_
   - `SUPABASE_PROJECT_REF` = `jltzysyxqureudfavgpj`;
   - `LIGHTHOUSE_ORIGINS` = los portales que se miden y se vigilan, `nombre=origen` separados por comas: `demo-norte=https://rikuy-demo-norte.vercel.app,demo-sur=https://rikuy-demo-sur.vercel.app,ucurena=https://rikuy-ucurena.vercel.app`. Un municipio nuevo en línea se suma aquí;
@@ -94,6 +94,8 @@ Lo que corre solo cada día ([ADR-035](adr/ADR-035-free-plan-operations.md)), si
 | 03:37          | Limpieza de fotos y logos sin uso por más de 7 días                               | Supabase (`rikuy-remove-unused-media`)      | El trabajo reintenta y, si se agota, aparece en «Trabajos»                                |
 | 07:07          | Informe interno: espacio, base, trabajos y cuotas                                 | Supabase (`rikuy-daily-report`) → ejecutor  | Correo a los operadores (con SMTP) y el mismo resumen en `/plataforma`                    |
 | 08:23          | Control externo: inicio y `/mapa` de cada portal, panel                           | GitHub Actions («Daily health»)             | El job falla y GitHub le escribe al dueño del repositorio; el motivo queda como anotación |
+| 02:41          | Respaldo cifrado de la base y los archivos ([runbook](backup.md))                 | GitHub Actions («Backup»)                   | El job falla y GitHub le escribe al dueño                                                 |
+| Domingo 05:17  | Ensayo: el último respaldo se restaura en una base nueva y se comprueba           | GitHub Actions («Restore drill»)            | El job falla y GitHub le escribe al dueño; el motivo queda como anotación                 |
 | Cada 15 min    | Reservas de IA abandonadas (más de 10 min abiertas)                               | Supabase (`rikuy-expire-ai-requests`)       | Se cuentan como usadas; también borra pedidos de más de 90 días                           |
 | 03:47          | Propuestas del Copilot vencidas (30 días)                                         | Supabase (`rikuy-expire-copilot-proposals`) | Las borra; la auditoría conserva lo que se aceptó o rechazó                               |
 | 03:27          | Sonda de cada portal en línea (inicio, `/mapa` y una imagen)                      | Supabase (`rikuy-probe-portals`) → ejecutor | El resultado, con su motivo si falló, en «Métricas por municipio»                         |

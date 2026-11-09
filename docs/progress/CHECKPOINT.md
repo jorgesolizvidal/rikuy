@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** P6 · Paso 3 — gold con el modelo real (código; la corrida en producción queda para después del merge)
-- **Rama:** `fix/eval-grader` → PR hacia `main` (corrección del calificador tras la primera corrida en producción)
+- **Último paso completado:** P6 · Paso 4 — respaldo y restauración probada (código; el primer respaldo y el primer ensayo en producción quedan para después del merge). P6 · Paso 3 espera sus corridas con el modelo real.
+- **Rama:** `feat/p6-step4-backup-restore` → PR hacia `main`
 
 ## Historial
 
@@ -1575,20 +1575,68 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - **«Correr todas las tandas»:** corre una tanda tras otra hasta que no queda nada, falta preparar los datos de prueba o una tanda entera se queda sin respuesta. «Detener después de esta tanda» la para. «Correr solo la siguiente tanda» sigue disponible.
 - Tests: core 505 (+2: espacios especiales y lo que la pregunta nombró); el e2e de la evaluación corre el Copilot con «Correr todas las tandas» hasta que solo quedan los casos que esperan los datos de prueba.
 
+### P6 · Paso 4 — respaldo y restauración probada ✅ (código)
+
+- Se adelantó mientras P6 · Paso 3 espera la cuota del día para su corrida con el modelo real (decisión del usuario, 2026-11-08): este paso no depende de esas corridas.
+- Decisiones del usuario ([ADR-046](../adr/ADR-046-backup-restore.md)), 2026-11-08:
+  - **la base y los archivos**: el respaldo de PostgreSQL no guarda los archivos de Storage, y los originales no se pueden regenerar;
+  - **artefactos de GitHub, cifrados**, por 90 días (el repositorio es público);
+  - **a diario**;
+  - **ensayo automático cada semana**.
+- Contexto medido en producción (consulta de solo lectura): base de 29 MB, Storage de 57 MB (232 archivos, 50 MB de originales). El plan gratuito de Supabase no tiene respaldos.
+- **«Backup»** (`.github/workflows/backup.yml`, 06:41 UTC y a mano):
+  - `supabase db dump --linked`: roles (sin contraseñas), esquema y datos con `COPY`, sin el horario de `pg_cron` ni el registro de `pg_net`;
+  - `packages/db/scripts/backup.mjs download`: cada archivo de los dos buckets con su tipo, caché, tamaño y SHA-256;
+  - `manifest.json` con las filas de cada tabla y los archivos;
+  - `tar.gz` cifrado con **age** para la clave pública (`BACKUP_AGE_RECIPIENT`): el job no puede abrir lo que guarda; se comprueba la cabecera de age antes de subir el artefacto;
+  - el resumen del job muestra solo cantidades.
+- **«Restore drill»** (`.github/workflows/restore-drill.yml`, domingos 09:17 UTC y a mano, con un respaldo elegido o el más nuevo):
+  - falla si el más nuevo tiene más de 48 h;
+  - descifra con `BACKUP_AGE_IDENTITY`, levanta una pila nueva con **las versiones de servicio de producción** (`supabase link`) y pausa su horario;
+  - `backup-restore-db.sh`: en una transacción, sin triggers ni claves foráneas, vacía cada tabla del respaldo y carga sus filas. Ante un error, el registro muestra solo el mensaje, nunca las líneas de DETAIL o CONTEXT, que citan filas;
+  - `backup.mjs restore-storage` sube los archivos con su tipo y su caché;
+  - `backup.mjs verify` comprueba las filas de cada tabla, cada archivo byte por byte, que la base registre exactamente esos archivos, un archivo público sin clave, cada portal en línea por su dirección con sus destinos (la misma API anónima del portal) y que Auth lea todas las cuentas;
+  - los tiempos de restauración quedan en el resumen.
+- **En cada PR**, el job de integración corre los mismos scripts sobre su pila y los datos de las pruebas:
+  - respalda y cifra con una clave de un solo uso;
+  - vacía Storage y comprueba que no quedó ningún archivo (así la restauración no puede «aprobar» con archivos viejos);
+  - vuelve la base a las migraciones;
+  - restaura y verifica.
+- [Runbook](../backup.md): qué se guarda y qué no, cómo activarlo (clave de age en tu computadora, tres secretos y una variable), cómo abrir un respaldo, cómo restaurar de verdad (proyecto nuevo, base, archivos, comprobación y lo que no estaba en el respaldo: Vault, roles, SMTP, variables) y qué hacer si el ensayo falla.
+- `docs/deploy.md` (variables de GitHub y la tabla de lo que corre solo), arquitectura, roadmap e índice de ADRs actualizados.
+- Tests:
+  - 9 unitarios nuevos (`packages/db/scripts/backup-lib.test.mjs`): filas por tabla del volcado (vacías incluidas, cortado o repetido rechazado), el SQL de la restauración, nombres de tabla, rutas que no salen de la carpeta, nombres codificados, manifiesto (formato, filas, huellas, repetidos) y diferencias;
+  - **en el CI del PR, de punta a punta** sobre la pila con los datos de las pruebas: 76 tablas y 1.432 filas, 126 archivos (2,3 MB) borrados y devueltos byte por byte, 3 de 3 portales con sus destinos y 9 cuentas leídas por Auth. La base se restauró en 1 s y los archivos en 0,9 s;
+  - probado en local contra PostgreSQL 16 (carga sin triggers, reemplazo de filas de la migración, un error que no muestra datos y deja todo como estaba) y contra un Storage simulado (descarga recursiva con nombres con espacios y eñes, manifiesto, subida con `x-upsert`).
+
+**Desviaciones:**
+
+- **El paso queda ✅ en el roadmap tras el primer respaldo y el primer ensayo en verde en producción**, anotados en el runbook.
+- Los respaldos viven en GitHub; la clave secreta se guarda además fuera (gestor de contraseñas).
+- No hay restauración de un solo municipio: queda en «Pendientes registrados».
+- La pila del ensayo local del CI no se pudo levantar en mi entorno (no descarga las imágenes de Supabase): se prueba en el CI del PR.
+
+Lo que encontró el CI, ya corregido:
+
+- `supabase storage rm` no vaciaba los buckets de la pila, y la comprobación lo detectó (126 archivos seguían ahí). Ahora los borra `empty-local-storage.mjs`, que solo acepta una dirección local.
+- `postgres` no puede escribir ni leer una tabla interna de Storage (`storage.buckets_vectors`), vacía en el respaldo. La restauración solo carga las tablas con filas y solo vacía las que tienen filas y se pueden leer. La comprobación cuenta solo las tablas legibles: una que no se puede leer falla solo si el respaldo traía filas para ella.
+
 ## Cómo verificarlo
 
-Después del merge y del despliegue de Vercel (esta corrección no tiene migración):
+Después del merge (no hay migración):
 
-1. En «Cuotas por municipio», deja la IA de **Demo Valle en 180 mil** tokens por día y la de Demo comercial en 30 mil o más.
-2. Espera a que se renueven las cuotas: la de las demos a la medianoche de Bolivia y la de la plataforma a las 20:00. Lo más seguro es correrla el **9 de noviembre después de las 20:00**, para que Groq ya no cuente el uso de la corrida 1.
-3. `/plataforma/asistente`: demo A = Demo Valle, demo B = Demo comercial → «Empezar una corrida». Los datos de prueba siguen preparados: recarga y comprueba que los cuatro digan «Lista». Luego pulsa **«Correr todas las tandas»** y deja la página abierta (poco más de una hora).
-4. Pon tu nota (1–5) a las 40 reservadas y pulsa «Copiar resultados».
-5. Otro día, `/plataforma/copilot` con las dos demos y «Correr todas las tandas» (7 tandas).
-6. «Retirar los datos de prueba», «Copiar resultados» de las dos páginas y pégamelos: los anoto y cierro el paso.
+1. **La clave del respaldo**, en tu computadora: instala age (Windows: `winget install --id FiloSottile.age`) y corre `age-keygen -o rikuy-backup-key.txt`. Guarda el archivo completo en tu gestor de contraseñas.
+2. **GitHub** → Settings → Secrets and variables → Actions:
+   - variable `BACKUP_AGE_RECIPIENT` = la línea pública `age1…`;
+   - secret `BACKUP_AGE_IDENTITY` = la línea `AGE-SECRET-KEY-1…`;
+   - secret `SUPABASE_SECRET_KEY` = la _secret key_ de Supabase (la misma de Vercel).
+3. Actions → **«Backup»** → _Run workflow_. Al terminar, pásame su resumen (tablas, filas, archivos).
+4. Actions → **«Restore drill»** → _Run workflow_. Pásame su resumen (las comprobaciones y los tiempos).
+5. Pendiente de P6 · Paso 3: el 9 de noviembre después de las 20:00, la corrida del asistente con «Correr todas las tandas» (pasos en [«Evaluar con el modelo real»](../deploy.md#evaluar-con-el-modelo-real-p6--paso-3)).
 
 ## Siguiente paso
 
-**P6 · Paso 4 — respaldo de la base con restauración probada** (autorizado: el usuario confirmó los 5 pasos del P6 el 2026-11-04), en la rama `feat/p6-step4-backup-restore`, cuando las corridas del Paso 3 estén anotadas. Empieza con las decisiones del usuario (qué se respalda, dónde, cada cuánto y cómo se ensaya la restauración) y su ADR.
+Cerrar P6 · Paso 3 y P6 · Paso 4 con sus resultados en producción (un PR de documentación con las corridas del gold y el primer respaldo y ensayo). Después, **P6 · Paso 5 — expediente del gate** (autorizado el 2026-11-04), en la rama `feat/p6-step5-gate-dossier`: cada uno de los 10 criterios con su evidencia, commit y limitaciones; revisión de permisos, regiones, proveedores, costos y responsable.
 
 ## Decisiones pendientes del usuario
 
