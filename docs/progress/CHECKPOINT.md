@@ -6,7 +6,7 @@
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
 - **Último paso completado:** P6 · Paso 4 — respaldo y restauración probada (código; el primer respaldo y el primer ensayo en producción quedan para después del merge). P6 · Paso 3 espera sus corridas con el modelo real.
-- **Rama:** `fix/assistant-context-echo` → PR hacia `main`
+- **Rama:** `docs/roadmap-after-gate` → PR hacia `main`
 
 ## Historial
 
@@ -1629,6 +1629,22 @@ Lo que encontró el CI, ya corregido:
 
 - `supabase storage rm` no vaciaba los buckets de la pila, y la comprobación lo detectó (126 archivos seguían ahí). Ahora los borra `empty-local-storage.mjs`, que solo acepta una dirección local.
 - `postgres` no puede escribir ni leer una tabla interna de Storage (`storage.buckets_vectors`), vacía en el respaldo. La restauración solo carga las tablas con filas y solo vacía las que tienen filas y se pueden leer. La comprobación cuenta solo las tablas legibles: una que no se puede leer falla solo si el respaldo traía filas para ella.
+
+### Roadmap después del gate (documentación) ✅
+
+- Decisión del usuario (2026-11-09): después de P6 vienen las fases **C0–C8 de crecimiento**, en este orden ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)):
+  - **C0** Ucureña lista como vitrina (los pendientes «antes de cargar el contenido de Ucureña», Blender y la carga real);
+  - **C1** métricas y estrategia: lo más visto, escaneos QR, lo que preguntan los visitantes sin respuesta, recomendaciones del Copilot e informe mensual para la alcaldía;
+  - **C2** pasaporte turístico con sellos QR;
+  - **C3** rediseño de la interfaz con un sistema de diseño white-label;
+  - **C4** portal en español e inglés;
+  - **C5** circuitos entre municipios (con su ADR);
+  - **C6** recopilación de conocimiento para comunidades sin libro (OCR, entrevistas, guía);
+  - **C7** Copilot de ayuda del panel y acciones con confirmación;
+  - **C8** reconocimiento de imágenes como prototipo medido.
+- Más adelante, sin fase: audioguías de la comunidad, WhatsApp, entradas con pago por QR.
+- Planes pagos: se siguen usando los gratuitos mientras Ucureña sea la vitrina; Vercel Pro y Supabase Pro llegan cuando una alcaldía confirme, antes de poner en línea su portal.
+- E2 y E3 dicen qué se adelantó; el OCR pasa a C6 y los pendientes de antes de cargar Ucureña, a C0.
 
 ## Cómo verificarlo
 
