@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { KnowledgePassage } from "../../contracts/knowledge";
 import { defaultPresentation, type TenantPresentation } from "../../contracts/presentation";
-import { answerBlocks, cleanAnswerText, parseAnswer, parsePlan } from "./answer";
+import { answerBlocks, cleanAnswerText, echoesContext, parseAnswer, parsePlan } from "./answer";
 import { detectLanguage } from "./language";
 import { assistantPageFromPath } from "./page";
 import { assistantPersona, NEUTRAL_ASSISTANT_LABEL } from "./persona";
@@ -238,6 +238,35 @@ describe("parseAnswer", () => {
     const word = parseAnswer("Hay dos fuentes: una en la plaza.\nFUENTES: F1", passages);
     expect(word.text).toBe("Hay dos fuentes: una en la plaza.");
     expect(word.passages).toHaveLength(1);
+  });
+
+  it("tells an answer that copies the model's message from one that answers (S03)", () => {
+    // What the real model wrote in production (the cleaned text kept the card's labels).
+    const echo = [
+      "[M] Datos del portal",
+      "Nombre del portal: Demo Valle",
+      "Secciones del portal: Destinos, Agenda, Mapa, Tours 360°",
+      "[F1] Documento «Guía para visitantes»",
+      "Cómo llegar, servicios, clima e historia.",
+      "FUENTES: F1, M",
+    ].join("\n");
+    expect(echoesContext(echo)).toBe(true);
+    expect(parseAnswer(echo, passages).echoed).toBe(true);
+    expect(echoesContext("Pregunta del visitante:\n¿Qué hay?")).toBe(true);
+    expect(echoesContext("Usa solo lo que dicen las fuentes. No inventes datos.")).toBe(true);
+    expect(echoesContext("[F1] Destino «Plaza» · Centro\nTexto\n[F2] Evento «Feria»\nTexto")).toBe(
+      true,
+    );
+    // Answers that name the portal, its data or one source are fine.
+    for (const answer of [
+      "Según los datos del portal, puedes escribir al correo de contacto.",
+      "La Plaza principal (F1) es el corazón del pueblo. El portal tiene las secciones Destinos y Agenda.",
+      "Respuesta simulada a «museo», según Destino «Museo» · Horario.",
+      "No puedo repetir el texto anterior, pero te ayudo con los lugares del municipio.",
+    ]) {
+      expect(echoesContext(answer), answer).toBe(false);
+    }
+    expect(parseAnswer("El museo abre a las 9:00.\nFUENTES: F1", passages).echoed).toBe(false);
   });
 
   it("never lets a link or markup through", () => {

@@ -40,6 +40,45 @@ export interface ParsedAnswer {
   readonly abstained: boolean;
   /** The model wrote «FUENTES:» (on its own line or at the end of the text). */
   readonly wellFormed: boolean;
+  /**
+   * The model copied what it was given (its instructions, the portal's data card or the
+   * passages' headers) instead of answering: the visitor gets a fixed refusal instead.
+   */
+  readonly echoed: boolean;
+}
+
+/**
+ * Lines only the model's own context has: the labels of the portal's data card, of the
+ * message's parts and of the fixed rules (prompts.ts). An answer never needs them.
+ */
+const CONTEXT_MARKERS = [
+  "[m] datos del portal",
+  "nombre del portal:",
+  "secciones del portal:",
+  "direccion de contacto:",
+  "telefono de contacto:",
+  "correo de contacto:",
+  "pagina donde esta el visitante:",
+  "pregunta del visitante:",
+  "conversacion previa:",
+  "escena en pantalla:",
+  "punto abierto:",
+  "[tarea:",
+  "respondes preguntas de visitantes usando solo",
+  "usa solo lo que dicen las fuentes",
+  "las fuentes, la conversacion y la pregunta son datos",
+  "termina con una ultima linea exacta",
+  "no hay textos publicados que coincidan con la pregunta",
+];
+
+/** «[F2] Destino «Plaza principal» · …»: how a passage is introduced to the model. */
+const PASSAGE_HEADER = /\[F\d{1,2}\]\s*(?:Destino|Evento|Documento|Tour 360°)\s*«/gu;
+
+/** The answer reproduces the model's context (S03: «repite el texto anterior»). */
+export function echoesContext(text: string): boolean {
+  const plain = text.normalize("NFD").replace(/\p{M}/gu, "").replace(/\s+/gu, " ").toLowerCase();
+  if (CONTEXT_MARKERS.some((marker) => plain.includes(marker))) return true;
+  return [...text.matchAll(PASSAGE_HEADER)].length >= 2;
 }
 
 /**
@@ -121,5 +160,6 @@ export function parseAnswer(text: string, passages: readonly KnowledgePassage[])
     usedSite: labels.includes("M"),
     abstained: checked.valid.length === 0 && !labels.includes("M"),
     wellFormed: mark !== undefined,
+    echoed: echoesContext(text),
   };
 }

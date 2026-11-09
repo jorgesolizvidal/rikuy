@@ -9,7 +9,15 @@ import {
 import type { AssistantResult } from "../assistant/ask";
 import type { PlatformRepository, PlatformTenantSummary } from "../platform/ports";
 import { COPILOT_GOLD } from "./copilot-gold";
-import { datasetOf, itemsOf, pendingItems, type EvalItem } from "./plan";
+import {
+  datasetOf,
+  itemsOf,
+  pendingItems,
+  scopeOfDataset,
+  SECURITY_SUFFIX,
+  type EvalItem,
+  type EvalScope,
+} from "./plan";
 import type { EvalKind, EvalRepository, EvalResultRow, EvalRunSummary, EvalSuite } from "./ports";
 import { evaluationReport, type EvalReport } from "./report";
 
@@ -44,7 +52,13 @@ export type StartEvaluationResult =
   | { readonly status: "forbidden" | "invalid" | "not_ready" | "not_configured" };
 
 export async function startEvaluation(
-  input: { readonly suite: unknown; readonly tenantA: unknown; readonly tenantB: unknown },
+  input: {
+    readonly suite: unknown;
+    readonly tenantA: unknown;
+    readonly tenantB: unknown;
+    /** «security»: only the security cases, three times each (the assistant only). */
+    readonly scope?: unknown;
+  },
   deps: {
     readonly platform: Platform;
     readonly evals: EvalRepository;
@@ -56,7 +70,18 @@ export async function startEvaluation(
   if (deps.model === null) return { status: "not_configured" };
   const suite = input.suite === "assistant" || input.suite === "copilot" ? input.suite : null;
   const b = typeof input.tenantB === "string" && input.tenantB !== "" ? input.tenantB : null;
-  if (suite === null || typeof input.tenantA !== "string" || b === input.tenantA) {
+  const scope: EvalScope | null =
+    input.scope === undefined || input.scope === "full"
+      ? "full"
+      : input.scope === "security" && suite === "assistant"
+        ? "security"
+        : null;
+  if (
+    suite === null ||
+    scope === null ||
+    typeof input.tenantA !== "string" ||
+    b === input.tenantA
+  ) {
     return { status: "invalid" };
   }
   const tenants = await deps.platform.listTenants();
@@ -68,7 +93,7 @@ export async function startEvaluation(
   }
   const started = await deps.evals.start({
     suite,
-    dataset: datasetOf(suite),
+    dataset: datasetOf(suite, scope),
     tenantA: input.tenantA,
     tenantB: b,
     provider: deps.model.provider,
@@ -84,6 +109,8 @@ export interface EvaluationView {
   readonly report: EvalReport | null;
   /** Items still to run (not evaluated yet, or that got a notice). */
   readonly pending: number;
+  /** All of the gold, or only its security cases (three times each). */
+  readonly scope: EvalScope;
   /** The run's dataset is not this build's (a case changed): it cannot continue. */
   readonly outdated: boolean;
 }
@@ -97,16 +124,27 @@ export async function loadEvaluation(
   const runs = await deps.evals.runs(suite);
   const run = (runId ? runs.find((entry) => entry.id === runId) : runs[0]) ?? null;
   if (run === null) {
-    return { runs, run: null, rows: [], report: null, pending: 0, outdated: false };
+    return {
+      runs,
+      run: null,
+      rows: [],
+      report: null,
+      pending: 0,
+      scope: "full",
+      outdated: false,
+    };
   }
   const rows = (await deps.evals.results(run.id)) ?? [];
+  const known = scopeOfDataset(suite, run.dataset);
+  const scope = known ?? (run.dataset.endsWith(SECURITY_SUFFIX) ? "security" : "full");
   return {
     runs,
     run,
     rows,
-    report: evaluationReport(suite, rows),
-    pending: pendingItems(itemsOf(suite), rows).length,
-    outdated: run.dataset !== datasetOf(suite),
+    report: evaluationReport(suite, rows, scope),
+    pending: pendingItems(itemsOf(suite, scope), rows).length,
+    scope,
+    outdated: known === null,
   };
 }
 
@@ -254,7 +292,8 @@ async function runContext(
   const run = (await evals.runs(suite)).find((entry) => entry.id === runId);
   if (!run) return { status: "not_found" as const };
   if (run.finishedAt !== null) return { status: "finished" as const };
-  if (run.dataset !== datasetOf(suite)) return { status: "outdated" as const };
+  const scope = scopeOfDataset(suite, run.dataset);
+  if (scope === null) return { status: "outdated" as const };
   const tenants = await platform.listTenants();
   const a = tenants.find((tenant) => tenant.tenantId === run.tenantA.id);
   const b = run.tenantB ? tenants.find((tenant) => tenant.tenantId === run.tenantB?.id) : undefined;
@@ -263,7 +302,7 @@ async function runContext(
   }
   const rows = (await evals.results(run.id)) ?? [];
   const names: GoldNames = { A: a.displayName, B: b?.displayName ?? null };
-  return { status: "ok" as const, run, a, b: usableDemo(b) ? b : null, rows, names };
+  return { status: "ok" as const, run, scope, a, b: usableDemo(b) ? b : null, rows, names };
 }
 
 export async function runAssistantBatch(
@@ -272,7 +311,7 @@ export async function runAssistantBatch(
 ): Promise<BatchResult> {
   const context = await runContext(input.runId, deps.platform, deps.evals, "assistant");
   if (context.status !== "ok") return { status: context.status };
-  const { run, a, b, rows, names } = context;
+  const { run, scope, a, b, rows, names } = context;
   const byId = new Map(ASSISTANT_GOLD.map((gold) => [gold.id, gold]));
   const ready = b === null ? false : await deps.fixturesReady(b.tenantId);
   const blocked = (item: EvalItem) => {
@@ -281,9 +320,9 @@ export async function runAssistantBatch(
     if (needsDemoB(gold) && b === null) return true;
     return gold.fixtures === true && !ready;
   };
-  const pending = pendingItems(itemsOf("assistant"), rows, blocked);
+  const pending = pendingItems(itemsOf("assistant", scope), rows, blocked);
   if (pending.length === 0) {
-    const all = pendingItems(itemsOf("assistant"), rows);
+    const all = pendingItems(itemsOf("assistant", scope), rows);
     return all.length === 0 ? { status: "done", ran: [], remaining: 0 } : { status: "waiting" };
   }
   const [ownTour, otherTour] = await Promise.all([
