@@ -53,6 +53,55 @@ export function countCopyRows(sql) {
   return counts;
 }
 
+/**
+ * The data dump without its empty COPY blocks: loading nothing into a table still needs the
+ * right to write it, and some platform tables (Storage's own) are not writable by `postgres`.
+ *
+ * @param {string} sql
+ */
+export function withoutEmptyCopies(sql) {
+  const lines = sql.split("\n");
+  const kept = [];
+  for (let index = 0; index < lines.length; index += 1) {
+    const line = lines[index];
+    const bare = line.endsWith("\r") ? line.slice(0, -1) : line;
+    const next = lines[index + 1] ?? "";
+    if (COPY_LINE.test(bare) && (next === "\\." || next === "\\.\r")) {
+      index += 1;
+      continue;
+    }
+    kept.push(line);
+  }
+  return kept.join("\n");
+}
+
+/**
+ * The SQL that replaces the database's rows with a backup's: with triggers and foreign-key
+ * checks off, empties every dumped table that has rows now (a table the role cannot read is
+ * left alone: the platform's own), then loads the non-empty COPY blocks.
+ *
+ * @param {string} sql the data dump
+ */
+export function restoreScript(sql) {
+  const tables = Object.keys(countCopyRows(sql)).map(quoteTable);
+  const literal = tables.map((table) => `'${table.replaceAll("'", "''")}'`).join(", ");
+  return [
+    "set session_replication_role = replica;",
+    "do $restore$",
+    "declare t text;",
+    "declare has_rows boolean;",
+    "begin",
+    `  foreach t in array array[${literal}]::text[] loop`,
+    "    continue when not has_table_privilege(t, 'select');",
+    "    execute format('select exists (select 1 from %s)', t) into has_rows;",
+    "    if has_rows then execute format('truncate %s cascade', t); end if;",
+    "  end loop;",
+    "end",
+    "$restore$;",
+    withoutEmptyCopies(sql),
+  ].join("\n");
+}
+
 /** `"schema"."table"`, quoted for SQL. */
 export function quoteTable(table) {
   const dot = table.indexOf(".");

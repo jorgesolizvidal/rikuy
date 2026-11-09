@@ -7,8 +7,10 @@ import {
   objectPath,
   parseManifest,
   quoteTable,
+  restoreScript,
   rowMismatches,
   summarize,
+  withoutEmptyCopies,
 } from "./backup-lib.mjs";
 
 const DUMP = [
@@ -62,6 +64,19 @@ describe("the data dump", () => {
   it("refuses a dump cut in the middle of a table or with a table twice", () => {
     expect(() => countCopyRows('COPY "public"."x" ("a") FROM stdin;\n1')).toThrow(/termina/u);
     expect(() => countCopyRows(`${DUMP}\n${DUMP}`)).toThrow(/repetida/u);
+  });
+
+  it("loads only the tables with rows, after emptying the ones that have rows now", () => {
+    const loaded = withoutEmptyCopies(DUMP);
+    expect(loaded).not.toContain('"auth"."users"');
+    expect(countCopyRows(loaded)).toEqual({ "public.tenants": 2, "storage.objects": 1 });
+    const script = restoreScript(DUMP);
+    expect(script.startsWith("set session_replication_role = replica;")).toBe(true);
+    expect(script).toContain(
+      `array['"public"."tenants"', '"auth"."users"', '"storage"."objects"']::text[]`,
+    );
+    expect(script).toContain("has_table_privilege(t, 'select')");
+    expect(script.endsWith(loaded)).toBe(true);
   });
 
   it("quotes tables for TRUNCATE, and refuses a name without schema", () => {

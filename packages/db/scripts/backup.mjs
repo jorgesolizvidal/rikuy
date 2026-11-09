@@ -3,7 +3,7 @@
 //
 //   node packages/db/scripts/backup.mjs download <dir>          files of every bucket → <dir>/storage
 //   node packages/db/scripts/backup.mjs manifest <dir>          <dir>/manifest.json from the dump and the files
-//   node packages/db/scripts/backup.mjs tables <dir>            the dumped tables, quoted, for TRUNCATE
+//   node packages/db/scripts/backup.mjs restore-sql <dir>       the SQL that loads the data (backup-restore-db.sh)
 //   node packages/db/scripts/backup.mjs restore-storage <dir>   uploads the files back (upsert)
 //   node packages/db/scripts/backup.mjs verify <dir>            row counts, every file, the portal's reads
 //
@@ -27,6 +27,7 @@ import {
   objectPath,
   parseManifest,
   quoteTable,
+  restoreScript,
   rowMismatches,
   summarize,
 } from "./backup-lib.mjs";
@@ -171,9 +172,10 @@ function readManifest(dir) {
   return parseManifest(JSON.parse(readFileSync(join(dir, "manifest.json"), "utf8")));
 }
 
-function tables(dir) {
-  const value = readManifest(dir);
-  process.stdout.write(Object.keys(value.tables).map(quoteTable).join(", "));
+/** The SQL that loads the backup into a migrated database (see backup-restore-db.sh). */
+function restoreSql(dir) {
+  readManifest(dir);
+  process.stdout.write(restoreScript(readFileSync(join(dir, "db", "data.sql"), "utf8")));
 }
 
 async function restoreStorage(dir) {
@@ -209,16 +211,30 @@ async function verify(dir) {
   const value = readManifest(dir);
   const problems = [];
 
-  // 1. Every table has the rows it had.
+  // 1. Every table has the rows it had. A table this role cannot read (the platform's own)
+  //    only counts when the backup had rows in it.
+  const literal = Object.keys(value.tables)
+    .map((table) => `'${quoteTable(table).replaceAll("'", "''")}'`)
+    .join(", ");
+  const readable = new Set(
+    psqlJson(`select coalesce(json_agg(t), '[]') from unnest(array[${literal}]::text[]) as t
+      where has_table_privilege(t, 'select');`) ?? [],
+  );
+  const counted = Object.keys(value.tables).filter((table) => readable.has(quoteTable(table)));
   const counts =
-    psqlJson(
-      `select json_object_agg(t, c) from (${Object.keys(value.tables)
-        .map(
-          (table) =>
-            `select ${`'${table.replaceAll("'", "''")}'`} as t, count(*)::int as c from ${quoteTable(table)}`,
-        )
-        .join(" union all ")}) as counts;`,
-    ) ?? {};
+    (counted.length === 0
+      ? {}
+      : psqlJson(
+          `select json_object_agg(t, c) from (${counted
+            .map(
+              (table) =>
+                `select '${table.replaceAll("'", "''")}' as t, count(*)::int as c from ${quoteTable(table)}`,
+            )
+            .join(" union all ")}) as counts;`,
+        )) ?? {};
+  for (const table of Object.keys(value.tables)) {
+    if (!readable.has(quoteTable(table)) && value.tables[table] === 0) counts[table] = 0;
+  }
   const mismatches = rowMismatches(value.tables, counts);
   for (const mismatch of mismatches) {
     problems.push(
@@ -317,12 +333,12 @@ const [command, dir] = process.argv.slice(2);
 const commands = {
   download,
   manifest,
-  tables,
+  "restore-sql": restoreSql,
   "restore-storage": restoreStorage,
   verify,
 };
 if (!commands[command] || !dir) {
-  console.error("Uso: backup.mjs <download|manifest|tables|restore-storage|verify> <carpeta>");
+  console.error("Uso: backup.mjs <download|manifest|restore-sql|restore-storage|verify> <carpeta>");
   process.exit(2);
 }
 try {
