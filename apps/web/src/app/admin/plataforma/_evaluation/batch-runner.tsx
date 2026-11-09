@@ -46,7 +46,13 @@ export function BatchRunner({
   const stop = useRef(false);
 
   async function once(): Promise<Outcome> {
-    const result = await runBatchAction({ suite, runId });
+    let result: Awaited<ReturnType<typeof runBatchAction>>;
+    try {
+      result = await runBatchAction({ suite, runId });
+    } catch {
+      // The request failed or the function ran out of time: what was recorded stays.
+      return { kind: "stop", message: PROBLEMS.error ?? "", ok: false };
+    }
     if (result.status !== "done" || !("ran" in result)) {
       return { kind: "stop", message: PROBLEMS[result.status] ?? PROBLEMS.error ?? "", ok: false };
     }
@@ -57,9 +63,9 @@ export function BatchRunner({
     const unanswered = result.ran.filter((entry) => entry.pass === null).length;
     if (unanswered === result.ran.length) return { kind: "stop", message: NO_ANSWERS, ok: false };
     const text = `Listo: ${passed} de ${result.ran.length} bien${unanswered > 0 ? `, ${unanswered} sin respuesta` : ""}. Quedan ${result.remaining}.`;
-    return result.remaining === 0
-      ? { kind: "stop", message: text, ok: true }
-      : { kind: "more", message: text };
+    // «Quedan» counts only what can run now: the next call says whether anything is left or
+    // only what waits for the trap data, so the loop always asks once more.
+    return { kind: "more", message: text };
   }
 
   function runOne() {
