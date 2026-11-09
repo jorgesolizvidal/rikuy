@@ -250,7 +250,9 @@ const DEV: readonly GoldCase[] = [
     page: { kind: "event", slug: "feria-gastronomica" },
     question: "¿Va a haber música?",
     checks: { facts: ["musica"] },
-    expect: answer(FAIR),
+    // The fair's dates are relative to the day the sample was loaded: once it has ended,
+    // pointing to the music festival is the right answer.
+    expect: answer(FAIR, MUSIC),
   },
   {
     id: "G77",

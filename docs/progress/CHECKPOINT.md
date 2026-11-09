@@ -6,7 +6,7 @@
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
 - **Último paso completado:** P6 · Paso 3 — gold con el modelo real (código; la corrida en producción queda para después del merge)
-- **Rama:** `feat/p6-step3-real-model-gold` → PR hacia `main`
+- **Rama:** `fix/eval-grader` → PR hacia `main` (corrección del calificador tras la primera corrida en producción)
 
 ## Historial
 
@@ -1566,15 +1566,24 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - No se comparan modelos ni se mide precisión@5 o nDCG; la factualidad se mide con hechos esperados y la nota humana (ADR-045).
 - La guía del tour de Demo Valle no tiene descripciones de escena (su tour es anterior a P5 · Paso 5): los casos del tour no exigen hechos de la escena.
 
+**Corrección posterior (`fix/eval-grader`):** la primera corrida del asistente en producción (8 nov, Demo Valle y Demo comercial) se detuvo en 221 de 243 respuestas, cuando se acabó la cuota de IA del día de Demo Valle. De sus 4 fallos, 3 eran del calificador y no del modelo; el detalle está en [gold con el modelo real](../gold-modelo-real.md#corrida-1-del-asistente--8-nov-2026-incompleta-no-cuenta-para-el-cierre).
+
+- **S15** contaba como fuga que el asistente repitiera el nombre que el propio visitante había escrito («la laguna escondida»). Ahora lo que la pregunta ya nombró no cuenta; el precio del borrador y cualquier dato que la pregunta no nombró, sí. Vale también para el Copilot.
+- **G65:** el modelo escribe a veces un espacio fino sin salto (U+202F) entre el número y la unidad («30 minutos»). `normalizeGoldText` ahora lee los espacios y guiones especiales como los comunes.
+- **G76** acepta la feria o el festival de música: las fechas de la muestra son relativas al día en que se cargó, y la feria de Demo Valle ya terminó. Esto cambia la huella del conjunto, así que la corrida 1 queda como registro y no se puede continuar.
+- Los avisos de cuota decían «sin respuesta: tomorrow»; ahora dicen el motivo en palabras.
+- **«Correr todas las tandas»:** corre una tanda tras otra hasta que no queda nada, falta preparar los datos de prueba o una tanda entera se queda sin respuesta. «Detener después de esta tanda» la para. «Correr solo la siguiente tanda» sigue disponible.
+- Tests: core 505 (+2: espacios especiales y lo que la pregunta nombró); el e2e de la evaluación corre el Copilot con «Correr todas las tandas» hasta que solo quedan los casos que esperan los datos de prueba.
+
 ## Cómo verificarlo
 
-Después del merge, espera a que terminen «Deploy database» (en Actions) y el despliegue de Vercel. Luego sigue [«Evaluar con el modelo real»](../deploy.md#evaluar-con-el-modelo-real-p6--paso-3):
+Después del merge y del despliegue de Vercel (esta corrección no tiene migración):
 
-1. Crea la demo B («Demo Pruebas»): dirección en Vercel, alta con «Demo comercial», aceptar, ponerla en línea, «Cargar contenido de muestra» y «Armar el tour de muestra».
-2. En «Cuotas por municipio», sube la IA de Demo Valle y Demo Pruebas a 150 mil tokens por día.
-3. `/plataforma/asistente`: demo A = Demo Valle, demo B = Demo Pruebas → «Empezar una corrida» → «Preparar los datos de prueba» (recarga hasta que no diga «la está leyendo») → «Correr la siguiente tanda» hasta que no quede nada (se reparte en dos días por el límite diario de Groq).
-4. Pon tu nota (1–5) a las 40 reservadas.
-5. `/plataforma/copilot`: lo mismo con las dos demos (7 tandas).
+1. En «Cuotas por municipio», deja la IA de **Demo Valle en 180 mil** tokens por día y la de Demo comercial en 30 mil o más.
+2. Espera a que se renueven las cuotas: la de las demos a la medianoche de Bolivia y la de la plataforma a las 20:00. Lo más seguro es correrla el **9 de noviembre después de las 20:00**, para que Groq ya no cuente el uso de la corrida 1.
+3. `/plataforma/asistente`: demo A = Demo Valle, demo B = Demo comercial → «Empezar una corrida». Los datos de prueba siguen preparados: recarga y comprueba que los cuatro digan «Lista». Luego pulsa **«Correr todas las tandas»** y deja la página abierta (poco más de una hora).
+4. Pon tu nota (1–5) a las 40 reservadas y pulsa «Copiar resultados».
+5. Otro día, `/plataforma/copilot` con las dos demos y «Correr todas las tandas» (7 tandas).
 6. «Retirar los datos de prueba», «Copiar resultados» de las dos páginas y pégamelos: los anoto y cierro el paso.
 
 ## Siguiente paso

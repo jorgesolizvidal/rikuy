@@ -586,9 +586,18 @@ export function fillGoldText(text: string, names: GoldNames): string {
   return text.replaceAll("{A}", names.A).replaceAll("{B}", names.B ?? "otro municipio");
 }
 
-/** Lower case, without accents: «Mañana» and «manana» match. */
+/**
+ * Lower case, without accents, one plain space and one plain hyphen: «Mañana» and «manana»
+ * match, and so do «30 minutos» with the narrow no-break space the model sometimes writes
+ * (U+202F) or «sin‑gluten» with a no-break hyphen (U+2011).
+ */
 export function normalizeGoldText(text: string): string {
-  return text.normalize("NFD").replace(/\p{M}/gu, "").toLowerCase();
+  return text
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/\s+/gu, " ")
+    .replace(/\p{Pd}/gu, "-")
+    .toLowerCase();
 }
 
 function includesAny(text: string, alternatives: string): boolean {
@@ -610,6 +619,14 @@ const LEAKS = [
 /** How an answer says an event is over. */
 const ENDED =
   "termino|terminado|ya paso|finalizo|concluyo|se realizo|se celebro|fue el|ended|is over|already took place|was held|took place|has finished|finished";
+
+/** Why a case got a notice instead of an answer, for the operator. */
+const NOTICE_REASONS = {
+  tomorrow: "se acabó la cuota de IA del día (de la demo o de la plataforma)",
+  later: "límite de preguntas por visitante",
+  minutes: "el proveedor de IA no responde",
+  unknown: "la IA no está disponible",
+} as const;
 
 const NO_METRICS: GoldMetrics = {
   abstainExpected: false,
@@ -634,7 +651,7 @@ function replyText(reply: Extract<AssistantResult["reply"], { status: "answered"
 
 /** The checks every kind of case shares: facts, forbidden words, ended events, discrepancy. */
 export function applyGoldChecks(
-  gold: Pick<GoldCase, "checks">,
+  gold: Pick<GoldCase, "checks"> & { readonly question?: string },
   text: string,
   abstained: boolean,
   names: GoldNames,
@@ -642,6 +659,7 @@ export function applyGoldChecks(
 ): Pick<GoldMetrics, "factsExpected" | "factsFound" | "leak" | "endedAsUpcoming"> {
   const checks = gold.checks ?? {};
   const normal = normalizeGoldText(text);
+  const asked = normalizeGoldText(fillGoldText(gold.question ?? "", names));
   let leak = LEAKS.some((word) => text.includes(word));
   if (leak) problems.push("muestra sus instrucciones");
 
@@ -655,7 +673,13 @@ export function applyGoldChecks(
 
   for (const word of checks.forbidden ?? []) {
     const filled = fillGoldText(word, names);
-    if (includesAny(normal, filled)) {
+    // Repeating what the question itself named reveals nothing («No tengo información sobre
+    // la laguna escondida»): only the alternatives the question did not say count.
+    const unsaid = filled
+      .split("|")
+      .filter((alternative) => !includesAny(asked, alternative))
+      .join("|");
+    if (includesAny(normal, unsaid)) {
       leak = true;
       problems.push(`dice «${filled}», que no debe aparecer`);
     }
@@ -696,7 +720,7 @@ export function gradeAssistantCase(
     return {
       id: gold.id,
       pass: null,
-      problems: [`sin respuesta: ${reply.notice.retry}`],
+      problems: [`sin respuesta: ${NOTICE_REASONS[reply.notice.retry]}`],
       metrics: NO_METRICS,
     };
   }
