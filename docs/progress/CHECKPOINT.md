@@ -1605,7 +1605,8 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - [Runbook](../backup.md): qué se guarda y qué no, cómo activarlo (clave de age en tu computadora, tres secretos y una variable), cómo abrir un respaldo, cómo restaurar de verdad (proyecto nuevo, base, archivos, comprobación y lo que no estaba en el respaldo: Vault, roles, SMTP, variables) y qué hacer si el ensayo falla.
 - `docs/deploy.md` (variables de GitHub y la tabla de lo que corre solo), arquitectura, roadmap e índice de ADRs actualizados.
 - Tests:
-  - 8 unitarios nuevos (`packages/db/scripts/backup-lib.test.mjs`): filas por tabla del volcado (vacías incluidas, cortado o repetido rechazado), nombres de tabla, rutas que no salen de la carpeta, nombres codificados, manifiesto (formato, filas, huellas, repetidos) y diferencias;
+  - 9 unitarios nuevos (`packages/db/scripts/backup-lib.test.mjs`): filas por tabla del volcado (vacías incluidas, cortado o repetido rechazado), el SQL de la restauración, nombres de tabla, rutas que no salen de la carpeta, nombres codificados, manifiesto (formato, filas, huellas, repetidos) y diferencias;
+  - **en el CI del PR, de punta a punta** sobre la pila con los datos de las pruebas: 76 tablas y 1.432 filas, 126 archivos (2,3 MB) borrados y devueltos byte por byte, 3 de 3 portales con sus destinos y 9 cuentas leídas por Auth. La base se restauró en 1 s y los archivos en 0,9 s;
   - probado en local contra PostgreSQL 16 (carga sin triggers, reemplazo de filas de la migración, un error que no muestra datos y deja todo como estaba) y contra un Storage simulado (descarga recursiva con nombres con espacios y eñes, manifiesto, subida con `x-upsert`).
 
 **Desviaciones:**
@@ -1614,6 +1615,11 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - Los respaldos viven en GitHub; la clave secreta se guarda además fuera (gestor de contraseñas).
 - No hay restauración de un solo municipio: queda en «Pendientes registrados».
 - La pila del ensayo local del CI no se pudo levantar en mi entorno (no descarga las imágenes de Supabase): se prueba en el CI del PR.
+
+Lo que encontró el CI, ya corregido:
+
+- `supabase storage rm` no vaciaba los buckets de la pila, y la comprobación lo detectó (126 archivos seguían ahí). Ahora los borra `empty-local-storage.mjs`, que solo acepta una dirección local.
+- `postgres` no puede escribir ni leer una tabla interna de Storage (`storage.buckets_vectors`), vacía en el respaldo. La restauración solo carga las tablas con filas y solo vacía las que tienen filas y se pueden leer. La comprobación cuenta solo las tablas legibles: una que no se puede leer falla solo si el respaldo traía filas para ella.
 
 ## Cómo verificarlo
 
