@@ -191,9 +191,7 @@ jobs:
             | age -r "$(age-keygen -y "$RUNNER_TEMP/key.txt")" -o "$RUNNER_TEMP/backup.tar.gz.age"
           rm -rf "$work"
 
-          for bucket in media-originals media-public; do
-            pnpm exec supabase --experimental storage rm -r "ss:///$bucket/" --local > /dev/null 2>&1 || true
-          done
+          node packages/db/scripts/empty-local-storage.mjs
           left="$(psql "$SUPABASE_DB_URL" -XAtc "select count(*) from storage.objects")"
           if [ "$left" != "0" ]; then echo "::error::Storage was not emptied ($left files left)"; exit 1; fi
           pnpm exec supabase db reset --local --no-seed
