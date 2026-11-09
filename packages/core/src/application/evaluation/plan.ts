@@ -34,8 +34,26 @@ export function fingerprint(text: string): string {
 export const ASSISTANT_DATASET = `rikuy-gold/v2#${fingerprint(JSON.stringify(ASSISTANT_GOLD))}`;
 export const COPILOT_DATASET = `rikuy-copilot-gold/v1#${fingerprint(JSON.stringify(COPILOT_GOLD))}`;
 
-export function datasetOf(suite: EvalSuite): string {
-  return suite === "assistant" ? ASSISTANT_DATASET : COPILOT_DATASET;
+/**
+ * What a run covers. «full» is the whole gold (ADR-045); «security» asks only the 40
+ * security cases, three times each: the quick check after a fix that touches the
+ * assistant's guards, without spending a full run's tokens. Only the assistant has it.
+ */
+export type EvalScope = "full" | "security";
+
+export const SECURITY_SUFFIX = "/seguridad";
+export const SECURITY_REPETITIONS = 3;
+
+export function datasetOf(suite: EvalSuite, scope: EvalScope = "full"): string {
+  if (suite === "copilot") return COPILOT_DATASET;
+  return scope === "security" ? `${ASSISTANT_DATASET}${SECURITY_SUFFIX}` : ASSISTANT_DATASET;
+}
+
+/** The scope of a run's dataset in this build; null: another version of the cases. */
+export function scopeOfDataset(suite: EvalSuite, dataset: string): EvalScope | null {
+  if (dataset === datasetOf(suite, "full")) return "full";
+  if (suite === "assistant" && dataset === datasetOf(suite, "security")) return "security";
+  return null;
 }
 
 export function assistantItems(cases: readonly GoldCase[] = ASSISTANT_GOLD): EvalItem[] {
@@ -56,8 +74,21 @@ export function copilotItems(cases: readonly CopilotGoldCase[] = COPILOT_GOLD): 
   return cases.map((gold) => ({ caseId: gold.id, repetition: 1, split: "copilot" as const }));
 }
 
-export function itemsOf(suite: EvalSuite): EvalItem[] {
-  return suite === "assistant" ? assistantItems() : copilotItems();
+/** Every security case once, then again, then a third time. */
+export function securityItems(cases: readonly GoldCase[] = ASSISTANT_GOLD): EvalItem[] {
+  const security = cases.filter((gold) => goldSplit(gold.id) === "security");
+  return Array.from({ length: SECURITY_REPETITIONS }, (_, index) =>
+    security.map((gold) => ({
+      caseId: gold.id,
+      repetition: index + 1,
+      split: "security" as const,
+    })),
+  ).flat();
+}
+
+export function itemsOf(suite: EvalSuite, scope: EvalScope = "full"): EvalItem[] {
+  if (suite === "copilot") return copilotItems();
+  return scope === "security" ? securityItems() : assistantItems();
 }
 
 /**

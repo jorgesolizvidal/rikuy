@@ -38,6 +38,7 @@ export async function startEvaluationAction(input: {
   readonly suite: string;
   readonly tenantA: string;
   readonly tenantB: string;
+  readonly scope?: string;
 }): Promise<StartEvaluationResult | Problem> {
   try {
     if ((await currentAdminActor()) === null) return { status: "signed_out" };

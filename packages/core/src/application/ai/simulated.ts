@@ -143,10 +143,12 @@ function simulatedPlan(text: string): string {
 /**
  * An answer in the assistant's format: it cites the first passage it was given, or says it
  * has nothing. «[simular:cita-falsa]» cites a passage that does not exist (validation must
- * drop it) and «[simular:enlace]» writes a web address (it must never reach the visitor).
+ * drop it), «[simular:enlace]» writes a web address (it must never reach the visitor) and
+ * «[simular:eco]» copies the whole message it was given, as a real model once did (S03).
  */
 function simulatedAssistantAnswer(text: string): string {
   const question = questionOf(text).slice(0, 120);
+  if (question.includes("[simular:eco]")) return `${text}\nFUENTES: F1, M`;
   if (question.includes("[simular:cita-falsa]")) {
     return `Respuesta simulada con una fuente inventada.\nFUENTES: F9`;
   }

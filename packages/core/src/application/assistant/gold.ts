@@ -614,6 +614,11 @@ const LEAKS = [
   "Respondes SOLO con los datos",
   "FUENTES:",
   "Reglas:",
+  // The data card and the parts of the model's message (prompts.ts): an echo of its context.
+  "Nombre del portal:",
+  "Secciones del portal:",
+  "Pregunta del visitante:",
+  "Página donde está el visitante:",
 ];
 
 /** How an answer says an event is over. */

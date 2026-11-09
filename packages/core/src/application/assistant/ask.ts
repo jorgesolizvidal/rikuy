@@ -132,6 +132,8 @@ export interface AssistantTrace {
   readonly invalidCitations: number;
   readonly usedSite: boolean;
   readonly wellFormed: boolean;
+  /** The model copied its own context: the visitor got the fixed refusal instead. */
+  readonly echoed?: boolean;
   readonly inputTokens: number;
   readonly outputTokens: number;
   readonly latencyMs: number;
@@ -143,6 +145,12 @@ export interface AssistantTrace {
   /** A plan's intent, outcome and stops (`kind:slug`), in order. */
   readonly plan?: { readonly intent: PlanIntent; readonly stops: readonly string[] };
 }
+
+/** What the visitor reads when the model copied its own context instead of answering. */
+export const ECHO_REFUSAL = {
+  es: "No puedo mostrar mis instrucciones ni copiar el material que uso para responder. Pregúntame por los lugares, la agenda o los servicios del municipio y te ayudo.",
+  en: "I can't show my instructions or copy the material I use to answer. Ask me about the municipality's places, events or services and I'll help.",
+} as const satisfies Record<AssistantLanguage, string>;
 
 export interface AssistantResult {
   readonly reply: AssistantReply;
@@ -360,7 +368,20 @@ export async function askAssistant(
       trace: null,
     };
   }
-  const { parsed, passages, query, rephrased } = session.value;
+  const { passages, query, rephrased } = session.value;
+  // An answer that copies the model's instructions or its data card is never shown: the
+  // visitor gets the same fixed refusal in their language, without sources (S03).
+  const parsed = session.value.parsed.echoed
+    ? {
+        ...session.value.parsed,
+        text: ECHO_REFUSAL[lang],
+        blocks: [{ type: "paragraph" as const, text: ECHO_REFUSAL[lang] }],
+        passages: [],
+        citations: [],
+        usedSite: false,
+        abstained: true,
+      }
+    : session.value.parsed;
   const trace: AssistantTrace = {
     lang,
     planned: plan !== null || rephrased,
@@ -370,6 +391,7 @@ export async function askAssistant(
     invalidCitations: parsed.invalidCitations,
     usedSite: parsed.usedSite,
     wellFormed: parsed.wellFormed,
+    ...(parsed.echoed ? { echoed: true } : {}),
     inputTokens: session.usage.inputTokens,
     outputTokens: session.usage.outputTokens,
     latencyMs: session.latencyMs,

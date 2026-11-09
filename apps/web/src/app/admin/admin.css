@@ -2015,3 +2015,13 @@ p.metrics-sources {
 .eval-table td:nth-child(2) {
   min-width: 16rem;
 }
+
+/* «Qué casos» of «Evaluar el asistente»: above the demos, as wide as its text allows. */
+.eval-scope {
+  max-width: 34rem;
+  margin-bottom: 0.75rem;
+}
+
+.eval-scope select {
+  max-width: 100%;
+}

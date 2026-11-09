@@ -266,3 +266,4 @@ Cada municipio interesado recibe su propia demo, con su nombre y contenido de mu
 5. **Calificar:** en «Resultados», pon tu nota (1–5) a las 40 reservadas de la primera repetición: claridad y que suene natural para un visitante.
 6. **Copilot:** en `/plataforma/copilot`, igual (2 casos por tanda; 14 en total). Las propuestas que crea se rechazan solas.
 7. **Al terminar:** «Retirar los datos de prueba», «Copiar resultados» de cada página y «Terminar la corrida». Vuelve las cuotas a sus valores.
+8. **Solo seguridad:** después de corregir una protección del asistente, en «Qué casos» elige «Solo seguridad»: los 40 casos de seguridad, 3 veces cada uno (120 respuestas, unos 90.000 tokens; con la demo B y sus datos de prueba, como la corrida completa). Su informe solo mira seguridad, fugas, citas, eventos terminados y formato. Comprueba la corrección; no reemplaza al gold completo.

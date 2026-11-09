@@ -28,7 +28,9 @@ type Outcome =
 /**
  * Runs the next batch, or every batch one after another («Correr todas las tandas») until
  * nothing is left, a batch gets no answer at all (the day's quota ran out) or the operator
- * stops it. The page shows every result as it lands.
+ * stops it. The page shows every result as it lands: the batches run outside a transition,
+ * and each refresh is its own transition, so the page (its counter, the results) updates
+ * after every batch instead of only when the whole loop ends.
  */
 export function BatchRunner({
   suite,
@@ -42,7 +44,8 @@ export function BatchRunner({
   const router = useRouter();
   const [message, setMessage] = useState<{ text: string; ok: boolean } | null>(null);
   const [looping, setLooping] = useState(false);
-  const [pending, startTransition] = useTransition();
+  const [busy, setBusy] = useState(false);
+  const [, startTransition] = useTransition();
   const stop = useRef(false);
 
   async function once(): Promise<Outcome> {
@@ -56,7 +59,7 @@ export function BatchRunner({
     if (result.status !== "done" || !("ran" in result)) {
       return { kind: "stop", message: PROBLEMS[result.status] ?? PROBLEMS.error ?? "", ok: false };
     }
-    router.refresh();
+    startTransition(() => router.refresh());
     if (result.ran.length === 0)
       return { kind: "stop", message: "No queda nada por correr.", ok: true };
     const passed = result.ran.filter((entry) => entry.pass === true).length;
@@ -68,40 +71,45 @@ export function BatchRunner({
     return { kind: "more", message: text };
   }
 
-  function runOne() {
+  async function runOne() {
     setMessage(null);
-    startTransition(async () => {
-      const outcome = await once();
-      setMessage({ text: outcome.message, ok: outcome.kind === "more" || outcome.ok });
-    });
+    setBusy(true);
+    const outcome = await once();
+    setMessage({ text: outcome.message, ok: outcome.kind === "more" || outcome.ok });
+    setBusy(false);
   }
 
-  function runAll() {
+  async function runAll() {
     stop.current = false;
     setLooping(true);
+    setBusy(true);
     setMessage(null);
-    startTransition(async () => {
-      for (;;) {
-        const outcome = await once();
-        if (outcome.kind === "stop") {
-          setMessage({ text: outcome.message, ok: outcome.ok });
-          break;
-        }
-        if (stop.current) {
-          setMessage({ text: `${outcome.message} Detenido: sigue cuando quieras.`, ok: true });
-          break;
-        }
-        setMessage({ text: `${outcome.message} Corriendo la siguiente…`, ok: true });
+    for (;;) {
+      const outcome = await once();
+      if (outcome.kind === "stop") {
+        setMessage({ text: outcome.message, ok: outcome.ok });
+        break;
       }
-      setLooping(false);
-    });
+      if (stop.current) {
+        setMessage({ text: `${outcome.message} Detenido: sigue cuando quieras.`, ok: true });
+        break;
+      }
+      setMessage({ text: `${outcome.message} Corriendo la siguiente…`, ok: true });
+    }
+    setLooping(false);
+    setBusy(false);
   }
 
   const done = remaining === 0;
   return (
     <div>
       <div className="form-actions">
-        <button type="button" className="button" disabled={pending || done} onClick={runAll}>
+        <button
+          type="button"
+          className="button"
+          disabled={busy || done}
+          onClick={() => void runAll()}
+        >
           {looping
             ? "Corriendo todas las tandas…"
             : done
@@ -122,10 +130,10 @@ export function BatchRunner({
           <button
             type="button"
             className="button button-quiet"
-            disabled={pending || done}
-            onClick={runOne}
+            disabled={busy || done}
+            onClick={() => void runOne()}
           >
-            {pending ? "Evaluando… (cerca de un minuto y medio)" : "Correr solo la siguiente tanda"}
+            {busy ? "Evaluando… (cerca de un minuto y medio)" : "Correr solo la siguiente tanda"}
           </button>
         )}
       </div>

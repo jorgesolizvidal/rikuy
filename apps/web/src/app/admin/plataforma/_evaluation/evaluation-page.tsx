@@ -4,6 +4,7 @@ import {
   evalFixtureStates,
   evaluationCases,
   HELD_OUT_REPETITIONS,
+  SECURITY_REPETITIONS,
   itemsOf,
   loadEvaluation,
   openOrganization,
@@ -80,7 +81,7 @@ export async function EvaluationPage({
   const status = aiGatewayStatus();
   const { run, rows, report } = view;
   const cases = evaluationCases(suite);
-  const total = itemsOf(suite).length;
+  const total = itemsOf(suite, view.scope).length;
   const path = suite === "assistant" ? "/plataforma/asistente" : "/plataforma/copilot";
 
   let fixtures: FixtureState[] | null = null;
@@ -167,7 +168,16 @@ export async function EvaluationPage({
       {run ? (
         <>
           <section aria-labelledby="corrida" className="metrics-section">
-            <h2 id="corrida">Corrida del {when(run.createdAt)}</h2>
+            <h2 id="corrida">
+              Corrida del {when(run.createdAt)}
+              {view.scope === "security" ? " · solo seguridad" : ""}
+            </h2>
+            {view.scope === "security" ? (
+              <p className="field-hint">
+                Solo los 40 casos de seguridad, 3 veces cada uno. Comprueba las protecciones; la
+                calidad, los hechos y la revisión del español quedan para el gold completo.
+              </p>
+            ) : null}
             <p>
               Demo A: <strong>{run.tenantA.displayName}</strong>
               {run.tenantB ? (
@@ -263,8 +273,10 @@ export async function EvaluationPage({
               <ul className="metrics-sources">
                 {report.splits.map((split) => (
                   <li key={split.split}>
-                    {SPLIT_NAMES[split.split] ?? split.split}: {split.passed} bien de{" "}
-                    {split.evaluated} evaluados ({split.expected} en total)
+                    {view.scope === "security" && split.split === "security"
+                      ? `Seguridad (×${SECURITY_REPETITIONS})`
+                      : (SPLIT_NAMES[split.split] ?? split.split)}
+                    : {split.passed} bien de {split.evaluated} evaluados ({split.expected} en total)
                     {split.notEvaluated > 0
                       ? ` · ${split.notEvaluated} sin evaluar (cuota o proveedor): se repiten solos`
                       : ""}
@@ -279,7 +291,7 @@ export async function EvaluationPage({
               </ul>
               <CopyReport
                 text={[
-                  `${TITLES[suite]} · ${run.dataset} · ${run.provider}/${run.model}`,
+                  `${TITLES[suite]}${view.scope === "security" ? " (solo seguridad)" : ""} · ${run.dataset} · ${run.provider}/${run.model}`,
                   `Demo A: ${run.tenantA.displayName}${run.tenantB ? ` · Demo B: ${run.tenantB.displayName}` : ""}`,
                   `Resultado: ${report.status}`,
                   ...report.gates.map(
@@ -314,7 +326,9 @@ export async function EvaluationPage({
                       <tr key={`${row.caseId}#${row.repetition}`}>
                         <th scope="row">
                           {row.caseId}
-                          {row.split === "heldout" ? ` (${row.repetition})` : ""}
+                          {row.split === "heldout" || view.scope === "security"
+                            ? ` (${row.repetition})`
+                            : ""}
                           <span className="cell-detail"> {row.category}</span>
                         </th>
                         <td>
