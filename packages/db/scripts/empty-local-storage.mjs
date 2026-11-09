@@ -2,7 +2,7 @@
 // (ADR-046) cannot pass with files left from before. Refuses any address that is not local.
 //
 //   SUPABASE_URL=http://127.0.0.1:54321 SUPABASE_SECRET_KEY=… node packages/db/scripts/empty-local-storage.mjs
-/* global fetch */
+/* global fetch, URL */
 import { BACKUP_BUCKETS } from "./backup-lib.mjs";
 
 const url = process.env.SUPABASE_URL ?? "";
