@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** P6 · Paso 4 — respaldo y restauración probada (código; el primer respaldo y el primer ensayo en producción quedan para después del merge). P6 · Paso 3 espera sus corridas con el modelo real.
-- **Rama:** `feat/p6-step4-backup-restore` → PR hacia `main`
+- **Último paso completado:** P6 · Paso 4 — respaldo y restauración probada ✅ (primer respaldo y primer ensayo en producción en verde, 2026-11-09). P6 · Paso 3 espera su corrida con el modelo real.
+- **Rama:** `docs/p6-closure` → PR hacia `main` (cierre de los Pasos 3 y 4 con sus resultados en producción)
 
 ## Historial
 
@@ -1575,7 +1575,7 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 - **«Correr todas las tandas»:** corre una tanda tras otra hasta que no queda nada, falta preparar los datos de prueba o una tanda entera se queda sin respuesta. «Detener después de esta tanda» la para. «Correr solo la siguiente tanda» sigue disponible.
 - Tests: core 505 (+2: espacios especiales y lo que la pregunta nombró); el e2e de la evaluación corre el Copilot con «Correr todas las tandas» hasta que solo quedan los casos que esperan los datos de prueba.
 
-### P6 · Paso 4 — respaldo y restauración probada ✅ (código)
+### P6 · Paso 4 — respaldo y restauración probada ✅
 
 - Se adelantó mientras P6 · Paso 3 espera la cuota del día para su corrida con el modelo real (decisión del usuario, 2026-11-08): este paso no depende de esas corridas.
 - Decisiones del usuario ([ADR-046](../adr/ADR-046-backup-restore.md)), 2026-11-08:
@@ -1621,18 +1621,20 @@ Lo que encontró el CI, ya corregido:
 - `supabase storage rm` no vaciaba los buckets de la pila, y la comprobación lo detectó (126 archivos seguían ahí). Ahora los borra `empty-local-storage.mjs`, que solo acepta una dirección local.
 - `postgres` no puede escribir ni leer una tabla interna de Storage (`storage.buckets_vectors`), vacía en el respaldo. La restauración solo carga las tablas con filas y solo vacía las que tienen filas y se pueden leer. La comprobación cuenta solo las tablas legibles: una que no se puede leer falla solo si el respaldo traía filas para ella.
 
+**En producción (2026-11-09):** el usuario creó la clave de age en su computadora (guardada en su gestor de contraseñas) y configuró `BACKUP_AGE_RECIPIENT`, `BACKUP_AGE_IDENTITY` y `SUPABASE_SECRET_KEY` en GitHub.
+
+- **«Backup»** (a mano, 6 min): 75 tablas, 1.783 filas, 232 archivos (134 originales, 50 MB; 98 públicos, 6,8 MB), cada archivo de la base con su copia. Artefacto `rikuy-backup-2026-11-09T1506Z`, 51 MB cifrado.
+- **«Restore drill»** (a mano, 1 min 43 s), con la pila en las versiones de producción (PostgreSQL 17.11): base en menos de 1 s, archivos en 1,4 s, y ✓ en las cuatro comprobaciones (1.783 filas de 75 tablas, 232 archivos byte por byte, 5 de 5 portales en línea con sus destinos, 9 cuentas leídas por Auth).
+- Anotado en el [runbook](../backup.md#saber-que-funciona). **P6 · Paso 4 ✅.**
+
 ## Cómo verificarlo
 
-Después del merge (no hay migración):
-
-1. **La clave del respaldo**, en tu computadora: instala age (Windows: `winget install --id FiloSottile.age`) y corre `age-keygen -o rikuy-backup-key.txt`. Guarda el archivo completo en tu gestor de contraseñas.
-2. **GitHub** → Settings → Secrets and variables → Actions:
-   - variable `BACKUP_AGE_RECIPIENT` = la línea pública `age1…`;
-   - secret `BACKUP_AGE_IDENTITY` = la línea `AGE-SECRET-KEY-1…`;
-   - secret `SUPABASE_SECRET_KEY` = la _secret key_ de Supabase (la misma de Vercel).
-3. Actions → **«Backup»** → _Run workflow_. Al terminar, pásame su resumen (tablas, filas, archivos).
-4. Actions → **«Restore drill»** → _Run workflow_. Pásame su resumen (las comprobaciones y los tiempos).
-5. Pendiente de P6 · Paso 3: el 9 de noviembre después de las 20:00, la corrida del asistente con «Correr todas las tandas» (pasos en [«Evaluar con el modelo real»](../deploy.md#evaluar-con-el-modelo-real-p6--paso-3)).
+- P6 · Paso 4: los resúmenes de «Backup» y «Restore drill» en Actions (enlazados en el [runbook](../backup.md#saber-que-funciona)). Desde ahora corren solos: el respaldo cada día a las 02:41 y el ensayo cada domingo a las 05:17 (hora de Bolivia).
+- P6 · Paso 3, pendiente (hoy, 9 de noviembre, después de las 20:00):
+  1. «Cuotas por municipio»: IA de Demo Valle en 180 mil tokens por día.
+  2. `/plataforma/asistente`: demo A = Demo Valle, demo B = Demo comercial → «Empezar una corrida» → comprobar que los datos de prueba digan «Lista» → **«Correr todas las tandas»**.
+  3. Nota del 1 al 5 a las 40 reservadas y «Copiar resultados».
+  4. Otro día, `/plataforma/copilot` con las mismas demos y «Correr todas las tandas»; después, «Retirar los datos de prueba».
 
 ## Siguiente paso
 
