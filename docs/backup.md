@@ -36,11 +36,11 @@ Runbook del respaldo diario y del ensayo semanal ([ADR-046](adr/ADR-046-backup-r
 - Sus resúmenes muestran **solo cantidades**: nunca nombres, correos ni contenido (el repositorio es público).
 - Los tiempos de «Restaurar la base» y «Restaurar los archivos» del ensayo son la medida del tiempo de restauración.
 
-| Ensayo | Respaldo | Base | Archivos | Comprobaciones |
-| ------ | -------- | ---- | -------- | -------------- |
-| —      | —        | —    | —        | —              |
+| Ensayo                                                                                            | Respaldo                                                                                       | Base         | Archivos     | Comprobaciones                                                                     |
+| ------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------ | ------------ | ---------------------------------------------------------------------------------- |
+| 9 nov 2026, a mano ([corrida](https://github.com/jorgesolizvidal/rikuy/actions/runs/42642019803)) | `rikuy-backup-2026-11-09T1506Z`: 75 tablas, 1.783 filas, 232 archivos (56,8 MB), 51 MB cifrado | menos de 1 s | 232 en 1,4 s | ✓ filas de 75 tablas, ✓ 232 archivos byte por byte, ✓ 5 de 5 portales, ✓ 9 cuentas |
 
-(Se anotan aquí las primeras corridas.)
+El primer respaldo ([corrida](https://github.com/jorgesolizvidal/rikuy/actions/runs/42640334745)) tardó 6 min, la mayor parte en volcar el esquema. El ensayo completo, con la pila nueva en las versiones de producción (PostgreSQL 17.11), tardó 1 min 43 s.
 
 **Si el ensayo falla:**
 
