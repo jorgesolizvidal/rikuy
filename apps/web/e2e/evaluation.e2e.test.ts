@@ -93,6 +93,25 @@ describe("evaluation with the model (ADR-045)", () => {
       on conflict (tenant_id, user_id) do update
         set role = 'owner', status = 'active', revoked_at = null, accepted_at = now()
     `;
+    // A security-only run asks 120 questions on top of the other tests of the day: lift the
+    // demos' AI quota and the platform's daily cap of this test database (ADR-036), so no
+    // batch ends in «sin cuota».
+    for (const tenant of [NORTE, SUR]) {
+      await db`
+        insert into public.tenant_quotas (tenant_id, resource, limit_amount)
+        values (${tenant}, 'ai_tokens', 2000000)
+        on conflict (tenant_id, resource) do update set limit_amount = excluded.limit_amount
+      `;
+      await db`
+        update public.usage_buckets set limit_amount = 2000000
+        where tenant_id = ${tenant} and resource = 'ai_tokens' and period_end > now()
+      `;
+    }
+    await db`
+      insert into public.ai_platform_days (day, limit_tokens)
+      values ((now() at time zone 'utc')::date, 100000000)
+      on conflict (day) do update set limit_tokens = excluded.limit_tokens
+    `;
     browser = await chromium.launch({
       executablePath: CHROME,
       args: ["--host-resolver-rules=MAP *.localhost 127.0.0.1"],
@@ -120,6 +139,10 @@ describe("evaluation with the model (ADR-045)", () => {
       where user_id = ${OPERATOR_ID} and tenant_id in (${NORTE}, ${SUR})
     `;
     await db`update public.tenants set is_demo = false where id in (${NORTE}, ${SUR})`;
+    await db`
+      delete from public.tenant_quotas
+      where tenant_id in (${NORTE}, ${SUR}) and resource = 'ai_tokens'
+    `;
     await browser?.close();
     await db.end({ timeout: 5 });
   });

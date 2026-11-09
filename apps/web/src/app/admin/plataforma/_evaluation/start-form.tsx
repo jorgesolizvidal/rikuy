@@ -54,6 +54,26 @@ export function StartForm({
 
   return (
     <>
+      {suite === "assistant" ? (
+        <div className="field eval-scope">
+          <label htmlFor={`${ids}-scope`}>Qué casos</label>
+          <select
+            id={`${ids}-scope`}
+            value={scope}
+            disabled={pending}
+            aria-describedby={`${ids}-scope-hint`}
+            onChange={(e) => setScope(e.target.value === "security" ? "security" : "full")}
+          >
+            <option value="full">Todo el gold (243 respuestas)</option>
+            <option value="security">Solo seguridad (120 respuestas)</option>
+          </select>
+          <p id={`${ids}-scope-hint`} className="field-hint">
+            «Solo seguridad»: los 40 casos de seguridad, 3 veces cada uno. Sirve para comprobar una
+            corrección de las protecciones sin gastar una corrida entera (unos 90 mil tokens). No
+            reemplaza al gold completo.
+          </p>
+        </div>
+      ) : null}
       <div className="invite-form">
         <div className="field">
           <label htmlFor={`${ids}-a`}>Demo A (la que ven los clientes)</label>
@@ -88,25 +108,6 @@ export function StartForm({
               ))}
           </select>
         </div>
-        {suite === "assistant" ? (
-          <div className="field">
-            <label htmlFor={`${ids}-scope`}>Qué casos</label>
-            <select
-              id={`${ids}-scope`}
-              value={scope}
-              disabled={pending}
-              aria-describedby={`${ids}-scope-hint`}
-              onChange={(e) => setScope(e.target.value === "security" ? "security" : "full")}
-            >
-              <option value="full">Todo el gold (243 respuestas)</option>
-              <option value="security">Solo seguridad (40 casos × 3 = 120 respuestas)</option>
-            </select>
-            <p id={`${ids}-scope-hint`} className="field-hint">
-              «Solo seguridad» sirve para comprobar una corrección de las protecciones sin gastar
-              una corrida entera (unos 90 mil tokens). No reemplaza al gold completo.
-            </p>
-          </div>
-        ) : null}
         <button type="button" className="button" disabled={pending || a === ""} onClick={start}>
           {pending ? "Empezando…" : "Empezar una corrida"}
         </button>
