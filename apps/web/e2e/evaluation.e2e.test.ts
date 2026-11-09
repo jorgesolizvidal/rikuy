@@ -159,7 +159,7 @@ describe("evaluation with the model (ADR-045)", () => {
     expect(draft.status, "a draft never reaches the portal").toBe(404);
 
     // A batch: five cases, graded and recorded.
-    await page.getByRole("button", { name: /^Correr la siguiente tanda/u }).click();
+    await page.getByRole("button", { name: "Correr solo la siguiente tanda" }).click();
     await page.getByText(/^Listo: \d de 5 bien\./u).waitFor({ timeout: 90_000 });
     const rows = await db<
       { case_id: string; pass: boolean | null; estimated_cost_usd: string | null }[]
@@ -203,13 +203,25 @@ describe("evaluation with the model (ADR-045)", () => {
     await page.getByRole("button", { name: "Empezar una corrida" }).click();
     await page.waitForURL(/\/plataforma\/copilot\?corrida=/u);
     const runId = new URL(page.url()).searchParams.get("corrida") ?? "";
-    await page.getByRole("button", { name: /^Correr la siguiente tanda/u }).click();
+    await page.getByRole("button", { name: "Correr solo la siguiente tanda" }).click();
     await page.getByText(/^Listo: \d de 2 bien\./u).waitFor({ timeout: 90_000 });
     expect(
       (
         await db`select case_id from public.eval_results where run_id = ${runId} order by case_id`
       ).map((row) => row.case_id),
     ).toEqual(["C01", "C02"]);
+
+    // «Correr todas las tandas» goes on by itself until only what needs the (retired) trap
+    // data is left: C04–C06 and C14 wait for it.
+    await page.getByRole("button", { name: /^Correr todas las tandas/u }).click();
+    await page
+      .getByText(/necesita los datos de prueba de la demo B/u)
+      .waitFor({ timeout: 180_000 });
+    expect(
+      (
+        await db`select case_id from public.eval_results where run_id = ${runId} order by case_id`
+      ).map((row) => row.case_id),
+    ).toEqual(["C01", "C02", "C03", "C07", "C08", "C09", "C10", "C11", "C12", "C13"]);
     expect(
       await db`select 1 from public.copilot_proposals where created_by = ${OPERATOR_ID} and status = 'pending'`,
     ).toHaveLength(0);

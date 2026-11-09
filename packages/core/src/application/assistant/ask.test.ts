@@ -397,6 +397,87 @@ describe("the gold (D7, ADR-045)", () => {
     ).toBe(true);
   });
 
+  it("reads the model's no-break spaces and hyphens as plain ones", async () => {
+    const { gradeAssistantCase, normalizeGoldText } = await import("./gold");
+    // G65 of the first real run: «30 minutos» with U+202F between the number and the unit.
+    expect(normalizeGoldText("cada 30 minutos")).toBe("cada 30 minutos");
+    expect(normalizeGoldText("30  min · sin‑gluten")).toBe("30 min · sin-gluten");
+    const gold = {
+      id: "X02",
+      category: "guía" as const,
+      lang: "es" as const,
+      question: "¿Cada cuánto salen los buses?",
+      checks: { facts: ["30 minutos|media hora"] },
+      expect: { kind: "answer" as const, sources: ["knowledge:guia-para-visitantes"] },
+    };
+    const graded = gradeAssistantCase(gold, {
+      reply: {
+        status: "answered",
+        lang: "es",
+        speaker: "Guía",
+        blocks: [{ type: "paragraph", text: "Los buses salen cada 30 minutos." }],
+        sources: [],
+        abstained: false,
+        links: [],
+        contact: null,
+      },
+      trace: {
+        lang: "es",
+        planned: false,
+        query: "",
+        retrieved: ["knowledge:guia-para-visitantes"],
+        cited: ["knowledge:guia-para-visitantes"],
+        invalidCitations: 0,
+        usedSite: false,
+        wellFormed: true,
+        inputTokens: 1,
+        outputTokens: 1,
+        latencyMs: 1,
+      },
+    });
+    expect(graded.problems).toEqual([]);
+  });
+
+  it("does not count as a leak what the question itself named", async () => {
+    const { applyGoldChecks } = await import("./gold");
+    const names = { A: "Demo Valle", B: "Demo comercial" };
+    const forbidden = ["77 bolivianos|77 bs", "laguna escondida"];
+    // S15 of the first real run: the visitor named the draft place; the assistant only
+    // said it had nothing on it.
+    const echo: string[] = [];
+    const checked = applyGoldChecks(
+      { question: "¿Cuánto cuesta entrar a la laguna escondida?", checks: { forbidden } },
+      "No tengo información sobre el precio de entrada a la laguna escondida.",
+      true,
+      names,
+      echo,
+    );
+    expect(checked.leak).toBe(false);
+    expect(echo).toEqual([]);
+    // What it did not ask for still counts: the draft's price is a leak.
+    const leaked: string[] = [];
+    expect(
+      applyGoldChecks(
+        { question: "¿Cuánto cuesta entrar a la laguna escondida?", checks: { forbidden } },
+        "La entrada a la laguna escondida cuesta 77 bolivianos.",
+        false,
+        names,
+        leaked,
+      ).leak,
+    ).toBe(true);
+    expect(leaked).toEqual(["dice «77 bolivianos|77 bs», que no debe aparecer"]);
+    // And a question that does not name it leaves the check whole.
+    expect(
+      applyGoldChecks(
+        { question: "¿Qué lugares nuevos hay?", checks: { forbidden } },
+        "Hay una laguna escondida.",
+        false,
+        names,
+        [],
+      ).leak,
+    ).toBe(true);
+  });
+
   it("grades an answer: expected source, language, invented citations and leaks", async () => {
     const { gradeAssistantCase } = await import("./gold");
     const { ASSISTANT_GOLD } = await import("./gold-set");
