@@ -8,8 +8,8 @@
  *   after retiring, the ended event's page is gone;
  * - runs a batch: five results with their verdicts, recorded in eval_results with a cost
  *   (none for the simulated model) and the report says «incompleto»;
- * - a security-only run asks only the security cases (40 × 3), and while «Correr todas las
- *   tandas» goes on the page's counter follows each batch (it used to wait for the loop);
+ * - a security-only run asks only the security cases (40 × 3); «Correr todas las tandas»
+ *   reports every batch while it goes on and the page shows what was recorded;
  * - «Evaluar el Copilot»: a batch of two cases, and no proposal left pending;
  * - both pages pass axe and do not overflow at 390 and 1280 px.
  *
@@ -235,28 +235,25 @@ describe("evaluation with the model (ADR-045)", () => {
     expect(run?.dataset).toMatch(/\/seguridad$/u);
     await page.getByText(/· 0 de 120 resultados/u).waitFor();
 
-    // While every batch runs, the counter moves before the loop ends: both at once on the
-    // page (with one long transition, it stayed at 0 until the loop was over).
+    // Every batch reports while the loop goes on, and the loop stops by itself: what is
+    // left waits for the trap data, which this run does not prepare. (With the simulated
+    // model a batch takes milliseconds, so the test does not race the loop: it reads the
+    // runner's own report, then the page once the loop is over.)
     await page.getByRole("button", { name: /^Correr todas las tandas \(quedan 120\)/u }).click();
-    await page.waitForFunction(
-      () => {
-        const counter = /· (\d+) de 120 resultados/u.exec(document.body.innerText);
-        const looping = [...document.querySelectorAll("button")].some(
-          (button) => button.textContent === "Corriendo todas las tandas…",
-        );
-        return looping && Number(counter?.[1] ?? 0) >= 10;
-      },
-      undefined,
-      { timeout: 120_000 },
-    );
-    await page.getByRole("button", { name: "Detener después de esta tanda" }).click();
-    await page.getByText(/Detenido: sigue cuando quieras\./u).waitFor({ timeout: 120_000 });
+    await page.getByText(/Quedan \d+\. Corriendo la siguiente…$/u).waitFor({ timeout: 60_000 });
+    await page
+      .getByRole("button", { name: "Correr solo la siguiente tanda" })
+      .waitFor({ timeout: 120_000 });
     const rows = await db<{ case_id: string; repetition: number; split: string }[]>`
       select case_id, repetition, split from public.eval_results where run_id = ${runId}`;
-    expect(rows.length).toBeGreaterThanOrEqual(10);
+    expect(rows.length).toBeGreaterThanOrEqual(5);
     expect(
       rows.every((entry) => entry.split === "security" && /^S\d\d$/u.test(entry.case_id)),
     ).toBe(true);
+    // The page shows what was recorded, not what it showed when the loop started.
+    await page
+      .getByText(new RegExp(`· ${rows.length} de 120 resultados`, "u"))
+      .waitFor({ timeout: 30_000 });
     await page.getByText(/^Seguridad \(×3\):/u).waitFor();
     await accessible("/plataforma/asistente (solo seguridad)");
   });
