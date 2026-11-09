@@ -166,6 +166,44 @@ jobs:
             echo "::error title=portals e2e::${line//%/%25}"
           done
 
+      # ADR-046: the same scripts as «Backup» and «Restore drill», on this stack and its test
+      # data. Back up and encrypt, empty the stack (every file, then the database back to the
+      # migrations), decrypt, restore and check every table, file, portal and account.
+      - name: Backup and restore drill (on this stack)
+        env:
+          BACKUP_SOURCE: local
+        run: |
+          set -euo pipefail
+          sudo apt-get install -y -qq age > /dev/null
+          pkill -f "next start" || true
+          umask 077
+          work="$RUNNER_TEMP/backup"
+          mkdir -p "$work/db" "$RUNNER_TEMP/restore"
+          pnpm exec supabase db dump --local --role-only -f "$work/db/roles.sql"
+          pnpm exec supabase db dump --local -f "$work/db/schema.sql"
+          pnpm exec supabase db dump --local --data-only --use-copy \
+            -x cron.job,cron.job_run_details,net._http_response,net.http_request_queue \
+            -f "$work/db/data.sql"
+          node packages/db/scripts/backup.mjs download "$work"
+          node packages/db/scripts/backup.mjs manifest "$work"
+          age-keygen -o "$RUNNER_TEMP/key.txt" 2> /dev/null
+          tar -C "$work" -czf - manifest.json db storage \
+            | age -r "$(age-keygen -y "$RUNNER_TEMP/key.txt")" -o "$RUNNER_TEMP/backup.tar.gz.age"
+          rm -rf "$work"
+
+          for bucket in media-originals media-public; do
+            pnpm exec supabase --experimental storage rm -r "ss:///$bucket/" --local > /dev/null 2>&1 || true
+          done
+          left="$(psql "$SUPABASE_DB_URL" -XAtc "select count(*) from storage.objects")"
+          if [ "$left" != "0" ]; then echo "::error::Storage was not emptied ($left files left)"; exit 1; fi
+          pnpm exec supabase db reset --local --no-seed
+          psql "$SUPABASE_DB_URL" -Xq -c "select cron.unschedule(jobid) from cron.job" > /dev/null
+
+          age -d -i "$RUNNER_TEMP/key.txt" "$RUNNER_TEMP/backup.tar.gz.age" | tar -xzf - -C "$RUNNER_TEMP/restore"
+          bash packages/db/scripts/backup-restore-db.sh "$RUNNER_TEMP/restore" "$SUPABASE_DB_URL"
+          node packages/db/scripts/backup.mjs restore-storage "$RUNNER_TEMP/restore"
+          node packages/db/scripts/backup.mjs verify "$RUNNER_TEMP/restore"
+
   contracts:
     name: Contracts (RC-09/10/11/12) · Lighthouse budget
     runs-on: ubuntu-latest

@@ -1,0 +1,113 @@
+name: Backup
+
+# Once a day (02:41 in Bolivia), and on demand: the whole database (with the accounts) and
+# every file of Storage, in one archive encrypted for the backup key, kept 90 days as an
+# artifact of this run (ADR-046). The repository is public: nothing readable leaves the
+# runner, and the logs only show counts. Restoring: docs/backup.md.
+#
+# Repository settings → Secrets and variables → Actions:
+#   secret   SUPABASE_ACCESS_TOKEN   (as for «Deploy database»)
+#   secret   SUPABASE_DB_PASSWORD    (as for «Deploy database»)
+#   secret   SUPABASE_SECRET_KEY     the project's secret key (to read every file)
+#   variable SUPABASE_PROJECT_REF    (as for «Deploy database»)
+#   variable BACKUP_AGE_RECIPIENT    the PUBLIC half of the backup key (age1…)
+#
+# GitHub pauses scheduled workflows of a repository without commits for 60 days: a commit,
+# or «Enable workflow» in the Actions tab, turns it back on.
+
+on:
+  schedule:
+    - cron: "41 6 * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: backup
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  backup:
+    name: Database and files → encrypted artifact
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      BACKUP_AGE_RECIPIENT: ${{ vars.BACKUP_AGE_RECIPIENT }}
+      BACKUP_SOURCE: linked
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Check configuration
+        run: |
+          for name in SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD SUPABASE_SECRET_KEY PROJECT_REF BACKUP_AGE_RECIPIENT; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not configured"; exit 1; fi
+          done
+          case "$BACKUP_AGE_RECIPIENT" in
+            age1*) ;;
+            *) echo "::error::BACKUP_AGE_RECIPIENT must be the public key (age1…), never the secret one"; exit 1 ;;
+          esac
+          sudo apt-get install -y -qq age > /dev/null
+
+      - name: Link the project
+        run: pnpm exec supabase link --project-ref "$PROJECT_REF" > /dev/null
+
+      - name: Dump the database
+        run: |
+          umask 077
+          work="$RUNNER_TEMP/backup"
+          mkdir -p "$work/db"
+          pnpm exec supabase db dump --linked --role-only -f "$work/db/roles.sql"
+          pnpm exec supabase db dump --linked -f "$work/db/schema.sql"
+          pnpm exec supabase db dump --linked --data-only --use-copy \
+            -x cron.job,cron.job_run_details,net._http_response,net.http_request_queue \
+            -f "$work/db/data.sql"
+
+      - name: Copy the files
+        env:
+          SUPABASE_URL: https://${{ vars.SUPABASE_PROJECT_REF }}.supabase.co
+        run: |
+          umask 077
+          node packages/db/scripts/backup.mjs download "$RUNNER_TEMP/backup"
+          node packages/db/scripts/backup.mjs manifest "$RUNNER_TEMP/backup"
+
+      - name: Encrypt
+        id: archive
+        run: |
+          umask 077
+          name="rikuy-backup-$(date -u +%Y-%m-%dT%H%MZ)"
+          mkdir -p "$RUNNER_TEMP/out"
+          tar -C "$RUNNER_TEMP/backup" -czf - manifest.json db storage \
+            | age -r "$BACKUP_AGE_RECIPIENT" -o "$RUNNER_TEMP/out/$name.tar.gz.age"
+          rm -rf "$RUNNER_TEMP/backup"
+          # Only an age file leaves the runner.
+          head -c 21 "$RUNNER_TEMP/out/$name.tar.gz.age" | grep -q '^age-encryption.org/v1' \
+            || { echo "::error::The archive is not encrypted"; exit 1; }
+          echo "name=$name" >> "$GITHUB_OUTPUT"
+          echo "Archivo cifrado: $name ($(du -h "$RUNNER_TEMP/out/$name.tar.gz.age" | cut -f1))" >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v5
+        with:
+          name: ${{ steps.archive.outputs.name }}
+          path: ${{ runner.temp }}/out/${{ steps.archive.outputs.name }}.tar.gz.age
+          retention-days: 90
+          compression-level: 0
+          if-no-files-found: error
+
+      - name: Clean up
+        if: always()
+        run: rm -rf "$RUNNER_TEMP/backup" "$RUNNER_TEMP/out" supabase/.temp

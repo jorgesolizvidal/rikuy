@@ -1,0 +1,130 @@
+name: Restore drill
+
+# Every Sunday (05:17 in Bolivia), and on demand: the newest backup is decrypted and restored
+# into a new, empty Supabase stack on the runner (the same service versions as production),
+# then checked: every table has its rows, every file comes back byte for byte, each online
+# portal answers from its address with its places, and Auth reads the accounts (ADR-046).
+# A red run means the backups stopped working or stopped being made: GitHub emails the owner.
+# Production is only read to learn its service versions; nothing is written to it.
+#
+# Repository settings → Secrets and variables → Actions:
+#   secret   BACKUP_AGE_IDENTITY     the SECRET half of the backup key (AGE-SECRET-KEY-1…)
+#   secret   SUPABASE_ACCESS_TOKEN, SUPABASE_DB_PASSWORD; variable SUPABASE_PROJECT_REF
+#            (as for «Deploy database»)
+
+on:
+  schedule:
+    - cron: "17 9 * * 0"
+  workflow_dispatch:
+    inputs:
+      artifact:
+        description: "Nombre del respaldo (rikuy-backup-…); vacío: el más reciente"
+        type: string
+        default: ""
+
+concurrency:
+  group: restore-drill
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  drill:
+    name: Newest backup → new stack → checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      GH_TOKEN: ${{ github.token }}
+      BACKUP_AGE_IDENTITY: ${{ secrets.BACKUP_AGE_IDENTITY }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      PROJECT_REF: ${{ vars.SUPABASE_PROJECT_REF }}
+      WANTED: ${{ inputs.artifact }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: pnpm
+
+      - name: Install
+        run: |
+          pnpm install --frozen-lockfile
+          sudo apt-get install -y -qq age > /dev/null
+          for name in BACKUP_AGE_IDENTITY SUPABASE_ACCESS_TOKEN SUPABASE_DB_PASSWORD PROJECT_REF; do
+            if [ -z "${!name}" ]; then echo "::error::$name is not configured"; exit 1; fi
+          done
+
+      - name: Find the backup
+        id: find
+        run: |
+          artifacts="$(gh api --paginate "repos/$GITHUB_REPOSITORY/actions/artifacts?per_page=100" \
+            --jq '.artifacts[] | select(.expired | not) | select(.name | startswith("rikuy-backup-"))
+                  | {name, run: .workflow_run.id, created: .created_at}' | jq -s 'sort_by(.created)')"
+          if [ -n "$WANTED" ]; then
+            chosen="$(echo "$artifacts" | jq -c --arg n "$WANTED" 'map(select(.name == $n)) | last')"
+          else
+            chosen="$(echo "$artifacts" | jq -c 'last')"
+          fi
+          if [ "$chosen" = "null" ] || [ -z "$chosen" ]; then
+            echo "::error::No backup to restore (is «Backup» running?)"; exit 1
+          fi
+          created="$(echo "$chosen" | jq -r .created)"
+          age_hours=$(( ( $(date +%s) - $(date -d "$created" +%s) ) / 3600 ))
+          echo "name=$(echo "$chosen" | jq -r .name)" >> "$GITHUB_OUTPUT"
+          echo "run=$(echo "$chosen" | jq -r .run)" >> "$GITHUB_OUTPUT"
+          echo "Respaldo: $(echo "$chosen" | jq -r .name), hace ${age_hours} h; $(echo "$artifacts" | jq length) guardados." >> "$GITHUB_STEP_SUMMARY"
+          # The schedule makes one a day: an older newest one means the backups stopped.
+          if [ -z "$WANTED" ] && [ "$age_hours" -gt 48 ]; then
+            echo "::error::The newest backup is ${age_hours} h old: «Backup» stopped running"; exit 1
+          fi
+
+      - name: Download and decrypt
+        run: |
+          umask 077
+          mkdir -p "$RUNNER_TEMP/in" "$RUNNER_TEMP/restore"
+          gh run download "${{ steps.find.outputs.run }}" -n "${{ steps.find.outputs.name }}" -D "$RUNNER_TEMP/in"
+          printf '%s\n' "$BACKUP_AGE_IDENTITY" > "$RUNNER_TEMP/key.txt"
+          age -d -i "$RUNNER_TEMP/key.txt" "$RUNNER_TEMP/in/${{ steps.find.outputs.name }}.tar.gz.age" \
+            | tar -xzf - -C "$RUNNER_TEMP/restore"
+          rm -f "$RUNNER_TEMP/key.txt"
+          rm -rf "$RUNNER_TEMP/in"
+
+      # Linking saves production's service versions, so the new stack runs the same ones.
+      - name: Start a new, empty stack
+        run: |
+          pnpm exec supabase link --project-ref "$PROJECT_REF" > /dev/null
+          pnpm exec supabase start -x realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
+          STATUS="$(pnpm exec supabase status -o json)"
+          SECRET="$(echo "$STATUS" | jq -r '.SECRET_KEY // .SERVICE_ROLE_KEY')"
+          echo "::add-mask::$SECRET"
+          {
+            echo "SUPABASE_URL=$(echo "$STATUS" | jq -r '.API_URL')"
+            echo "SUPABASE_PUBLISHABLE_KEY=$(echo "$STATUS" | jq -r '.PUBLISHABLE_KEY // .ANON_KEY')"
+            echo "SUPABASE_SECRET_KEY=$SECRET"
+            echo "SUPABASE_DB_URL=$(echo "$STATUS" | jq -r '.DB_URL // "postgresql://postgres:postgres@127.0.0.1:54322/postgres"')"
+          } >> "$GITHUB_ENV"
+
+      # The restored copy must not run production's schedule (cron is rebuilt by the migrations).
+      - name: Pause the copy's schedule
+        run: psql "$SUPABASE_DB_URL" -Xq -c "select cron.unschedule(jobid) from cron.job" > /dev/null
+
+      - name: Restore the database
+        run: bash packages/db/scripts/backup-restore-db.sh "$RUNNER_TEMP/restore" "$SUPABASE_DB_URL" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Restore the files
+        run: node packages/db/scripts/backup.mjs restore-storage "$RUNNER_TEMP/restore" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - name: Check
+        run: node packages/db/scripts/backup.mjs verify "$RUNNER_TEMP/restore"
+
+      - name: Clean up
+        if: always()
+        run: |
+          rm -rf "$RUNNER_TEMP/restore" "$RUNNER_TEMP/in" "$RUNNER_TEMP/key.txt" supabase/.temp
+          pnpm exec supabase stop --no-backup > /dev/null 2>&1 || true
