@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C0 — Ucureña lista como vitrina. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster ✅ (con su corrección `fix/model-poster-republish`)
-- **Rama:** `fix/model-poster-republish` → PR hacia `main`
+- **Último paso completado:** C0 · Paso 3 — borrar un tour o pasarlo a otro destino o evento ✅
+- **Rama:** `feat/c0-step3-delete-move-tour` → PR hacia `main`
 
 ## Historial
 
@@ -1766,14 +1766,51 @@ Lo que encontró el CI, ya corregido:
 - Hasta que llegue la migración (la web sale unos minutos antes), guardar la imagen de un modelo falla con un mensaje.
 - El poster ya guardado en Demo Norte se llama `poster.webp`: para verlo en el portal hay que volver a subir la foto (con un nombre propio) y publicar el tour.
 
+**Verificación en producción (2026-11-10):** tras el merge del PR #63, el usuario volvió a subir la foto del monumento en Demo Norte, publicó el tour de «Plaza principal» y el diálogo del monumento en el portal mostró la foto nueva.
+
+### C0 · Paso 3 — borrar un tour o pasarlo a otro destino o evento ✅
+
+- Decisiones del usuario ([ADR-049](../adr/ADR-049-delete-move-tour.md)), 2026-11-10:
+  - **borrar es definitivo:** el tour, sus versiones y su historial; sus panoramas y modelos quedan libres para borrarlos (ADR-048);
+  - **solo propietarios y administradores** borran o pasan un tour a otro lugar;
+  - **los «Ir a otro recorrido» de otros tours** que llevaban a su lugar se ocultan (como hoy) y el panel avisa cuáles;
+  - **la dirección vieja del tour** lleva a donde está ahora: al tour movido o a la ficha de su lugar.
+- Base de datos (`20261113000000_c0_delete_move_tour.sql`, solo expand):
+  - `tour_redirects` (lugar que perdió su tour → tour; FK compuestas, RLS sin permisos, borrado en cascada con el tour). Un lugar que recibe un tour, creado o movido ahí, deja de redirigir (trigger `tours_clear_redirect`);
+  - `tour_removal_impact` (cualquier miembro): versiones publicadas, si está en el recorrido general y si empieza ahí, y los tours con un «Ir a otro recorrido» hacia su lugar (borrador, publicado o solo en una versión anterior);
+  - `move_tour` (propietario o administrador): a un destino o evento del municipio sin tour; rechaza el mismo lugar (`same`), uno con tour (`taken`), un texto de conocimiento y uno al que lleva un punto de su revisión de trabajo (`self_link`). Guarda la redirección, pone el nombre del lugar nuevo en los pasajes del asistente y audita `tour.moved`;
+  - `delete_tour` (propietario o administrador): en una transacción saca el tour del recorrido general (posiciones sin huecos, empieza por el primero si empezaba ahí, el número de edición avanza), borra sus pasajes, todas sus revisiones con escenas, puntos y fotos, y el tour; audita `tour.deleted`. Devuelve su lugar y los que había dejado antes (para la caché del portal);
+  - **una revisión sellada solo se borra dentro de `delete_tour`:** nuevo trigger `protect_sealed_tour_revision`, que lo permite únicamente para el tour marcado en `private.tour_deletions` en la misma transacción (nadie más puede escribir esa tabla). El trigger compartido de las revisiones de contenido no cambia;
+  - `portal_tour` nunca ofrece un «Ir a otro recorrido» hacia el propio lugar del tour (puede quedar en su historial después de moverlo);
+  - `portal_tour_redirect` (anónima): la página de un tour que no existe lleva al tour movido (si se puede ver) o a la ficha del lugar publicado; nada para un lugar sin publicar o un municipio suspendido.
+- `@rikuy/core` (`application/tours/removal`): `loadTourRemoval` (lo que cambia y los destinos y eventos próximos sin tour, solo para quien puede), `deleteTour`, `moveTour`, `tourPagesOf` y el puerto `PublishedTourRedirectReader`.
+- `@rikuy/db`: `createTourRemovalRepository` y `createSupabasePublishedTourRedirectReader` (antes de la migración: sin sección en el panel y sin redirecciones en el portal).
+- Portal: la página de un tour que no existe responde, en orden, el 308 de una dirección vieja de su lugar (ADR-047), un **307** al tour movido o un **307** a la ficha del lugar; si no, 404. Temporales porque el lugar puede volver a tener un tour.
+- Panel, editor del tour: sección **«Borrar o mover el tour»** (solo propietarios y administradores) con «Pasar a» (destinos y eventos próximos sin tour) y «Borrar el tour», cada uno con su confirmación, que dice qué cambia y qué tours tienen un «Ir a otro recorrido» hacia aquí. Al borrar, vuelve a la lista. Borrar o mover invalida la caché del municipio, más las páginas de tour de los lugares involucrados.
+- Tests:
+  - core 534 (+6, `removal.test.ts`: roles, lo que ven editores y analistas, destinos sin tour, identificadores inválidos, lo que decide la base, las páginas a invalidar);
+  - 1.345 pgTAP (46 nuevos, `038_delete_move_tour`): lo que cambia, para cualquier miembro y no para otro municipio; editor, analista y otro municipio sin mover ni borrar; el mismo lugar, uno con tour, un texto de conocimiento, uno desconocido y uno al que lleva un punto del borrador o de la versión publicada rechazados; el tour movido con su versión publicada, su lugar en el recorrido general, la redirección, los pasajes con el nombre nuevo y la auditoría; los visitantes lo abren en el lugar nuevo y la página vieja lleva ahí; el «Ir al museo» de otro tour se oculta; volver a una versión con un punto hacia el propio lugar no lo ofrece; un lugar que recibe un tour deja de redirigir; nadie marca un tour como «borrándose» y una revisión sellada sigue inmutable fuera del borrado; borrar deja el recorrido general sin huecos, sin pasajes ni redirecciones, auditado, la página lleva a la ficha y su panorama se puede borrar;
+  - integración contra Supabase local (`tour-removal.int.test.ts`, 4 casos): el analista ve lo que cambia y la base le rechaza mover y borrar; el propietario de otro municipio no ve nada; el propietario mueve (la página vieja lleva al tour) y borra (las dos páginas llevan a sus lugares);
+  - **e2e en un navegador real** (`tour-removal.e2e.test.ts`, nuevo paso del job «Contracts», 2 casos): mover un tour publicado desde el editor, con la confirmación que nombra el tour que lleva aquí; la página vieja, en la caché de los visitantes, responde 307 al tour nuevo; borrar vuelve a la lista sin dejar nada, y las dos páginas llevan a sus fichas; un analista no tiene la sección; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - tours (9) y dirección (2) en verde; `plpgsql_check` sin hallazgos.
+- Lo que encontraron las pruebas, ya corregido:
+  - un tour con un punto hacia aquí y sin borrador daba `draft: null` y el panel no abría el editor;
+  - al borrar un tour movido, la página del lugar que había dejado seguía en caché llevando al tour borrado: ahora se invalidan también esas páginas.
+
+**Desviaciones:**
+
+- Los medios de un tour borrado no se borran solos: se borran uno por uno en «Panoramas 360°» y «Modelos 3D».
+- Un «Ir a otro recorrido» oculto no se borra; el panel lo nombra para cambiarlo o quitarlo en su tour.
+- Las páginas de tour que redirigen pierden `?escena=` (están en caché, como en ADR-047).
+
 ## Cómo verificarlo
 
-- En Demo Norte, «Modelos 3D» → el monumento → «Subir una foto como imagen» con la foto. El panel dice «Un tour usa este modelo: publícalo de nuevo…».
-- En «Tours 360°», el tour de «Plaza principal» aparece con cambios: «Publicar». En el portal, el diálogo del monumento muestra la foto nueva (recargar la página del tour).
+- En Demo Norte, como propietario: «Tours 360°» → un tour → «Borrar o mover el tour». «Pasar a» otro destino sin tour → «Pasar el tour…» → «Sí, pasar el tour». La dirección vieja del tour lleva al tour en su lugar nuevo.
+- «Borrar el tour…» → «Sí, borrar el tour»: vuelve a la lista; la dirección del tour lleva a la ficha del destino; en «Panoramas 360°» sus panoramas ya se pueden borrar.
 
 ## Siguiente paso
 
-**C0 · Paso 3 — borrar un tour o pasarlo a otro destino o evento** ([roadmap](../roadmap.md#c0--ucureña-lista-como-vitrina)). Antes de empezar, confirmar con el usuario qué pasa con el historial del tour borrado, con los «ir a otro recorrido» que llevaban a él y con el recorrido general.
+**C0 · Paso 4 — carga del contenido real de Ucureña por el usuario** ([roadmap](../roadmap.md#c0--ucureña-lista-como-vitrina)), con la revisión de Lighthouse sobre el contenido real y el README con capturas y métricas. Antes de empezar, confirmar con el usuario qué carga primero y en qué orden revisamos.
 
 ## Decisiones pendientes del usuario
 

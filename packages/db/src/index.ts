@@ -57,6 +57,10 @@ export {
   createSupabasePublishedTourReader,
   createTourRepository,
 } from "./tours";
+export {
+  createSupabasePublishedTourRedirectReader,
+  createTourRemovalRepository,
+} from "./tour-removal";
 export { createSharpSampleImageRenderer, sampleIllustrationSvg } from "./sample-images";
 export { createOperationsRepository } from "./operations";
 export { createKnowledgeRepository, mapPassageRow } from "./knowledge";

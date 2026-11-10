@@ -6,7 +6,7 @@ import type { Metadata } from "next";
 import { preload } from "react-dom";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { movedOrNotFound, portalTour, portalTourIndex } from "@/server/portal-content";
+import { portalTour, portalTourIndex, tourMovedOrNotFound } from "@/server/portal-content";
 import { tourData, tourMenu } from "@/server/portal-tours";
 import type { PortalView } from "@/server/portal-view";
 import { portalView } from "@/server/portal-view";
@@ -94,8 +94,9 @@ export async function TourPage({
   readonly params: TourPageParams["params"];
 }) {
   const loaded = await load(kind, params);
-  // An old address of its destination or event opens the tour at its new one (ADR-047);
-  // the scene of a shared link (?escena=) is not in a cached page, so it opens the entry.
-  if (loaded === null) return movedOrNotFound(params, kind, (slug) => tourPath(kind, slug));
+  // An old address of its destination or event opens the tour at its new one (ADR-047), a
+  // moved tour its new page and a deleted one its place (ADR-049); the scene of a shared link
+  // (?escena=) is not in a cached page, so it opens the entry.
+  if (loaded === null) return tourMovedOrNotFound(params, kind);
   return <TourArticle view={loaded.view} tour={tourData(loaded.view, loaded.tour)} />;
 }

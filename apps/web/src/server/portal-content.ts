@@ -6,11 +6,12 @@ import {
   loadAssistantPlaces,
   mapPlacePath,
   PORTAL_PATHS,
+  tourPath,
   type PortalMapPlace,
   type PublishedImage,
 } from "@rikuy/core";
 import { publicMediaUrl } from "@rikuy/db";
-import { notFound, permanentRedirect } from "next/navigation";
+import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { cache } from "react";
 
 import {
@@ -20,6 +21,7 @@ import {
   publishedMapReader,
   publishedRedirectReader,
   publishedTourReader,
+  publishedTourRedirectReader,
 } from "./platform";
 import type { NearbyTargetDto } from "@/app/portal/[host]/visitor-location";
 
@@ -211,5 +213,37 @@ export async function movedOrNotFound(
   const view = await portalView(host);
   const current = view ? await portalMovedSlug(view, kind, decodeURIComponent(slug)) : null;
   if (current) permanentRedirect(to(current));
+  notFound();
+}
+
+/**
+ * For a tour page that is not found: an old address of its place answers 308 to the tour at
+ * the current one (ADR-047); a tour that moved leads to its new page, and a place without a
+ * tour to its own page (ADR-049). These two are temporary (307): the place can get a tour
+ * again. Anything else is the portal's 404.
+ */
+export async function tourMovedOrNotFound(
+  params: Promise<{ readonly host: string; readonly slug: string }>,
+  kind: "destination" | "event",
+): Promise<never> {
+  const { host, slug } = await params;
+  const view = await portalView(host);
+  if (!view) notFound();
+  const decoded = decodeURIComponent(slug);
+  const current = await portalMovedSlug(view, kind, decoded);
+  if (current) permanentRedirect(tourPath(kind, current));
+  const moved = await publishedTourRedirectReader().find(
+    view.context.tenant.tenantId,
+    kind,
+    decoded,
+  );
+  if (moved?.target === "tour") redirect(tourPath(moved.kind, moved.slug));
+  if (moved?.target === "place") {
+    redirect(
+      moved.kind === "event"
+        ? PORTAL_PATHS.event(moved.slug)
+        : PORTAL_PATHS.destination(moved.slug),
+    );
+  }
   notFound();
 }

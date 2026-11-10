@@ -1,4 +1,4 @@
-import { loadTourEditor, richTextToMarkup } from "@rikuy/core";
+import { loadTourEditor, loadTourRemoval, richTextToMarkup } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -7,11 +7,13 @@ import { adminSession } from "@/server/admin-session";
 import { platformSettings } from "@/server/platform";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
+import { tourCandidates } from "@/server/tour-candidates";
 
 import { SignOutButton } from "../../../../sign-out-button";
 import { PortalShare } from "../../destinos/[id]/portal-share";
 import { KIND, TOUR_STATUS } from "../labels";
 import { TourEditor } from "./tour-editor";
+import { TourRemoval } from "./tour-removal";
 
 export const metadata: Metadata = { title: "Tour 360°" };
 
@@ -29,13 +31,20 @@ export default async function TourPage({ params }: TourPageProps) {
   const { slug, id } = await params;
   const membership = await requireOrganization(slug);
   const session = await adminSession();
-  const editor = await loadTourEditor(membership, id, {
-    tours: session.tours,
-    panoramas: session.panoramas,
-    models: session.models,
-    media: session.media,
-    content: session.content,
-  });
+  const [editor, removal] = await Promise.all([
+    loadTourEditor(membership, id, {
+      tours: session.tours,
+      panoramas: session.panoramas,
+      models: session.models,
+      media: session.media,
+      content: session.content,
+    }),
+    loadTourRemoval(membership, id, {
+      removal: session.tourRemoval,
+      tours: session.tours,
+      candidates: () => tourCandidates(membership.tenantId),
+    }),
+  ]);
   if (editor === null) notFound();
 
   const { record, revision } = editor;
@@ -149,6 +158,19 @@ export default async function TourPage({ params }: TourPageProps) {
             opens="este tour"
           />
         </div>
+      ) : null}
+      {removal?.canRemove ? (
+        <TourRemoval
+          org={membership.slug}
+          tourId={record.tourId}
+          contentTitle={record.content.title}
+          revisions={removal.impact.revisions}
+          published={removal.impact.published}
+          inGeneralTour={removal.impact.inGeneralTour}
+          startsGeneralTour={removal.impact.startsGeneralTour}
+          linkedFrom={removal.impact.linkedFrom}
+          destinations={removal.destinations}
+        />
       ) : null}
     </main>
   );

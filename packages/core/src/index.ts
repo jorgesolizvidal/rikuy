@@ -80,6 +80,7 @@ export * from "./application/tours/tours";
 export * from "./application/tours/publication";
 export * from "./application/tours/portal-view";
 export * from "./application/tours/general";
+export * from "./application/tours/removal";
 export * from "./domain/tours/viewer";
 export * from "./application/mail/invitations";
 export * from "./domain/demo/sample-template";

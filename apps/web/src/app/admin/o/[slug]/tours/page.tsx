@@ -5,6 +5,7 @@ import Link from "next/link";
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
+import { tourCandidates } from "@/server/tour-candidates";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { PortalShare } from "../destinos/[id]/portal-share";
@@ -31,26 +32,7 @@ export default async function ToursPage({ params }: ToursPageProps) {
   const [{ tours, candidates, canEdit }, general, hostname] = await Promise.all([
     loadTours(membership, {
       tours: session.tours,
-      candidates: async () => {
-        const [destinations, events] = await Promise.all([
-          session.content.listDestinations(membership.tenantId),
-          session.content.listEvents(membership.tenantId),
-        ]);
-        return [
-          ...destinations.map((entry) => ({
-            contentId: entry.contentId,
-            kind: "destination" as const,
-            title: entry.title,
-          })),
-          ...events
-            .filter((entry) => !entry.ended)
-            .map((entry) => ({
-              contentId: entry.contentId,
-              kind: "event" as const,
-              title: entry.title,
-            })),
-        ];
-      },
+      candidates: () => tourCandidates(membership.tenantId),
     }),
     loadGeneralTour(membership, { general: session.general }),
     session.content.portalHostname(membership.tenantId),
