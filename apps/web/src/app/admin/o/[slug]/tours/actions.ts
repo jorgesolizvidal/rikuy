@@ -5,7 +5,9 @@ import {
   addTourScene,
   changeTourScene,
   createTour,
+  deleteTour,
   discardTourDraft,
+  moveTour,
   openOrganization,
   publishTour,
   removeTourHotspot,
@@ -13,7 +15,10 @@ import {
   saveGeneralTour,
   updateTourHotspot,
   updateTourScene,
+  tourPagesOf,
   type CreateTourOutcome,
+  type DeleteTourOutcome,
+  type MoveTourOutcome,
   type HotspotEditResult,
   type HotspotKind,
   type DiscardTourOutcome,
@@ -227,6 +232,45 @@ export async function saveGeneralTourAction(
       await refreshPortal(
         (tenantId) => session.content.portalHostname(tenantId),
         membership.tenantId,
+      );
+    }
+    return result;
+  });
+}
+
+export type DeleteTourState = DeleteTourOutcome | SessionProblem;
+
+/** «Borrar el tour» (ADR-049): final. The browser goes back to the list. */
+export async function deleteTourAction(slug: string, tourId: string): Promise<DeleteTourState> {
+  return run(slug, async (membership) => {
+    const session = await adminSession();
+    const result = await deleteTour(membership, tourId, session.tourRemoval);
+    if (result.status === "deleted") {
+      await refreshPortal(
+        (tenantId) => session.content.portalHostname(tenantId),
+        membership.tenantId,
+        tourPagesOf(result.place, ...result.formerPlaces),
+      );
+    }
+    return result;
+  });
+}
+
+export type MoveTourState = MoveTourOutcome | SessionProblem;
+
+/** «Pasar a otro destino o evento» (ADR-049): its old page then leads to the new one. */
+export async function moveTourAction(
+  slug: string,
+  target: { readonly tourId: string; readonly contentId: string },
+): Promise<MoveTourState> {
+  return run(slug, async (membership) => {
+    const session = await adminSession();
+    const result = await moveTour(membership, target, session.tourRemoval);
+    if (result.status === "moved") {
+      await refreshPortal(
+        (tenantId) => session.content.portalHostname(tenantId),
+        membership.tenantId,
+        tourPagesOf(result.from, result.to, ...result.formerPlaces),
       );
     }
     return result;

@@ -12,6 +12,7 @@ import {
   type PublishedPresentationReader,
   type PublishedRedirectReader,
   type PublishedTourReader,
+  type PublishedTourRedirectReader,
   type TenantDirectory,
 } from "@rikuy/core";
 import {
@@ -21,6 +22,7 @@ import {
   createSupabasePublishedMapReader,
   createSupabasePublishedRedirectReader,
   createSupabasePublishedTourReader,
+  createSupabasePublishedTourRedirectReader,
   createSupabaseTenantDirectory,
 } from "@rikuy/db";
 
@@ -159,6 +161,22 @@ export function publishedTourReader(): PublishedTourReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedTours;
+}
+
+let publishedTourRedirects: PublishedTourRedirectReader | undefined;
+
+/**
+ * Anonymous reader of where a tour went (ADR-049). Only a tour page that is not found asks:
+ * the answer (a redirect or the 404) is cached with the page.
+ */
+export function publishedTourRedirectReader(): PublishedTourRedirectReader {
+  if (publishedTourRedirects) return publishedTourRedirects;
+  const { env } = platformSettings();
+  publishedTourRedirects = createSupabasePublishedTourRedirectReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedTourRedirects;
 }
 
 export function publishedMapReader(): PublishedMapReader {
