@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useId, useRef, useState, type ChangeEvent } from "react";
 
 import { ModelViewer, type ModelCanvasHandle } from "@/components/model-viewer/model-viewer";
 
@@ -18,6 +18,38 @@ const POSTER_FAILURES = {
   invalid: "No pudimos usar esa imagen. Inténtalo de nuevo.",
   error: "No pudimos guardar la imagen. Inténtalo de nuevo en unos segundos.",
 } as const;
+
+const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+
+/**
+ * A photo chosen as poster (ADR-048), shrunk in the browser to at most 1280 px so it fits a
+ * Server Action; the server re-encodes it anyway. The canvas also applies the photo's
+ * orientation and drops its metadata (location included).
+ */
+async function shrinkPhoto(file: File): Promise<Blob | null> {
+  if (!PHOTO_TYPES.includes(file.type)) return null;
+  const bitmap = await createImageBitmap(file).catch(() => null);
+  if (!bitmap) return null;
+  const scale = Math.min(1, 1280 / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  for (const quality of [0.9, 0.8, 0.7, 0.6]) {
+    let blob = await new Promise<Blob | null>((resolve) =>
+      canvas.toBlob(resolve, "image/webp", quality),
+    );
+    // A browser that cannot write WebP answers PNG: JPEG is smaller.
+    if (blob && blob.type !== "image/webp") {
+      blob = await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", quality),
+      );
+    }
+    if (blob && blob.size <= MAX_CAPTURE_BYTES) return blob;
+  }
+  return null;
+}
 
 interface ModelPreviewProps {
   readonly slug: string;
@@ -44,6 +76,7 @@ export function ModelPreview({
   canEdit,
 }: ModelPreviewProps) {
   const router = useRouter();
+  const photoId = useId();
   const automatic = canEdit && posterUrl === null;
   const [open, setOpen] = useState(automatic);
   const [handle, setHandle] = useState<ModelCanvasHandle | null>(null);
@@ -52,19 +85,25 @@ export function ModelPreview({
   const [saving, setSaving] = useState(false);
   const captured = useRef(false);
 
-  const save = useCallback(
-    async (viewer: ModelCanvasHandle, done: string) => {
-      setSaving(true);
-      const blob = await viewer.capture(MAX_CAPTURE_BYTES);
+  const send = useCallback(
+    async (blob: Blob | null, done: string, problem: string = POSTER_FAILURES.invalid) => {
       if (!blob) {
         setSaving(false);
         setFailed(true);
-        return setMessage(POSTER_FAILURES.invalid);
+        return setMessage(problem);
       }
       const form = new FormData();
       form.set("slug", slug);
       form.set("versionId", versionId);
-      form.set("poster", blob, blob.type === "image/webp" ? "poster.webp" : "poster.png");
+      form.set(
+        "poster",
+        blob,
+        blob.type === "image/webp"
+          ? "poster.webp"
+          : blob.type === "image/jpeg"
+            ? "poster.jpg"
+            : "poster.png",
+      );
       const result = await saveModelPosterAction(form).catch(() => ({ status: "error" as const }));
       setSaving(false);
       if (result.status !== "saved") {
@@ -77,6 +116,31 @@ export function ModelPreview({
     },
     [router, slug, versionId],
   );
+
+  const save = useCallback(
+    async (viewer: ModelCanvasHandle, done: string) => {
+      setSaving(true);
+      await send(await viewer.capture(MAX_CAPTURE_BYTES), done);
+    },
+    [send],
+  );
+
+  async function choosePhoto(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    setSaving(true);
+    setFailed(false);
+    setMessage("Preparando la foto…");
+    const blob = await shrinkPhoto(file).catch(() => null);
+    await send(
+      blob,
+      "Imagen actualizada con tu foto.",
+      PHOTO_TYPES.includes(file.type)
+        ? "No pudimos leer esa foto. Prueba con otra."
+        : "Usa una foto JPG, PNG o WebP.",
+    );
+  }
 
   const ready = useCallback(
     (viewer: ModelCanvasHandle) => {
@@ -121,6 +185,21 @@ export function ModelPreview({
         </div>
       )}
       <div className="row-actions">
+        {canEdit ? (
+          <>
+            <input
+              id={photoId}
+              type="file"
+              className="visually-hidden"
+              accept={PHOTO_TYPES.join(",")}
+              disabled={saving}
+              onChange={(event) => void choosePhoto(event)}
+            />
+            <label htmlFor={photoId} className="button button-quiet" aria-disabled={saving}>
+              Subir una foto como imagen
+            </label>
+          </>
+        ) : null}
         {open ? (
           <>
             {canEdit ? (

@@ -13,7 +13,8 @@ const FAILURES = {
   signed_out: "Tu sesión venció. Inicia sesión de nuevo para subir la foto.",
   rate_limited: "Hiciste muchas subidas seguidas. Espera unos minutos e inténtalo de nuevo.",
   not_uploaded: "La foto no terminó de subirse. Inténtalo de nuevo.",
-  not_found: "No encontramos esa subida. Inténtalo de nuevo.",
+  not_found: "No encontramos esa subida (o ya se borró). Recarga la página.",
+  busy: "Ya hay una versión nueva en camino. Espera a que termine de procesarse.",
   error: "No pudimos subir la foto. Revisa tu conexión e inténtalo de nuevo.",
 } as const;
 
@@ -45,7 +46,14 @@ function put(url: string, file: File, mime: string, onProgress: (percent: number
  * the file straight to Storage, and the server enqueues the processing job. The list below
  * shows the progress; the page can be closed.
  */
-export function PanoramaUpload({ slug }: { readonly slug: string }) {
+export function PanoramaUpload({
+  slug,
+  replaces,
+}: {
+  readonly slug: string;
+  /** Replace this panorama with a new version of it (ADR-048). */
+  readonly replaces?: string;
+}) {
   const id = useId();
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -63,7 +71,11 @@ export function PanoramaUpload({ slug }: { readonly slug: string }) {
     if (declared) return setPhase({ kind: "failed", message: PANORAMA_PROBLEMS[declared] });
 
     setPhase({ kind: "working", message: "Preparando la subida…" });
-    const start = await startPanoramaUploadAction(slug, { mime: file.type, bytes: file.size });
+    const start = await startPanoramaUploadAction(
+      slug,
+      { mime: file.type, bytes: file.size },
+      replaces,
+    );
     if (start.status === "invalid") {
       return setPhase({ kind: "failed", message: PANORAMA_PROBLEMS[start.problem] });
     }
@@ -88,8 +100,9 @@ export function PanoramaUpload({ slug }: { readonly slug: string }) {
     }
     setPhase({
       kind: "done",
-      message:
-        "Foto subida. Se está procesando; aparecerá como «Listo» en la lista en unos segundos.",
+      message: replaces
+        ? "Versión nueva subida. Se está procesando; cuando esté lista podrás usarla en los tours."
+        : "Foto subida. Se está procesando; aparecerá como «Listo» en la lista en unos segundos.",
     });
     router.refresh();
   }
@@ -103,7 +116,7 @@ export function PanoramaUpload({ slug }: { readonly slug: string }) {
 
   return (
     <div className="field panorama-upload">
-      <span id={`${id}-hint`} className="field-hint">
+      <span id={`${id}-hint`} className={replaces ? "visually-hidden" : "field-hint"}>
         {PANORAMA_HINT}
       </span>
       <div className="photo-actions">
@@ -117,8 +130,12 @@ export function PanoramaUpload({ slug }: { readonly slug: string }) {
           aria-invalid={phase.kind === "failed" ? true : undefined}
           onChange={choose}
         />
-        <label htmlFor={id} className="button" aria-disabled={busy}>
-          {busy ? "Subiendo…" : "Subir un panorama"}
+        <label
+          htmlFor={id}
+          className={replaces ? "button button-quiet" : "button"}
+          aria-disabled={busy}
+        >
+          {busy ? "Subiendo…" : replaces ? "Reemplazar el panorama" : "Subir un panorama"}
         </label>
       </div>
       {phase.kind === "uploading" ? (

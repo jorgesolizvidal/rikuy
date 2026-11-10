@@ -355,6 +355,15 @@ jobs:
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-slug 2>&1 | tee ../../slug.log
 
+      # ADR-048: where each panorama and model is used, a replacement put in a tour's draft
+      # (visitors keep the old one), deleting what no tour used, and a photo as a model's image.
+      - name: Replacing and deleting media in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-media 2>&1 | tee ../../media.log
+
       # ADR-044: a real server error recorded with its request ID and reference code, a measured
       # route, and the operator's metrics pages (search by code, «Revisar ahora»).
       - name: Metrics in a real browser
@@ -398,7 +407,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log metrics.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log metrics.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

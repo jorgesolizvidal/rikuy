@@ -150,6 +150,18 @@ function setup(
         upload: { assetId: "a", versionId: VERSION, version: 1, originalPath: "t/a/1/original" },
       };
     },
+    createReplacementUpload: async (_tenant, assetId, mime, bytes) => {
+      calls.push(`replace:${assetId}:${mime}:${bytes}`);
+      return {
+        status: "created",
+        upload: {
+          assetId,
+          versionId: VERSION,
+          version: 2,
+          originalPath: `t/${assetId}/2/original`,
+        },
+      };
+    },
     signedUploadUrl: async () => "https://upload.example.test/x",
     findVersion: async () =>
       options.version === null
@@ -205,7 +217,8 @@ function setup(
       height: 960,
     }),
   };
-  return { calls, deps: { media, models, admin, processor } };
+  const library = { uses: async () => [] };
+  return { calls, deps: { media, models, admin, processor, library } };
 }
 
 describe("model uploads and posters", () => {

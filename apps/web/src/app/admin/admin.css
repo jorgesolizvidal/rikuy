@@ -2075,3 +2075,46 @@ p.metrics-sources {
 .eval-scope select {
   max-width: 100%;
 }
+
+/* ── Panoramas and models: where they are used, replace, delete (ADR-048) ─ */
+
+.media-uses p {
+  margin: 0;
+}
+
+.media-uses ul {
+  margin: 0.25rem 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+}
+
+.media-uses a {
+  color: var(--accent);
+  text-underline-offset: 0.2em;
+}
+
+.media-uses .cell-detail {
+  display: inline;
+}
+
+.media-actions {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+
+.media-actions .notice {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+
+.media-actions .notice p {
+  margin: 0;
+}
+
+.media-actions .inline-form {
+  justify-content: flex-start;
+  flex-wrap: wrap;
+}

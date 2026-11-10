@@ -54,6 +54,43 @@ const versionRowSchema = z.object({
   original_path: z.string(),
 });
 
+function uploadFailure(error: PostgrestError, operation: string): CreateUploadOutcome {
+  if (error.code === "42501") return { status: "forbidden" };
+  if (error.code === "23514") return { status: "invalid" };
+  if (error.code === "PT429") return { status: "rate_limited" };
+  if (error.code === "PT507") {
+    return {
+      status: "over_quota",
+      resource: error.hint === "media_compute_seconds" ? "media_compute_seconds" : "storage_bytes",
+    };
+  }
+  throw unexpected(operation, error);
+}
+
+function createdUpload(data: unknown): CreateUploadOutcome {
+  const [row] = z
+    .array(
+      z.object({
+        asset_id: z.uuid(),
+        version_id: z.uuid(),
+        version: z.number().int(),
+        original_path: z.string(),
+      }),
+    )
+    .length(1)
+    .parse(data);
+  if (!row) throw new Error("Starting the upload returned no row");
+  return {
+    status: "created",
+    upload: {
+      assetId: row.asset_id,
+      versionId: row.version_id,
+      version: row.version,
+      originalPath: row.original_path,
+    },
+  };
+}
+
 export function createMediaRepository(client: SessionClient): MediaRepository {
   return {
     async createImageUpload(tenantId, purpose, mime, bytes): Promise<CreateUploadOutcome> {
@@ -63,41 +100,24 @@ export function createMediaRepository(client: SessionClient): MediaRepository {
         p_mime: mime,
         p_bytes: bytes,
       });
+      if (error) return uploadFailure(error as PostgrestError, "Starting the upload");
+      return createdUpload(data);
+    },
+
+    async createReplacementUpload(tenantId, assetId, mime, bytes) {
+      const { data, error } = await client.rpc("create_media_replacement_upload", {
+        p_tenant_id: tenantId,
+        p_asset_id: assetId,
+        p_mime: mime,
+        p_bytes: bytes,
+      });
       if (error) {
-        const code = (error as PostgrestError).code;
-        if (code === "42501") return { status: "forbidden" };
-        if (code === "23514") return { status: "invalid" };
-        if (code === "PT429") return { status: "rate_limited" };
-        if (code === "PT507") {
-          const hint = (error as PostgrestError).hint;
-          return {
-            status: "over_quota",
-            resource: hint === "media_compute_seconds" ? "media_compute_seconds" : "storage_bytes",
-          };
-        }
-        throw unexpected("Starting the upload", error);
+        const failure = error as PostgrestError;
+        if (failure.code === "PT404") return { status: "not_found" as const };
+        if (failure.code === "PT409") return { status: "busy" as const };
+        return uploadFailure(failure, "Starting the replacement");
       }
-      const [row] = z
-        .array(
-          z.object({
-            asset_id: z.uuid(),
-            version_id: z.uuid(),
-            version: z.number().int(),
-            original_path: z.string(),
-          }),
-        )
-        .length(1)
-        .parse(data);
-      if (!row) throw new Error("Starting the upload returned no row");
-      return {
-        status: "created",
-        upload: {
-          assetId: row.asset_id,
-          versionId: row.version_id,
-          version: row.version,
-          originalPath: row.original_path,
-        },
-      };
+      return createdUpload(data);
     },
 
     async signedUploadUrl(originalPath) {
@@ -342,11 +362,13 @@ export function createSharpImageProcessor(): ImageProcessor {
     },
 
     async modelPoster(captured) {
-      // The panel's canvas capture: re-encoded (never stored as sent), at most 1280 px wide.
+      // The panel's canvas capture or a photo: re-encoded (never stored as sent), at most 1280 px.
       const { data, info } = await sharp(captured, {
         failOn: "error",
         limitInputPixels: 4096 * 4096,
       })
+        // A photo chosen as poster (ADR-048) may carry its orientation in EXIF.
+        .rotate()
         .resize({ width: 1280, height: 1280, fit: "inside", withoutEnlargement: true })
         .webp({ quality: 82, alphaQuality: 90, effort: 4 })
         .toBuffer({ resolveWithObject: true });

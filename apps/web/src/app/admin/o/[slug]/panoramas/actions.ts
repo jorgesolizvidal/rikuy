@@ -35,13 +35,19 @@ export type StartPanoramaUploadState =
 export async function startPanoramaUploadAction(
   slug: unknown,
   file: { readonly mime: unknown; readonly bytes: unknown },
+  /** The asset this upload replaces (a new version of it, ADR-048). */
+  replaces?: unknown,
 ): Promise<StartPanoramaUploadState> {
   try {
     const access = await membershipFor(slug);
     if (!("membership" in access)) return access;
     return await requestPanoramaUpload(
       access.membership,
-      { mime: file?.mime, bytes: file?.bytes },
+      {
+        mime: file?.mime,
+        bytes: file?.bytes,
+        ...(replaces === undefined ? {} : { replaces }),
+      },
       (await adminSession()).media,
     );
   } catch {

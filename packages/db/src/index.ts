@@ -34,6 +34,7 @@ export {
   publicMediaUrl,
 } from "./media";
 export type { MediaAdminOptions } from "./media";
+export { createMediaLibraryRepository } from "./media-library";
 export {
   createContentRepository,
   createSupabasePublishedContentReader,
