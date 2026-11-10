@@ -15,6 +15,8 @@ import { publishedContentReader, publishedEventReader, publishedTourReader } fro
 export async function refreshPortal(
   hostnameOf: (tenantId: string) => Promise<string | null>,
   tenantId: string,
+  /** Pages no list knows about: an address that changed, old and new (ADR-047). */
+  extraPaths: readonly string[] = [],
 ): Promise<void> {
   try {
     const hostname = await hostnameOf(tenantId);
@@ -35,6 +37,7 @@ export async function refreshPortal(
       ...events.map((event) => PORTAL_PATHS.event(event.slug)),
       PORTAL_PATHS.generalTour,
       ...tours.map((tour) => tourPath(tour.kind, tour.slug)),
+      ...extraPaths,
     ];
     for (const path of paths) revalidatePath(`${base}${path}`);
   } catch {

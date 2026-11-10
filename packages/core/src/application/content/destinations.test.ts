@@ -7,6 +7,7 @@ import {
   type DestinationDocument,
 } from "../../contracts/destination";
 import type { MembershipRole, OrganizationMembership } from "../../contracts/organization";
+import { changeContentSlug } from "./editing";
 import {
   createDestination,
   discardDestinationDraft,
@@ -74,6 +75,11 @@ function repository(overrides: Partial<ContentRepository> = {}) {
     async portalHostname() {
       return "demo-norte.localhost";
     },
+    async changeSlug(_tenant, _content, expected, slug) {
+      calls.push(`slug:${expected}->${slug}`);
+      return { status: "changed", slug, previousSlug: expected };
+    },
+    previousSlugs: async () => [],
     ...overrides,
   };
   return { repo, calls };
@@ -271,9 +277,84 @@ describe("editor state", () => {
         document: { title: "Mirador del Valle" },
         editCount: null,
         canPublish: true,
+        canChangeSlug: true,
+        previousSlugs: [],
         portalPath: { hostname: "demo-norte.localhost", path: "/destinos/mirador-del-valle" },
       },
     );
+    expect(
+      await loadDestinationEditor(
+        member("editor"),
+        CONTENT,
+        repository({
+          findDestination: async () =>
+            record({ published: { revisionId: "p", revisionNo: 2, document: complete } }),
+          previousSlugs: async () => [{ slug: "mirador", changedAt: "2026-11-10T12:00:00Z" }],
+        }).repo,
+      ),
+    ).toMatchObject({
+      canChangeSlug: false,
+      previousSlugs: [{ slug: "mirador", changedAt: "2026-11-10T12:00:00Z" }],
+    });
     expect(await loadDestinationEditor(member("owner"), CONTENT, repository().repo)).toBeNull();
+  });
+});
+
+describe("changing the address (ADR-047)", () => {
+  it("lets owners and admins change it, never editors or analysts", async () => {
+    for (const role of ["owner", "admin"] as const) {
+      const { repo, calls } = repository();
+      expect(
+        await changeContentSlug(
+          member(role),
+          CONTENT,
+          { expectedSlug: "mirador", slug: " mirador-del-valle " },
+          repo,
+        ),
+      ).toEqual({ status: "changed", slug: "mirador-del-valle", previousSlug: "mirador" });
+      expect(calls).toEqual(["slug:mirador->mirador-del-valle"]);
+    }
+    for (const role of ["editor", "analyst"] as const) {
+      const { repo, calls } = repository();
+      expect(
+        await changeContentSlug(member(role), CONTENT, { expectedSlug: "a", slug: "b" }, repo),
+      ).toEqual({ status: "forbidden" });
+      expect(calls).toEqual([]);
+    }
+  });
+
+  it("checks the address before asking the database", async () => {
+    const { repo, calls } = repository();
+    const change = (input: { expectedSlug: unknown; slug: unknown }) =>
+      changeContentSlug(member("owner"), CONTENT, input, repo);
+    expect(await change({ expectedSlug: "mirador", slug: "Mirador del Valle" })).toEqual({
+      status: "invalid",
+    });
+    expect(await change({ expectedSlug: "mirador", slug: "mirador-" })).toEqual({
+      status: "invalid",
+    });
+    expect(await change({ expectedSlug: "mirador", slug: 42 })).toEqual({ status: "invalid" });
+    expect(await change({ expectedSlug: null, slug: "mirador-2" })).toEqual({
+      status: "invalid",
+    });
+    expect(await change({ expectedSlug: "mirador", slug: "mirador" })).toEqual({
+      status: "unchanged",
+    });
+    expect(calls).toEqual([]);
+  });
+
+  it("passes on what the database decided", async () => {
+    for (const status of [
+      "slug_taken",
+      "slug_previous",
+      "stale",
+      "too_many",
+      "not_found",
+    ] as const) {
+      const { repo } = repository({ changeSlug: async () => ({ status }) });
+      expect(
+        await changeContentSlug(member("owner"), CONTENT, { expectedSlug: "a", slug: "b" }, repo),
+      ).toEqual({ status });
+    }
   });
 });

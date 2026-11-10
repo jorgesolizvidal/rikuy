@@ -63,6 +63,7 @@ export function loadDestinationEditor(
 ): Promise<DestinationEditor | null> {
   return loadContentEditor(
     membership,
+    contentId,
     () => repository.findDestination(membership.tenantId, contentId),
     repository,
     PORTAL_PATHS.destination,

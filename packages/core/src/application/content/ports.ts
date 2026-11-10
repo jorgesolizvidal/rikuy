@@ -64,6 +64,31 @@ export interface EventListEntry {
   readonly publishedAt: string | null;
 }
 
+/** An address the content had before; it keeps leading to the content (ADR-047). */
+export interface PreviousSlug {
+  readonly slug: string;
+  readonly changedAt: string;
+}
+
+export type ChangeSlugOutcome =
+  | {
+      readonly status: "changed";
+      readonly slug: string;
+      /** The address that keeps leading here, or null (never published: nobody had it). */
+      readonly previousSlug: string | null;
+    }
+  | {
+      readonly status:
+        | "slug_taken"
+        | "slug_previous"
+        | "stale"
+        | "unchanged"
+        | "too_many"
+        | "invalid"
+        | "forbidden"
+        | "not_found";
+    };
+
 export type CreateContentOutcome =
   | { readonly status: "created"; readonly contentId: string }
   | { readonly status: "slug_taken" | "invalid" | "forbidden" };
@@ -116,6 +141,18 @@ export interface ContentRepository {
   ): Promise<DiscardDraftOutcome>;
   /** Canonical portal hostname of the tenant (public information), or null. */
   portalHostname(tenantId: string): Promise<string | null>;
+  /**
+   * Changes the address of a destination or event (owners and admins). `expectedSlug` is
+   * the address the person saw; a published content keeps the old one as a redirect.
+   */
+  changeSlug(
+    tenantId: string,
+    contentId: string,
+    expectedSlug: string,
+    slug: string,
+  ): Promise<ChangeSlugOutcome>;
+  /** The addresses it had before, newest first (they lead to it). */
+  previousSlugs(tenantId: string, contentId: string): Promise<PreviousSlug[]>;
 }
 
 /** A published image with the pixel size of its original (to reserve layout space). */
@@ -149,6 +186,18 @@ export interface PublishedDestinationReader {
   find(tenantId: string, slug: string): Promise<PublishedDestination | null>;
   /** The published destinations that have opening hours, by slug (ADR-039). */
   openingHours(tenantId: string): Promise<ReadonlyMap<string, OpeningHours>>;
+}
+
+/**
+ * The current address of an old one (ADR-047), only while visitors can see the content;
+ * null otherwise (unknown address, draft, municipality not active).
+ */
+export interface PublishedRedirectReader {
+  currentSlug(
+    tenantId: string,
+    kind: "destination" | "event",
+    slug: string,
+  ): Promise<string | null>;
 }
 
 export interface PublishedEventSummary {

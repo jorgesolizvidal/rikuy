@@ -3,11 +3,10 @@ import "./tour.css";
 
 import { assistantPersona, PORTAL_PATHS, tourPath, type TourContentKind } from "@rikuy/core";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 import { preload } from "react-dom";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { portalTour, portalTourIndex } from "@/server/portal-content";
+import { movedOrNotFound, portalTour, portalTourIndex } from "@/server/portal-content";
 import { tourData, tourMenu } from "@/server/portal-tours";
 import type { PortalView } from "@/server/portal-view";
 import { portalView } from "@/server/portal-view";
@@ -95,6 +94,8 @@ export async function TourPage({
   readonly params: TourPageParams["params"];
 }) {
   const loaded = await load(kind, params);
-  if (loaded === null) notFound();
+  // An old address of its destination or event opens the tour at its new one (ADR-047);
+  // the scene of a shared link (?escena=) is not in a cached page, so it opens the entry.
+  if (loaded === null) return movedOrNotFound(params, kind, (slug) => tourPath(kind, slug));
   return <TourArticle view={loaded.view} tour={tourData(loaded.view, loaded.tour)} />;
 }

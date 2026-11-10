@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P6 ✅ — gate del piloto SaaS aprobado por el usuario el 2026-11-10. P1, P2, P3, P4, el Hito Demo / Portafolio, P5 y P6 ✅. Sigue C0.
-- **Último paso completado:** P6 · Paso 5 — expediente del gate ✅ (gate aprobado el 2026-11-10).
-- **Rama:** `feat/p6-step5-gate-dossier` → PR hacia `main` (expediente y aprobación del gate)
+- **Fase:** C0 — Ucureña lista como vitrina. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C0 · Paso 1 — cambiar la dirección de un destino o evento con redirecciones ✅
+- **Rama:** `feat/c0-step1-slug-redirects` → PR hacia `main`
 
 ## Historial
 
@@ -1681,19 +1681,45 @@ Lo que encontró el CI, ya corregido:
 - Planes pagos: se siguen usando los gratuitos mientras Ucureña sea la vitrina; Vercel Pro y Supabase Pro llegan cuando una alcaldía confirme, antes de poner en línea su portal.
 - E2 y E3 dicen qué se adelantó; el OCR pasa a C6 y los pendientes de antes de cargar Ucureña, a C0.
 
+### C0 · Paso 1 — cambiar la dirección con redirecciones ✅
+
+- Pasos de C0 confirmados por el usuario (2026-11-10): 1 dirección con redirecciones, 2 reemplazar y borrar panoramas y modelos (y foto propia como poster), 3 borrar un tour o pasarlo a otro destino, 4 carga del contenido real de Ucureña. **Los arreglos en Blender salen de C0** y pasan al final del proyecto (decisión del usuario): se suben con «Reemplazar» del Paso 2.
+- Decisiones ([ADR-047](../adr/ADR-047-slug-redirects.md)): solo propietarios y administradores; la dirección anterior se guarda solo si el contenido se publicó alguna vez; todas las anteriores apuntan al contenido (un solo 308); una anterior queda reservada para su lugar; hasta 20 por contenido.
+- Base de datos (`20261110000000_c0_slug_redirects.sql`, solo expand):
+  - `content_slug_redirects` (municipio, tipo, dirección → contenido; FK compuestas; RLS de lectura para miembros; escritura solo por la RPC). Triggers: una anterior es de un contenido de su tipo y nunca la actual de otro; `content_items` no puede tomar la anterior de otro lugar (al crear ni al cambiar);
+  - `change_content_slug` (propietario o administrador, con la dirección que la persona vio): guarda la anterior si hubo una revisión sellada, vuelve a una anterior quitándola de la lista, audita `content.slug_changed`;
+  - `portal_content_redirect` (anónima): la dirección actual de una anterior, solo si el contenido está publicado en un municipio activo.
+- `@rikuy/core`: `changeContentSlug` (rol, formato, misma dirección), `ContentEditor.canChangeSlug` y `previousSlugs`, puerto `PublishedRedirectReader`. «Cargar contenido de muestra» deja como está un lugar de muestra renombrado.
+- `@rikuy/db`: `changeSlug` y `previousSlugs` en el repositorio; `createSupabasePublishedRedirectReader`. Antes de la migración (la web sale unos minutos antes) no redirige nada y no hay anteriores.
+- Portal: ficha del destino, ficha del evento, sus tours y el `.ics` responden **308** a la dirección actual cuando la pedida es una anterior; si no, el 404 de siempre. El 308 queda en la caché de la página. Cambiar la dirección invalida además la ficha y el tour de la anterior y de la nueva.
+- Panel, editor del destino y del evento: sección **«Dirección en el portal»** con la actual, «Direcciones anteriores» (siguen llevando aquí) y, para propietarios y administradores, «Cambiar la dirección» con la explicación de que los enlaces y QR que circulan siguen funcionando y la sugerencia a partir del nombre. Al cambiarla, «Para visitantes» muestra el enlace y el QR nuevos sin perder lo que se está escribiendo. Corrige el texto anterior del destino, que mostraba `/{dirección}` sin `/destinos/`.
+- Tests:
+  - 517 unitarios en core (+3: roles, formato antes de la base, lo que decide la base; y el editor con las anteriores) y 153 en db (+11: códigos de la base, lo enviado, anteriores antes y después de la migración, el lector anónimo);
+  - 1.237 pgTAP (41 nuevos, `035_slug_redirects`): sin publicar no deja anterior; publicado sí, con auditoría; un salto aunque cambie varias veces; volver a una anterior; editor, analista y otro municipio rechazados; dirección vieja (`stale`), la misma, formato inválido, la actual de otro, la anterior de otro (al cambiar y al crear); un evento puede usar la anterior de un destino; conocimiento sin dirección pública; tope de 20 y volver siempre posible; municipio suspendido y contenido sin versión publicada no responden; visitantes sin acceso a la tabla ni a la RPC;
+  - integración contra Supabase (`content.int.test.ts`): el editor rechazado por la base, cambiar, el lector anónimo, anteriores, otro lugar no la toma, `stale`, volver, el propietario de otro municipio sin acceso;
+  - **e2e en un navegador real** (`slug.e2e.test.ts`, nuevo paso del job «Contracts»): la página en caché de la dirección vieja pasa a 308 (también su tour), la nueva abre, el sitemap solo lista la nueva, volver funciona; un evento con su `.ics`; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador: dirección inválida y ocupada por la anterior de otro destino rechazadas con su mensaje, cambio con la anterior listada, QR nuevo, 308 desde la página en caché, sitemap, vuelta a la original; portales (161) y contratos RC-09/10/11/12 (202) en verde.
+
+**Desviaciones:**
+
+- El 308 de un tour no conserva `?escena=` (la página está en caché): un enlace a una escena compartido antes del cambio abre el tour en su entrada.
+- Una ruta del asistente guardada en el navegador con la dirección vieja omite ese lugar; el UID del `.ics` cambia con la dirección.
+- Las direcciones anteriores no se borran desde el panel.
+
 ## Cómo verificarlo
 
-- El [expediente del gate](../gate-p6.md): cada criterio enlaza su evidencia; la aprobación queda al final.
-- Pendiente de limpieza: terminar las 3 corridas de evaluación que siguen abiertas (`/plataforma/asistente` y `/plataforma/copilot`).
+- En el panel, como propietario: abrir un destino publicado → «Dirección en el portal» → «Cambiar la dirección». La dirección vieja (`/destinos/…`) abre la nueva y aparece en «Direcciones anteriores».
+- Pendiente de limpieza (opcional): en `/plataforma/asistente` y `/plataforma/copilot`, terminar las corridas del 9 nov (asistente) y del 10 nov a las 13:15 (Copilot) desde «Corridas:». La del 8 nov es de una versión anterior de los casos y queda abierta.
 
 ## Siguiente paso
 
-**C0 — Ucureña lista como vitrina** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): los pendientes marcados «antes de cargar el contenido de Ucureña» (cambiar la dirección con redirecciones; reemplazar y borrar panoramas, modelos y tours; foto propia como poster), los arreglos en Blender y la carga del contenido real. Antes de empezar, confirmar con el usuario los pasos de C0, como en las fases anteriores.
+**C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster** ([roadmap](../roadmap.md#c0--ucureña-lista-como-vitrina)). Antes de empezar, confirmar con el usuario qué pasa con los tours que usan un medio reemplazado (nuevo borrador o al publicar) y si borrar es definitivo.
 
 ## Decisiones pendientes del usuario
 
 - El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».
-- **Al final del proyecto, en Blender** (pedido del usuario, 2026-10-25):
+- **Al final del proyecto, en Blender** (pedido del usuario, 2026-10-25; confirmado fuera de C0 el 2026-11-10):
   - corregir la iluminación de la ametralladora: sus mapas marcan casi todo como metal sobre colores muy oscuros;
   - corregir su material dorado, que tiene la textura equivocada;
   - ajustar el espacio al girar algunos modelos 3D (centro de giro, distancia de la cámara).

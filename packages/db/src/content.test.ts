@@ -5,6 +5,7 @@ import {
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
   createSupabasePublishedMapReader,
+  createSupabasePublishedRedirectReader,
 } from "./content";
 import { createSessionClient } from "./session-client";
 
@@ -365,5 +366,64 @@ describe("map reader", () => {
         json([{ west: null, south: null, east: null, north: null, destinations: 0, events: 0 }]),
     });
     expect(await reader.extent(TENANT)).toEqual({ bounds: null, destinations: 0, events: 0 });
+  });
+});
+
+describe("addresses (ADR-047)", () => {
+  it.each([
+    [pgError("PT409", 409, "slug"), { status: "slug_taken" }],
+    [pgError("PT409", 409, "previous"), { status: "slug_previous" }],
+    [pgError("PT409", 409, "stale"), { status: "stale" }],
+    [pgError("PT409", 409, "too_many"), { status: "too_many" }],
+    [pgError("23514", 400, "unchanged"), { status: "unchanged" }],
+    [pgError("23514", 400, "slug"), { status: "invalid" }],
+    [pgError("42501", 403), { status: "forbidden" }],
+    [pgError("PT404", 404), { status: "not_found" }],
+  ])("maps rename errors (%#)", async (response, outcome) => {
+    const { repo } = session(() => response.clone());
+    expect(await repo.changeSlug(TENANT, CONTENT, "mirador", "mirador-2")).toEqual(outcome);
+  });
+
+  it("sends the address the person saw and returns the one that keeps leading here", async () => {
+    const { repo, calls } = session(() => json([{ slug: "mirador-2", previous_slug: "mirador" }]));
+    expect(await repo.changeSlug(TENANT, CONTENT, "mirador", "mirador-2")).toEqual({
+      status: "changed",
+      slug: "mirador-2",
+      previousSlug: "mirador",
+    });
+    expect(calls[0]?.body).toEqual({
+      p_tenant_id: TENANT,
+      p_content_id: CONTENT,
+      p_expected_slug: "mirador",
+      p_slug: "mirador-2",
+    });
+  });
+
+  it("lists old addresses, and none before the migration", async () => {
+    const listed = session(() => json([{ slug: "mirador", created_at: "2026-11-10T12:00:00Z" }]));
+    expect(await listed.repo.previousSlugs(TENANT, CONTENT)).toEqual([
+      { slug: "mirador", changedAt: "2026-11-10T12:00:00Z" },
+    ]);
+    const missing = session(() => pgError("PGRST205", 404));
+    expect(await missing.repo.previousSlugs(TENANT, CONTENT)).toEqual([]);
+  });
+
+  it("asks visitors' old addresses anonymously, and nothing redirects before the migration", async () => {
+    const reader = (response: () => Response) =>
+      createSupabasePublishedRedirectReader({
+        url: BASE,
+        publishableKey: "sb_publishable_test",
+        fetch: async () => response(),
+      });
+    expect(
+      await reader(() => json("mirador-2")).currentSlug(TENANT, "destination", "mirador"),
+    ).toBe("mirador-2");
+    expect(await reader(() => json(null)).currentSlug(TENANT, "event", "feria")).toBeNull();
+    expect(
+      await reader(() => pgError("PGRST202", 404)).currentSlug(TENANT, "event", "feria"),
+    ).toBeNull();
+    await expect(
+      reader(() => pgError("XX000", 500)).currentSlug(TENANT, "event", "feria"),
+    ).rejects.toThrow();
   });
 });

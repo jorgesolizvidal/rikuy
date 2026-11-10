@@ -1,6 +1,6 @@
 import { buildEventIcs, PORTAL_PATHS } from "@rikuy/core";
 
-import { portalEvent, portalOrigin } from "@/server/portal-content";
+import { portalEvent, portalMovedSlug, portalOrigin } from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 /** Resolved per request: these small responses carry their own Cache-Control. */
@@ -16,7 +16,15 @@ export async function GET(_request: Request, { params }: CalendarContext) {
   const view = await portalView(host);
   if (view === null) return new Response("Not found", { status: 404 });
   const event = await portalEvent(view, decodeURIComponent(slug));
-  if (event === null) return new Response("Not found", { status: 404 });
+  if (event === null) {
+    // An old address of the event (ADR-047): its calendar file at the current one.
+    const current = await portalMovedSlug(view, "event", decodeURIComponent(slug));
+    if (current === null) return new Response("Not found", { status: 404 });
+    return new Response(null, {
+      status: 308,
+      headers: { location: PORTAL_PATHS.eventCalendar(current) },
+    });
+  }
 
   const origin = portalOrigin(view);
   const canonicalHost = view.context.tenant.canonicalHost ?? view.context.host;
