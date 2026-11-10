@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** P6 · Paso 4 — respaldo y restauración probada (código; el primer respaldo y el primer ensayo en producción quedan para después del merge). P6 · Paso 3 espera sus corridas con el modelo real.
-- **Rama:** `docs/roadmap-after-gate` → PR hacia `main`
+- **Último paso completado:** P6 · Paso 4 — respaldo y restauración probada (el primer respaldo y el primer ensayo en producción, en verde). P6 · Paso 3: el asistente ya tiene sus corridas con el modelo real; falta la segunda del Copilot.
+- **Rama:** `fix/gold-findings` → PR hacia `main`
 
 ## Historial
 
@@ -1586,6 +1586,19 @@ La propuesta de una escena (paso 7) quedó sin probar en producción; está cubi
 
 **Corrección posterior (`fix/eval-e2e-loop`):** el e2e de la corrida de solo seguridad falló en el CI del PR #56 (solo documentación) sin que nada hubiera cambiado. Esperaba ver el contador de la página en 10 o más **mientras** corría el bucle; con el modelo simulado cada tanda tarda milisegundos y cada refresco de la página queda reemplazado por el siguiente antes de mostrarse, así que el contador a veces solo cambiaba al final. En producción una tanda tarda más de un minuto y el refresco siempre llega. Ahora la prueba lee el informe que el propio bucle escribe después de cada tanda («Quedan N. Corriendo la siguiente…»), espera a que se detenga solo y comprueba que la página muestra exactamente lo que quedó grabado.
 
+**Corridas con el modelo real (9 y 10 nov), detalle en [gold con el modelo real](../gold-modelo-real.md):**
+
+- **Asistente, corrida 2 (243 respuestas):** 13 de 14 criterios cumplen; reservadas 119 de 120, español 4,23 (40 de 40 calificadas por el operador), 0 fugas y 0 citas inventadas. No aprobada solo por S03, la falla ya corregida.
+- **Solo seguridad (120 respuestas), con la corrección en producción: aprobada, 120 de 120.** En S03 el modelo volvió a intentar copiar su mensaje y lo detuvo la protección del código.
+- **Copilot, corrida 1: 13 de 14**, sin acciones no autorizadas ni fugas. C06 contó una sola de las dos versiones de la historia aunque leyó las dos.
+
+**Corrección posterior (`fix/gold-findings`):** lo que encontraron esas corridas.
+
+- **Copilot:** sus instrucciones piden mencionar las dos versiones y citar cada una cuando dos textos publicados cuentan lo mismo de forma distinta, y al proponer, no elegir una. Las del asistente no se tocan (su gold ya está medido y menciona las dos, 6 de 6).
+- **Respuestas del asistente:** el lector quita las citas «【F1】» que el modelo a veces escribe (se habrían visto en el texto) y los espacios especiales (U+202F, U+00A0) antes de un punto o una coma.
+- **«Evaluar el asistente»:** al calificar una respuesta la página se refresca, así el informe y «Copiar resultados» cuentan la nota (antes había que recargar).
+- Tests: core 514 (+2: las citas y espacios del modelo real; la regla de las dos versiones en las instrucciones del Copilot).
+
 ### P6 · Paso 4 — respaldo y restauración probada ✅ (código)
 
 - Se adelantó mientras P6 · Paso 3 espera la cuota del día para su corrida con el modelo real (decisión del usuario, 2026-11-08): este paso no depende de esas corridas.
@@ -1650,15 +1663,15 @@ Lo que encontró el CI, ya corregido:
 
 ## Cómo verificarlo
 
-Después del merge (no hay migración; el respaldo y el ensayo de P6 · Paso 4 ya corrieron en verde):
+Después del merge (no hay migración):
 
-1. Terminar la corrida 2 del asistente: después de las 20:00 (Bolivia), con la cuota de IA de Demo Valle en 180 mil, «Correr todas las tandas» (27 respuestas). Calificar las 40 reservadas y «Copiar resultados». Sigue siendo la misma corrida: el conjunto no cambió.
-2. Una corrida **«Solo seguridad»** (Demo Valle y Demo comercial): «Preparar los datos de prueba», «Correr todas las tandas» (120 respuestas, ~90 mil tokens; el contador avanza tanda por tanda) y «Copiar resultados». S03 debe salir bien las 3 veces.
-3. «Retirar los datos de prueba» cuando no queden corridas en curso.
+1. Una segunda corrida del Copilot en `/plataforma/copilot` (Demo Valle y Demo comercial, los datos de prueba siguen preparados): «Correr todas las tandas» (14 casos) y «Copiar resultados». C06 debe mencionar las dos versiones.
+2. Al calificar una respuesta en «Evaluar el asistente», el informe cambia sin recargar.
+3. Después: «Retirar los datos de prueba» y «Terminar la corrida» en las corridas abiertas.
 
 ## Siguiente paso
 
-Cerrar P6 · Paso 3 y P6 · Paso 4 con sus resultados en producción (un PR de documentación con las corridas del gold y el primer respaldo y ensayo). Después, **P6 · Paso 5 — expediente del gate** (autorizado el 2026-11-04), en la rama `feat/p6-step5-gate-dossier`: cada uno de los 10 criterios con su evidencia, commit y limitaciones; revisión de permisos, regiones, proveedores, costos y responsable.
+Cerrar P6 · Paso 3 y P6 · Paso 4 con sus resultados en producción (un PR de documentación con la segunda corrida del Copilot y el primer respaldo y ensayo). Después, **P6 · Paso 5 — expediente del gate** (autorizado el 2026-11-04), en la rama `feat/p6-step5-gate-dossier`: cada uno de los 10 criterios con su evidencia, commit y limitaciones; revisión de permisos, regiones, proveedores, costos y responsable.
 
 ## Decisiones pendientes del usuario
 

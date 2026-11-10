@@ -1,10 +1,14 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { rateAnswerAction } from "./actions";
 
-/** The operator's 1–5 rating of a held-out answer: clarity and cultural adequacy. */
+/**
+ * The operator's 1–5 rating of a held-out answer: clarity and cultural adequacy. After each
+ * saved rating the page refreshes, so the report and «Copiar resultados» count it.
+ */
 export function RatingSelect({
   runId,
   caseId,
@@ -19,6 +23,7 @@ export function RatingSelect({
   readonly disabled: boolean;
 }) {
   const id = useId();
+  const router = useRouter();
   const [value, setValue] = useState(rating === null ? "" : String(rating));
   const [failed, setFailed] = useState(false);
   const [pending, startTransition] = useTransition();
@@ -43,7 +48,8 @@ export function RatingSelect({
               repetition,
               rating: next === "" ? null : Number(next),
             });
-            if (result.status !== "rated") setFailed(true);
+            if (result.status === "rated") router.refresh();
+            else setFailed(true);
           });
         }}
       >
