@@ -9,6 +9,7 @@ import { wordDiff } from "../../domain/copilot/diff";
 import { proposableFields } from "../../domain/copilot/issues";
 import { parseCopilotAnswer, parseProposal } from "../../domain/copilot/parse";
 import { proposalTargetFromQuery } from "../../domain/copilot/paths";
+import { copilotAskMessages, copilotProposeMessages } from "../../domain/copilot/prompts";
 import { runAiSession, type AiLedger, type AiProvider } from "../ai/gateway";
 import { createSimulatedAiProvider } from "../ai/simulated";
 import type { ContentRepository, DestinationRecord } from "../content/ports";
@@ -176,6 +177,28 @@ const content = (record: DestinationRecord | null = destination()) =>
 const tours = { find: async () => null } as unknown as TourRepository;
 
 describe("Copilot domain (ADR-042)", () => {
+  it("asks for both versions when published texts disagree (gold C06)", () => {
+    const [ask] = copilotAskMessages({
+      snapshot: { site: "Demo", today: "hoy", items: [], omitted: 0, usage: [] },
+      passages: [],
+      history: [],
+      question: "¿Cómo nació el pueblo?",
+    });
+    expect(ask?.content).toContain("no elijas una: menciona las dos y cita cada una");
+    expect(ask?.content).toContain("7. Termina con una última línea exacta");
+    const [propose] = copilotProposeMessages({
+      site: "Demo",
+      target: "Destino «Plaza»",
+      fields: ["summary"],
+      current: {},
+      context: [],
+      passages: [],
+      style: "improve",
+      words: "",
+    });
+    expect(propose?.content).toContain("no elijas una: menciona las dos o deja fuera ese dato");
+  });
+
   it("diffs by words: what stays, goes and comes", () => {
     expect(wordDiff("Un museo pequeño.", "Un museo grande y antiguo.")).toEqual([
       { kind: "same", text: "Un museo " },

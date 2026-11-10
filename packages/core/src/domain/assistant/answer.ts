@@ -87,9 +87,14 @@ export function echoesContext(text: string): boolean {
  */
 const SOURCES_MARK = /(?<![\p{L}\p{N}])(?:FUENTES|SOURCES)\s*:/gu;
 
-/** Removes what the visitor must never see from the model: links, labels and markup. */
+/**
+ * Removes what the visitor must never see from the model: links, labels and markup. The
+ * model sometimes cites with «【F1】» and writes a narrow no-break space before a period
+ * (both seen in the gold with the real model): neither is shown.
+ */
 export function cleanAnswerText(text: string): string {
   return text
+    .replace(/\u3010[^\u3011\n]{0,40}\u3011/gu, "")
     .replace(/\[(?:F\d+|M)\]/gu, "")
     .replace(/\((?:F\d+|M)(?:\s*,\s*(?:F\d+|M))*\)/gu, "")
     .replace(/<[^>]{0,200}>/gu, "")
@@ -97,9 +102,9 @@ export function cleanAnswerText(text: string): string {
     .replace(/\b(?:https?:\/\/|www\.)\S+/giu, "")
     .replace(/\*\*|__|`/gu, "")
     .replace(/^\s{0,3}#{1,6}\s+/gmu, "")
-    .replace(/[ \t]+\n/gu, "\n")
-    .replace(/[ \t]{2,}/gu, " ")
-    .replace(/[ \t]+([.,;:!?)])/gu, "$1")
+    .replace(/[\p{Zs}\t]+\n/gu, "\n")
+    .replace(/[\p{Zs}\t]{2,}/gu, " ")
+    .replace(/[\p{Zs}\t]+([.,;:!?)])/gu, "$1")
     .replace(/\n{3,}/gu, "\n\n")
     .trim();
 }

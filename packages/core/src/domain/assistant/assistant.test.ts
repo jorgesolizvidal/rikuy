@@ -277,6 +277,17 @@ describe("parseAnswer", () => {
     ).toBe("Título\nMira aquí o y ya");
   });
 
+  it("hides the model's «【F1】» labels and its narrow spaces before punctuation", () => {
+    expect(
+      cleanAnswerText(
+        "Nació con los arrieros【F1】. Otra versión dice que con mineros【F2†L1-L3】.",
+      ),
+    ).toBe("Nació con los arrieros. Otra versión dice que con mineros.");
+    expect(cleanAnswerText("según la historia tradicional\u202f. Otra versión\u00a0, dicen")).toBe(
+      "según la historia tradicional. Otra versión, dicen",
+    );
+  });
+
   it("keeps paragraphs and lists", () => {
     expect(answerBlocks("Puedes:\n- ver el valle\n- llevar agua\n\nBuen viaje.")).toEqual([
       { type: "paragraph", text: "Puedes:" },
