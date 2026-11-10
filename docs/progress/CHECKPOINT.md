@@ -1661,6 +1661,7 @@ Lo que encontró el CI, ya corregido:
   - **responsable operativo y de recuperación:** Jorge Bryan Soliz Vidal;
   - **RPO 24 h y RTO 4 h** para el piloto;
   - **medir las teselas en su Android** antes de cerrar: en producción no había panoramas de más de 4096 px (Demo Norte, 2880 px), así que la política por resolución nunca se había probado con teselas en un celular real.
+- **Teselas en Android** (10 nov): el usuario subió a Demo Norte un panorama real de 8192 × 4096 px (168 teselas en 3 niveles), lo publicó en el tour de «Concierto de la banda» y lo midió con `?medir=1`. Chrome: primera escena en 1,11 s con wifi y 1,86 s con datos móviles lentos, 31–39 archivos, 58–84 cuadros/s. Firefox con datos: 5,24 s, por la carga de la página (el visor espera a `load`), no por las teselas. Anotado en el criterio 5 y en [contratos de los tours](../contratos-tours.md).
 - Encontrado al revisar: «Lighthouse on production» falló 1 de las últimas 8 corridas (10 nov, `/agenda` de Ucureña vacía, LCP simulado 2,55 s sobre 2,5 s). Anotado como limitación del criterio 9; se revisa con el contenido real (C0).
 
 ### Roadmap después del gate (documentación) ✅
@@ -1682,12 +1683,12 @@ Lo que encontró el CI, ya corregido:
 ## Cómo verificarlo
 
 1. Leer el [expediente del gate](../gate-p6.md): cada criterio enlaza su evidencia.
-2. Medición de las teselas: subir `DJI_0876.JPG` (8192 × 4096) a Demo Norte, armar un tour con él en un evento, publicar y medir con `?medir=1` en el Android; se anota en el criterio 5.
+2. La medición de las teselas en [contratos de los tours](../contratos-tours.md#teselas-en-el-dispositivo-2026-11-10-gate-p6--criterio-5).
 3. Terminar las 3 corridas de evaluación que siguen abiertas.
 
 ## Siguiente paso
 
-Anotar la medición de las teselas en el criterio 5 y, con el expediente completo, **el usuario aprueba o no el gate**. Con la aprobación, P6 · Paso 5 ✅ y P6 ✅. Después: **C0 — Ucureña lista como vitrina**.
+Con el expediente completo, **el usuario aprueba o no el gate**. Con la aprobación, P6 · Paso 5 ✅ y P6 ✅. Después: **C0 — Ucureña lista como vitrina**.
 
 ## Decisiones pendientes del usuario
 

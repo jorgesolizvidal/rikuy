@@ -8,18 +8,18 @@ Este expediente reúne, criterio por criterio, la evidencia del gate P6 tal como
 
 ## Resumen
 
-| #   | Criterio (auditoría 14, con ajustes)                                                                     | Estado                     | Evidencia principal                                                                               |
-| --- | -------------------------------------------------------------------------------------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------- |
-| 1   | A y B en el mismo build, ZC-01, B por alta genérica                                                      | Cumple                     | Ensayo ZC-01 en CI; 5 municipios en producción con el mismo build, 3 dados de alta desde el panel |
-| 2   | Marca, membresías y RLS; matriz de permisos sin fugas; roles y revocación                                | Cumple                     | RC-15, 1.196 aserciones pgTAP, segundo factor de propietarios y administradores (ADR-043)         |
-| 3   | Portal, destinos, evento, mapa, administración, borrador → publicar → volver a una versión               | Cumple                     | Integración y e2e de portales (161), contratos RC-09/10/11/12 (202), producción                   |
-| 4   | Museo y Carnaval de 2/4 escenas, entrada única, puntos, GLB a pedido, edición sin perder vínculos        | Cumple                     | RC-07, RC-01, RC-08 en un navegador real; medición en Android                                     |
-| 5   | Original privado, pipeline durable recuperable, manifiesto y derivados, multirresolución                 | Cumple con límites         | D-01 (9 escenarios), ADR-020; teselas en CI y local. **Medición de teselas en Android: en curso** |
-| 6   | Subdominios, dominio propio (opcional), admin central, cookies no compartidas                            | Cumple (dominio propio no) | Registro de dominios, alias 308, cookies del panel solo en su host, RC-12                         |
-| 7   | Copilot V1 y V2 con diff, permisos y conflictos; asistente y guía con contexto; A-01                     | Cumple                     | [Gold con el modelo real](gold-modelo-real.md): seguridad 120/120, Copilot 14/14, 0 fugas         |
-| 8   | Métricas por municipio con su fuente y período                                                           | Cumple                     | `/plataforma/metricas` (ADR-044)                                                                  |
-| 9   | RC del piloto, responsive y accesibilidad básica; el portal funciona sin IA                              | Cumple con límites         | RC-01, 02, 05–12, 14, 15 en CI; RC-13 parcial; portal sin IA probado                              |
-| 10  | Runbook, respaldo y restauración probados, revisión de permisos/regiones/proveedores/costos, responsable | Cumple                     | [Respaldo](backup.md) y ensayo en verde; este expediente                                          |
+| #   | Criterio (auditoría 14, con ajustes)                                                                     | Estado                     | Evidencia principal                                                                                                          |
+| --- | -------------------------------------------------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| 1   | A y B en el mismo build, ZC-01, B por alta genérica                                                      | Cumple                     | Ensayo ZC-01 en CI; 5 municipios en producción con el mismo build, 3 dados de alta desde el panel                            |
+| 2   | Marca, membresías y RLS; matriz de permisos sin fugas; roles y revocación                                | Cumple                     | RC-15, 1.196 aserciones pgTAP, segundo factor de propietarios y administradores (ADR-043)                                    |
+| 3   | Portal, destinos, evento, mapa, administración, borrador → publicar → volver a una versión               | Cumple                     | Integración y e2e de portales (161), contratos RC-09/10/11/12 (202), producción                                              |
+| 4   | Museo y Carnaval de 2/4 escenas, entrada única, puntos, GLB a pedido, edición sin perder vínculos        | Cumple                     | RC-07, RC-01, RC-08 en un navegador real; medición en Android                                                                |
+| 5   | Original privado, pipeline durable recuperable, manifiesto y derivados, multirresolución                 | Cumple                     | D-01 (9 escenarios), ADR-020; teselas de un panorama de 8192 px en Android: primera escena en 1,11 s (wifi) y 1,86 s (datos) |
+| 6   | Subdominios, dominio propio (opcional), admin central, cookies no compartidas                            | Cumple (dominio propio no) | Registro de dominios, alias 308, cookies del panel solo en su host, RC-12                                                    |
+| 7   | Copilot V1 y V2 con diff, permisos y conflictos; asistente y guía con contexto; A-01                     | Cumple                     | [Gold con el modelo real](gold-modelo-real.md): seguridad 120/120, Copilot 14/14, 0 fugas                                    |
+| 8   | Métricas por municipio con su fuente y período                                                           | Cumple                     | `/plataforma/metricas` (ADR-044)                                                                                             |
+| 9   | RC del piloto, responsive y accesibilidad básica; el portal funciona sin IA                              | Cumple con límites         | RC-01, 02, 05–12, 14, 15 en CI; RC-13 parcial; portal sin IA probado                                                         |
+| 10  | Runbook, respaldo y restauración probados, revisión de permisos/regiones/proveedores/costos, responsable | Cumple                     | [Respaldo](backup.md) y ensayo en verde; este expediente                                                                     |
 
 ## Criterios
 
@@ -86,9 +86,9 @@ Este expediente reúne, criterio por criterio, la evidencia del gate P6 tal como
 - **Ledger de trabajos durable** (P2 · Pasos 1–2, ADR-014): arrendamiento con _fencing_, reintentos con espera, cola de fallidos, puntos de control. **D-01** contra PostgreSQL real en cada PR, 9 escenarios: un ejecutor que muere sin avisar, retomar desde el punto de control con el viejo bloqueado, duplicados al mismo tiempo, un municipio que satura la cola sin frenar a otro, y panoramas y modelos completados por un segundo ejecutor.
 - **Panoramas** (P2 · Paso 3): vista previa ≤ 40 KB, imagen única ≤ 4096 px y teselas solo por encima de 4096 px; manifiesto revalidado por la base. Con los panoramas reales de 8192 × 4096 px: 168 teselas en 3 niveles; en el CI, una escena en teselas en RC-07.
 - **GLB** (P2 · Paso 4, ADR-026): Meshopt + KTX2 verificado y comparación de colores en un navegador real (ΔE media ≤ 2).
-- **Medición de teselas en Android con un panorama de 8192 px en producción: en curso** (decisión del usuario, 10 nov). Se anota aquí al terminar.
+- **Teselas en un celular real** (10 nov, [contratos de los tours](contratos-tours.md#teselas-en-el-dispositivo-2026-11-10-gate-p6--criterio-5)): un panorama real de 8192 × 4096 px subido a Demo Norte quedó en 168 teselas en 3 niveles; el celular descargó solo 31–42 archivos. Con Chrome, primera escena en **1,11 s** con wifi y **1,86 s** con datos móviles lentos (objetivos de la auditoría: 2,5 s y 2 s), y el giro se mantuvo sobre 58 cuadros por segundo.
 
-**Limitaciones:** las texturas de más de 2048 px se reducen en la copia optimizada; un medio que deja de usarse sigue público (las revisiones selladas lo necesitan).
+**Limitaciones:** con Firefox y datos móviles la primera escena tardó 5,24 s, por la carga de la página y no por las teselas (el visor espera a que la página termine de cargar); una corrida por combinación y sin iPhone; las texturas de más de 2048 px se reducen en la copia optimizada; un medio que deja de usarse sigue público (las revisiones selladas lo necesitan).
 
 ### 6. Dominios y sesiones
 
@@ -214,7 +214,7 @@ Ni las preguntas ni las respuestas del asistente se guardan en la base; la posic
 | #   | Qué                                                  | Estado                                                                                                                               |
 | --- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------ |
 | B1  | Datos de dominio validados y medios autorizados      | Parcial: medios reales del usuario para pruebas; el contenido real de Ucureña llega en C0, con el usuario como responsable editorial |
-| B2  | M-01 y A-01 ejecutados                               | A-01 ✅ con el modelo real. M-01: política por resolución ✅; teselas en Android en curso                                            |
+| B2  | M-01 y A-01 ejecutados                               | ✅ A-01 con el modelo real; M-01 con la política por resolución y las teselas medidas en Android                                     |
 | B3  | Presupuesto, planes, proveedor, regiones y retención | Documentado arriba; **aprobar los planes pagos y la matriz de datos antes de la operación comercial**                                |
 | B4  | Dominio real con DNS y verificación                  | Pendiente: dominio del municipio                                                                                                     |
 | B5  | SLO/RPO/RTO, responsable y recuperación probada      | RPO/RTO, responsable y recuperación ✅; sin SLO de disponibilidad en planes gratuitos                                                |
