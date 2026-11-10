@@ -76,8 +76,7 @@ export async function submitModelAction(
   }
 }
 
-export type ModelPosterState =
-  { readonly status: ModelPosterOutcome } | { readonly status: "signed_out" | "error" };
+export type ModelPosterState = ModelPosterOutcome | { readonly status: "signed_out" | "error" };
 
 /**
  * The poster the panel captured from its viewer (a small WebP or PNG). The server re-encodes
@@ -90,18 +89,16 @@ export async function saveModelPosterAction(formData: FormData): Promise<ModelPo
     const file = formData.get("poster");
     const capture = file instanceof Blob ? new Uint8Array(await file.arrayBuffer()) : null;
     const session = await adminSession();
-    return {
-      status: await saveModelPoster(
-        access.membership,
-        { versionId: formData.get("versionId"), capture },
-        {
-          models: session.models,
-          media: session.media,
-          admin: mediaAdmin(),
-          processor: imageProcessor(),
-        },
-      ),
-    };
+    return await saveModelPoster(
+      access.membership,
+      { versionId: formData.get("versionId"), capture },
+      {
+        models: session.models,
+        media: session.media,
+        admin: mediaAdmin(),
+        processor: imageProcessor(),
+      },
+    );
   } catch {
     return { status: "error" };
   }

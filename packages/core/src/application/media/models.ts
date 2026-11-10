@@ -32,7 +32,10 @@ export const MODEL_UPLOADERS: readonly MembershipRole[] = ["owner", "admin", "ed
 /** Folder of what the pipeline makes, inside the version prefix. */
 export const MODEL_FOLDER = "model/";
 export const MODEL_FILE = "model.glb";
-export const MODEL_POSTER_FILE = "poster.webp";
+/** A new name for each poster: `poster-<8 hex>.webp` (ADR-048). */
+export function newModelPosterFile(): string {
+  return `poster-${globalThis.crypto.randomUUID().replaceAll("-", "").slice(0, 8)}.webp`;
+}
 /** The panel's capture, before re-encoding (a PNG of a large canvas). */
 export const MODEL_POSTER_MAX_CAPTURE_BYTES = 6 * 1024 * 1024;
 
@@ -60,14 +63,25 @@ export interface ModelView {
 export type ModelSubmitOutcome =
   "processing" | "ready" | "rejected" | "not_uploaded" | "not_found" | "forbidden";
 
-export type ModelPosterOutcome = "saved" | "invalid" | "not_ready" | "not_found" | "forbidden";
+export type ModelPosterFailure = "invalid" | "not_ready" | "not_found" | "forbidden";
+
+/**
+ * Saved: `tours` use this version in the revision they are edited from; `openedDrafts` of
+ * them got a draft now. Visitors see the new image when each one is published again.
+ */
+export type ModelPosterOutcome =
+  | { readonly status: "saved"; readonly tours: number; readonly openedDrafts: number }
+  | { readonly status: ModelPosterFailure };
 
 /** The municipality's models, with the signed-in user's session. */
 export interface ModelRepository {
   list(tenantId: string): Promise<ModelView[]>;
   /** The browser finished uploading: move to processing and enqueue the job (one transaction). */
   submit(tenantId: string, versionId: string): Promise<ModelSubmitOutcome>;
-  /** Records the poster stored next to the model (the database checks role and state). */
+  /**
+   * Records the poster stored next to the model and opens a draft in the published tours
+   * that show it (one transaction; the database checks role and state).
+   */
   setPoster(tenantId: string, versionId: string, poster: ModelPoster): Promise<ModelPosterOutcome>;
 }
 
@@ -202,37 +216,37 @@ export async function saveModelPoster(
     readonly processor: Pick<ImageProcessor, "modelPoster">;
   },
 ): Promise<ModelPosterOutcome> {
-  if (!MODEL_UPLOADERS.includes(membership.role)) return "forbidden";
+  if (!MODEL_UPLOADERS.includes(membership.role)) return { status: "forbidden" };
   const { versionId, capture } = input;
-  if (typeof versionId !== "string" || !UUID.test(versionId)) return "not_found";
+  if (typeof versionId !== "string" || !UUID.test(versionId)) return { status: "not_found" };
   if (
     !(capture instanceof Uint8Array) ||
     capture.byteLength === 0 ||
     capture.byteLength > MODEL_POSTER_MAX_CAPTURE_BYTES
   ) {
-    return "invalid";
+    return { status: "invalid" };
   }
   const info = inspectImage(capture);
-  if (info === null || Math.min(info.width, info.height) < 64) return "invalid";
+  if (info === null || Math.min(info.width, info.height) < 64) return { status: "invalid" };
 
   const version = await deps.media.findVersion(versionId);
   if (!version || version.tenantId !== membership.tenantId || version.purpose !== "model") {
-    return "not_found";
+    return { status: "not_found" };
   }
-  if (version.status !== "ready") return "not_ready";
+  if (version.status !== "ready") return { status: "not_ready" };
 
   let poster: Awaited<ReturnType<ImageProcessor["modelPoster"]>>;
   try {
     poster = await deps.processor.modelPoster(capture);
   } catch {
-    return "invalid";
+    return { status: "invalid" };
   }
+  // A new name each time: the public copy of an earlier poster is cached for a year.
+  const file = newModelPosterFile();
   const prefix = imageVersionPrefix(version.tenantId, version.assetId, version.version);
-  await deps.admin.storeDerivatives(prefix + MODEL_FOLDER, [
-    { ...poster.file, name: MODEL_POSTER_FILE },
-  ]);
+  await deps.admin.storeDerivatives(prefix + MODEL_FOLDER, [{ ...poster.file, name: file }]);
   return deps.models.setPoster(membership.tenantId, versionId, {
-    file: MODEL_POSTER_FILE,
+    file,
     width: poster.width,
     height: poster.height,
     bytes: poster.file.bytes.byteLength,

@@ -60,6 +60,10 @@ export function mapModelRow(raw: unknown): ModelView {
   };
 }
 
+const posterToursSchema = z.array(
+  z.object({ tour_id: z.string().uuid(), opened_draft: z.boolean() }).passthrough(),
+);
+
 export function createModelRepository(client: SessionClient): ModelRepository {
   return {
     async list(tenantId) {
@@ -83,16 +87,23 @@ export function createModelRepository(client: SessionClient): ModelRepository {
     },
 
     async setPoster(tenantId, versionId, poster) {
-      const { error } = await client.rpc("set_model_poster", {
+      const { data, error } = await client.rpc("change_model_poster", {
         p_tenant_id: tenantId,
         p_version_id: versionId,
         p_poster: poster,
       });
-      if (!error) return "saved";
-      if (error.code === "42501") return "forbidden";
-      if (error.code === "PT404") return "not_found";
-      if (error.code === "PT409") return "not_ready";
-      if (error.code === "23514") return "invalid";
+      if (!error) {
+        const tours = posterToursSchema.parse(data ?? []);
+        return {
+          status: "saved",
+          tours: tours.length,
+          openedDrafts: tours.filter((tour) => tour.opened_draft).length,
+        };
+      }
+      if (error.code === "42501") return { status: "forbidden" };
+      if (error.code === "PT404") return { status: "not_found" };
+      if (error.code === "PT409") return { status: "not_ready" };
+      if (error.code === "23514") return { status: "invalid" };
       throw new Error(`Saving a model poster failed (${error.code || "unknown"})`);
     },
   };

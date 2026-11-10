@@ -61,3 +61,20 @@ Decisiones del usuario (2026-11-10):
 - Un modelo nuevo necesita su poster antes de que el tour se publique (como al agregarlo por primera vez).
 - Las versiones viejas de un medio reemplazado siguen ocupando cuota mientras las use el historial de algún tour.
 - Un reemplazo con otra proporción o encuadre puede necesitar ajustar la vista inicial y la posición de los puntos: el panel no lo detecta.
+
+## Corrección (2026-11-10, `fix/model-poster-republish`)
+
+En producción, una foto propia como poster no llegaba al tour publicado, ni siquiera al publicarlo de nuevo:
+
+- todos los posters de una versión se guardaban con el mismo nombre (`model/poster.webp`), y su copia pública tiene caché de un año;
+- la publicación del tour no copiaba nada de un modelo que ya era público, así que la copia pública seguía siendo la vieja;
+- un tour publicado sin borrador no se puede volver a publicar.
+
+Desde la corrección:
+
+- **cada poster tiene su propio nombre** (`poster-<8 hex>.webp`); `poster.webp` sigue valiendo para los anteriores;
+- `change_model_poster` (reemplaza a `set_model_poster` en el panel) registra el poster y, en la misma transacción, **abre un borrador** en cada tour cuya revisión de trabajo es la publicada que usa esa versión. Los visitantes ven la imagen nueva cuando el tour se publica de nuevo, como con cualquier cambio; el panel lo dice al guardar la imagen;
+- la publicación del tour **copia siempre el poster actual** de cada modelo, aunque el modelo ya sea público (un archivo pequeño; si ya está, cuenta como copiado), y la base vuelve a medir la versión para la cuota;
+- la revisión anterior conserva su imagen para «Volver a esta versión».
+
+Encontrado al revisar la limpieza: al borrar un panorama o un modelo, el ejecutor solo listaba la carpeta de la versión y no sus subcarpetas (`panorama/`, `panorama/tiles/…`, `model/`), así que sus derivados quedaban en Storage. Ahora recorre las subcarpetas. En producción no se había borrado ningún medio todavía.

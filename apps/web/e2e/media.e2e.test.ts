@@ -287,9 +287,19 @@ describe("replacing and deleting panoramas and models (ADR-048)", () => {
         .toBuffer(),
     });
     await card.getByText("Imagen actualizada con tu foto.").waitFor({ timeout: 20_000 });
-    const [row] = await db<{ poster: { width: number; height: number } }[]>`
+    // The published tour that shows the model: the new image reaches visitors when it is
+    // published again (its draft is ready for that).
+    await expect(card.innerText()).resolves.toContain(
+      "Un tour usa este modelo: publícalo de nuevo para que los visitantes vean la imagen nueva.",
+    );
+    const [row] = await db<{ poster: { file: string; width: number; height: number } }[]>`
       select manifest -> 'poster' as poster from public.asset_versions where id = ${model.version}`;
     expect(row?.poster).toMatchObject({ width: 1280, height: 960 });
+    // Its own name: the public copy of the earlier poster is cached for a year.
+    expect(row?.poster.file).toMatch(/^poster-[0-9a-f]{8}\.webp$/u);
+    const [tour] = await db<{ draft: string | null }[]>`
+      select draft_revision_id as draft from public.tours where id = ${tourId}`;
+    expect(tour?.draft).not.toBeNull();
     await accessible(page, "models");
     await page.context().close();
   }, 120_000);
