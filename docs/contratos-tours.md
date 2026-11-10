@@ -154,3 +154,22 @@ Después del calentamiento, 60 cambios más suman un 5 %, sin crecer los nodos n
 - red real, no controlada;
 - el tamaño de los panoramas y del GLB no se ve, porque Storage está en otro dominio y no envía `Timing-Allow-Origin`;
 - la memoria de la GPU no se puede medir desde la página.
+
+### Teselas en el dispositivo (2026-11-10, gate P6 · criterio 5)
+
+Hasta aquí ningún panorama de producción pasaba de 4096 px (los de Demo Norte son de 2880), así que la entrega en teselas ([ADR-020](adr/ADR-020-panorama-delivery-by-resolution.md)) solo se había probado en el CI y en local. El usuario subió a Demo Norte `DJI_0876.JPG`, un panorama real de 8192 × 4096 px (11,6 MB): quedó con **168 teselas en 3 niveles** y una imagen de respaldo de 4096 px. Lo publicó como única escena del tour de «Concierto de la banda» y lo midió con `?medir=1` en su celular (CRT-NX3, Android 15, Mali-G57 MC2), una corrida por combinación:
+
+| Métrica                    | Chrome · wifi                      | Chrome · datos móviles             | Firefox · datos móviles            | Objetivo de la auditoría                                    |
+| -------------------------- | ---------------------------------- | ---------------------------------- | ---------------------------------- | ----------------------------------------------------------- |
+| Red (informada)            | ~6,8 Mbps, ~250 ms                 | «3g», ~0,05 Mbps, ~550 ms          | no la informa                      | —                                                           |
+| Primer byte / contenido    | 0,13 / 0,50 s                      | 1,03 / 1,32 s                      | 0,28 / 2,91 s                      | —                                                           |
+| LCP                        | 0,50 s                             | 1,89 s                             | 3,81 s                             | —                                                           |
+| Primera escena en pantalla | **1,11 s**                         | **1,86 s**                         | **5,24 s**                         | vista previa ≤ 2 s (red lenta); utilizable ≤ 2,5 s (rápida) |
+| Archivos del panorama      | 31                                 | 39                                 | 42 (1,5 MB)                        | solo el nivel que la pantalla necesita                      |
+| Fluidez al girar           | 84 cuadros/s, p95 17 ms, 0 > 50 ms | 58 cuadros/s, p95 45 ms, 6 > 50 ms | 63 cuadros/s, p95 24 ms, 0 > 50 ms | ≥ 30 cuadros/s sostenidos                                   |
+
+- **Las teselas funcionan en el celular:** se descargaron entre 31 y 42 archivos (la vista previa y las teselas del nivel que pide la pantalla), no las 168, y el giro se mantuvo sobre 58 cuadros por segundo.
+- **Chrome cumple** los dos objetivos: 1,11 s con wifi y 1,86 s con datos móviles lentos. Con datos, 6 cuadros pasaron de 50 ms al girar, mientras llegaban teselas nuevas por una red de ~0,05 Mbps.
+- **Firefox con datos no cumple** el de red lenta: 5,24 s. No viene de las teselas: el primer texto de la página ya tardó 2,9 s y el visor espera a que la página termine de cargar (3,8 s). Con Chrome, en la misma red, la página cargó en 1,3 s.
+
+**Límites:** una corrida por combinación, red real y no controlada; el tamaño de las teselas no se ve en Chrome (Storage no envía `Timing-Allow-Origin`); sin iPhone.
