@@ -13,7 +13,8 @@ const FAILURES = {
   signed_out: "Tu sesión venció. Inicia sesión de nuevo para subir el modelo.",
   rate_limited: "Hiciste muchas subidas seguidas. Espera unos minutos e inténtalo de nuevo.",
   not_uploaded: "El archivo no terminó de subirse. Inténtalo de nuevo.",
-  not_found: "No encontramos esa subida. Inténtalo de nuevo.",
+  not_found: "No encontramos esa subida (o ya se borró). Recarga la página.",
+  busy: "Ya hay una versión nueva en camino. Espera a que termine de procesarse.",
   error: "No pudimos subir el modelo. Revisa tu conexión e inténtalo de nuevo.",
 } as const;
 
@@ -44,7 +45,14 @@ function put(url: string, file: File, onProgress: (percent: number) => void) {
  * GLB upload: the server reserves a version and signs a one-time URL, the browser sends the
  * file straight to Storage, and the server enqueues the optimization job.
  */
-export function ModelUpload({ slug }: { readonly slug: string }) {
+export function ModelUpload({
+  slug,
+  replaces,
+}: {
+  readonly slug: string;
+  /** Replace this modelo with a new version of it (ADR-048). */
+  readonly replaces?: string;
+}) {
   const id = useId();
   const router = useRouter();
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
@@ -65,7 +73,7 @@ export function ModelUpload({ slug }: { readonly slug: string }) {
     if (declared) return setPhase({ kind: "failed", message: MODEL_PROBLEMS[declared] });
 
     setPhase({ kind: "working", message: "Preparando la subida…" });
-    const start = await startModelUploadAction(slug, { mime, bytes: file.size });
+    const start = await startModelUploadAction(slug, { mime, bytes: file.size }, replaces);
     if (start.status === "invalid") {
       return setPhase({ kind: "failed", message: MODEL_PROBLEMS[start.problem] });
     }
@@ -90,7 +98,9 @@ export function ModelUpload({ slug }: { readonly slug: string }) {
     }
     setPhase({
       kind: "done",
-      message: "Modelo subido. Se está optimizando; aparecerá como «Listo» en la lista en un rato.",
+      message: replaces
+        ? "Versión nueva subida. Se está optimizando; cuando esté lista podrás usarla en los tours."
+        : "Modelo subido. Se está optimizando; aparecerá como «Listo» en la lista en un rato.",
     });
     router.refresh();
   }
@@ -104,7 +114,7 @@ export function ModelUpload({ slug }: { readonly slug: string }) {
 
   return (
     <div className="field panorama-upload">
-      <span id={`${id}-hint`} className="field-hint">
+      <span id={`${id}-hint`} className={replaces ? "visually-hidden" : "field-hint"}>
         {MODEL_HINT}
       </span>
       <div className="photo-actions">
@@ -118,8 +128,12 @@ export function ModelUpload({ slug }: { readonly slug: string }) {
           aria-invalid={phase.kind === "failed" ? true : undefined}
           onChange={choose}
         />
-        <label htmlFor={id} className="button" aria-disabled={busy}>
-          {busy ? "Subiendo…" : "Subir un modelo 3D"}
+        <label
+          htmlFor={id}
+          className={replaces ? "button button-quiet" : "button"}
+          aria-disabled={busy}
+        >
+          {busy ? "Subiendo…" : replaces ? "Reemplazar el modelo" : "Subir un modelo 3D"}
         </label>
       </div>
       {phase.kind === "uploading" ? (

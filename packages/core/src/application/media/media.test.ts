@@ -185,6 +185,7 @@ function fakes(
         },
       };
     },
+    createReplacementUpload: async () => ({ status: "not_found" as const }),
     signedUploadUrl: async (path) => `https://storage.test/upload/${path}?token=t`,
     findVersion: async () => version,
     signedPreviewUrl: async (path) => `https://storage.test/sign/${path}`,

@@ -1,3 +1,4 @@
+import { latestReadyVersions } from "../media/library";
 import type { OrganizationMembership } from "../../contracts/organization";
 import type { ImageReference } from "../../contracts/destination";
 import type {
@@ -285,10 +286,13 @@ export async function loadTourEditor(
       : Promise.resolve([[], [], []] as const),
     isPublic ? deps.content.portalHostname(membership.tenantId) : Promise.resolve(null),
   ]);
-  const ready = panoramas.filter(
-    (view) => view.status === "ready" && view.manifest !== null && !used.has(view.versionId),
+  // The newest ready version of each panorama the tour does not use yet (ADR-048: an older
+  // version of one it uses is not offered either).
+  const usedAssets = new Set(revision.scenes.map((scene) => scene.panorama.assetId));
+  const ready = latestReadyVersions(panoramas, usedAssets).filter(
+    (view) => view.manifest !== null && !used.has(view.versionId),
   );
-  const readyModels = models.filter((view) => view.status === "ready" && view.manifest !== null);
+  const readyModels = latestReadyVersions(models).filter((view) => view.manifest !== null);
   const posterPath = (assetId: string, version: number, file: string) =>
     imageVersionPrefix(membership.tenantId, assetId, version) + MODEL_FOLDER + file;
   const photoPath = (image: ImageReference) =>

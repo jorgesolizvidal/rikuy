@@ -18,6 +18,13 @@ import {
   type MediaAdmin,
   type MediaRepository,
 } from "./ports";
+import {
+  groupMediaVersions,
+  isAssetId,
+  MEDIA_DELETERS,
+  type MediaAsset,
+  type MediaLibraryRepository,
+} from "./library";
 
 /** Who may upload models (tours are edited by the same people as destinations). */
 export const MODEL_UPLOADERS: readonly MembershipRole[] = ["owner", "admin", "editor"];
@@ -72,25 +79,39 @@ export type RequestModelUploadResult =
       readonly mime: typeof MODEL_MIME;
     }
   | { readonly status: "invalid"; readonly problem: ModelProblem }
-  | { readonly status: "forbidden" | "rate_limited" }
+  | { readonly status: "forbidden" | "rate_limited" | "not_found" | "busy" }
   | { readonly status: "over_quota"; readonly resource: UsageResource };
 
 /** Step 1: reserve a model version and hand the browser a one-time upload URL. */
 export async function requestModelUpload(
   membership: OrganizationMembership,
-  input: { readonly mime: unknown; readonly bytes: unknown },
+  input: {
+    readonly mime: unknown;
+    readonly bytes: unknown;
+    /** The model this one replaces (a new version of it, ADR-048). */
+    readonly replaces?: unknown;
+  },
   media: MediaRepository,
 ): Promise<RequestModelUploadResult> {
   if (!MODEL_UPLOADERS.includes(membership.role)) return { status: "forbidden" };
   const problem = checkDeclaredModel(input.mime, input.bytes);
   if (problem !== null) return { status: "invalid", problem };
+  if (input.replaces !== undefined && !isAssetId(input.replaces)) return { status: "not_found" };
 
-  const created = await media.createImageUpload(
-    membership.tenantId,
-    "model",
-    MODEL_MIME,
-    input.bytes as number,
-  );
+  const created =
+    input.replaces === undefined
+      ? await media.createImageUpload(
+          membership.tenantId,
+          "model",
+          MODEL_MIME,
+          input.bytes as number,
+        )
+      : await media.createReplacementUpload(
+          membership.tenantId,
+          input.replaces,
+          MODEL_MIME,
+          input.bytes as number,
+        );
   if (created.status === "invalid") return { status: "invalid", problem: "too_heavy" };
   if (created.status === "over_quota") return created;
   if (created.status !== "created") return { status: created.status };
@@ -124,9 +145,21 @@ export interface ModelCard extends ModelView {
 /** The list for the panel, with signed URLs for the optimized model and its poster. */
 export async function loadModels(
   membership: OrganizationMembership,
-  deps: { readonly models: ModelRepository; readonly media: MediaRepository },
-): Promise<{ readonly cards: readonly ModelCard[]; readonly canUpload: boolean }> {
-  const views = await deps.models.list(membership.tenantId);
+  deps: {
+    readonly models: ModelRepository;
+    readonly media: MediaRepository;
+    readonly library: Pick<MediaLibraryRepository, "uses">;
+  },
+): Promise<{
+  readonly cards: readonly ModelCard[];
+  readonly assets: readonly MediaAsset<ModelCard>[];
+  readonly canUpload: boolean;
+  readonly canDelete: boolean;
+}> {
+  const [views, uses] = await Promise.all([
+    deps.models.list(membership.tenantId),
+    deps.library.uses(membership.tenantId, "model"),
+  ]);
   const folder = (view: ModelView) =>
     imageVersionPrefix(membership.tenantId, view.assetId, view.version) + MODEL_FOLDER;
   const paths = views.flatMap((view) =>
@@ -139,17 +172,18 @@ export async function loadModels(
   );
   const signed =
     paths.length > 0 ? await deps.media.signedPreviewUrls(paths) : new Map<string, string>();
+  const cards = views.map((view) => ({
+    ...view,
+    modelUrl: view.manifest ? (signed.get(folder(view) + view.manifest.model.file) ?? null) : null,
+    posterUrl: view.manifest?.poster
+      ? (signed.get(folder(view) + view.manifest.poster.file) ?? null)
+      : null,
+  }));
   return {
     canUpload: MODEL_UPLOADERS.includes(membership.role),
-    cards: views.map((view) => ({
-      ...view,
-      modelUrl: view.manifest
-        ? (signed.get(folder(view) + view.manifest.model.file) ?? null)
-        : null,
-      posterUrl: view.manifest?.poster
-        ? (signed.get(folder(view) + view.manifest.poster.file) ?? null)
-        : null,
-    })),
+    canDelete: MEDIA_DELETERS.includes(membership.role),
+    cards,
+    assets: groupMediaVersions(cards, uses),
   };
 }
 

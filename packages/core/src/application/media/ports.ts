@@ -38,6 +38,16 @@ export interface MediaRepository {
     mime: ImageMime | "model/gltf-binary" | "application/pdf" | "text/plain",
     bytes: number,
   ): Promise<CreateUploadOutcome>;
+  /**
+   * A new version of a panorama or model (ADR-048): same rules as a first upload, plus
+   * `not_found` (deleted, another tenant, not tour media) and `busy` (one already on its way).
+   */
+  createReplacementUpload(
+    tenantId: string,
+    assetId: string,
+    mime: ImageMime | "model/gltf-binary",
+    bytes: number,
+  ): Promise<CreateUploadOutcome | { readonly status: "not_found" | "busy" }>;
   /** One-time URL the browser PUTs the original to. The bytes never pass through the BFF. */
   signedUploadUrl(originalPath: string): Promise<string>;
   /** Only versions the user can see (members of the tenant), else null. */

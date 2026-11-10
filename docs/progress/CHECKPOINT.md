@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C0 — Ucureña lista como vitrina. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C0 · Paso 1 — cambiar la dirección de un destino o evento con redirecciones ✅
-- **Rama:** `feat/c0-step1-slug-redirects` → PR hacia `main`
+- **Último paso completado:** C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster ✅
+- **Rama:** `feat/c0-step2-replace-delete-media` → PR hacia `main`
 
 ## Historial
 
@@ -1707,14 +1707,50 @@ Lo que encontró el CI, ya corregido:
 - Una ruta del asistente guardada en el navegador con la dirección vieja omite ese lugar; el UID del `.ics` cambia con la dirección.
 - Las direcciones anteriores no se borran desde el panel.
 
+**Verificación en producción (2026-11-10):** el usuario cambió en Demo Norte «Plaza principal» a `plaza-central` y volvió: la dirección vieja y el QR abrieron la nueva en su celular. Comprobado con una consulta de solo lectura: dos `content.slug_changed` auditados y la dirección anterior `plaza-central` llevando a `plaza-principal`. También terminó las corridas de evaluación del 9 y 10 de noviembre; la del 8 queda abierta (es de una versión anterior de los casos y la página no la deja terminar).
+
+### C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster ✅
+
+- Decisiones del usuario ([ADR-048](../adr/ADR-048-replace-delete-media.md)), 2026-11-10:
+  - **reemplazar:** la versión nueva entra en el borrador de cada tour que usa el medio; los visitantes la ven al publicarlo;
+  - **borrar:** solo lo que ningún tour usa ni usó (borrador, publicado o historial); si no se puede, el panel dice dónde se usa;
+  - **poster:** foto propia o la captura del visor; vale la última.
+- Base de datos (`20261111000000_c0_replace_delete_media.sql`, solo expand):
+  - `assets.deleted_at` / `deleted_by`;
+  - `create_media_replacement_upload` (propietario, administrador o editor): versión N + 1 del mismo panorama o modelo, mismas reglas de tipo, peso, cuota y límite de subidas; uno a la vez por medio (`busy`);
+  - `apply_media_replacement` (propietario, administrador o editor): pone la versión lista más nueva en el borrador de cada tour cuya revisión de trabajo usa una anterior (abre el borrador con los mismos identificadores si no hay; el número de edición avanza); una versión más vieja se rechaza (`stale`); audita `media.replacement_applied`;
+  - `delete_media_asset` (propietario o administrador): solo si ninguna revisión de un tour usa alguna versión (`in_use`) y nada se procesa (`busy`); marca el medio borrado, rechaza cada versión (libera la cuota) y encola `media.remove_unused` por versión; audita `media.deleted`;
+  - `claim_unused_media` también entrega la carpeta de una versión de un medio borrado; `list_tenant_panoramas` y `list_tenant_models` dejan fuera los borrados (mismas columnas);
+  - `media_asset_uses` (cualquier miembro): cada tour que usa cada medio, en qué revisión (borrador, publicada, historial) y si es su revisión de trabajo.
+- `@rikuy/core`: `application/media/library` (`groupMediaVersions`: versión actual, reemplazo en camino o rechazado, tours y cuáles tienen la anterior, si se puede borrar; `latestReadyVersions` para el editor del tour; `applyMediaReplacement`, `deleteTourMedia`); `requestPanoramaUpload` y `requestModelUpload` aceptan `replaces`; `loadPanoramas` y `loadModels` agrupan por medio con sus usos.
+- `@rikuy/db`: `createReplacementUpload` en el repositorio de medios y `createMediaLibraryRepository`; el poster se gira según su EXIF.
+- Panel:
+  - **«Panoramas 360°» y «Modelos 3D»:** una tarjeta por medio con su versión, la versión nueva en camino, **«Lo usan: Tour de «…» · publicado, con la versión anterior»**, **«Reemplazar el panorama/modelo»**, **«Usar la versión nueva en los tours»** cuando algún tour tiene la anterior, y **«Borrar»** con confirmación (o el motivo por el que no se puede);
+  - **«Subir una foto como imagen»** en cada modelo: el navegador la reduce a 1.280 px, aplica su orientación y quita sus metadatos;
+  - el editor del tour ofrece solo la versión más nueva de cada panorama y modelo.
+- Tests:
+  - 527 unitarios en core (+10, `library.test.ts`: agrupación, tours con la versión anterior, reemplazo rechazado, qué se puede borrar, el orden, la versión que ofrece el editor, roles, reemplazos en camino o borrados) y 169 en db (+16, `media-library.test.ts`);
+  - 1.279 pgTAP (42 nuevos, `036_replace_delete_media`): dónde se usa (analista sí, otro municipio no); versión nueva del mismo medio; uno a la vez y no durante el procesamiento; tipo, peso, foto, otro municipio y analista rechazados; sin lista no se usa; usarla abre el borrador con la misma escena, sus puntos y el modelo intactos, y lo publicado sigue igual; dos veces no cambia nada; una más vieja se rechaza; con el borrador abierto avanza su número de edición; el modelo nuevo va a sus puntos y pide su poster para publicar; borrar lo usado, lo que se procesa, como editor u otro municipio rechazado; borrar lo no usado lo saca de la lista, no se reemplaza ni se agrega a un tour, rechaza su versión, se audita y el ejecutor recibe su carpeta;
+  - integración contra Supabase (`media-library.int.test.ts`): reemplazo con URL firmada real, `busy`, analista y otro municipio rechazados, el borrador del tour con la nueva y lo publicado con la anterior, borrar lo usado rechazado y lo no usado borrado con su trabajo de limpieza;
+  - **e2e en un navegador real** (`media.e2e.test.ts`, nuevo paso del job «Contracts», 3 casos): reemplazar con una subida real, «Usar la versión nueva en los tours» (borrador con la nueva, publicado con la anterior), borrar tras confirmar, foto propia como poster (1.280 × 960), analista sin reemplazar ni borrar; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador: los tres flujos en Demo Norte con un tour publicado, la tarjeta antes y después de usar la versión nueva («publicado y en el borrador»), sin desbordes a 390 px; portales (161), contratos RC-09/10/11/12 (202) y tours (9) en verde.
+
+**Desviaciones:**
+
+- «Usar la versión nueva en los tours» es un botón, no automático al terminar el procesamiento: así se revisa el resultado (y el poster de un modelo) antes de que llegue a los borradores.
+- Un medio que alguna vez se publicó en un tour no se puede borrar mientras esa versión del tour exista; con el Paso 3 (borrar un tour) puede quedar libre.
+- Si el reemplazo cambia el encuadre, la vista inicial y la posición de los puntos se ajustan a mano.
+
 ## Cómo verificarlo
 
-- En el panel, como propietario: abrir un destino publicado → «Dirección en el portal» → «Cambiar la dirección». La dirección vieja (`/destinos/…`) abre la nueva y aparece en «Direcciones anteriores».
-- Pendiente de limpieza (opcional): en `/plataforma/asistente` y `/plataforma/copilot`, terminar las corridas del 9 nov (asistente) y del 10 nov a las 13:15 (Copilot) desde «Corridas:». La del 8 nov es de una versión anterior de los casos y queda abierta.
+- En «Panoramas 360°», como propietario: un panorama que usa un tour publicado dice «Lo usan…» y no se puede borrar. «Reemplazar el panorama» sube una versión nueva; cuando queda lista, «Usar la versión nueva en los tours» la pone en el borrador del tour y el portal sigue mostrando la anterior hasta publicar.
+- Un panorama que ningún tour usó se borra con «Borrar» → «Sí, borrar».
+- En «Modelos 3D», «Subir una foto como imagen» cambia el poster.
 
 ## Siguiente paso
 
-**C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster** ([roadmap](../roadmap.md#c0--ucureña-lista-como-vitrina)). Antes de empezar, confirmar con el usuario qué pasa con los tours que usan un medio reemplazado (nuevo borrador o al publicar) y si borrar es definitivo.
+**C0 · Paso 3 — borrar un tour o pasarlo a otro destino o evento** ([roadmap](../roadmap.md#c0--ucureña-lista-como-vitrina)). Antes de empezar, confirmar con el usuario qué pasa con el historial del tour borrado, con los «ir a otro recorrido» que llevaban a él y con el recorrido general.
 
 ## Decisiones pendientes del usuario
 

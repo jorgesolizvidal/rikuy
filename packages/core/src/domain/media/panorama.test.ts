@@ -96,6 +96,7 @@ describe("panorama uploads", () => {
       status: "created" as const,
       upload: { assetId: "a", versionId: "v", version: 1, originalPath: "t/a/1/original" },
     }),
+    createReplacementUpload: async () => ({ status: "busy" as const }),
     signedUploadUrl: async () => "https://upload.example.test/x",
     findVersion: async () => null,
     signedPreviewUrl: async () => null,

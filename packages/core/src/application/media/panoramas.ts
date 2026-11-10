@@ -6,6 +6,13 @@ import { PANORAMA_RULES, type PanoramaProblem } from "../../domain/media/panoram
 import { checkDeclaredImage } from "../../domain/media/rules";
 import type { DerivedFile, MediaRepository, ReadyImageMetadata } from "./ports";
 import type { JobLease } from "../jobs/ports";
+import {
+  groupMediaVersions,
+  isAssetId,
+  MEDIA_DELETERS,
+  type MediaAsset,
+  type MediaLibraryRepository,
+} from "./library";
 import type { PanoramaPlan, PanoramaLevelPlan } from "../../domain/media/panorama";
 
 /** Who may upload panoramas (tours are edited by the same people as destinations). */
@@ -56,26 +63,35 @@ export type RequestPanoramaUploadResult =
       readonly mime: string;
     }
   | { readonly status: "invalid"; readonly problem: PanoramaProblem }
-  | { readonly status: "forbidden" | "rate_limited" }
+  | { readonly status: "forbidden" | "rate_limited" | "not_found" | "busy" }
   | { readonly status: "over_quota"; readonly resource: UsageResource };
 
 /** Step 1: reserve a panorama version and hand the browser a one-time upload URL. */
 export async function requestPanoramaUpload(
   membership: OrganizationMembership,
-  input: { readonly mime: unknown; readonly bytes: unknown },
+  input: {
+    readonly mime: unknown;
+    readonly bytes: unknown;
+    /** The panorama this one replaces (a new version of it, ADR-048). */
+    readonly replaces?: unknown;
+  },
   media: MediaRepository,
 ): Promise<RequestPanoramaUploadResult> {
   if (!PANORAMA_UPLOADERS.includes(membership.role)) return { status: "forbidden" };
   const problem = checkDeclaredImage(PANORAMA_RULES, input.mime, input.bytes);
   if (problem !== null) return { status: "invalid", problem };
+  if (input.replaces !== undefined && !isAssetId(input.replaces)) return { status: "not_found" };
 
   const mime = input.mime as "image/png" | "image/jpeg" | "image/webp";
-  const created = await media.createImageUpload(
-    membership.tenantId,
-    "panorama",
-    mime,
-    input.bytes as number,
-  );
+  const created =
+    input.replaces === undefined
+      ? await media.createImageUpload(membership.tenantId, "panorama", mime, input.bytes as number)
+      : await media.createReplacementUpload(
+          membership.tenantId,
+          input.replaces,
+          mime,
+          input.bytes as number,
+        );
   if (created.status === "invalid") return { status: "invalid", problem: "too_heavy" };
   if (created.status === "over_quota") return created;
   if (created.status !== "created") return { status: created.status };
@@ -107,12 +123,27 @@ export interface PanoramaCard extends PanoramaView {
   readonly imageUrl: string | null;
 }
 
-/** The list for the panel, with signed URLs for the renditions of ready panoramas. */
+/**
+ * The list for the panel, with signed URLs for the renditions of ready panoramas, grouped by
+ * panorama (its current version and a replacement on its way) with the tours that use it.
+ */
 export async function loadPanoramas(
   membership: OrganizationMembership,
-  deps: { readonly panoramas: PanoramaRepository; readonly media: MediaRepository },
-): Promise<{ readonly cards: readonly PanoramaCard[]; readonly canUpload: boolean }> {
-  const views = await deps.panoramas.list(membership.tenantId);
+  deps: {
+    readonly panoramas: PanoramaRepository;
+    readonly media: MediaRepository;
+    readonly library: Pick<MediaLibraryRepository, "uses">;
+  },
+): Promise<{
+  readonly cards: readonly PanoramaCard[];
+  readonly assets: readonly MediaAsset<PanoramaCard>[];
+  readonly canUpload: boolean;
+  readonly canDelete: boolean;
+}> {
+  const [views, uses] = await Promise.all([
+    deps.panoramas.list(membership.tenantId),
+    deps.library.uses(membership.tenantId, "panorama"),
+  ]);
   const folder = (view: PanoramaView) =>
     `${membership.tenantId}/${view.assetId}/${view.version}/${PANORAMA_FOLDER}`;
   const paths = views.flatMap((view) =>
@@ -122,17 +153,18 @@ export async function loadPanoramas(
   );
   const signed =
     paths.length > 0 ? await deps.media.signedPreviewUrls(paths) : new Map<string, string>();
+  const cards = views.map((view) => ({
+    ...view,
+    previewUrl: view.manifest
+      ? (signed.get(folder(view) + view.manifest.preview.file) ?? null)
+      : null,
+    imageUrl: view.manifest ? (signed.get(folder(view) + view.manifest.image.file) ?? null) : null,
+  }));
   return {
     canUpload: PANORAMA_UPLOADERS.includes(membership.role),
-    cards: views.map((view) => ({
-      ...view,
-      previewUrl: view.manifest
-        ? (signed.get(folder(view) + view.manifest.preview.file) ?? null)
-        : null,
-      imageUrl: view.manifest
-        ? (signed.get(folder(view) + view.manifest.image.file) ?? null)
-        : null,
-    })),
+    canDelete: MEDIA_DELETERS.includes(membership.role),
+    cards,
+    assets: groupMediaVersions(cards, uses),
   };
 }
 
