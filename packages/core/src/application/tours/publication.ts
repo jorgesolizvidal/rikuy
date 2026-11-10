@@ -10,8 +10,10 @@ import type { MediaAdmin } from "../media/ports";
 /**
  * What a tour revision needs in the public bucket before it is sealed (ADR-030): each
  * panorama's preview, image and tiles, each model with its poster, and the points' photos.
- * What is already public (another tour uses it, or an earlier publication) is skipped;
- * photos are always re-copied (three small files each, idempotent).
+ * What is already public (another tour uses it, or an earlier publication) is skipped, but
+ * for the poster of a model: it can change after the model was published (each poster has
+ * its own name, ADR-048), so it is always copied (one small file; already public counts as
+ * copied). Photos are always re-copied (three small files each, idempotent).
  */
 export interface TourMediaPlan {
   readonly files: readonly {
@@ -45,11 +47,12 @@ export function tourMediaPlan(revision: TourRevision): TourMediaPlan {
     }
     for (const hotspot of scene.hotspots) {
       const model = hotspot.model;
-      if (model && !model.published && model.manifest?.poster && !files.has(model.versionId)) {
+      if (model?.manifest?.poster && !files.has(model.versionId)) {
+        const poster = `model/${model.manifest.poster.file}`;
         files.set(model.versionId, {
           assetId: model.assetId,
           version: model.version,
-          files: [`model/${model.manifest.model.file}`, `model/${model.manifest.poster.file}`],
+          files: model.published ? [poster] : [`model/${model.manifest.model.file}`, poster],
         });
       }
     }

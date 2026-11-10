@@ -211,6 +211,26 @@ export function createSupabaseMediaAdmin(
     if (error) throw unexpected("Publishing the media version", error);
   };
 
+  // Every file under a folder (prefix ending in "/"), a few levels deep, page by page.
+  const listFolder = async (bucket: string, prefix: string, depth: number): Promise<string[]> => {
+    const names: string[] = [];
+    for (let offset = 0; ; offset += 1000) {
+      const { data, error } = await admin.storage.from(bucket).list(prefix.slice(0, -1), {
+        limit: 1000,
+        offset,
+        sortBy: { column: "name", order: "asc" },
+      });
+      if (error) throw new Error(`Listing a version's files failed (${error.name || "unknown"})`);
+      const items = data ?? [];
+      for (const item of items) {
+        if (item.id !== null) names.push(`${prefix}${item.name}`);
+        else if (depth < 4)
+          names.push(...(await listFolder(bucket, `${prefix}${item.name}/`, depth + 1)));
+      }
+      if (items.length < 1000) return names;
+    }
+  };
+
   return {
     async readOriginal(originalPath) {
       const { data, error } = await originals().download(originalPath);
@@ -257,24 +277,22 @@ export function createSupabaseMediaAdmin(
       await originals().remove([originalPath]);
     },
 
-    // Photos and logos keep every file directly in their version's folder (no subfolders).
+    // Photos and logos keep their files directly in the version's folder; panoramas and
+    // models also in subfolders (panorama/tiles/<level>/, model/, model/work/).
     async removeVersionFolder(prefix) {
       if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\/[1-9][0-9]{0,5}\/$/u.test(prefix)) {
         throw new Error("Refusing to remove anything but one version's folder");
       }
       let removed = 0;
       for (const bucket of [MEDIA_BUCKETS.originals, MEDIA_BUCKETS.public]) {
-        const { data, error } = await admin.storage
-          .from(bucket)
-          .list(prefix.slice(0, -1), { limit: 1000 });
-        if (error) throw new Error(`Listing a version's files failed (${error.name || "unknown"})`);
-        const names = (data ?? [])
-          .filter((item) => item.id !== null)
-          .map((item) => `${prefix}${item.name}`);
-        if (names.length === 0) continue;
-        const { error: removeError } = await admin.storage.from(bucket).remove(names);
-        if (removeError) {
-          throw new Error(`Removing a version's files failed (${removeError.name || "unknown"})`);
+        const names = await listFolder(bucket, prefix, 0);
+        for (let start = 0; start < names.length; start += 500) {
+          const { error: removeError } = await admin.storage
+            .from(bucket)
+            .remove(names.slice(start, start + 500));
+          if (removeError) {
+            throw new Error(`Removing a version's files failed (${removeError.name || "unknown"})`);
+          }
         }
         removed += names.length;
       }

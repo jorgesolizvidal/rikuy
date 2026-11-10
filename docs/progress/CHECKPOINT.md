@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C0 — Ucureña lista como vitrina. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster ✅
-- **Rama:** `feat/c0-step2-replace-delete-media` → PR hacia `main`
+- **Último paso completado:** C0 · Paso 2 — reemplazar y borrar panoramas y modelos 3D; foto propia como poster ✅ (con su corrección `fix/model-poster-republish`)
+- **Rama:** `fix/model-poster-republish` → PR hacia `main`
 
 ## Historial
 
@@ -1742,11 +1742,34 @@ Lo que encontró el CI, ya corregido:
 - Un medio que alguna vez se publicó en un tour no se puede borrar mientras esa versión del tour exista; con el Paso 3 (borrar un tour) puede quedar libre.
 - Si el reemplazo cambia el encuadre, la vista inicial y la posición de los puntos se ajustan a mano.
 
+**Verificación en producción (2026-11-10):** el usuario hizo las pruebas tras el merge. Reemplazar, «Usar la versión nueva en los tours», borrar y la foto propia funcionaron en el panel, pero el tour publicado de «Plaza principal» seguía mostrando el poster anterior del monumento. Comprobado con una consulta de solo lectura: la versión registraba el poster nuevo y su archivo privado era del 10 de noviembre, pero la copia pública seguía siendo la del 27 de octubre.
+
+**Corrección posterior (`fix/model-poster-republish`):** la imagen nueva no habría llegado ni publicando de nuevo el tour: todos los posters se llamaban `poster.webp` (copia pública con caché de un año), la publicación no copiaba nada de un modelo ya público y un tour publicado sin borrador no se puede publicar ([ADR-048, corrección](../adr/ADR-048-replace-delete-media.md#corrección-2026-11-10-fixmodel-poster-republish)).
+
+- Base de datos (`20261112000000_c0_model_poster_republish.sql`, solo expand):
+  - el poster acepta `poster-<8 hex>.webp` (y `poster.webp`, los anteriores);
+  - `change_model_poster` registra el poster y abre un borrador, con los mismos identificadores, en cada tour cuya revisión de trabajo es la publicada que usa esa versión; devuelve los tours y audita `media.model_poster_set` con ellos. `set_model_poster` queda para la web que sigue desplegada;
+  - `media_publish_version` vuelve a medir una versión ya pública (la copia del poster nuevo cuenta en la cuota).
+- `@rikuy/core`: cada poster con su nombre (`newModelPosterFile`), `saveModelPoster` devuelve los tours y los borradores abiertos, y `tourMediaPlan` copia el poster actual aunque el modelo ya sea público.
+- Panel: al guardar la imagen, «Un tour usa este modelo: publícalo de nuevo para que los visitantes vean la imagen nueva.»
+- **Encontrado al revisar:** al borrar un panorama o un modelo, la limpieza solo listaba la carpeta de la versión y dejaba sus subcarpetas (`panorama/`, teselas, `model/`) en Storage. Ahora recorre las subcarpetas en los dos buckets. En producción no se había borrado nada.
+- Tests:
+  - core 528 (+1 y casos nuevos: nombre propio en cada poster; el plan copia el poster de un modelo ya público) y db 171 (+2: la limpieza borra subcarpetas en los dos buckets y no toca otra versión);
+  - 1.299 pgTAP (20 nuevos, `037_model_poster_republish`): nombres válidos e inválidos (ruta, mayúsculas, otro formato); analista, otro municipio, poster inválido y panorama rechazados; el museo sin borrador recibe uno y la plaza conserva el suyo; lo publicado no cambia; auditoría; un segundo poster no abre nada más; un modelo sin tours solo cambia su poster; publicar de nuevo sella el poster nuevo y la revisión anterior conserva el suyo; volver a publicar una versión pública la mide de nuevo;
+  - integración contra Supabase local (`model-poster.int.test.ts`): primer poster, tour publicado con él, foto como poster nuevo con su nombre y borrador abierto, lo que ven los visitantes no cambia hasta publicar, y al publicar la URL pública sirve la imagen nueva mientras la anterior sigue respondiendo; un modelo borrado pierde sus 5 archivos, también los de `model/` y `model/work/`;
+  - e2e de medios (3) con la foto propia: el aviso de publicar de nuevo, el nombre propio y el borrador del tour; e2e de tours (9) en verde;
+  - `plpgsql_check` sin hallazgos.
+
+**Desviaciones:**
+
+- Los posters anteriores quedan en la carpeta privada del modelo (unos 100–150 KB cada uno, en la cuota) y se borran con el modelo.
+- Hasta que llegue la migración (la web sale unos minutos antes), guardar la imagen de un modelo falla con un mensaje.
+- El poster ya guardado en Demo Norte se llama `poster.webp`: para verlo en el portal hay que volver a subir la foto (con un nombre propio) y publicar el tour.
+
 ## Cómo verificarlo
 
-- En «Panoramas 360°», como propietario: un panorama que usa un tour publicado dice «Lo usan…» y no se puede borrar. «Reemplazar el panorama» sube una versión nueva; cuando queda lista, «Usar la versión nueva en los tours» la pone en el borrador del tour y el portal sigue mostrando la anterior hasta publicar.
-- Un panorama que ningún tour usó se borra con «Borrar» → «Sí, borrar».
-- En «Modelos 3D», «Subir una foto como imagen» cambia el poster.
+- En Demo Norte, «Modelos 3D» → el monumento → «Subir una foto como imagen» con la foto. El panel dice «Un tour usa este modelo: publícalo de nuevo…».
+- En «Tours 360°», el tour de «Plaza principal» aparece con cambios: «Publicar». En el portal, el diálogo del monumento muestra la foto nueva (recargar la página del tour).
 
 ## Siguiente paso
 

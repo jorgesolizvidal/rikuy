@@ -39,9 +39,15 @@ export const modelTextureSchema = z
 /** A material that uses, as its color, a texture another material uses as data. */
 export const colorSuspectSchema = z.object({ material: label, texture: label }).strict();
 
+/**
+ * Each poster has its own name, so a new one never hides behind the year-long cache of the
+ * public copy of an earlier one (ADR-048). "poster.webp": posters saved before.
+ */
+export const MODEL_POSTER_FILE_PATTERN = /^poster(-[0-9a-f]{8})?\.webp$/u;
+
 export const modelPosterSchema = z
   .object({
-    file: z.literal("poster.webp"),
+    file: z.string().regex(MODEL_POSTER_FILE_PATTERN),
     width: z.number().int().min(64).max(2048),
     height: z.number().int().min(64).max(2048),
     bytes: z.number().int().min(1).max(1_048_576),

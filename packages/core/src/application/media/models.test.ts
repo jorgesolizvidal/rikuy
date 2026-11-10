@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { modelManifestSchema, type ModelManifest } from "../../contracts/model";
+import { modelManifestSchema, modelPosterSchema, type ModelManifest } from "../../contracts/model";
 import {
   checkDeclaredModel,
   isGlb,
@@ -14,6 +14,7 @@ import {
   requestModelUpload,
   saveModelPoster,
   submitModel,
+  type ModelPosterOutcome,
   type ModelRepository,
 } from "./models";
 import type { ImageVersionRecord, MediaRepository } from "./ports";
@@ -138,7 +139,7 @@ describe("model rules (ADR-026)", () => {
 function setup(
   options: {
     version?: Partial<ImageVersionRecord> | null;
-    posterOutcome?: "saved" | "not_ready";
+    posterOutcome?: ModelPosterOutcome;
   } = {},
 ) {
   const calls: string[] = [];
@@ -201,8 +202,8 @@ function setup(
     ],
     submit: async () => "processing",
     setPoster: async (_tenant, _version, poster) => {
-      calls.push(`poster:${poster.width}x${poster.height}:${poster.bytes}`);
-      return options.posterOutcome ?? "saved";
+      calls.push(`poster:${poster.file}:${poster.width}x${poster.height}:${poster.bytes}`);
+      return options.posterOutcome ?? { status: "saved", tours: 2, openedDrafts: 1 };
     },
   };
   const admin = {
@@ -252,38 +253,49 @@ describe("model uploads and posters", () => {
     expect(cards[0]?.posterUrl).toBe("https://signed.example.test/t/a/1/model/poster.webp");
   });
 
-  it("stores the re-encoded poster next to the model and records it", async () => {
+  it("stores the re-encoded poster next to the model under a new name and records it", async () => {
     const { calls, deps } = setup();
     expect(
       await saveModelPoster(editor, { versionId: VERSION, capture: png(1600, 1200) }, deps),
-    ).toBe("saved");
-    expect(calls).toEqual(["store:t/a/1/model/poster.webp", "poster:1280x960:90"]);
+    ).toEqual({ status: "saved", tours: 2, openedDrafts: 1 });
+    const [store, record] = calls;
+    const file = /^store:t\/a\/1\/model\/(poster-[0-9a-f]{8}\.webp)$/u.exec(store ?? "")?.[1];
+    expect(file).toBeDefined();
+    expect(record).toBe(`poster:${file}:1280x960:90`);
+    expect(modelPosterSchema.shape.file.safeParse(file).success).toBe(true);
+
+    // Another poster of the same version never reuses the name (its public copy is cached).
+    const again = setup();
+    await saveModelPoster(editor, { versionId: VERSION, capture: png(1600, 1200) }, again.deps);
+    expect(again.calls[0]).not.toBe(store);
   });
 
   it("refuses posters it should not store", async () => {
     const capture = png(1600, 1200);
-    expect(await saveModelPoster(analyst, { versionId: VERSION, capture }, setup().deps)).toBe(
-      "forbidden",
-    );
+    expect(await saveModelPoster(analyst, { versionId: VERSION, capture }, setup().deps)).toEqual({
+      status: "forbidden",
+    });
     expect(
       await saveModelPoster(
         editor,
         { versionId: VERSION, capture: new Uint8Array(10) },
         setup().deps,
       ),
-    ).toBe("invalid");
+    ).toEqual({ status: "invalid" });
     expect(
       await saveModelPoster(editor, { versionId: VERSION, capture: png(32, 32) }, setup().deps),
-    ).toBe("invalid");
+    ).toEqual({ status: "invalid" });
     for (const version of [null, { tenantId: "other" }, { purpose: "content" as const }]) {
       const { calls, deps } = setup({ version });
-      expect(await saveModelPoster(editor, { versionId: VERSION, capture }, deps)).toBe(
-        "not_found",
-      );
+      expect(await saveModelPoster(editor, { versionId: VERSION, capture }, deps)).toEqual({
+        status: "not_found",
+      });
       expect(calls).toEqual([]);
     }
     const { calls, deps } = setup({ version: { status: "processing" } });
-    expect(await saveModelPoster(editor, { versionId: VERSION, capture }, deps)).toBe("not_ready");
+    expect(await saveModelPoster(editor, { versionId: VERSION, capture }, deps)).toEqual({
+      status: "not_ready",
+    });
     expect(calls).toEqual([]);
   });
 });

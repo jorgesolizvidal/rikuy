@@ -22,6 +22,17 @@ const POSTER_FAILURES = {
 const PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 /**
+ * A published tour shows the image it had when it was sealed: the new one reaches visitors
+ * when the tour is published again (its draft is ready for it, ADR-048).
+ */
+function toursNotice(tours: number): string {
+  if (tours === 0) return "";
+  return tours === 1
+    ? " Un tour usa este modelo: publícalo de nuevo para que los visitantes vean la imagen nueva."
+    : ` ${tours} tours usan este modelo: publícalos de nuevo para que los visitantes vean la imagen nueva.`;
+}
+
+/**
  * A photo chosen as poster (ADR-048), shrunk in the browser to at most 1280 px so it fits a
  * Server Action; the server re-encodes it anyway. The canvas also applies the photo's
  * orientation and drops its metadata (location included).
@@ -111,7 +122,7 @@ export function ModelPreview({
         return setMessage(POSTER_FAILURES[result.status]);
       }
       setFailed(false);
-      setMessage(done);
+      setMessage(`${done}${toursNotice(result.tours)}`);
       router.refresh();
     },
     [router, slug, versionId],

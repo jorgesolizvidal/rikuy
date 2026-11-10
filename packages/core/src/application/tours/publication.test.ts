@@ -47,7 +47,9 @@ const modelManifest = {
   model: { file: "model.glb" },
 } as never;
 
-function revision(options: { published?: boolean; editCount?: number } = {}): TourRevision {
+function revision(
+  options: { published?: boolean; editCount?: number; modelPublished?: boolean } = {},
+): TourRevision {
   return {
     revisionId: "70000000-0000-4000-8000-0000000000e1",
     revisionNo: 2,
@@ -87,7 +89,7 @@ function revision(options: { published?: boolean; editCount?: number } = {}): To
               assetId: MODEL,
               version: 1,
               manifest: modelManifest,
-              published: false,
+              published: options.modelPublished ?? false,
             },
           },
           {
@@ -141,6 +143,13 @@ describe("tour media plan", () => {
     ]);
     expect(plan.files.some((entry) => entry.assetId === PANO2)).toBe(false);
     expect(plan.photos).toEqual([{ assetId: PHOTO, version: 2 }]);
+  });
+
+  it("copies the poster of a model that is already public: it may be a new one", () => {
+    const plan = tourMediaPlan(revision({ modelPublished: true }));
+    expect(plan.files.find((entry) => entry.assetId === MODEL)?.files).toEqual([
+      "model/poster.webp",
+    ]);
   });
 
   it("copies the files, then the photos", async () => {
