@@ -27,7 +27,7 @@ P2 ✅ Jobs durables · pipeline de panoramas y GLB · observabilidad
 P4 ✅ Tours 360° · hotspots · GLB lazy
 ★ ✅ Hito Demo / Portafolio
 P5 ✅ Asistente turístico (una conversación, guía en tours, voz) · Copilot V1/V2
-P6  Gate Early SaaS Pilot
+P6 ✅ Gate Early SaaS Pilot (aprobado el 2026-11-10)
 C0–C8 crecimiento: Ucureña lista · métricas · pasaporte QR · diseño · español/inglés · circuitos · conocimiento · Copilot · imágenes
 E1–E4 expansión · X0/X1 migración del sistema anterior
 ```
@@ -131,7 +131,7 @@ Pasos confirmados por el usuario (2026-11-04). Casi todos los criterios ya tiene
 | 2 ✅ | Métricas por municipio para el operador: errores con ID de petición, latencias, trabajos, uso y costo de la IA, integridad de lo publicado ([ADR-044](adr/ADR-044-tenant-metrics.md))   | 8                 | Cada cifra del panel dice de dónde sale y su período                                       |
 | 3 ✅ | Gold con el modelo real: el asistente ampliado y el Copilot (casos semilla de la auditoría) ([ADR-045](adr/ADR-045-real-model-gold.md))                                                 | 7                 | Resultados con el modelo real anotados, sin fugas ni herramientas no autorizadas           |
 | 4 ✅ | Respaldo de la base y los archivos con restauración probada ([ADR-046](adr/ADR-046-backup-restore.md))                                                                                  | 10                | Una restauración ensayada de punta a punta, con su runbook                                 |
-| 5    | Expediente del gate ([gate-p6.md](gate-p6.md)): cada uno de los 10 criterios con su evidencia, commit y limitaciones; revisión de permisos, regiones, proveedores, costos y responsable | 1–10              | El usuario aprueba el gate                                                                 |
+| 5 ✅ | Expediente del gate ([gate-p6.md](gate-p6.md)): cada uno de los 10 criterios con su evidencia, commit y limitaciones; revisión de permisos, regiones, proveedores, costos y responsable | 1–10              | El usuario aprueba el gate                                                                 |
 
 ## Después del gate — crecimiento (C0–C8)
 

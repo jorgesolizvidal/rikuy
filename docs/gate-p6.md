@@ -1,6 +1,6 @@
 # Expediente del gate P6 — Early SaaS Pilot
 
-> **Estado:** pendiente de la aprobación del usuario. **Release evaluado:** `732dc5f` (`main` del 10 nov 2026), el que sirven en producción los cinco portales y el panel (cabecera `X-Rikuy-Version: 732dc5fb427d`). **Responsable operativo:** Jorge Bryan Soliz Vidal.
+> **Estado:** ✅ aprobado por el usuario el 10 nov 2026 ([Aprobación](#aprobación)). **Release evaluado:** `732dc5f` (`main` del 10 nov 2026), el que sirven en producción los cinco portales y el panel (cabecera `X-Rikuy-Version: 732dc5fb427d`). **Responsable operativo:** Jorge Bryan Soliz Vidal.
 
 Este expediente reúne, criterio por criterio, la evidencia del gate P6 tal como lo define la auditoría (documento 14, «EARLY SAAS PILOT — gate P6»), con los ajustes ya registrados en el [roadmap](roadmap.md#p6--gate-early-saas-pilot-ajustado): criterio 5 por [ADR-020](adr/ADR-020-panorama-delivery-by-resolution.md), criterio 6 con el dominio propio **opcional** y criterio 7 con el gold ampliado. La auditoría se leyó en modo solo lectura.
 
@@ -221,4 +221,4 @@ Ni las preguntas ni las respuestas del asistente se guardan en la base; la posic
 
 ## Aprobación
 
-Pendiente: el usuario aprueba el gate (piloto) con las limitaciones de arriba. Al aprobarse se anota aquí la fecha y P6 · Paso 5 pasa a ✅ en el roadmap.
+**Aprobado por el usuario el 10 nov 2026**, con las limitaciones de este expediente, como piloto con planes gratuitos. La operación comercial sigue pidiendo B3 (planes pagos y matriz de datos aprobados) y B4 (dominio real), y no se corta el sistema anterior. P6 · Paso 5 ✅ y P6 ✅ en el [roadmap](roadmap.md).

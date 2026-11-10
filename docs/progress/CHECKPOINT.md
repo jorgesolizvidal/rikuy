@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** P6 — gate del piloto SaaS (pasos confirmados el 2026-11-04). P1, P2, P3, P4, el Hito Demo / Portafolio y P5 ✅.
-- **Último paso completado:** P6 · Paso 3 — gold con el modelo real ✅ y P6 · Paso 4 — respaldo y restauración probada ✅ (cerrados con sus resultados en producción, 2026-11-09 y 2026-11-10).
-- **Rama:** `feat/p6-step5-gate-dossier` → PR hacia `main` (expediente del gate; P6 · Paso 5 en curso)
+- **Fase:** P6 ✅ — gate del piloto SaaS aprobado por el usuario el 2026-11-10. P1, P2, P3, P4, el Hito Demo / Portafolio, P5 y P6 ✅. Sigue C0.
+- **Último paso completado:** P6 · Paso 5 — expediente del gate ✅ (gate aprobado el 2026-11-10).
+- **Rama:** `feat/p6-step5-gate-dossier` → PR hacia `main` (expediente y aprobación del gate)
 
 ## Historial
 
@@ -1653,7 +1653,7 @@ Lo que encontró el CI, ya corregido:
 - **«Restore drill»** (a mano, 1 min 43 s), con la pila en las versiones de producción (PostgreSQL 17.11): base en menos de 1 s, archivos en 1,4 s, y ✓ en las cuatro comprobaciones (1.783 filas de 75 tablas, 232 archivos byte por byte, 5 de 5 portales en línea con sus destinos, 9 cuentas leídas por Auth).
 - Anotado en el [runbook](../backup.md#saber-que-funciona). **P6 · Paso 4 ✅.**
 
-### P6 · Paso 5 — expediente del gate (en curso)
+### P6 · Paso 5 — expediente del gate ✅
 
 - [Expediente del gate](../gate-p6.md): los 10 criterios de la auditoría 14 (con los ajustes del roadmap), cada uno con su evidencia (PR, pruebas, corridas del CI, verificación en producción) y sus limitaciones; revisión de permisos, regiones y proveedores, costos (hoy 0 USD; ~45 USD al mes más el uso al contratar) y operación; estado de B1–B5 de la auditoría 09. La auditoría se leyó en modo solo lectura.
 - **Release evaluado:** `732dc5f`, el que sirven los cinco portales y el panel (`X-Rikuy-Version`).
@@ -1663,6 +1663,7 @@ Lo que encontró el CI, ya corregido:
   - **medir las teselas en su Android** antes de cerrar: en producción no había panoramas de más de 4096 px (Demo Norte, 2880 px), así que la política por resolución nunca se había probado con teselas en un celular real.
 - **Teselas en Android** (10 nov): el usuario subió a Demo Norte un panorama real de 8192 × 4096 px (168 teselas en 3 niveles), lo publicó en el tour de «Concierto de la banda» y lo midió con `?medir=1`. Chrome: primera escena en 1,11 s con wifi y 1,86 s con datos móviles lentos, 31–39 archivos, 58–84 cuadros/s. Firefox con datos: 5,24 s, por la carga de la página (el visor espera a `load`), no por las teselas. Anotado en el criterio 5 y en [contratos de los tours](../contratos-tours.md).
 - Encontrado al revisar: «Lighthouse on production» falló 1 de las últimas 8 corridas (10 nov, `/agenda` de Ucureña vacía, LCP simulado 2,55 s sobre 2,5 s). Anotado como limitación del criterio 9; se revisa con el contenido real (C0).
+- **Aprobado por el usuario el 2026-11-10** con las limitaciones del expediente, como piloto con planes gratuitos. No autoriza la operación comercial (faltan B3 y B4 de la auditoría 09) ni el corte del sistema anterior. **P6 ✅.**
 
 ### Roadmap después del gate (documentación) ✅
 
@@ -1682,13 +1683,12 @@ Lo que encontró el CI, ya corregido:
 
 ## Cómo verificarlo
 
-1. Leer el [expediente del gate](../gate-p6.md): cada criterio enlaza su evidencia.
-2. La medición de las teselas en [contratos de los tours](../contratos-tours.md#teselas-en-el-dispositivo-2026-11-10-gate-p6--criterio-5).
-3. Terminar las 3 corridas de evaluación que siguen abiertas.
+- El [expediente del gate](../gate-p6.md): cada criterio enlaza su evidencia; la aprobación queda al final.
+- Pendiente de limpieza: terminar las 3 corridas de evaluación que siguen abiertas (`/plataforma/asistente` y `/plataforma/copilot`).
 
 ## Siguiente paso
 
-Con el expediente completo, **el usuario aprueba o no el gate**. Con la aprobación, P6 · Paso 5 ✅ y P6 ✅. Después: **C0 — Ucureña lista como vitrina**.
+**C0 — Ucureña lista como vitrina** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): los pendientes marcados «antes de cargar el contenido de Ucureña» (cambiar la dirección con redirecciones; reemplazar y borrar panoramas, modelos y tours; foto propia como poster), los arreglos en Blender y la carga del contenido real. Antes de empezar, confirmar con el usuario los pasos de C0, como en las fases anteriores.
 
 ## Decisiones pendientes del usuario
 
