@@ -1,6 +1,7 @@
 "use server";
 
 import {
+  changeContentSlug,
   confirmContentImageUpload,
   createDestination,
   createEvent,
@@ -18,6 +19,8 @@ import {
   type OpeningHours,
   type OrganizationMembership,
   type RequestImageUploadResult,
+  PORTAL_PATHS,
+  tourPath,
 } from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
@@ -262,6 +265,57 @@ export async function restoreRevisionAction(
       );
     }
     return { status: result.status };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+// ── Address (ADR-047) ─────────────────────────────────────────────────────────
+
+export interface ChangeSlugState {
+  readonly status:
+    | "idle"
+    | "changed"
+    | "invalid"
+    | "unchanged"
+    | "slug_taken"
+    | "slug_previous"
+    | "stale"
+    | "too_many"
+    | "forbidden"
+    | "not_found"
+    | "signed_out"
+    | "error";
+  readonly slug?: string;
+  readonly previousSlug?: string | null;
+}
+
+export async function changeSlugAction(
+  _previous: ChangeSlugState,
+  formData: FormData,
+): Promise<ChangeSlugState> {
+  try {
+    const access = await context(formData.get("org"));
+    if (!("membership" in access)) return access;
+    const contentId = formData.get("contentId");
+    if (typeof contentId !== "string") return { status: "not_found" };
+    const kind: ContentKindName = formData.get("kind") === "event" ? "event" : "destination";
+    const expectedSlug = formData.get("expectedSlug");
+    const result = await changeContentSlug(
+      access.membership,
+      contentId,
+      { expectedSlug, slug: formData.get("slug") },
+      access.session.content,
+    );
+    if (result.status !== "changed") return { status: result.status };
+    const page = kind === "event" ? PORTAL_PATHS.event : PORTAL_PATHS.destination;
+    const addresses = [result.slug, ...(typeof expectedSlug === "string" ? [expectedSlug] : [])];
+    await refreshPortal(
+      (tenantId) => access.session.content.portalHostname(tenantId),
+      access.membership.tenantId,
+      addresses.flatMap((slug) => [page(slug), tourPath(kind, slug)]),
+    );
+    return { status: "changed", slug: result.slug, previousSlug: result.previousSlug };
   } catch {
     return { status: "error" };
   }

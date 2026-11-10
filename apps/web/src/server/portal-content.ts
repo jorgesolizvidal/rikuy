@@ -10,6 +10,7 @@ import {
   type PublishedImage,
 } from "@rikuy/core";
 import { publicMediaUrl } from "@rikuy/db";
+import { notFound, permanentRedirect } from "next/navigation";
 import { cache } from "react";
 
 import {
@@ -17,11 +18,12 @@ import {
   publishedContentReader,
   publishedEventReader,
   publishedMapReader,
+  publishedRedirectReader,
   publishedTourReader,
 } from "./platform";
 import type { NearbyTargetDto } from "@/app/portal/[host]/visitor-location";
 
-import type { PortalView } from "./portal-view";
+import { portalView, type PortalView } from "./portal-view";
 
 /** What an <img> needs to load the right derivative and reserve its space. */
 export interface ResponsiveImage {
@@ -181,4 +183,33 @@ export async function portalHasTour(
 ): Promise<boolean> {
   if (ended) return (await portalTour(view, kind, slug)) !== null;
   return (await portalTourIndex(view)).some((entry) => entry.kind === kind && entry.slug === slug);
+}
+
+/**
+ * The current address of an old one (ADR-047), or null. Only pages whose address is not
+ * found ask; the answer is cached with the page.
+ */
+export async function portalMovedSlug(
+  view: PortalView,
+  kind: "destination" | "event",
+  slug: string,
+): Promise<string | null> {
+  return publishedRedirectReader().currentSlug(view.context.tenant.tenantId, kind, slug);
+}
+
+/**
+ * For a page whose address was not found: an old address of a destination or event answers
+ * 308 to its current page (old links and printed QR codes keep working); anything else is
+ * the portal's 404.
+ */
+export async function movedOrNotFound(
+  params: Promise<{ readonly host: string; readonly slug: string }>,
+  kind: "destination" | "event",
+  to: (slug: string) => string,
+): Promise<never> {
+  const { host, slug } = await params;
+  const view = await portalView(host);
+  const current = view ? await portalMovedSlug(view, kind, decodeURIComponent(slug)) : null;
+  if (current) permanentRedirect(to(current));
+  notFound();
 }

@@ -5,6 +5,7 @@
  * else. Isolation is checked with the other tenant's owner and anonymous reads.
  */
 import {
+  changeContentSlug,
   confirmContentImageUpload,
   contentImagePath,
   createDestination,
@@ -19,7 +20,11 @@ import {
 import sharp from "sharp";
 import { beforeAll, describe, expect, it } from "vitest";
 
-import { createContentRepository, createSupabasePublishedContentReader } from "./content";
+import {
+  createContentRepository,
+  createSupabasePublishedContentReader,
+  createSupabasePublishedRedirectReader,
+} from "./content";
 import { env, signIn, stackAvailable, USERS } from "./integration/local-stack";
 import {
   createMediaRepository,
@@ -228,5 +233,92 @@ describe.runIf(stackAvailable)("destinations against local Supabase", () => {
         surContent,
       ),
     ).toEqual({ status: "invalid", issues: [{ path: "images", code: "media" }] });
+  });
+
+  it("changing the address keeps the old one leading here, for owners only (ADR-047)", async () => {
+    const ownerContent = createContentRepository(owner.client);
+    const redirects = createSupabasePublishedRedirectReader({
+      url: env.url,
+      publishableKey: env.publishableKey,
+    });
+    const first = `direccion-${Date.now()}`;
+    const second = `${first}-nueva`;
+    const created = await createDestination(
+      ownerNorte,
+      { title: "Dirección de prueba", slug: first },
+      ownerContent,
+    );
+    if (created.status !== "created") throw new Error(`create: ${created.status}`);
+    const { contentId } = created;
+    const document: DestinationDocument = {
+      title: "Dirección de prueba",
+      summary: "Un lugar para probar el cambio de dirección.",
+      body: [],
+      location: { lat: -17.39, lng: -66.15 },
+      cover: null,
+      gallery: [],
+    };
+    const published = await publishDestination(
+      ownerNorte,
+      contentId,
+      document,
+      1,
+      ownerContent,
+      admin,
+    );
+    expect(published.status).toBe("published");
+
+    // An editor cannot change it (the database says so too, not only the use case).
+    expect(
+      await createContentRepository(editor.client).changeSlug(NORTE, contentId, first, second),
+    ).toEqual({ status: "forbidden" });
+
+    expect(
+      await changeContentSlug(
+        ownerNorte,
+        contentId,
+        { expectedSlug: first, slug: second },
+        ownerContent,
+      ),
+    ).toEqual({ status: "changed", slug: second, previousSlug: first });
+    expect(await visitors().find(NORTE, first)).toBeNull();
+    expect((await visitors().find(NORTE, second))?.title).toBe("Dirección de prueba");
+    expect(await redirects.currentSlug(NORTE, "destination", first)).toBe(second);
+    expect(await redirects.currentSlug(SUR, "destination", first)).toBeNull();
+    expect(await redirects.currentSlug(NORTE, "event", first)).toBeNull();
+    expect((await ownerContent.previousSlugs(NORTE, contentId)).map((entry) => entry.slug)).toEqual(
+      [first],
+    );
+
+    // Nobody else takes the old address; the place itself can go back to it.
+    expect(
+      await createDestination(ownerNorte, { title: "Otro", slug: first }, ownerContent),
+    ).toEqual({ status: "slug_taken" });
+    expect(
+      await changeContentSlug(
+        ownerNorte,
+        contentId,
+        { expectedSlug: first, slug: `${first}-x` },
+        ownerContent,
+      ),
+    ).toEqual({ status: "stale" });
+    expect(
+      await changeContentSlug(
+        ownerNorte,
+        contentId,
+        { expectedSlug: second, slug: first },
+        ownerContent,
+      ),
+    ).toEqual({ status: "changed", slug: first, previousSlug: second });
+    expect(await redirects.currentSlug(NORTE, "destination", second)).toBe(first);
+    expect(await redirects.currentSlug(NORTE, "destination", first)).toBeNull();
+
+    // Another municipality's owner cannot change it nor see its old addresses.
+    const sur = await signIn(USERS.ownerSur);
+    const surContent = createContentRepository(sur.client);
+    expect(await surContent.changeSlug(NORTE, contentId, first, `${first}-sur`)).toEqual({
+      status: "forbidden",
+    });
+    expect(await surContent.previousSlugs(NORTE, contentId)).toEqual([]);
   });
 });

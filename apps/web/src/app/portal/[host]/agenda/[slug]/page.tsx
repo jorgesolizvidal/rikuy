@@ -10,10 +10,10 @@ import {
   tourPath,
 } from "@rikuy/core";
 import type { Metadata } from "next";
-import { notFound } from "next/navigation";
 
 import { RichTextView } from "@/components/rich-text";
 import {
+  movedOrNotFound,
   portalEvent,
   portalNearbyTargets,
   portalOrigin,
@@ -82,7 +82,7 @@ const GALLERY_SIZES = "(min-width: 72rem) 23rem, (min-width: 40rem) 45vw, 100vw"
 
 export default async function EventPage({ params }: EventPageProps) {
   const loaded = await load(params);
-  if (loaded === null) notFound();
+  if (loaded === null) return movedOrNotFound(params, "event", PORTAL_PATHS.event);
   const { view, event } = loaded;
   const [targets, tour] = await Promise.all([
     portalNearbyTargets(view),

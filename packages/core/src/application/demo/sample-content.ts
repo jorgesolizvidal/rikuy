@@ -181,6 +181,8 @@ export async function loadSampleContent(
         { title: item.title, slug: item.slug },
         deps.content,
       );
+      // Its address now belongs to a renamed sample place (ADR-047): that one stays.
+      if (created.status === "slug_taken") continue;
       if (created.status !== "created") throw new SampleStop({ status: "failed" });
       ids.set(item.slug, created.contentId);
       const draft = await deps.content.findDestination(membership.tenantId, created.contentId);
@@ -221,6 +223,7 @@ export async function loadSampleContent(
         { title: item.title, slug: item.slug },
         deps.content,
       );
+      if (created.status === "slug_taken") continue;
       if (created.status !== "created") throw new SampleStop({ status: "failed" });
       const draft = await deps.content.findEvent(membership.tenantId, created.contentId);
       const day = sampleEventDate(deps.now(), item.inDays, item.weekday);

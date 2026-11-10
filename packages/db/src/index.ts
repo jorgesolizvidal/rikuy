@@ -39,6 +39,7 @@ export {
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
   createSupabasePublishedMapReader,
+  createSupabasePublishedRedirectReader,
 } from "./content";
 export type { SupabasePublishedContentReaderOptions } from "./content";
 export { createJobAdminRepository } from "./job-admin";

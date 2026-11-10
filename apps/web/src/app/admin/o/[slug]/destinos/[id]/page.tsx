@@ -21,6 +21,7 @@ import { toHoursValues } from "./hours-values";
 import type { EditorImage } from "./image-fields";
 import { CopilotProposeLink } from "../../copilot/copilot-link";
 import { PortalShare } from "./portal-share";
+import { SlugField } from "./slug-field";
 import { RevisionHistory } from "./revision-history";
 
 export const metadata: Metadata = { title: "Editar destino" };
@@ -106,7 +107,6 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
             ? ` Hay un borrador (versión ${record.draft.revisionNo}) con cambios sin publicar.`
             : ""}
         </p>
-        <p className="cell-detail">Dirección en el portal: /{record.slug}</p>
       </div>
 
       {editor.canEdit ? null : (
@@ -134,6 +134,16 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
               target={{ type: "content", contentId: record.contentId }}
             />
           ) : null}
+          <SlugField
+            org={membership.slug}
+            kind="destination"
+            contentId={record.contentId}
+            slug={record.slug}
+            title={document.title}
+            published={record.history.length > 0}
+            previous={editor.previousSlugs}
+            canChange={editor.canChangeSlug}
+          />
           {editor.portalPath ? (
             <PortalShare
               url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}

@@ -12,9 +12,11 @@ import {
   type PublishedDestinationReader,
   type PublishedEventReader,
   type PublishedMapReader,
+  type PublishedRedirectReader,
 } from "@rikuy/core";
 import { z } from "zod";
 
+import { isMissingFunction } from "./missing-function";
 import type { SessionClient } from "./session-client";
 
 /**
@@ -344,6 +346,80 @@ export function createContentRepository(client: SessionClient): ContentRepositor
     async portalHostname(tenantId) {
       const { data, error } = await client.rpc("tenant_portal_host", { p_tenant_id: tenantId });
       if (error) throw unexpected("Reading the portal address", error);
+      return z.string().nullable().parse(data);
+    },
+
+    async changeSlug(tenantId, contentId, expectedSlug, slug) {
+      const { data, error, status } = await client.rpc("change_content_slug", {
+        p_tenant_id: tenantId,
+        p_content_id: contentId,
+        p_expected_slug: expectedSlug,
+        p_slug: slug,
+      });
+      if (error) {
+        const kind = failure(error, status);
+        if (kind === "conflict") {
+          if (error.hint === "previous") return { status: "slug_previous" };
+          if (error.hint === "stale") return { status: "stale" };
+          if (error.hint === "too_many") return { status: "too_many" };
+          return { status: "slug_taken" };
+        }
+        if (kind === "invalid") {
+          return { status: error.hint === "unchanged" ? "unchanged" : "invalid" };
+        }
+        if (kind === null) throw unexpected("Changing the address", error);
+        return { status: kind };
+      }
+      const [row] = z
+        .array(z.object({ slug: z.string(), previous_slug: z.string().nullable() }))
+        .length(1)
+        .parse(data);
+      if (!row) throw new Error("Changing the address returned no row");
+      return { status: "changed", slug: row.slug, previousSlug: row.previous_slug };
+    },
+
+    async previousSlugs(tenantId, contentId) {
+      const { data, error } = await client
+        .from("content_slug_redirects")
+        .select("slug, created_at")
+        .eq("tenant_id", tenantId)
+        .eq("content_id", contentId)
+        .order("created_at", { ascending: false })
+        .order("slug");
+      if (error) {
+        // Deployed before the migration (ADR-047): no old addresses yet.
+        if (error.code === "42P01" || error.code === "PGRST205") return [];
+        throw unexpected("Reading the old addresses", error);
+      }
+      return z
+        .array(z.object({ slug: z.string(), created_at: z.string() }))
+        .parse(data)
+        .map((row) => ({ slug: row.slug, changedAt: row.created_at }));
+    },
+  };
+}
+
+/**
+ * Old addresses for portals (ADR-047): anonymous, only for content visitors can see. Before
+ * the migration the function does not exist yet: nothing redirects (as before).
+ */
+export function createSupabasePublishedRedirectReader(
+  options: SupabasePublishedContentReaderOptions,
+): PublishedRedirectReader {
+  const client = createClient(options.url, options.publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
+  });
+  const timeoutMs = options.timeoutMs ?? 3_000;
+  return {
+    async currentSlug(tenantId, kind, slug) {
+      const { data, error } = await client
+        .rpc("portal_content_redirect", { p_tenant_id: tenantId, p_kind: kind, p_slug: slug })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (error) {
+        if (isMissingFunction(error)) return null;
+        throw unexpected("Reading an old address", error);
+      }
       return z.string().nullable().parse(data);
     },
   };

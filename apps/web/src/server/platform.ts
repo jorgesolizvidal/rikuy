@@ -10,6 +10,7 @@ import {
   type PublishedEventReader,
   type PublishedMapReader,
   type PublishedPresentationReader,
+  type PublishedRedirectReader,
   type PublishedTourReader,
   type TenantDirectory,
 } from "@rikuy/core";
@@ -18,6 +19,7 @@ import {
   createSupabasePublishedContentReader,
   createSupabasePublishedEventReader,
   createSupabasePublishedMapReader,
+  createSupabasePublishedRedirectReader,
   createSupabasePublishedTourReader,
   createSupabaseTenantDirectory,
 } from "@rikuy/db";
@@ -116,6 +118,22 @@ export function publishedContentReader(): PublishedDestinationReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedContent;
+}
+
+let publishedRedirects: PublishedRedirectReader | undefined;
+
+/**
+ * Anonymous reader of old addresses (ADR-047). Only an unknown address reaches it: the
+ * answer (a 308 or the 404) is cached with the page.
+ */
+export function publishedRedirectReader(): PublishedRedirectReader {
+  if (publishedRedirects) return publishedRedirects;
+  const { env } = platformSettings();
+  publishedRedirects = createSupabasePublishedRedirectReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedRedirects;
 }
 
 /** Anonymous agenda reader, read fresh like destinations (pages are cached per host). */

@@ -861,6 +861,56 @@ a.button-quiet {
   justify-content: flex-start;
 }
 
+/* ── Destination and event: address in the portal (ADR-047) ─────────────── */
+
+.slug-field {
+  display: grid;
+  gap: 0.5rem;
+  padding: 1.25rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--fg) 4%, transparent);
+}
+
+.slug-field h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.slug-field p {
+  margin: 0;
+}
+
+.slug-current {
+  overflow-wrap: anywhere;
+}
+
+.slug-current .cell-detail,
+.slug-previous .cell-detail {
+  display: inline;
+}
+
+.slug-previous-heading {
+  margin: 0.5rem 0 0;
+  font-size: 1rem;
+}
+
+.slug-previous {
+  margin: 0.5rem 0 0;
+  padding-left: 1.25rem;
+  display: grid;
+  gap: 0.25rem;
+  overflow-wrap: anywhere;
+}
+
+.slug-form {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.slug-form .inline-form {
+  justify-content: flex-start;
+}
+
 /* ── Destination: link and QR for visitors ─────────────────────────────── */
 
 .portal-share {

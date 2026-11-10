@@ -21,6 +21,7 @@ import { DestinationEditor, type EditorValues } from "../../destinos/[id]/destin
 import type { EditorImage } from "../../destinos/[id]/image-fields";
 import { CopilotProposeLink } from "../../copilot/copilot-link";
 import { PortalShare } from "../../destinos/[id]/portal-share";
+import { SlugField } from "../../destinos/[id]/slug-field";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
 import type { VenueOption } from "../../destinos/[id]/schedule-field";
 import { scheduleValues } from "../../destinos/[id]/schedule-values";
@@ -110,7 +111,6 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
             ? ` Hay un borrador (versión ${record.draft.revisionNo}) con cambios sin publicar.`
             : ""}
         </p>
-        <p className="cell-detail">Dirección en el portal: /agenda/{record.slug}</p>
       </div>
 
       {editor.canEdit ? null : (
@@ -140,6 +140,16 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
               target={{ type: "content", contentId: record.contentId }}
             />
           ) : null}
+          <SlugField
+            org={membership.slug}
+            kind="event"
+            contentId={record.contentId}
+            slug={record.slug}
+            title={document.title}
+            published={record.history.length > 0}
+            previous={editor.previousSlugs}
+            canChange={editor.canChangeSlug}
+          />
           {editor.portalPath ? (
             <PortalShare
               url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}

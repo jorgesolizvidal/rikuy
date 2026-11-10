@@ -9,9 +9,11 @@ import { slugify } from "../../domain/tenancy/slug";
 import { publishContentImages } from "../media/content-images";
 import type { MediaAdmin } from "../media/ports";
 import type {
+  ChangeSlugOutcome,
   ContentRecord,
   ContentRepository,
   CreateContentOutcome,
+  PreviousSlug,
   SaveContentOutcome,
 } from "./ports";
 
@@ -84,17 +86,23 @@ export interface ContentEditor<D> {
   readonly canPublish: boolean;
   /** Public page, or null while it is not published (or the portal has no address). */
   readonly portalPath: { readonly hostname: string; readonly path: string } | null;
+  /** Owners and admins change the address (ADR-047). */
+  readonly canChangeSlug: boolean;
+  /** Addresses it had before, which keep leading to it (newest first). */
+  readonly previousSlugs: readonly PreviousSlug[];
 }
 
 export async function loadContentEditor<D>(
   membership: OrganizationMembership,
+  contentId: string,
   find: () => Promise<ContentRecord<D> | null>,
-  repository: Pick<ContentRepository, "portalHostname">,
+  repository: Pick<ContentRepository, "portalHostname" | "previousSlugs">,
   publicPath: (slug: string) => string,
 ): Promise<ContentEditor<D> | null> {
-  const [record, hostname] = await Promise.all([
+  const [record, hostname, previousSlugs] = await Promise.all([
     find(),
     repository.portalHostname(membership.tenantId),
+    repository.previousSlugs(membership.tenantId, contentId),
   ]);
   if (record === null) return null;
   const document = record.draft?.document ?? record.published?.document;
@@ -106,7 +114,48 @@ export async function loadContentEditor<D>(
     canEdit: canEditContent(membership.role),
     canPublish: canPublishContent(membership.role),
     portalPath: record.published && hostname ? { hostname, path: publicPath(record.slug) } : null,
+    canChangeSlug: canPublishContent(membership.role),
+    previousSlugs,
   };
+}
+
+export type ChangeSlugResult =
+  | { readonly status: "changed"; readonly slug: string; readonly previousSlug: string | null }
+  | {
+      readonly status:
+        | "invalid"
+        | "unchanged"
+        | "slug_taken"
+        | "slug_previous"
+        | "stale"
+        | "too_many"
+        | "forbidden"
+        | "not_found";
+    };
+
+/**
+ * Changes the address of a destination or event (ADR-047). Like publishing, it changes what
+ * visitors open, so only owners and admins do it. A published content keeps its old address
+ * leading to the new one (old links and printed QR codes keep working).
+ */
+export async function changeContentSlug(
+  membership: OrganizationMembership,
+  contentId: string,
+  input: { readonly expectedSlug: unknown; readonly slug: unknown },
+  repository: Pick<ContentRepository, "changeSlug">,
+): Promise<ChangeSlugResult> {
+  if (!canPublishContent(membership.role)) return { status: "forbidden" };
+  const slug = typeof input.slug === "string" ? input.slug.trim() : "";
+  const expected = typeof input.expectedSlug === "string" ? input.expectedSlug : "";
+  if (!isValidContentSlug(slug) || !isValidContentSlug(expected)) return { status: "invalid" };
+  if (slug === expected) return { status: "unchanged" };
+  const outcome: ChangeSlugOutcome = await repository.changeSlug(
+    membership.tenantId,
+    contentId,
+    expected,
+    slug,
+  );
+  return outcome;
 }
 
 export type SaveContentResult =

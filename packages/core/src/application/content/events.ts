@@ -77,6 +77,7 @@ export function loadEventEditor(
 ): Promise<EventEditor | null> {
   return loadContentEditor(
     membership,
+    contentId,
     () => repository.findEvent(membership.tenantId, contentId),
     repository,
     PORTAL_PATHS.event,
