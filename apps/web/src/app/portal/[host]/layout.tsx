@@ -131,9 +131,17 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         <a href="/" className="portal-brand">
           {view.logo ? (
             // Versioned, immutable public derivative (≤512 px WebP); the site name next to it
-            // is the accessible name, so the image is decorative.
+            // is the accessible name, so the image is decorative. Low priority: React would
+            // otherwise preload it ahead of the page's photo, which is what visitors wait for
+            // (the largest element, LCP), on a slow phone network.
             // eslint-disable-next-line @next/next/no-img-element
-            <img className="portal-logo" src={view.logo.webp} alt="" decoding="async" />
+            <img
+              className="portal-logo"
+              src={view.logo.webp}
+              alt=""
+              decoding="async"
+              fetchPriority="low"
+            />
           ) : (
             <span className="portal-mark" aria-hidden="true">
               {monogram(identity.shortName)}

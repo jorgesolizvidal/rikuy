@@ -41,6 +41,24 @@ export const PORTAL_PATHS = {
   terms: "/terminos",
 } as const;
 
+/**
+ * Public media (photos, logo) served from the portal's own address (ADR-050): the CDN
+ * forwards `/medios/{path}` to the public bucket and keeps a copy, so the page's photo
+ * travels over the connection the page already opened instead of a second one.
+ */
+export const PORTAL_MEDIA_PREFIX = "/medios";
+
+const MEDIA_SEGMENT = /^[A-Za-z0-9][A-Za-z0-9._-]*$/u;
+
+/** `/medios/{tenant}/{asset}/{version}/{file}` for a path of the public bucket. */
+export function portalMediaPath(path: string): string {
+  const segments = path.split("/");
+  if (segments.length === 0 || !segments.every((segment) => MEDIA_SEGMENT.test(segment))) {
+    throw new Error("A public media path is made of plain segments");
+  }
+  return `${PORTAL_MEDIA_PREFIX}/${segments.join("/")}`;
+}
+
 /** The map's query for a plan's route: `?ruta=destination:plaza,event:feria` (ADR-039). */
 export const MAP_ROUTE_QUERY = "ruta";
 export const MAP_ROUTE_MAX = 6;

@@ -79,20 +79,21 @@ for (const portal of portals) {
     check(() => assert.doesNotMatch(html, new RegExp(other.name)));
   }
 
-  // Logo: a versioned public derivative from Storage, or the monogram when there is none.
+  // Logo: a versioned public derivative, from the portal's own address (ADR-050), or the
+  // monogram when there is none.
   const logoSrc = /<img class="portal-logo" src="([^"]+)"/.exec(html)?.[1];
   if (portal.logo) {
     check(() => assert.ok(logoSrc, `${portal.host} shows its logo`));
+    check(() => assert.match(logoSrc, /^\/medios\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/\d+\/logo\.webp$/));
+    const image = await get(portal.host, logoSrc);
+    check(() => assert.equal(image.status, 200, "logo is publicly reachable"));
+    check(() => assert.equal(image.headers["content-type"], "image/webp"));
     check(() =>
       assert.match(
-        logoSrc,
-        /\/storage\/v1\/object\/public\/media-public\/[0-9a-f-]{36}\/[0-9a-f-]{36}\/\d+\/logo\.webp$/,
+        html,
+        /<meta property="og:image" content="https?:\/\/[^"/]+\/medios\/[^"]+\/logo\.png"/,
       ),
     );
-    const image = await fetch(logoSrc);
-    check(() => assert.equal(image.status, 200, "logo is publicly reachable"));
-    check(() => assert.equal(image.headers.get("content-type"), "image/webp"));
-    check(() => assert.match(html, /<meta property="og:image" content="[^"]+\/logo\.png"/));
   } else {
     check(() => assert.equal(logoSrc, undefined, `${portal.host} uses the monogram`));
   }
@@ -149,9 +150,12 @@ for (const portal of portals) {
   );
   for (const other of others) check(() => assert.doesNotMatch(html, new RegExp(other.name)));
 
-  // Responsive photos: srcset with real widths and reserved size, when there are any.
+  // Responsive photos: srcset with real widths, from the portal's own address (ADR-050).
   for (const [, srcset] of html.matchAll(/srcSet="([^"]+)"/g)) {
-    check(() => assert.match(srcset, /\/w480\.webp 480w/));
+    check(() => assert.match(srcset, /^\/medios\/\S+\/w480\.webp 480w/));
+    const photo = await get(portal.host, srcset.split(" ")[0]);
+    check(() => assert.equal(photo.status, 200, "photo is reachable from the portal"));
+    check(() => assert.equal(photo.headers["content-type"], "image/webp"));
   }
 
   for (const hidden of portal.hidden) {
@@ -295,9 +299,16 @@ if (withLogo) {
   check(() => assert.match(cover, /fetchPriority="high"|fetchpriority="high"/));
   check(() => assert.match(cover, /width="\d+" height="\d+"/));
   const src = /src="([^"]+)"/.exec(cover)?.[1];
-  const image = await fetch(src.replaceAll("&amp;", "&"));
+  const image = await get("demo-norte.localhost", src.replaceAll("&amp;", "&"));
   check(() => assert.equal(image.status, 200, "cover derivative is public"));
-  check(() => assert.match(html, /<meta property="og:image" content="[^"]+\/w1600\.webp"/));
+  check(() => assert.match(src, /^\/medios\//, "cover from the portal's own address"));
+  check(() =>
+    assert.match(
+      html,
+      /<meta property="og:image" content="https?:\/\/[^"/]+\/medios\/[^"]+\/w1600\.webp"/,
+    ),
+  );
+  check(() => assert.match(html, /"image":"https?:\/\/[^"/]+\/medios\/[^"]+\/w1600\.webp"/));
 }
 
 if (zc01) {

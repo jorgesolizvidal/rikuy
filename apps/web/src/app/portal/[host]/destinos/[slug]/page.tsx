@@ -103,7 +103,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const jsonLd = serializeJsonLd(
     destinationJsonLd(destination, {
       url,
-      imageUrl: cover?.largest.url ?? null,
+      imageUrl: cover ? `${portalOrigin(view)}${cover.largest.url}` : null,
       portalName: siteName,
     }),
   );

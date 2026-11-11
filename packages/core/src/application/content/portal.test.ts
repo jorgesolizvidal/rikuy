@@ -17,6 +17,7 @@ import {
   directionsUrl,
   imageCandidates,
   openStreetMapUrl,
+  portalMediaPath,
   serializeJsonLd,
 } from "./portal";
 
@@ -64,6 +65,27 @@ describe("responsive image candidates", () => {
       ["w480.webp", 480],
       ["w960.webp", 800],
     ]);
+  });
+});
+
+describe("portal media paths", () => {
+  it("serves a public bucket path from the portal's own address", () => {
+    expect(portalMediaPath(`${TENANT}/${ASSET}/1/w960.webp`)).toBe(
+      `/medios/${TENANT}/${ASSET}/1/w960.webp`,
+    );
+  });
+
+  it("never builds a path that leaves the folder or carries a query", () => {
+    for (const path of [
+      "",
+      "../x/logo.webp",
+      `${TENANT}//w.webp`,
+      "a/b?c=1",
+      "a/b#c",
+      "a/%2e%2e",
+    ]) {
+      expect(() => portalMediaPath(path)).toThrow();
+    }
   });
 });
 

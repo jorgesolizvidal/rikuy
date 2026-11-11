@@ -4,6 +4,8 @@ import { dirname, join } from "node:path";
 
 import type { NextConfig } from "next";
 
+import { mediaRewrite } from "./src/lib/media-rewrite";
+
 const require = createRequire(import.meta.url);
 const versionOf = (packageJson: string) =>
   (JSON.parse(readFileSync(packageJson, "utf8")) as { version: string }).version;
@@ -54,6 +56,9 @@ const nextConfig: NextConfig = {
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
       },
     ];
+  },
+  async rewrites() {
+    return { beforeFiles: mediaRewrite(process.env.NEXT_PUBLIC_SUPABASE_URL), afterFiles: [] };
   },
 };
 

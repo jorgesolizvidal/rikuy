@@ -96,7 +96,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const jsonLd = serializeJsonLd(
     eventJsonLd(event, {
       url,
-      imageUrl: cover?.largest.url ?? null,
+      imageUrl: cover ? `${origin}${cover.largest.url}` : null,
       portalName: siteName,
       portalUrl: origin,
     }),

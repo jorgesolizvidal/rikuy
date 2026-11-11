@@ -26,5 +26,6 @@ export const config = {
   // Everything except Next.js build assets. New public files must be added here explicitly.
   // vendor/: versioned third-party files (the map worker), the same for every host.
   // _vercel/: Vercel's own endpoints (Speed Insights), served by the platform.
-  matcher: ["/((?!_next/static|_next/image|_vercel/|favicon.ico|vendor/).*)"],
+  // medios/: public media, forwarded to Storage by a rewrite (ADR-050).
+  matcher: ["/((?!_next/static|_next/image|_vercel/|favicon.ico|vendor/|medios/).*)"],
 };

@@ -80,11 +80,13 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
             )}
           </div>
           <ul className="portal-cards">
-            {destinations.slice(0, HOME_DESTINATIONS).map((destination) => (
+            {destinations.slice(0, HOME_DESTINATIONS).map((destination, index) => (
               <DestinationCard
                 key={destination.slug}
                 tenantId={view.context.tenant.tenantId}
                 destination={destination}
+                // On a phone the first photo is in view: it is what the page waits for (LCP).
+                priority={index === 0}
               />
             ))}
           </ul>
