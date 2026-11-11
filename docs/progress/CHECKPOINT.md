@@ -6,7 +6,8 @@
 
 - **Fase:** C0 — Ucureña lista como vitrina. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
 - **Último paso completado:** C0 · Paso 3 — borrar un tour o pasarlo a otro destino o evento ✅
-- **Rama:** `feat/c0-step3-delete-move-tour` → PR hacia `main`
+- **En curso:** C0 · Paso 4 — carga del contenido real de Ucureña (parte 1 lista)
+- **Rama:** `fix/portal-photo-lcp` → PR hacia `main`
 
 ## Historial
 
@@ -1803,14 +1804,41 @@ Lo que encontró el CI, ya corregido:
 - Un «Ir a otro recorrido» oculto no se borra; el panel lo nombra para cambiarlo o quitarlo en su tour.
 - Las páginas de tour que redirigen pierden `?escena=` (están en caché, como en ADR-047).
 
+**Verificación en producción (2026-11-10):** el usuario pasó un tour de «Concierto de la banda» a «Festival de invierno» y lo devolvió (dos `tour.moved` en la auditoría, consulta de solo lectura), y creó, publicó y borró un tour de prueba. Las direcciones viejas llevaron a donde correspondía.
+
+### C0 · Paso 4 — contenido real de Ucureña (en curso)
+
+Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, eventos y el libro; 2: panoramas, los modelos 3D que están bien, tours y el orden del recorrido general; 3: capturas y README); las capturas las saca él.
+
+**Parte 1 (2026-11-10/11), cargada por el usuario:** marca, 4 destinos con fotos, 3 eventos y el libro histórico en `.txt` (con sus páginas reconocidas), y el asistente «Chaski» configurado. Revisado:
+
+- «Probar la búsqueda» devuelve pasajes también para algo que el libro no tiene («cerro rico»): es la búsqueda sin IA; el asistente lee esos pasajes y responde que no tiene la información. En el portal, Chaski respondió la ch'ampa guerra y la Reforma Agraria (2 de agosto de 1953) con su fuente, dijo que no tiene datos de un hospital ni de una feria del pan, y dio la fecha de la feria de comidas típicas.
+- Pendiente del usuario: corregir «Comidas Tipicas» → «Típicas» y el título «Libro histórico de Ucureña».
+- **«Lighthouse on production» falló en las páginas con fotos** (inicio 3,63 s, `/destinos` 3,91 s, fichas 3,77–4,14 s de LCP simulado): la foto venía de Storage, otro dominio. Corregido en `fix/portal-photo-lcp`.
+
+### Corrección `fix/portal-photo-lcp` — fotos del portal desde su propia dirección
+
+- Decisión del usuario ([ADR-050](../adr/ADR-050-portal-media-same-origin.md)), 2026-11-11: las fotos y el logo del portal salen de **`/medios/{municipio}/{medio}/{versión}/{archivo}`**, en la misma dirección del portal.
+- Una _rewrite_ de Next.js (`src/lib/media-rewrite.ts`) los reenvía al bucket público; `apps/web/vercel.json` activa la caché de la CDN de Vercel (30 días) y agrega a esas respuestas una CSP `sandbox` y `nosniff`. El `proxy.ts` no corre en `/medios`.
+- `portalMediaPath` en `@rikuy/core` (solo segmentos simples: sin `..`, `?` ni `%`). `responsiveImage` y el logo devuelven rutas relativas; Open Graph y JSON-LD las vuelven absolutas con el origen del portal; los íconos leen el logo directo de Storage desde el servidor.
+- Panoramas, teselas y modelos 3D siguen saliendo de Storage.
+- El logo de la cabecera va con `fetchPriority="low"` (React lo precargaba con prioridad alta) y la primera tarjeta del inicio, con prioridad alta.
+- Tests: core (+2: la ruta y lo que rechaza), web 43 (+3, `media-rewrite.test.ts`: la _rewrite_ lleva a la misma URL pública que da Storage, el bucket y el prefijo coinciden, nada sin Storage); e2e de portales: logo, portada, `srcset`, `og:image` y JSON-LD desde `/medios`, y cada foto responde 200 como WebP.
+- Verificado en local: una foto por `/medios` responde 200 `image/webp` con la caché de un año, una ruta con `..` no llega a otro bucket; portales 161 en verde; Lighthouse local de Demo Sur con fotos dentro del presupuesto salvo `/destinos` (2,87 s, foto de prueba de 104 KB). En local no hay TLS ni otro dominio: la mejora se mide en producción.
+
+**Desviaciones:**
+
+- En local, `next start` no agrega las cabeceras de `vercel.json`: la CSP de `/medios` y la caché (`x-vercel-cache`) se comprueban en producción.
+- Una foto borrada puede seguir en la caché de Vercel hasta 30 días; se purga desde su panel si hace falta.
+
 ## Cómo verificarlo
 
-- En Demo Norte, como propietario: «Tours 360°» → un tour → «Borrar o mover el tour». «Pasar a» otro destino sin tour → «Pasar el tour…» → «Sí, pasar el tour». La dirección vieja del tour lleva al tour en su lugar nuevo.
-- «Borrar el tour…» → «Sí, borrar el tour»: vuelve a la lista; la dirección del tour lleva a la ficha del destino; en «Panoramas 360°» sus panoramas ya se pueden borrar.
+- Tras el merge, `curl -sI https://rikuy-ucurena.vercel.app/medios/…` (una dirección de foto de la página) responde 200 `image/webp` con `content-security-policy: default-src 'none'; sandbox`, y la segunda vez `x-vercel-cache: HIT`.
+- «Lighthouse on production» en verde para las páginas con fotos de Ucureña.
 
 ## Siguiente paso
 
-**C0 · Paso 4 — carga del contenido real de Ucureña por el usuario** ([roadmap](../roadmap.md#c0--ucureña-lista-como-vitrina)), con la revisión de Lighthouse sobre el contenido real y el README con capturas y métricas. Antes de empezar, confirmar con el usuario qué carga primero y en qué orden revisamos.
+**C0 · Paso 4, parte 2** — el usuario sube panoramas, los modelos 3D que están bien, arma los tours y el orden del recorrido general; después reviso (Lighthouse, desbordes, axe, cuota) y seguimos con la parte 3 (capturas y README).
 
 ## Decisiones pendientes del usuario
 

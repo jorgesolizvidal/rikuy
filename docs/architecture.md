@@ -84,6 +84,7 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 ## 7. Storage
 
 - Buckets por ambiente: `media-originals` (privado) y `media-public` (solo derivados publicados).
+- El portal sirve sus fotos y su logo desde su propia dirección, `/medios/{municipio}/{medio}/{versión}/{archivo}`: una _rewrite_ los reenvía a `media-public` y la CDN de Vercel guarda la copia ([ADR-050](adr/ADR-050-portal-media-same-origin.md)). Panoramas, teselas y modelos siguen saliendo de Storage.
 - Rutas: `{tenant_id}/{asset_id}/{version}/{variante}` — nunca nombres de municipio.
 - Subida directa desde el navegador con URL firmada emitida por un caso de uso; los binarios no pasan por el BFF.
 - Derivados inmutables con caché larga en CDN; despublicar no revoca copias ya descargadas.

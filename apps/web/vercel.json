@@ -1,4 +1,15 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "regions": ["gru1"]
+  "regions": ["gru1"],
+  "headers": [
+    {
+      "source": "/medios/(.*)",
+      "headers": [
+        { "key": "x-vercel-enable-rewrite-caching", "value": "1" },
+        { "key": "Vercel-CDN-Cache-Control", "value": "max-age=2592000" },
+        { "key": "Content-Security-Policy", "value": "default-src 'none'; sandbox" },
+        { "key": "X-Content-Type-Options", "value": "nosniff" }
+      ]
+    }
+  ]
 }

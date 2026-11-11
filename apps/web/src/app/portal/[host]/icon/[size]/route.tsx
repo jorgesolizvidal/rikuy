@@ -38,7 +38,7 @@ export async function GET(request: Request, { params }: IconContext) {
   const { palette, presentation, configId } = view.resolved;
   // URLs carry ?v=<sealed config id>: a matching version can be cached forever.
   const versioned = configId !== null && new URL(request.url).searchParams.get("v") === configId;
-  const logo = view.logo ? await logoDataUri(view.logo.png) : null;
+  const logo = view.logo ? await logoDataUri(view.logo.pngFromStorage) : null;
   // A fallback icon must not be cached forever: the logo may be reachable on the next try.
   const immutable = versioned && (view.logo === null || logo !== null);
   const inner = Math.round(pixels * 0.8);

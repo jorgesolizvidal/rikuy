@@ -6,11 +6,11 @@ import {
   loadAssistantPlaces,
   mapPlacePath,
   PORTAL_PATHS,
+  portalMediaPath,
   tourPath,
   type PortalMapPlace,
   type PublishedImage,
 } from "@rikuy/core";
-import { publicMediaUrl } from "@rikuy/db";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -38,11 +38,11 @@ export interface ResponsiveImage {
   readonly largest: { readonly url: string; readonly width: number; readonly height: number };
 }
 
+/** Photos are served from the portal's own address (ADR-050): relative URLs. */
 export function responsiveImage(tenantId: string, image: PublishedImage): ResponsiveImage {
-  const supabaseUrl = platformSettings().env.NEXT_PUBLIC_SUPABASE_URL;
   const candidates = imageCandidates(tenantId, image).map((candidate) => ({
     ...candidate,
-    url: publicMediaUrl(supabaseUrl, candidate.path),
+    url: portalMediaPath(candidate.path),
   }));
   const middle = candidates[Math.min(1, candidates.length - 1)];
   const largest = candidates.at(-1);
