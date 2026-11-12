@@ -2,7 +2,7 @@
 
 Registro de los contratos de regresión de P4 según la auditoría `14-regression-contracts-evals` (§1, reglas de evidencia). Cada contrato dice de dónde viene, con qué datos se prueba, dónde corre, qué se comprobó y qué queda fuera.
 
-**Entorno de CI** (job «Contracts (RC-09/10/11/12) · Lighthouse budget»): GitHub Actions `ubuntu-latest`, compilación de producción (`next start`), Supabase local con el seed, Chrome del runner con WebGL por software (SwiftShader). Los municipios son los del seed (Demo Norte, Demo Sur); los tours de prueba se crean en **Demo Sur** con las mismas RPC que el panel, como su propietario (`owner@demo-sur.example.test`).
+**Entorno de CI** (job «Browser · Tours (RC-01/07/08) · Lighthouse of the tours · evaluation»; antes, «Contracts (RC-09/10/11/12) · Lighthouse budget»): GitHub Actions `ubuntu-latest`, compilación de producción (`next start`), Supabase local con el seed, Chrome del runner con WebGL por software (SwiftShader). Los municipios son los del seed (Demo Norte, Demo Sur); los tours de prueba se crean en **Demo Sur** con las mismas RPC que el panel, como su propietario (`owner@demo-sur.example.test`).
 
 **Datos de prueba (fixtures):** sintéticos y generados en cada corrida, ninguno en el repositorio:
 

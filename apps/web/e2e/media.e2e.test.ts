@@ -14,12 +14,30 @@
 import { randomUUID } from "node:crypto";
 
 import axe from "axe-core";
-import { chromium, type Browser, type Page } from "playwright-core";
+import { chromium, type Browser, type Locator, type Page } from "playwright-core";
 import postgres from "postgres";
 import sharp from "sharp";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { passSecondFactor } from "./support/second-factor";
+
+/**
+ * Waits until React has hydrated a file input: before that, choosing a file fires a change
+ * event nobody listens to, and the upload never starts (what made this test flaky in CI).
+ */
+async function hydrated(input: Locator): Promise<Locator> {
+  await input.waitFor({ state: "attached" });
+  await expect
+    .poll(
+      () =>
+        input.evaluate((element) =>
+          Object.keys(element).some((key) => key.startsWith("__reactProps")),
+        ),
+      { timeout: 15_000 },
+    )
+    .toBe(true);
+  return input;
+}
 
 const CHROME = process.env.CHROME_PATH ?? "/opt/pw-browsers/chromium-1194/chrome-linux/chrome";
 const PORT = Number(process.env.RIKUY_PORT ?? 3000);
@@ -222,7 +240,9 @@ describe("replacing and deleting panoramas and models (ADR-048)", () => {
     await expect(card.innerText()).resolves.toContain(`Tour de «${TITLE}»`);
     await expect(card.innerText()).resolves.toContain("No se puede borrar");
 
-    await card.locator("input[type=file]").setInputFiles({
+    await (
+      await hydrated(card.locator("input[type=file]"))
+    ).setInputFiles({
       name: "sala.jpg",
       mimeType: "image/jpeg",
       buffer: await sharp({
@@ -231,7 +251,13 @@ describe("replacing and deleting panoramas and models (ADR-048)", () => {
         .jpeg()
         .toBuffer(),
     });
-    await card.getByText("Versión nueva subida").waitFor({ timeout: 20_000 });
+    await card
+      .getByText("Versión nueva subida")
+      .waitFor({ timeout: 20_000 })
+      .catch(async (error: unknown) => {
+        // Say what the panel showed instead (a refusal, a failed upload…).
+        throw new Error(`${String(error)}\nThe card said: ${await card.innerText()}`);
+      });
     const [pending] = await db<{ id: string; status: string }[]>`
       select id, status from public.asset_versions where asset_id = ${used.asset} and version = 2`;
     expect(pending?.status).toBe("processing");
@@ -277,7 +303,9 @@ describe("replacing and deleting panoramas and models (ADR-048)", () => {
     const page = await signedIn(OWNER_EMAIL);
     await page.goto(`${ADMIN}/o/demo-sur/modelos`);
     const card = page.locator(`li[data-asset="${model.asset}"]`);
-    await card.locator('input[type=file][accept*="image/jpeg"]').setInputFiles({
+    await (
+      await hydrated(card.locator('input[type=file][accept*="image/jpeg"]'))
+    ).setInputFiles({
       name: "horno.jpg",
       mimeType: "image/jpeg",
       buffer: await sharp({
