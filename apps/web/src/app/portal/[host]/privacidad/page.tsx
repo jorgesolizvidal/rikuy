@@ -68,6 +68,32 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
         </li>
       </ul>
 
+      <h2>Estadísticas de visitas</h2>
+      <p>
+        Para que {siteName} sepa qué lugares, eventos y recorridos interesan más, el portal cuenta
+        las visitas de forma anónima, sin cookies y sin guardar nada en tu teléfono.
+      </p>
+      <ul>
+        <li>
+          Al abrir una página, al ver una escena de un recorrido 360° y al tocar «Cómo llegar»,
+          «Compartir» o «Añadir al calendario», tu navegador avisa a la plataforma qué fue. Si
+          llegaste escaneando un código QR de un cartel, también se cuenta el escaneo.
+        </li>
+        <li>
+          Se guardan solo totales por día (por ejemplo, «el museo tuvo 40 visitas el lunes») y el
+          país y la ciudad aproximados de donde vienen las visitas, que el servicio que aloja el
+          portal estima a partir de la conexión. No se guarda tu dirección IP ni nada que te
+          identifique.
+        </li>
+        <li>
+          Para contar cuántas personas distintas visitaron el portal en un día, se usa una huella
+          calculada con tu dirección IP y tu navegador, mezclada con un valor que cambia cada día.
+          Esa huella no permite saber quién eres, no se puede relacionar con la de otro día y se
+          borra a los dos días.
+        </li>
+        <li>Los buscadores y los programas automáticos no se cuentan.</li>
+      </ul>
+
       <h2>Tu ubicación</h2>
       <p>
         El portal puede mostrarte dónde estás en el mapa, a qué distancia queda cada lugar y

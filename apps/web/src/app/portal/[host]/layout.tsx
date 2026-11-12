@@ -22,6 +22,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AssistantLauncher } from "./assistant-launcher";
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
+import { VisitTracker } from "./visit-tracker";
 
 /**
  * The portal's display face (titles), self-hosted and preloaded with the page: as a plain
@@ -206,6 +207,8 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           siteName={identity.siteName}
         />
       ) : null}
+      {/* Anonymous visit counts (ADR-051): daily totals, no cookies. */}
+      <VisitTracker />
       {/* Real-user performance (anonymous, no cookies), only where Vercel serves it. */}
       {process.env.VERCEL === "1" ? <SpeedInsights /> : null}
     </div>

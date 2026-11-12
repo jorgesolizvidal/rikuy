@@ -1367,4 +1367,40 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     await status("Se descartaron los cambios");
     expect(errors).toEqual([]);
   });
+
+  it("counts each scene shown on its tour's page (ADR-051)", async () => {
+    const { a, b } = SCENES as Required<Record<"a" | "b", Scene>>;
+    const sceneViews = async () =>
+      new Map(
+        (
+          await db<{ scene_id: string; views: number }[]>`
+            select scene_id, sum(views)::int as views from public.visit_daily_counts
+            where tenant_id = ${SUR}::uuid and content_id = ${ids.destination}::uuid
+              and target = 'destination_tour' and event = 'scene'
+            group by scene_id`
+        ).map((row) => [row.scene_id, row.views]),
+      );
+    const before = await sceneViews();
+    // A visitor's phone: the default headless agent is a robot for the counts.
+    const page = await (
+      await browser.newContext({
+        viewport: { width: 390, height: 844 },
+        userAgent:
+          "Mozilla/5.0 (Linux; Android 15; CRT-NX3) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Mobile Safari/537.36",
+      })
+    ).newPage();
+    await page.goto(`${PORTAL}/destinos/${ids.slug}/tour`);
+    await settledOn(page, need(a.sceneId));
+    await page.getByRole("button", { name: /^Siguiente/u }).click();
+    await settledOn(page, need(b.sceneId));
+    await expect
+      .poll(async () => {
+        const after = await sceneViews();
+        return [a, b].map(
+          (scene) => (after.get(need(scene.sceneId)) ?? 0) - (before.get(need(scene.sceneId)) ?? 0),
+        );
+      })
+      .toEqual([1, 1]);
+    await page.context().close();
+  });
 });

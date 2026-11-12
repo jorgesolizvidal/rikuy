@@ -10,6 +10,7 @@ import {
   setTourAssistantContext,
   type TourAssistantContext,
 } from "@/lib/assistant-context";
+import { sendVisit, tourPagePath } from "@/lib/visit-beacon";
 import {
   TourViewer,
   type TourCanvasHandle,
@@ -216,6 +217,10 @@ export function TourExplorer({
     });
   }, [guideKind, guideSlug, sceneId, openId]);
   useEffect(() => () => setTourAssistantContext(null), []);
+  const tourPageRef = useRef(tourPagePath(guideKind, guideSlug));
+  useEffect(() => {
+    tourPageRef.current = tourPagePath(guideKind, guideSlug);
+  }, [guideKind, guideSlug]);
   function askGuide(question: string, hotspotId: string | null, from: HTMLElement) {
     const context: TourAssistantContext = {
       page: { kind: guideKind, slug: guideSlug },
@@ -371,6 +376,8 @@ export function TourExplorer({
     // For the measurement panel (the first one is "Primera escena en pantalla").
     performance.mark("rikuy:tour-shown", { detail: sceneId });
     setShown(sceneId);
+    // Counted on its tour's page, also when the general tour shows it (ADR-051).
+    sendVisit("scene", tourPageRef.current, sceneId);
   }, []);
   const onFailure = useCallback((failure: "webgl" | "scene", sceneId: string) => {
     if (failure === "webgl") setWebgl(false);

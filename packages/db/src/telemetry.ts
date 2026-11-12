@@ -1,9 +1,9 @@
-import type { RequestErrorRecord, RouteLatencyRecord, Telemetry } from "@rikuy/core";
+import type { RequestErrorRecord, RouteLatencyRecord, Telemetry, VisitRecord } from "@rikuy/core";
 import postgres from "postgres";
 
 /**
- * Telemetry of the web app (ADR-044): server errors and the latency of the measured routes,
- * written through worker_api with the workload's own role (rikuy_worker). Never a visitor's
+ * Telemetry of the web app (ADR-044): server errors, the latency of the measured routes and
+ * the anonymous visit counts (ADR-051), written through worker_api with the workload's own role (rikuy_worker). Never a visitor's
  * or a staff member's session, never the secret key. One small connection per instance,
  * closed when idle; a write that fails is reported to `onFailure` and never thrown.
  */
@@ -11,7 +11,7 @@ export interface PostgresTelemetryOptions {
   readonly url: string;
   /** Local only: the connection is made as `postgres`; in the cloud the URL's user is the worker. */
   readonly role?: string;
-  readonly onFailure?: (what: "error" | "latency", error: unknown) => void;
+  readonly onFailure?: (what: "error" | "latency" | "visit", error: unknown) => void;
 }
 
 export interface PostgresTelemetry extends Telemetry {
@@ -55,6 +55,18 @@ export function createPostgresTelemetry(options: PostgresTelemetryOptions): Post
         `;
       } catch (error) {
         fail("latency", error);
+      }
+    },
+    async recordVisit(record: VisitRecord) {
+      try {
+        await sql`
+          select worker_api.record_visit(
+            ${record.tenantId}::uuid, ${record.target}, ${record.slug}, ${record.sceneId}::uuid,
+            ${record.event}, ${record.country}, ${record.city}, ${record.visitor}
+          )
+        `;
+      } catch (error) {
+        fail("visit", error);
       }
     },
     async close() {

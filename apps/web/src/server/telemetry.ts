@@ -6,13 +6,14 @@ import {
   type MeasuredRoute,
   type ServerErrorInput,
   type Telemetry,
+  type VisitRecord,
 } from "@rikuy/core";
 import { createPostgresTelemetry } from "@rikuy/db/worker";
 
 /**
  * Telemetry of the web app (ADR-044): server errors (from instrumentation's
- * onRequestError) and the latency of the routes the server answers on every visitor
- * request. Written with the workload's connection (rikuy_worker), one small connection per
+ * onRequestError), the latency of the routes the server answers on every visitor request
+ * and the anonymous visit counts (ADR-051). Written with the workload's connection (rikuy_worker), one small connection per
  * instance. Without WORKER_DATABASE_URL nothing is recorded and nothing breaks. Never
  * throws: telemetry must not turn a working response into an error.
  */
@@ -65,4 +66,11 @@ export async function recordRouteLatency(
   const sink = telemetry();
   if (sink === null) return;
   await sink.recordLatency({ tenantId, route, ms: performance.now() - startedAt, status });
+}
+
+/** An anonymous visit count (ADR-051); call it inside after(), once responded. */
+export async function recordVisit(record: VisitRecord): Promise<void> {
+  const sink = telemetry();
+  if (sink === null) return;
+  await sink.recordVisit(record);
 }
