@@ -399,7 +399,8 @@ describe("the visitor's assistant (simulated model)", () => {
       // (Playwright does not see a Blob body: the server's records show what arrived.)
       const sent: { url: string; type: string | null }[] = [];
       page.on("request", (request) => {
-        if (request.method() === "POST") {
+        // The anonymous visit count (ADR-051) is not part of the assistant.
+        if (request.method() === "POST" && !request.url().endsWith("/visita")) {
           sent.push({
             url: new URL(request.url()).pathname,
             type: request.headers()["content-type"] ?? null,

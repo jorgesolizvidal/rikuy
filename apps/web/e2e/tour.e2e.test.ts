@@ -826,8 +826,11 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
     expect(text).toContain("Sin terminar en 30 s: 0");
     expect(text).toMatch(/Primera escena en pantalla: \d+ ms/u);
     expect(text).toMatch(/Hasta ver la escena \(p95\): \d+ ms/u);
-    // Nothing leaves the device: only GETs to the portal and to Storage.
-    expect(requests.filter((line) => !line.startsWith("GET "))).toEqual([]);
+    // Nothing of the measurement leaves the device: only GETs to the portal and to Storage,
+    // besides the portal's anonymous visit count (ADR-051: the page and each scene shown).
+    const visitCount = `POST ${PORTAL}/visita`;
+    expect(requests).toContain(visitCount);
+    expect(requests.filter((line) => !line.startsWith("GET ") && line !== visitCount)).toEqual([]);
     expect(
       new Set(requests.map((line) => new URL(line.slice(line.indexOf(" ") + 1)).origin)),
     ).toEqual(new Set([new URL(PORTAL).origin, new URL(SUPABASE_URL).origin]));

@@ -6,7 +6,7 @@
 
 - **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
 - **Último paso completado:** C1 · Paso 2 — panel «Estadísticas» del municipio ✅
-- **Rama:** `feat/c1-step2-statistics` → PR hacia `main`
+- **Rama:** `ci/faster-pipeline` → PR hacia `main`
 
 ## Historial
 
@@ -1931,6 +1931,26 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - «Visitantes» del período es la suma de los de cada día (la huella cambia cada día); la página lo dice.
 - Los números de antes de un cambio de nombre aparecen con el nombre nuevo (siguen al lugar).
 - Sin rango de fechas libre, como se decidió.
+
+**Verificación en producción (2026-11-12):** el usuario abrió «Estadísticas» de Ucureña: las visitas desde el 12 de noviembre, el museo con su escaneo de QR y «BO · Punata». Después abrió la plaza y su tour, y se sumaron.
+
+### Corrección `ci/faster-pipeline` — CI en verde y más rápido
+
+- **El CI estaba en rojo desde C1 · Paso 1**, en el job de navegador:
+  - el panel `?medir` del tour y el dictado del asistente esperaban que el navegador no enviara nada más que sus propias peticiones, y ahora el portal también manda el conteo anónimo (`POST /visita`, ADR-051). Las dos pruebas lo excluyen; la del tour comprueba además que el conteo se envía;
+  - «reemplazar un panorama» fallaba a menudo en GitHub (desde el 10 de noviembre): elegía el archivo antes de que React terminara de hidratar la página y la subida no empezaba. Ahora espera a que el campo esté hidratado y, si falla, dice qué mostró la tarjeta.
+- **Más rápido** (decisión del usuario, 2026-11-12). Antes, un PR tardaba ~15 min (todas las pruebas en navegador, una tras otra, en un solo trabajo) y el merge volvía a correr todo (~15 min) junto con «Lighthouse on production» (~10 min):
+  - nuevo trabajo **«What changed»**: compara con `main`;
+  - las pruebas en navegador van en **tres trabajos en paralelo**, cada uno con su pila y solo el seed: contratos y panel; Lighthouse del seed, visitas y estadísticas; tours, su Lighthouse, evaluación y colores del GLB;
+  - **en `main`** (después del merge) solo corren formato, lint, tipos, pruebas unitarias, build, pgTAP y gitleaks: las de navegador e integración ya pasaron en el PR con el mismo código. Corrido a mano («Run workflow»), corre todo;
+  - **un PR que solo cambia documentación** (`docs/` o `.md`) se salta la base, la integración y el navegador;
+  - **«Lighthouse on production»** no corre tras un merge que solo cambia documentación;
+  - una corrida vieja de la misma rama ya se cancelaba al llegar otra (sin cambios).
+- Verificado en local: los tres grupos, cada uno desde un seed limpio, en el orden del CI (contratos y las seis pruebas del panel; métricas, visitas y estadísticas; tours). `actionlint` sin hallazgos.
+
+**Desviaciones:**
+
+- Si dos PR se mezclan sin actualizar uno con el otro, la combinación no pasa por las pruebas en navegador hasta el siguiente PR o una corrida manual en `main`.
 
 ## Cómo verificarlo
 

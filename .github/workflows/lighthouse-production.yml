@@ -11,6 +11,8 @@ name: Lighthouse on production
 on:
   push:
     branches: [main]
+    # A merge that only changes documentation does not change what visitors get.
+    paths-ignore: ["docs/**", "**/*.md"]
   workflow_dispatch:
 
 concurrency:

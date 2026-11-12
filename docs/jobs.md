@@ -186,5 +186,5 @@ Corrige la causa y luego «Reintentar». Reintentar sin corregir solo vuelve a f
   - entrada en Draco;
   - archivos externos, extensiones desconocidas y archivos truncados rechazados.
   - Con `RIKUY_REAL_GLB=/ruta/modelo.glb`, también prueba un modelo real (nunca en el repositorio).
-- `apps/web/e2e/model-colors.e2e.test.ts` (job «Contracts», con el Chrome del runner): el procesador y el optimizador reales, y luego el original y el optimizado dibujados por three.js desde la misma cámara deben verse iguales (ΔE de las superficies). La imagen comparada queda como artefacto del job.
+- `apps/web/e2e/model-colors.e2e.test.ts` (job «Browser · Tours…» del CI, con el Chrome del runner): el procesador y el optimizador reales, y luego el original y el optimizado dibujados por three.js desde la misma cámara deben verse iguales (ΔE de las superficies). La imagen comparada queda como artefacto del job.
 - `apps/web/src/server/job-runner.test.ts`: el endpoint (503 sin configurar, 401 con otro secreto, 202 y drenaje después de responder) y los registros en JSON.

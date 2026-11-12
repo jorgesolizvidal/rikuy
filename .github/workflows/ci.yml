@@ -13,6 +13,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # What the push changes. A branch that only touches documentation skips the slow jobs, and
+  # main skips the browser and integration suites: they already passed on the PR with the
+  # same code (a manual run on main runs everything).
+  changes:
+    name: What changed
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      code: ${{ steps.diff.outputs.code }}
+      full: ${{ steps.diff.outputs.full }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Compare with main
+        id: diff
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = "workflow_dispatch" ]; then
+            echo "code=true" >> "$GITHUB_OUTPUT"; echo "full=true" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          if [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            files="$(git diff --name-only HEAD^ HEAD)"
+            full=false
+          else
+            files="$(git diff --name-only origin/main...HEAD)"
+            full=true
+          fi
+          # Only documentation: docs/ and Markdown files anywhere.
+          if [ -n "$files" ] && ! echo "$files" | grep -qvE '^docs/|\.md$'; then code=false; else code=true; fi
+          echo "code=$code" >> "$GITHUB_OUTPUT"
+          echo "full=$full" >> "$GITHUB_OUTPUT"
+          echo "Changed files: $(echo "$files" | wc -l) · code: $code · full suites: $full" >> "$GITHUB_STEP_SUMMARY"
+
   quality:
     name: Format · Lint · Typecheck · Test · Build
     runs-on: ubuntu-latest
@@ -49,6 +83,8 @@ jobs:
 
   database:
     name: Database · migrations, RLS and invariant tests
+    needs: changes
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -93,6 +129,8 @@ jobs:
 
   integration:
     name: Integration · real Supabase stack
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
@@ -202,27 +240,37 @@ jobs:
           node packages/db/scripts/backup.mjs restore-storage "$RUNNER_TEMP/restore"
           node packages/db/scripts/backup.mjs verify "$RUNNER_TEMP/restore"
 
-  contracts:
-    name: Contracts (RC-09/10/11/12) · Lighthouse budget
+  # The browser suites, in three jobs that run at the same time (each on its own stack with
+  # only the seed): the regression contracts and the panel; the Lighthouse budget of the seed
+  # pages and the visit counts; the reference tours with their Lighthouse budget.
+  browser:
+    name: Browser · ${{ matrix.name }}
+    needs: changes
+    if: needs.changes.outputs.code == 'true' && needs.changes.outputs.full == 'true'
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 25
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - suite: contracts
+            name: Contracts (RC-09/10/11/12) · panel
+          - suite: lighthouse
+            name: Lighthouse budget · visits and statistics
+          - suite: tours
+            name: Tours (RC-01/07/08) · Lighthouse of the tours · evaluation
     steps:
       - uses: actions/checkout@v7
-
       - uses: pnpm/action-setup@v6
-
       - uses: actions/setup-node@v7
         with:
           node-version-file: .nvmrc
           cache: pnpm
-
       - name: Install
         run: pnpm install --frozen-lockfile
-
       # A clean stack with only the seed: the same data on every run, so scores compare.
       - name: Start Supabase
         run: pnpm exec supabase start -x realtime,imgproxy,postgres-meta,studio,edge-runtime,logflare,vector,supavisor
-
       - name: Export local credentials
         run: |
           STATUS="$(pnpm exec supabase status -o json)"
@@ -235,7 +283,6 @@ jobs:
             echo "MAILPIT_URL=$(echo "$STATUS" | jq -r '.MAILPIT_URL // .INBUCKET_URL // "http://127.0.0.1:54324"')"
             echo "SUPABASE_DB_URL=$(echo "$STATUS" | jq -r '.DB_URL // "postgresql://postgres:postgres@127.0.0.1:54322/postgres"')"
           } >> "$GITHUB_ENV"
-
       # The assistant (ADR-038) with the simulated model: its button is on every page that
       # Lighthouse and the contracts measure, as in production.
       - name: Build and start the production server
@@ -258,170 +305,153 @@ jobs:
           cd apps/web
           nohup pnpm exec next start -p 3000 > ../../next.log 2>&1 &
           for i in $(seq 1 30); do curl -s -o /dev/null http://127.0.0.1:3000 && break; sleep 1; done
-
       # Widths, accessibility, links and SEO of every portal page and the admin (as an owner).
       - name: Regression contracts in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" node e2e/contracts.e2e.mjs 3000 2>&1 | tee ../../contracts.log
-
+      # P5 · Paso 3 (ADR-038): the visitor's assistant with the simulated model and the real
+      # search — loaded on demand, answers citing this municipality's pages, invented
+      # citations and web addresses dropped, English, the conversation kept on the device,
+      # another origin refused, a notice when the AI quota is used up, keyboard and phone.
+      - name: Visitor assistant in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-assistant 2>&1 | tee ../../assistant.log
+      # P5 · Paso 7 (ADR-042): the staff's Copilot in the panel — the review by fixed rules, a
+      # question answered with this municipality's pages only, a proposal accepted field by
+      # field into a draft (nothing published), a stale proposal refused, and an analyst who
+      # cannot ask for proposals.
+      - name: Copilot in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-copilot 2>&1 | tee ../../copilot.log
+      # ADR-043: an administrator without a second factor cannot open their municipality, sets
+      # up the app (real TOTP with GoTrue), the operator resets it and it is asked again.
+      - name: Second factor in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-second-factor 2>&1 | tee ../../second-factor.log
+      # ADR-047: the owner changes the address of a published destination; the cached old page
+      # answers 308 to the new one (also its tour and an event's calendar file), the sitemap
+      # lists only the new one, and going back works.
+      - name: Address change in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-slug 2>&1 | tee ../../slug.log
+      # ADR-048: where each panorama and model is used, a replacement put in a tour's draft
+      # (visitors keep the old one), deleting what no tour used, and a photo as a model's image.
+      - name: Replacing and deleting media in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-media 2>&1 | tee ../../media.log
+      # ADR-049: moving a published tour (its old page leads to the new one), deleting it (its
+      # pages lead to their places), and an analyst without the section.
+      - name: Deleting and moving a tour in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-tour-removal 2>&1 | tee ../../tour-removal.log
       # Fails the PR when a public page breaks lighthouse-budget.json (median of 3 runs).
       - name: Lighthouse budget (mobile)
-        if: success() || failure()
+        if: matrix.suite == 'lighthouse' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" node e2e/lighthouse.mjs 3000 2>&1 | tee ../../lighthouse.log
-
       - name: Keep the Lighthouse reports
-        if: success() || failure()
+        if: matrix.suite == 'lighthouse' && (success() || failure())
         uses: actions/upload-artifact@v5
         with:
           name: lighthouse-reports
           path: apps/web/lighthouse-reports/
           if-no-files-found: ignore
           retention-days: 14
-
+      # ADR-044: a real server error recorded with its request ID and reference code, a measured
+      # route, and the operator's metrics pages (search by code, «Revisar ahora»).
+      - name: Metrics in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-metrics 2>&1 | tee ../../metrics.log
+      # ADR-051: anonymous visit counts: pages, a QR scan, «Cómo llegar» and «Compartir»
+      # counted on their place, no cookies, robots and other sites never counted.
+      - name: Visit counts in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-visits 2>&1 | tee ../../visits.log
+      # ADR-052: «Estadísticas»: the period's totals as the database adds them up, compared
+      # with the period before, both CSVs, an analyst, and nothing for another municipality.
+      - name: Statistics in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-statistics 2>&1 | tee ../../statistics.log
       # RC-01/07/08 (P4): the reference tours (a museum and a four-scene carnival) walked in a
       # real browser — entry, information and gallery, every scene forward and back, arrows,
       # the 3D model loaded only on demand, another tour, out; fast taps and late answers never
       # bring an old scene back; the tour works as text without WebGL; the panel's point
       # editor keeps every relation it was not asked to change. It adds its own tours to Demo
-      # Sur, so it runs after the Lighthouse budget (which measures the seed).
+      # Sur (the seed's Lighthouse budget runs in its own job).
       - name: Tour viewer in a real browser (RC-01/07/08)
-        if: success() || failure()
+        if: matrix.suite == 'tours' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-tour 2>&1 | tee ../../tour.log
-
       # The tour pages those tours left in Demo Sur (found in its sitemap), against their own
       # lines of lighthouse-budget.json.
       - name: Lighthouse budget of the tour pages (mobile)
-        if: success() || failure()
+        if: matrix.suite == 'tours' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           LIGHTHOUSE_SET=tours LIGHTHOUSE_REQUIRE_TOURS=1 CHROME_PATH="$(command -v google-chrome)" node e2e/lighthouse.mjs 3000 2>&1 | tee ../../lighthouse-tours.log
-
       - name: Keep the Lighthouse reports of the tour pages
-        if: success() || failure()
+        if: matrix.suite == 'tours' && (success() || failure())
         uses: actions/upload-artifact@v5
         with:
           name: lighthouse-tour-reports
           path: apps/web/lighthouse-reports/
           if-no-files-found: ignore
           retention-days: 14
-
-      # P5 · Paso 3 (ADR-038): the visitor's assistant with the simulated model and the real
-      # search — loaded on demand, answers citing this municipality's pages, invented
-      # citations and web addresses dropped, English, the conversation kept on the device,
-      # another origin refused, a notice when the AI quota is used up, keyboard and phone.
-      - name: Visitor assistant in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-assistant 2>&1 | tee ../../assistant.log
-
-      # P5 · Paso 7 (ADR-042): the staff's Copilot in the panel — the review by fixed rules, a
-      # question answered with this municipality's pages only, a proposal accepted field by
-      # field into a draft (nothing published), a stale proposal refused, and an analyst who
-      # cannot ask for proposals.
-      - name: Copilot in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-copilot 2>&1 | tee ../../copilot.log
-
-      # ADR-043: an administrator without a second factor cannot open their municipality, sets
-      # up the app (real TOTP with GoTrue), the operator resets it and it is asked again.
-      - name: Second factor in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-second-factor 2>&1 | tee ../../second-factor.log
-
-      # ADR-047: the owner changes the address of a published destination; the cached old page
-      # answers 308 to the new one (also its tour and an event's calendar file), the sitemap
-      # lists only the new one, and going back works.
-      - name: Address change in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-slug 2>&1 | tee ../../slug.log
-
-      # ADR-048: where each panorama and model is used, a replacement put in a tour's draft
-      # (visitors keep the old one), deleting what no tour used, and a photo as a model's image.
-      - name: Replacing and deleting media in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-media 2>&1 | tee ../../media.log
-
-      # ADR-049: moving a published tour (its old page leads to the new one), deleting it (its
-      # pages lead to their places), and an analyst without the section.
-      - name: Deleting and moving a tour in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-tour-removal 2>&1 | tee ../../tour-removal.log
-
-      # ADR-044: a real server error recorded with its request ID and reference code, a measured
-      # route, and the operator's metrics pages (search by code, «Revisar ahora»).
-      - name: Metrics in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-metrics 2>&1 | tee ../../metrics.log
-
-      # ADR-051: anonymous visit counts: pages, a QR scan, «Cómo llegar» and «Compartir»
-      # counted on their place, no cookies, robots and other sites never counted.
-      - name: Visit counts in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-visits 2>&1 | tee ../../visits.log
-
-      # ADR-052: «Estadísticas»: the period's totals as the database adds them up, compared
-      # with the period before, both CSVs, an analyst, and nothing for another municipality.
-      - name: Statistics in a real browser
-        if: success() || failure()
-        working-directory: apps/web
-        run: |
-          set -o pipefail
-          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-statistics 2>&1 | tee ../../statistics.log
-
       # ADR-045: «Evaluar el asistente» and «Evaluar el Copilot» with the simulated model: a run
       # against two demos, the trap data prepared and retired, a batch of each, a rating, and
       # no proposal left behind.
       - name: Evaluation in a real browser
-        if: success() || failure()
+        if: matrix.suite == 'tours' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-evaluation 2>&1 | tee ../../evaluation.log
-
       # ADR-026: the real GLB processor and optimizer, then the original and the optimized file
       # drawn by three.js (software WebGL) from the same camera must look the same (ΔE).
       - name: GLB colors in a real browser
-        if: success() || failure()
+        if: matrix.suite == 'tours' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" RIKUY_MODEL_E2E_OUT="$RUNNER_TEMP/model-colors.png" \
             pnpm test:e2e-models 2>&1 | grep -v -E "^(Slice|Encoding|Total slices|Mode:|basis_compressor)" | tee ../../model-colors.log
-
       - name: Keep the GLB color comparison
-        if: success() || failure()
+        if: matrix.suite == 'tours' && (success() || failure())
         uses: actions/upload-artifact@v5
         with:
           name: model-colors
@@ -430,7 +460,6 @@ jobs:
             ${{ runner.temp }}/model-colors.png.json
           if-no-files-found: ignore
           retention-days: 14
-
       - name: Report failures
         if: failure()
         run: |
