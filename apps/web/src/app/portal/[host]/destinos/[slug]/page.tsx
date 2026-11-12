@@ -148,6 +148,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         {destination.location ? (
           <a
             className="portal-button portal-button-primary"
+            data-visit="directions"
             href={directionsUrl(destination.location)}
             target="_blank"
             rel="noopener noreferrer"

@@ -7,6 +7,7 @@ import type {
   RouteLatencyRecord,
   TenantMetrics,
 } from "../../contracts/metrics";
+import type { VisitRecord } from "../../domain/visits/visit";
 import type { JobLease } from "../jobs/ports";
 import type { PlatformRepository } from "../platform/ports";
 
@@ -30,6 +31,8 @@ export interface MetricsRepository {
 export interface Telemetry {
   recordError(record: RequestErrorRecord): Promise<void>;
   recordLatency(record: RouteLatencyRecord): Promise<void>;
+  /** An anonymous visit count (ADR-051). */
+  recordVisit(record: VisitRecord): Promise<void>;
 }
 
 async function operator(platform: PlatformRepository): Promise<boolean> {

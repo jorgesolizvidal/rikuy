@@ -28,7 +28,7 @@ export function ShareButton({ title, url }: { readonly title: string; readonly u
 
   return (
     <>
-      <button type="button" className="portal-button" onClick={share}>
+      <button type="button" className="portal-button" data-visit="share" onClick={share}>
         Compartir
       </button>
       <span className="portal-status" role="status">

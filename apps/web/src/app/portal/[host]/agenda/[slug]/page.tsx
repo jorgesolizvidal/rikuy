@@ -158,6 +158,7 @@ export default async function EventPage({ params }: EventPageProps) {
           {event.location ? (
             <a
               className="portal-button portal-button-primary"
+              data-visit="directions"
               href={directionsUrl(event.location)}
               target="_blank"
               rel="noopener noreferrer"
@@ -167,6 +168,7 @@ export default async function EventPage({ params }: EventPageProps) {
           ) : null}
           <a
             className="portal-button"
+            data-visit="calendar"
             href={PORTAL_PATHS.eventCalendar(event.slug)}
             download={`${event.slug}.ics`}
           >

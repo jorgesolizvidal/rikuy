@@ -166,6 +166,12 @@ Roles piloto: `owner`, `admin`, `editor`, `analyst`. Operador de plataforma sepa
 - Posición del visitante solo en el navegador (P3 · Paso 6): se pide tras pulsar «Usar mi ubicación», `watchPosition` mientras la página está visible (se detiene al ocultarla), punto y círculo de precisión, «Seguirme», distancia en línea recta y tiempo estimado, orden por cercanía y «Estás cerca de…» con la página abierta (radio por municipio en la marca, 150 m por defecto). Las reglas son código puro de `@rikuy/core` (`domain/geo/proximity`); en la pestaña solo se recuerda que se activó, nunca la posición.
 - La posición exacta nunca se envía ni se guarda. Para los planes del asistente, el teléfono envía solo su distancia en línea recta a cada lugar publicado (el servidor la redondea a 100 m y no la guarda ni la pasa al proveedor de IA). Sin permiso, todo funciona (RC-06).
 
+## 9 bis. Conteo anónimo de visitas (ADR-051)
+
+- Las páginas salen de la caché del CDN, así que cuenta el navegador: `VisitTracker` (en el layout del portal) envía `POST /visita` con `sendBeacon` al abrir cada página. También envía las escenas de un tour (desde el explorador), los toques de «Cómo llegar», «Compartir» y «Añadir al calendario» (elementos con `data-visit`) y los escaneos de QR (`?qr=1`, que quita de la dirección). Sin cookies ni nada guardado en el teléfono.
+- El servidor toma el municipio del contexto del proxy, exige el mismo portal (`Origin` o `Sec-Fetch-Site`), descarta robots, valida con `parseVisitBeacon` (`@rikuy/core`) y escribe después de responder con la conexión del ejecutor (`worker_api.record_visit`), que vuelve a comprobar el lugar publicado, la escena del tour publicado y el evento permitido.
+- Solo totales por día del municipio: `visit_daily_counts` (página, lugar, escena, evento) y `visit_daily_origins` (país y ciudad del CDN). Los visitantes únicos del día se cuentan con una huella `sha256(sal del día ‖ municipio ‖ dirección|navegador)` que se borra a los dos días con su sal; nunca se guarda la dirección. Tope de 500 eventos por huella y día.
+
 ## 10. IA (ADR-018 + cierre P0 + ADR-022)
 
 - **Gateway propio** ([ADR-036](adr/ADR-036-ai-gateway.md)): toda llamada a un modelo pasa por `runAiRequest`, con perfiles por caso de uso (asistente del visitante, de administración y la prueba del operador) y el proveedor como puerto (Groq por HTTP, o simulado en desarrollo). La IA se conecta a PostgreSQL con su propio rol, `rikuy_ai`, que solo ejecuta `ai_api`: ni la clave pública ni la secreta pueden gastar cuota de IA.

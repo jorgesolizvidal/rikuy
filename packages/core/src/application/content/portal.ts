@@ -37,6 +37,8 @@ export const PORTAL_PATHS = {
   assistantPlaces: "/asistente/lugares",
   /** POST: one dictation of the assistant, as text to review (ADR-041). */
   assistantDictation: "/asistente/dictado",
+  /** POST: an anonymous visit count, sent by the browser (ADR-051). */
+  visit: "/visita",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
@@ -57,6 +59,18 @@ export function portalMediaPath(path: string): string {
     throw new Error("A public media path is made of plain segments");
   }
   return `${PORTAL_MEDIA_PREFIX}/${segments.join("/")}`;
+}
+
+/**
+ * The mark of a printed QR code (ADR-051): the code opens `{url}?qr=1`, the page counts the
+ * scan and removes it from the address.
+ */
+export const QR_SCAN_QUERY = "qr";
+
+export function qrCodeUrl(url: string): string {
+  const target = new URL(url);
+  target.searchParams.set(QR_SCAN_QUERY, "1");
+  return target.toString();
 }
 
 /** The map's query for a plan's route: `?ruta=destination:plaza,event:feria` (ADR-039). */

@@ -1,9 +1,11 @@
+import { qrCodeUrl } from "@rikuy/core";
 import QRCode from "qrcode";
 
 /**
  * Where visitors see the destination, with a QR code for signs on site. Generated on the
  * server from the canonical portal address: black on white, medium error correction and a
  * quiet zone so it scans from a printed sign. PNG for quick printing, SVG for designers.
+ * The code opens the address with `?qr=1`, so its scans are counted apart (ADR-051).
  */
 export async function PortalShare({
   url,
@@ -20,9 +22,10 @@ export async function PortalShare({
   readonly opens?: string;
 }) {
   const options = { errorCorrectionLevel: "M", margin: 4 } as const;
+  const scanned = qrCodeUrl(url);
   const [svg, png] = await Promise.all([
-    QRCode.toString(url, { ...options, type: "svg" }),
-    QRCode.toDataURL(url, { ...options, width: 1200 }),
+    QRCode.toString(scanned, { ...options, type: "svg" }),
+    QRCode.toDataURL(scanned, { ...options, width: 1200 }),
   ]);
   const svgUrl = `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`;
 
@@ -42,7 +45,11 @@ export async function PortalShare({
       )}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img className="qr" src={svgUrl} width={160} height={160} alt={`Código QR de «${title}»`} />
-      <p className="field-hint">Imprímelo en carteles del lugar: al escanearlo se abre {opens}.</p>
+      <p className="field-hint">
+        Imprímelo en carteles del lugar: al escanearlo se abre {opens} y se cuenta como escaneo. Un
+        código descargado antes de que existiera este conteo abre igual, pero sus escaneos no se
+        cuentan: conviene descargarlo e imprimirlo de nuevo.
+      </p>
       <p className="qr-downloads">
         <a href={png} download={`qr-${slug}.png`}>
           Descargar PNG

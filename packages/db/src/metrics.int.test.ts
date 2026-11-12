@@ -84,6 +84,45 @@ describe.runIf(stackAvailable)("metrics per municipality against local Supabase"
     ).toBeGreaterThanOrEqual(1);
   });
 
+  it("records anonymous visit counts through the workload's role (ADR-051)", async () => {
+    const visitor = `9.9.9.${Math.floor(Math.random() * 200)}|Chrome`;
+    const before = await admin<{ views: number }[]>`
+      select coalesce(sum(views), 0)::int as views from public.visit_daily_counts
+      where tenant_id = ${SUR}::uuid and target = 'destination' and event = 'view'`;
+    for (let i = 0; i < 2; i += 1) {
+      await telemetry.recordVisit({
+        tenantId: SUR,
+        target: "destination",
+        slug: "laguna-espejo",
+        sceneId: null,
+        event: "view",
+        country: "BO",
+        city: "Cliza",
+        visitor,
+      });
+    }
+    // Not published here: ignored, and nothing breaks.
+    await telemetry.recordVisit({
+      tenantId: SUR,
+      target: "destination",
+      slug: "no-existe",
+      sceneId: null,
+      event: "view",
+      country: null,
+      city: null,
+      visitor,
+    });
+    const after = await admin<{ views: number }[]>`
+      select coalesce(sum(views), 0)::int as views from public.visit_daily_counts
+      where tenant_id = ${SUR}::uuid and target = 'destination' and event = 'view'`;
+    expect((after[0]?.views ?? 0) - (before[0]?.views ?? 0)).toBe(2);
+    const [origin] = await admin<{ views: number }[]>`
+      select views from public.visit_daily_origins
+      where tenant_id = ${SUR}::uuid and country = 'BO' and city = 'Cliza'
+        and day = (now() at time zone 'America/La_Paz')::date`;
+    expect(origin?.views).toBeGreaterThanOrEqual(2);
+  });
+
   it("the daily probe reads its target and records under the job's lease", async () => {
     await admin`delete from public.background_jobs where kind = 'metrics.probe_portal' and status = 'pending'`;
     await admin`select private.enqueue_portal_probes()`;

@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C0 — Ucureña lista como vitrina ✅. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10). Sigue C1.
-- **Último paso completado:** C0 · Paso 4 — contenido real de Ucureña, Lighthouse y README con capturas ✅
-- **Rama:** `docs/c0-step4-readme` → PR hacia `main`
+- **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C1 · Paso 1 — conteo anónimo de visitas ✅
+- **Rama:** `feat/c1-step1-anonymous-counts` → PR hacia `main`
 
 ## Historial
 
@@ -1855,14 +1855,47 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - Las capturas se ven en el README cuando la release existe con esos nombres de archivo.
 - Pendiente del usuario, sin captura: «Television» → «Televisión» en el punto del modelo 3D del museo, y «Comidas Tipicas» → «Típicas».
 
+**Cierre (2026-11-12):** el usuario hizo el merge (PR #66) y corrigió «Comidas Típicas» (ya en la agenda). «Televisión» quedó en el borrador del tour del museo (falta publicarlo) y la release `readme-capturas-2026-11` todavía no existe: hasta que la publique, el README no muestra las capturas.
+
+### C1 · Paso 1 — conteo anónimo de visitas ✅
+
+- Pasos de C1 confirmados por el usuario (2026-11-12): 1 conteo anónimo, 2 panel «Estadísticas», 3 lo que preguntan los visitantes (el texto de las preguntas sin respuesta, sin datos del visitante, 90 días), 4 recomendaciones del Copilot, 5 informe mensual (página en el panel y un correo el día 1). En el [roadmap](../roadmap.md#c1--métricas-y-estrategia).
+- Decisiones del usuario ([ADR-051](../adr/ADR-051-anonymous-visit-counts.md)): visitantes únicos con una **huella diaria sin cookies**; **QR nuevos con una marca** (`?qr=1`); origen **país y ciudad**; **totales por día sin límite**.
+- Base de datos (`20261114000000_c1_visit_counts.sql`, solo expand):
+  - `visit_daily_counts` (día del municipio, página, lugar por `content_id`, escena, evento; vistas y visitantes) y `visit_daily_origins` (país y ciudad; vistas y visitantes). RLS sin permisos: nadie las lee ni escribe directo.
+  - `private.visit_salts` (una sal por día) y `private.visit_marks` (la huella `sha256(sal ‖ municipio ‖ dirección|navegador)` de quien ya se contó, por sitio y por página o evento). La tarea `rikuy-forget-visit-marks` (08:17 UTC) borra marcas y sales de más de dos días.
+  - `worker_api.record_visit` (solo `rikuy_worker`): municipio en línea, lugar publicado y del tipo correcto, escena del tour publicado, eventos permitidos por página («Cómo llegar» y «Compartir» en fichas, el calendario solo en eventos, el QR en fichas, tours y recorrido general); día en la zona horaria del municipio; tope de 500 eventos por huella y día; el origen solo en vistas de página. Devuelve `recorded`, `ignored` o `capped`.
+- `@rikuy/core` (`domain/visits/visit`): `parseVisitBeacon` (la página sale de la dirección; mismas reglas que la base), `visitOrigin` (país de dos letras, ciudad decodificada y sin caracteres de control), `visitorKey`, `isAutomatedAgent` (buscadores, vistas previas, Lighthouse, _headless_ y scripts) y `visitRecordFrom`. `PORTAL_PATHS.visit`, `QR_SCAN_QUERY` y `qrCodeUrl`. `Telemetry.recordVisit`.
+- `@rikuy/db`: `recordVisit` en la telemetría del ejecutor.
+- Web:
+  - **`POST /visita`** en el host del portal: municipio del contexto del proxy, el mismo portal (`Origin`, o `Sec-Fetch-Site` sin `Origin`; si no, 403), hasta 1 KB, siempre `204`; escribe después de responder;
+  - **`VisitTracker`** en el layout del portal: una vista por dirección (también los tours a los que salta el recorrido general), el escaneo de QR (y quita `?qr` de la dirección) y los toques de los elementos con `data-visit` («Cómo llegar», «Compartir», «Añadir al calendario»). El explorador del tour envía cada escena mostrada, en la página de su tour. Sin `@rikuy/core` en el navegador;
+  - el **QR del panel** (fichas, tours y recorrido general) abre la dirección con `?qr=1` y explica que un código descargado antes no cuenta sus escaneos;
+  - **privacidad:** nueva sección «Estadísticas de visitas».
+- CI, job «Contracts»: nuevo paso **«Visit counts in a real browser»**.
+- Tests:
+  - core 546 (+10, `visit.test.ts`), web 45 (+2), db 171;
+  - 1.375 pgTAP (30 nuevos, `039_visit_counts`): solo el ejecutor escribe y nadie lee las tablas ni las marcas; vistas y visitantes, el día del municipio (23:30 en La Paz es el día anterior en UTC), lugar y escena, QR sin dirección (vista sin visitante); ignorados: lugar sin publicar, evento como destino, escena fuera del tour publicado, tour inexistente, acción no permitida, página desconocida, municipio sin estar en línea; origen solo en vistas; el museo de otro municipio con la misma dirección no suma; tope de 500; solo huellas; olvido a los dos días;
+  - integración (`metrics.int.test.ts`): dos vistas por la conexión real del ejecutor, una dirección inexistente ignorada, y el origen;
+  - **e2e en un navegador real** (`visits.e2e.test.ts`, 2 casos): inicio y ficha con su vista, el escaneo de QR (y la dirección sin `?qr`), «Cómo llegar» y «Compartir», una segunda visita que es vista y no visitante, sin cookies ni almacenamiento; un navegador _headless_ no cuenta, un envío de otro sitio da 403 y una dirección inexistente no suma. En `tour.e2e.test.ts`, un caso nuevo: cada escena mostrada suma en la página de su tour;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local: portales (161) y contratos RC-09/10/11/12 (202) en verde; Lighthouse de Demo Sur dentro del presupuesto (JS inicial 147–150 KB, CLS 0).
+
+**Desviaciones:**
+
+- El panel todavía no muestra los números: llega en el Paso 2 (las tablas no tienen lectura para miembros hasta entonces).
+- Los números son un mínimo: no cuentan a quien bloquea JavaScript o los envíos, ni los QR impresos antes.
+- «Visitantes» son personas distintas por día, no por semana o mes.
+- En local no hay origen (las cabeceras las pone Vercel); se ve en producción.
+
 ## Cómo verificarlo
 
-- Tras crear la release y hacer el merge, el README de GitHub muestra las 9 capturas.
-- `rikuy-ucurena.vercel.app` responde sin `noindex` y «Lighthouse on production» sigue en verde.
+- Tras el merge, abre una ficha de Ucureña en el celular y toca «Cómo llegar». Una consulta de solo lectura a `visit_daily_counts` muestra la vista y la acción del día, con tu país y ciudad en `visit_daily_origins`.
+- En el panel, el QR de una ficha abre la dirección con `?qr=1`; al escanearlo, la dirección queda sin la marca y el escaneo se cuenta.
 
 ## Siguiente paso
 
-**C1 — métricas y estrategia** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): lo más visto, escaneos QR, lo que preguntan los visitantes sin respuesta, recomendaciones del Copilot e informe mensual para la alcaldía. Antes de empezar, definir con el usuario los pasos de C1 y escribirlos en el roadmap.
+**C1 · Paso 2 — panel «Estadísticas» del municipio** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): lo más visto, tours y escenas, acciones, escaneos de QR y origen, por período. Antes de empezar, confirmar con el usuario qué ve cada rol y qué períodos.
 
 ## Decisiones pendientes del usuario
 

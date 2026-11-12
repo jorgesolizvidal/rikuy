@@ -382,6 +382,15 @@ jobs:
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-metrics 2>&1 | tee ../../metrics.log
 
+      # ADR-051: anonymous visit counts: pages, a QR scan, «Cómo llegar» and «Compartir»
+      # counted on their place, no cookies, robots and other sites never counted.
+      - name: Visit counts in a real browser
+        if: success() || failure()
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-visits 2>&1 | tee ../../visits.log
+
       # ADR-045: «Evaluar el asistente» and «Evaluar el Copilot» with the simulated model: a run
       # against two demos, the trap data prepared and retired, a batch of each, a rating, and
       # no proposal left behind.
@@ -416,7 +425,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log metrics.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log metrics.log visits.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do
