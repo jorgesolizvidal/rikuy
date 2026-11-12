@@ -83,3 +83,7 @@ Decisiones del usuario (2026-11-12):
 - **Costo:** cada envío es una invocación de función y una escritura pequeña en la base. Con el tráfico de la vitrina entra holgado en los planes gratuitos (1 millón de invocaciones al mes en Vercel Hobby); se revisa con el tráfico real.
 - El navegador manda el conteo en cada página. El código que lo hace pesa menos de 1 KB y no carga `@rikuy/core`.
 - No se respeta todavía `Global Privacy Control`: no hay datos personales ni seguimiento entre sitios. Si una alcaldía lo pide, se agrega sin cambiar el esquema.
+
+## Corrección (2026-11-12, `fix/lighthouse-visit-counts`)
+
+El primer día en producción, «Lighthouse on production» sumó 3 vistas de 1 visitante en cada página que mide, desde el runner de GitHub. Lighthouse emula un Chrome de Android cuyo nombre no dice «Lighthouse», y al cambiarle el nombre, Chrome sin pantalla deja de decir «HeadlessChrome». El medidor ahora agrega «Chrome-Lighthouse» al nombre del teléfono que emula, y el filtro de robots lo descarta. PageSpeed Insights ya lo incluye. Una herramienta que se presente como un navegador común se cuenta: por eso los números siguen siendo una estimación.

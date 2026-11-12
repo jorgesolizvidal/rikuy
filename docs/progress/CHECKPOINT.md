@@ -1888,6 +1888,14 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - «Visitantes» son personas distintas por día, no por semana o mes.
 - En local no hay origen (las cabeceras las pone Vercel); se ve en producción.
 
+**Verificación en producción (2026-11-12):** tras el merge, el usuario abrió fichas y tours de Ucureña en su celular y tocó «Cómo llegar» y «Compartir» en el museo. Comprobado con consultas de solo lectura: la vista, «Cómo llegar» y «Compartir» del museo, las escenas del tour de la plaza y el origen «BO · Punata».
+
+**Corrección posterior (`fix/lighthouse-visit-counts`):** las mismas consultas mostraron que **«Lighthouse on production» contaba como visitante**: 3 vistas de 1 visitante en cada página que mide, en los tres portales, desde «US · Des Moines» (el runner de GitHub). Lighthouse se presenta como un Chrome de Android sin la palabra «Lighthouse» y Chrome sin pantalla deja de decir «HeadlessChrome» cuando se le cambia el navegador, así que el filtro de robots no lo reconocía.
+
+- `e2e/lighthouse.mjs` mide con el mismo teléfono de Lighthouse, con «Chrome-Lighthouse» al final del nombre del navegador (`MEASURING_AGENT`). La página se ve igual y el portal no cuenta esas visitas (`isAutomatedAgent` ya lo reconocía).
+- Verificado en local: el envío de la página medida lleva ese nombre.
+- Los números del 12 de noviembre se borran a mano después del merge (solo hay visitas de prueba y de Lighthouse).
+
 ## Cómo verificarlo
 
 - Tras el merge, abre una ficha de Ucureña en el celular y toca «Cómo llegar». Una consulta de solo lectura a `visit_daily_counts` muestra la vista y la acción del día, con tu país y ciudad en `visit_daily_origins`.
