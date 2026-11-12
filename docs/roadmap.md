@@ -160,7 +160,7 @@ Pasos confirmados por el usuario (2026-11-10). Los arreglos en Blender salen de 
 | 1 ✅ | Cambiar la dirección de un destino o evento con redirecciones ([ADR-047](adr/ADR-047-slug-redirects.md))                                      | Una dirección vieja (enlace o QR impreso) abre la página nueva con un 308 y ningún otro lugar la toma |
 | 2 ✅ | Reemplazar y borrar panoramas y modelos 3D; foto propia como poster ([ADR-048](adr/ADR-048-replace-delete-media.md))                          | Un medio se reemplaza sin rehacer los tours y no se borra uno que use algo publicado                  |
 | 3 ✅ | Borrar un tour o pasarlo a otro destino o evento ([ADR-049](adr/ADR-049-delete-move-tour.md))                                                 | Sin dejar «ir a otro recorrido» ni un recorrido general rotos                                         |
-| 4    | Carga del contenido real de Ucureña por el usuario, con la revisión de Lighthouse sobre el contenido real y el README con capturas y métricas | Ucureña en línea con su contenido, indexada y dentro del presupuesto                                  |
+| 4 ✅ | Carga del contenido real de Ucureña por el usuario, con la revisión de Lighthouse sobre el contenido real y el README con capturas y métricas | Ucureña en línea con su contenido, indexada y dentro del presupuesto                                  |
 
 **Más adelante** (sin fase todavía): audioguías grabadas por la propia comunidad, en español y quechua, que además alimentan el conocimiento del asistente; WhatsApp (botones a cada local y, con clientes que paguen, el asistente dentro de WhatsApp); entradas a eventos con pago por QR.
 
