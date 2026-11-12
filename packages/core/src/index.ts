@@ -58,6 +58,8 @@ export * from "./contracts/metrics";
 export * from "./domain/metrics/telemetry";
 export * from "./application/metrics/metrics";
 export * from "./domain/visits/visit";
+export * from "./domain/visits/statistics";
+export * from "./application/statistics/statistics";
 export * from "./domain/jobs/failure";
 export * from "./application/jobs/ports";
 export * from "./application/jobs/run-job";

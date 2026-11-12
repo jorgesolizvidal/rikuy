@@ -1,0 +1,162 @@
+/* «Estadísticas» of a municipality (C1 · Paso 2, ADR-052). Its own stylesheet: panel-only. */
+.stats-periods ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-period {
+  display: inline-block;
+  padding: 0.5rem 0.875rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 20%, transparent);
+  border-radius: 999px;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.9375rem;
+}
+
+.stats-period[aria-current="page"] {
+  background: var(--fg);
+  border-color: var(--fg);
+  color: var(--bg);
+  font-weight: 600;
+}
+
+.stats-range {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+}
+
+.stats-range strong {
+  color: var(--fg);
+}
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 9.5rem), 1fr));
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-tile {
+  display: grid;
+  align-content: start;
+  gap: 0.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 0.75rem;
+}
+
+.stats-tile-label {
+  font-size: 0.875rem;
+  color: var(--muted);
+}
+
+.stats-tile-value {
+  font-size: 1.75rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.15;
+}
+
+/* The trend is said in words (and an arrow), never by color alone. */
+.stats-change {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fg);
+}
+
+.stats-chart {
+  margin: 0;
+}
+
+.stats-chart svg {
+  display: block;
+  width: 100%;
+  height: 10rem;
+}
+
+.stats-chart-bar {
+  fill: var(--accent);
+}
+
+.stats-chart-hit {
+  fill: transparent;
+}
+
+.stats-chart-hit:hover + .stats-chart-bar {
+  fill: var(--fg);
+}
+
+.stats-chart-axis {
+  stroke: color-mix(in srgb, var(--fg) 25%, transparent);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+.stats-chart-ends {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.25rem 1rem;
+  margin-top: 0.25rem;
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.stats-details summary {
+  cursor: pointer;
+  width: fit-content;
+}
+
+.stats-details[open] summary {
+  margin-bottom: 0.5rem;
+}
+
+.stats-tours {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stats-tour {
+  display: grid;
+  gap: 0.375rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 0.75rem;
+}
+
+.stats-tour h3,
+.stats-tour p {
+  margin: 0;
+}
+
+.stats-tour h3 {
+  font-size: 1rem;
+}
+
+.stats-origins {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+
+.metrics-table th[scope="row"] .org-detail {
+  display: block;
+  font-weight: 400;
+}
+
+.stats-downloads {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+  padding-left: 1.1rem;
+}

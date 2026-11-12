@@ -52,6 +52,7 @@ export {
   createPlatformUsageRepository,
   createUsageRepository,
 } from "./usage";
+export { createStatisticsRepository } from "./statistics";
 export {
   createGeneralTourRepository,
   createSupabasePublishedTourReader,

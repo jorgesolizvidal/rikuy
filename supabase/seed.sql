@@ -249,5 +249,41 @@ update public.background_jobs j
 set fencing_token = (select max(a.fencing_token) from public.job_attempts a where a.job_id = j.id)
 where j.id in ('5eed9000-0000-4000-8000-000000000001', '5eed9000-0000-4000-8000-000000000002');
 
+-- Visit counts (C1, ADR-051/052), synthetic: 70 days of Demo Norte up to today (its day), so
+-- «Estadísticas» has a period and a previous one to compare. Demo Sur has none (the visit
+-- e2e counts its own).
+insert into public.visit_daily_counts (tenant_id, day, target, content_id, scene_id, event, views, visitors)
+select '5eed1000-0000-4000-8000-000000000001', d.day, v.target, v.content_id::uuid, null, v.event,
+       v.base + (d.n % 7) * v.step, greatest(1, (v.base + (d.n % 7) * v.step) * 7 / 10)
+from (
+  select n, ((now() at time zone 'America/La_Paz')::date - n) as day from generate_series(0, 69) n
+) d
+cross join (values
+  ('home', null, 'view', 18, 3),
+  ('destinations', null, 'view', 8, 2),
+  ('agenda', null, 'view', 5, 1),
+  ('map', null, 'view', 4, 1),
+  ('destination', '5eed4100-0000-4000-8000-000000000001', 'view', 9, 2),
+  ('destination', '5eed4100-0000-4000-8000-000000000001', 'qr', 2, 1),
+  ('destination', '5eed4100-0000-4000-8000-000000000001', 'directions', 3, 1),
+  ('destination', '5eed4100-0000-4000-8000-000000000004', 'view', 6, 1),
+  ('destination', '5eed4100-0000-4000-8000-000000000004', 'share', 1, 1),
+  ('event', '5eed4100-0000-4000-8000-000000000011', 'view', 4, 1),
+  ('event', '5eed4100-0000-4000-8000-000000000011', 'calendar', 1, 1)
+) as v (target, content_id, event, base, step);
+
+insert into public.visit_daily_origins (tenant_id, day, country, city, views, visitors)
+select '5eed1000-0000-4000-8000-000000000001', d.day, v.country, v.city,
+       v.base + (d.n % 5) * 2, greatest(1, (v.base + (d.n % 5) * 2) * 7 / 10)
+from (
+  select n, ((now() at time zone 'America/La_Paz')::date - n) as day from generate_series(0, 69) n
+) d
+cross join (values
+  ('BO', 'Cochabamba', 20),
+  ('BO', 'Cliza', 9),
+  ('AR', 'Buenos Aires', 3),
+  (null, null, 1)
+) as v (country, city, base);
+
 insert into public.audit_events (scope, action, outcome, diff)
 values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3, "events": 4, "jobs": 2}');

@@ -196,6 +196,7 @@ async function adminPages(page) {
     event,
     `${base}/configuracion`,
     `${base}/miembros`,
+    `${base}/estadisticas`,
   ].map((url) => ({ label: url.replace(`http://app.localhost:${port}`, "admin"), url }));
 }
 

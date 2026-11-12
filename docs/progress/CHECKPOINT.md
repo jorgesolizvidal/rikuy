@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C1 · Paso 1 — conteo anónimo de visitas ✅
-- **Rama:** `feat/c1-step1-anonymous-counts` → PR hacia `main`
+- **Último paso completado:** C1 · Paso 2 — panel «Estadísticas» del municipio ✅
+- **Rama:** `feat/c1-step2-statistics` → PR hacia `main`
 
 ## Historial
 
@@ -1896,14 +1896,50 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - Verificado en local: el envío de la página medida lleva ese nombre.
 - Los números del 12 de noviembre se borran a mano después del merge (solo hay visitas de prueba y de Lighthouse).
 
+**Verificación en producción de la corrección (2026-11-12):** el usuario borró en el SQL Editor los totales y las huellas del 12 de noviembre. Después escaneó con su celular el QR nuevo del museo (`…/destinos/museo-de-ucurena?qr=1`): la página abrió sin `?qr=1` y quedaron 2 escaneos, 2 vistas y 1 visitante desde «BO · Punata». «Lighthouse on production», corrido a mano después, terminó en verde y no sumó ninguna visita (consultas de solo lectura).
+
+### C1 · Paso 2 — panel «Estadísticas» del municipio ✅
+
+- Decisiones del usuario ([ADR-052](../adr/ADR-052-statistics-panel.md)), 2026-11-12:
+  - **todos los miembros** lo ven (propietarios, administradores, editores y analistas);
+  - **períodos fijos:** últimos 7 días, últimos 30 días, este mes y el mes anterior;
+  - **comparado con el período anterior;**
+  - **descarga CSV** del período.
+- Base de datos (`20261115000000_c1_statistics.sql`, solo expand): las tablas de ADR-051 siguen cerradas. Se leen por dos funciones, solo para miembros (propietarios y administradores con su segundo factor):
+  - `tenant_visit_calendar`: zona horaria del municipio y primer día contado;
+  - `tenant_visit_statistics(tenant, desde, hasta, por_día)`: hasta 400 días; totales por página, lugar, escena y acción (o por día), vistas y visitantes del portal por día, y origen por país y ciudad. Cada lugar con su nombre publicado (o el del borrador si nunca se publicó) y cada escena con el de la versión publicada de su tour; la de un tour borrado, sin nombre.
+  - Seed: 70 días de visitas sintéticas en Demo Norte, para probar el panel en local.
+- `@rikuy/core`:
+  - `domain/visits/statistics`: períodos en el día del municipio (`statisticsRange`; «este mes» se compara con los mismos días del mes anterior, el 31 de marzo con todo febrero), fechas en español, `summarizeStatistics` (siete totales con su cambio, la serie diaria con ceros, lugares, tours con sus escenas, páginas, países y ciudades) y los CSV (`visitsCsv`, `originsCsv`: «;», BOM, fórmulas como texto);
+  - casos de uso `loadStatistics` (no pide el período anterior si no se contó entero) y `downloadStatistics`.
+- `@rikuy/db`: `createStatisticsRepository`; antes de la migración, «sin visitas» en lugar de un error.
+- Panel:
+  - **«Estadísticas»** en la página del municipio (`/o/{slug}/estadisticas`): períodos, rango de fechas y con qué se compara (o desde cuándo se cuenta), siete totales con «▲/▼ %» en palabras, vistas por día (barras de una serie, con descripción, número de cada día al pasar el puntero y la tabla), lo más visto con enlace al editor, tours con sus escenas, páginas del portal, países y ciudades, descargas y «Cómo se cuenta»;
+  - **`/estadisticas/descargar?periodo=…&tipo=visitas|origen`**: CSV por día, `no-store`; 404 sin acceso;
+  - estilos en su propia hoja (`statistics.css`).
+- Privacidad: el equipo del municipio ve los totales y puede descargarlos, nada sobre una persona.
+- Tests:
+  - 845 unitarios (core 565, db 175, web 45, worker 46, config 14), con los períodos en los bordes (31 de marzo, enero contra diciembre), la suma y la comparación, la serie con ceros, el orden y los CSV;
+  - 1.400 pgTAP (25 nuevos, `040_statistics`): visitantes sin acceso y tablas cerradas; propietario, analista y editor leen; propietario sin segundo factor y otro municipio no; período invertido, de más de 400 días o sin inicio; sumas, nombres (publicado sobre borrador, borrador si nunca se publicó, escena del tour publicado), días fuera, por día, visitantes del portal, orígenes, aislamiento, período vacío, tour borrado y que leer no cambia nada;
+  - **e2e en un navegador real** (`statistics.e2e.test.ts`, nuevo paso del job «Contracts», 2 casos): el propietario de Demo Sur llega desde la página del municipio, los totales coinciden con lo que suma la base, la comparación, el lugar con sus acciones y su enlace, el gráfico y su tabla, el origen, las dos descargas, axe y desbordes a 390 y 1280 px, y 404 para otro municipio; el analista ve y descarga; sin sesión, 404;
+  - contratos RC-09/10/11/12: 209 (7 nuevos, `/estadisticas`);
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador (1280 y 390 px): Demo Norte con 30 días, la comparación de 7 días y las descargas abiertas con sus acentos.
+
+**Desviaciones:**
+
+- «Visitantes» del período es la suma de los de cada día (la huella cambia cada día); la página lo dice.
+- Los números de antes de un cambio de nombre aparecen con el nombre nuevo (siguen al lugar).
+- Sin rango de fechas libre, como se decidió.
+
 ## Cómo verificarlo
 
-- Tras el merge, abre una ficha de Ucureña en el celular y toca «Cómo llegar». Una consulta de solo lectura a `visit_daily_counts` muestra la vista y la acción del día, con tu país y ciudad en `visit_daily_origins`.
-- En el panel, el QR de una ficha abre la dirección con `?qr=1`; al escanearlo, la dirección queda sin la marca y el escaneo se cuenta.
+- Tras el merge, en el panel: Ucureña → «Estadísticas». Debe mostrar las visitas desde el 12 de noviembre, «sin comparación» y desde cuándo se cuenta, el museo con su escaneo de QR y «BO · Punata» en «De dónde vienen».
+- Con la sesión de un analista o editor, la misma página; las dos descargas se abren en Excel con sus acentos.
 
 ## Siguiente paso
 
-**C1 · Paso 2 — panel «Estadísticas» del municipio** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): lo más visto, tours y escenas, acciones, escaneos de QR y origen, por período. Antes de empezar, confirmar con el usuario qué ve cada rol y qué períodos.
+**C1 · Paso 3 — lo que preguntan los visitantes** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): el texto de las preguntas que el asistente no pudo responder, sin datos del visitante, por 90 días. Antes de empezar, confirmar con el usuario quién las ve, si se agrupan las parecidas y qué se hace con una pregunta que trae datos personales.
 
 ## Decisiones pendientes del usuario
 
