@@ -2007,7 +2007,7 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
     - olvido a los 90 días y con su pedido;
     - `027` ahora exceptúa esta tabla de «ninguna columna guarda preguntas»;
   - integración (`ai.int.test.ts`): con el rol `rikuy_ai` real, una pregunta guardada enmascarada con su lugar, una sola vez; la prueba del operador y otro municipio no;
-  - **e2e en un navegador real** (`unanswered.e2e.test.ts`, nuevo paso del job de contratos, 3 casos):
+  - **e2e en un navegador real** (`unanswered.e2e.test.ts`, nuevo paso del job de contratos, 3 casos; el modelo simulado suma `[simular:no-sabe]`, que dice no saber aunque tenga pasajes, como hace un modelo real cuando lo que leyó no responde):
     - el visitante pregunta en Demo Norte desde una ficha y desde el inicio, con otras mayúsculas: se guardan con su página y su lugar;
     - una pregunta con correo y celular se guarda enmascarada;
     - un agradecimiento y una falla del proveedor no se guardan;

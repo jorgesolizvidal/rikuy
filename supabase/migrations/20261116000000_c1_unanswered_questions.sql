@@ -169,7 +169,7 @@ begin
 
   -- The place of the page, if it is one of this municipality's (published or not).
   if p_page_slug is not null and p_page_kind in ('destination', 'destination_tour', 'event', 'event_tour') then
-    v_kind := case when p_page_kind like 'destination%' then 'destination' else 'event' end;
+    v_kind := (case when p_page_kind like 'destination%' then 'destination' else 'event' end)::public.content_kind;
     select ci.id into v_content
     from public.content_items ci
     where ci.tenant_id = p_tenant_id and ci.kind = v_kind and ci.slug = p_page_slug;

@@ -35,8 +35,13 @@ const STAMP = Date.now()
   .toString(36)
   .replace(/\d/gu, (digit) => "abcdefghij"[Number(digit)] ?? "x");
 const PAGE = `${ADMIN}/o/demo-norte/preguntas`;
+/**
+ * The simulated model says it has nothing even with passages (a real model does so when what
+ * it read does not answer): on a place's page the search always finds the place itself.
+ */
+const UNKNOWN = "[simular:no-sabe]";
 /** The grouped question, as the panel shows it (case-sensitive: the other one has the word too). */
-const GROUPED = new RegExp(`HAY TELEFERICO ${STAMP.toUpperCase()}`, "u");
+const GROUPED = new RegExp(`HAY TELEFERICO ${STAMP.toUpperCase()}!! \\[SIMULAR`, "u");
 
 const db = postgres(DB_URL, { max: 1, prepare: false, onnotice: () => undefined });
 let browser: Browser;
@@ -158,7 +163,7 @@ describe("«Lo que preguntan los visitantes» (ADR-053)", () => {
 
     await page.goto(`${PORTAL}/destinos/mirador-del-valle`);
     await page.getByRole("button", { name: /hacer una pregunta/u }).click();
-    await ask(page, `Hola, ¿hay teleférico ${STAMP}?`);
+    await ask(page, `Hola, ¿hay teleférico ${STAMP}? ${UNKNOWN}`);
     await expect.poll(async () => (await kept()).length, { timeout: 10_000 }).toBe(1);
     // A greeting, and a question the provider could not answer, are not kept.
     await ask(page, "¡Muchas gracias!");
@@ -167,23 +172,27 @@ describe("«Lo que preguntan los visitantes» (ADR-053)", () => {
     await page.goto(PORTAL);
     await page.getByRole("button", { name: /hacer una pregunta/u }).click();
     await page.getByRole("button", { name: "Nueva conversación" }).click();
-    await ask(page, `HAY TELEFERICO ${STAMP.toUpperCase()}!!`);
+    await ask(page, `HAY TELEFERICO ${STAMP.toUpperCase()}!! ${UNKNOWN.toUpperCase()}`);
     await ask(
       page,
-      `¿Me avisan del ${STAMP}? Mi correo es ana.perez@example.com y mi celular 71234567`,
+      `¿Me avisan del ${STAMP}? Mi correo es ana.perez@example.com y mi celular 71234567 ${UNKNOWN}`,
     );
     await expect.poll(async () => (await kept()).length, { timeout: 10_000 }).toBe(3);
     await new Promise((resolve) => setTimeout(resolve, 1_000));
 
     expect(await kept()).toEqual([
-      { question_text: `¿hay teleférico ${STAMP}?`, page_kind: "destination", content_id: placeId },
       {
-        question_text: `HAY TELEFERICO ${STAMP.toUpperCase()}!!`,
+        question_text: `¿hay teleférico ${STAMP}? ${UNKNOWN}`,
+        page_kind: "destination",
+        content_id: placeId,
+      },
+      {
+        question_text: `HAY TELEFERICO ${STAMP.toUpperCase()}!! ${UNKNOWN.toUpperCase()}`,
         page_kind: "home",
         content_id: null,
       },
       {
-        question_text: `¿Me avisan del ${STAMP}? Mi correo es [correo] y mi celular [teléfono]`,
+        question_text: `¿Me avisan del ${STAMP}? Mi correo es [correo] y mi celular [teléfono] ${UNKNOWN}`,
         page_kind: "home",
         content_id: null,
       },
@@ -209,7 +218,7 @@ describe("«Lo que preguntan los visitantes» (ADR-053)", () => {
     await expect.poll(() => item.count()).toBe(1);
     // Both wordings are one question, shown with the newest one.
     expect(await item.locator(".question-text").innerText()).toContain(
-      `HAY TELEFERICO ${STAMP.toUpperCase()}!!`,
+      `HAY TELEFERICO ${STAMP.toUpperCase()}!! ${UNKNOWN.toUpperCase()}`,
     );
     expect(await item.innerText()).toMatch(/2 veces · 1 persona/u);
     // The other one, masked.
@@ -229,7 +238,7 @@ describe("«Lo que preguntan los visitantes» (ADR-053)", () => {
     await item.getByRole("link", { name: /Probar esta pregunta/u }).click();
     await page.waitForURL(/\/o\/demo-norte\/conocimiento\?pregunta=/u);
     expect(await page.getByLabel("Pregunta de un visitante").inputValue()).toBe(
-      `HAY TELEFERICO ${STAMP.toUpperCase()}!!`,
+      `HAY TELEFERICO ${STAMP.toUpperCase()}!! ${UNKNOWN.toUpperCase()}`,
     );
     await context.close();
   });
