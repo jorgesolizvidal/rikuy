@@ -111,6 +111,17 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/estadisticas`} className="org-card">
+            <span>
+              <span className="org-name">Estadísticas</span>
+              <span className="org-detail">
+                Visitas, lo más visto, tours, códigos QR y de dónde vienen
+              </span>
+            </span>
+            <span className="org-role">Ver</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/uso`} className="org-card">
             <span>
               <span className="org-name">Uso del plan</span>

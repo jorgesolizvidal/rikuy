@@ -86,6 +86,10 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
           identifique.
         </li>
         <li>
+          El equipo de {siteName} ve esos totales en su panel y puede descargarlos; no ve nada sobre
+          una persona en particular.
+        </li>
+        <li>
           Para contar cuántas personas distintas visitaron el portal en un día, se usa una huella
           calculada con tu dirección IP y tu navegador, mezclada con un valor que cambia cada día.
           Esa huella no permite saber quién eres, no se puede relacionar con la de otro día y se
