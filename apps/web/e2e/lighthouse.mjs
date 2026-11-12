@@ -17,6 +17,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import lighthouse from "lighthouse";
+import { userAgents } from "lighthouse/core/config/constants.js";
 
 const port = Number(process.argv[2] ?? 3000);
 const executablePath = process.env.CHROME_PATH || "/usr/bin/google-chrome";
@@ -244,6 +245,13 @@ function measure(lhr, page) {
   };
 }
 
+/**
+ * The phone Lighthouse emulates, marked as Lighthouse: its default agent is a plain Android
+ * Chrome, and the portal would count every run as a visit (ADR-051). The page renders the
+ * same for both agents.
+ */
+const MEASURING_AGENT = `${userAgents.mobile} Chrome-Lighthouse`;
+
 /** One Lighthouse run in a fresh Chrome; a failed run (a hiccup right after a deployment,
  * Chrome not answering) is retried once before giving up. */
 async function runOnce(page) {
@@ -256,6 +264,7 @@ async function runOnce(page) {
         output: "json",
         logLevel: "error",
         onlyCategories: CATEGORIES,
+        emulatedUserAgent: MEASURING_AGENT,
       }).finally(() => chrome.stop());
       if (!result?.lhr || result.lhr.runtimeError) {
         throw new Error(result?.lhr?.runtimeError?.message ?? "Lighthouse returned no result");
