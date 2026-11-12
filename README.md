@@ -13,15 +13,39 @@
 
 | Qué                         | Dirección                                                                                | Qué mirar                                                                                     |
 | --------------------------- | ---------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| Ucureña                     | [rikuy-ucurena.vercel.app](https://rikuy-ucurena.vercel.app)                             | El primer municipio real: destinos, agenda, 7 tours 360° y Chaski, su asistente               |
+| Un tour de Ucureña          | [Museo de Ucureña](https://rikuy-ucurena.vercel.app/destinos/museo-de-ucurena/tour)      | Panoramas reales, un modelo 3D y fotos dentro del tour                                        |
 | Portal de demostración      | [rikuy-demo-norte.vercel.app](https://rikuy-demo-norte.vercel.app)                       | Destinos, agenda, mapa con «Usar mi ubicación», los tours 360° y el «Asistente»               |
 | Un tour 360°                | [Mirador del Valle](https://rikuy-demo-norte.vercel.app/destinos/mirador-del-valle/tour) | Dos escenas unidas por flechas, un modelo 3D que se abre a pedido y el salto a otro recorrido |
 | Recorrido general           | [/recorrido](https://rikuy-demo-norte.vercel.app/recorrido)                              | Todos los tours del municipio en un solo visor, con el menú «Tours»                           |
 | Otro municipio, mismo build | [rikuy-demo-sur.vercel.app](https://rikuy-demo-sur.vercel.app)                           | Otra marca, otros colores y otros contenidos, sin una línea de código distinta                |
-| Ucureña                     | [rikuy-ucurena.vercel.app](https://rikuy-ucurena.vercel.app)                             | El primer municipio real, en preparación: su contenido se carga desde el panel                |
 
 El panel de administración ([rikuy-app-admin.vercel.app](https://rikuy-app-admin.vercel.app/login)) es solo por invitación: no hay registro público.
 
-> Los datos de los portales de demostración son sintéticos. Las fotos y los panoramas reales los sube cada municipio desde su panel.
+> Los datos de los portales de demostración son sintéticos. Las fotos, los panoramas y el libro de Ucureña son reales y los cargó su equipo desde el panel.
+
+## Capturas
+
+Ucureña en un celular Android: inicio, ficha de un destino, un tour 360°, el menú del recorrido general, Chaski respondiendo con el libro histórico como fuente y el mapa.
+
+<p>
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-inicio.webp" alt="Inicio del portal de Ucureña" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-ficha.webp" alt="Ficha del Museo de Ucureña" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-tour.webp" alt="Tour 360° del museo con una flecha a la otra escena" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-recorrido.webp" alt="Menú del recorrido general con los siete tours" width="200">
+</p>
+<p>
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-chaski-1.webp" alt="Chaski responde sobre la ch'ampa guerra" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-chaski-2.webp" alt="Fuentes de la respuesta: el libro histórico con sus páginas" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-mapa.webp" alt="Mapa con la ficha resumida del museo" width="200">
+</p>
+
+El editor del tour en el panel: escenas, vista inicial y los puntos de cada escena.
+
+<p>
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-panel-1.webp" alt="Editor del tour del museo: escenas y visor 360°" width="600">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-panel-2.webp" alt="Puntos de la escena: ir a otra escena, modelo 3D e información" width="380">
+</p>
 
 ## Qué hace
 
@@ -49,7 +73,7 @@ El panel de administración ([rikuy-app-admin.vercel.app](https://rikuy-app-admi
 
 ## Estado
 
-Fases P1 a P4 y el **Hito Demo / Portafolio** terminados: fundación, medios, portal, tours, Ucureña lista para cargar su contenido, demos comerciales y una semana de operación con planes gratuitos sin caídas. **P5** terminada: el asistente del visitante (conversación con fuentes citadas, planes, guía en el tour y voz) y el Copilot del panel para el equipo del municipio. Sigue **P6**, el gate del piloto SaaS. Detalle en el [roadmap](docs/roadmap.md) y el [checkpoint](docs/progress/CHECKPOINT.md).
+Fases P1 a P4 y el **Hito Demo / Portafolio** terminados: fundación, medios, portal, tours, demos comerciales y una semana de operación con planes gratuitos sin caídas. **P5** terminada: el asistente del visitante (conversación con fuentes citadas, planes, guía en el tour y voz) y el Copilot del panel. **P6**, el gate del piloto SaaS, aprobado el 10 de noviembre de 2026: segundo factor para propietarios y administradores, métricas por municipio, evaluación con el modelo real y respaldo diario con restauración probada. En curso **C0**: Ucureña como vitrina, con su contenido real. Detalle en el [roadmap](docs/roadmap.md) y el [checkpoint](docs/progress/CHECKPOINT.md).
 
 ## Arquitectura
 
@@ -78,7 +102,7 @@ Más detalle en [arquitectura](docs/architecture.md).
 
 ## Decisiones clave
 
-Las 42 decisiones están registradas como ADR ([índice](docs/adr/README.md)). Algunas:
+Las 50 decisiones están registradas como ADR ([índice](docs/adr/README.md)). Algunas:
 
 | ADR                                                        | Decisión                                                                                         |
 | ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
@@ -94,44 +118,49 @@ Las 42 decisiones están registradas como ADR ([índice](docs/adr/README.md)). A
 | [035](docs/adr/ADR-035-free-plan-operations.md)            | Operación con planes gratuitos: control diario, avisos por correo y limpieza automática          |
 | [036](docs/adr/ADR-036-ai-gateway.md)                      | Toda la IA pasa por un gateway que reserva la cuota antes de llamar al modelo                    |
 | [038](docs/adr/ADR-038-visitor-assistant.md)               | El asistente responde solo con pasajes publicados y descarta cualquier cita inventada            |
+| [046](docs/adr/ADR-046-backup-restore.md)                  | Respaldo diario cifrado de la base y los archivos, con un ensayo de restauración semanal         |
+| [050](docs/adr/ADR-050-portal-media-same-origin.md)        | Las fotos del portal salen de su propia dirección, por la conexión que la página ya abrió        |
 
 ## Métricas reales
 
-**Lighthouse sobre producción** (31 de octubre de 2026, móvil con 4G y CPU ×4 simulados, mediana de 3 corridas):
+**Lighthouse sobre producción** (12 de noviembre de 2026, con el contenido real de Ucureña y las dos demos; móvil con 4G y CPU ×4 simulados, mediana de 3 corridas):
 
 | Página                   | Rendimiento | LCP       | Accesibilidad · Buenas prácticas · SEO |
 | ------------------------ | ----------- | --------- | -------------------------------------- |
-| Inicio                   | 98–99       | 1,9–2,0 s | 100 · 100 · 100                        |
-| Destinos y su ficha      | 99–100      | 1,4–1,8 s | 100 · 100 · 100                        |
-| Agenda y ficha de evento | 99–100      | 1,7–1,8 s | 100 · 100 · 100                        |
-| Tour 360°                | 77–78       | 2,4–2,6 s | 100 · 100 · 100                        |
-| Mapa                     | 68–69       | 2,0 s     | 100 · 100 · 100                        |
+| Inicio                   | 99          | 1,9–2,1 s | 100 · 100 · 100                        |
+| Destinos y su ficha      | 98–100      | 1,8–2,3 s | 100 · 100 · 100                        |
+| Agenda y ficha de evento | 98–100      | 1,6–2,4 s | 100 · 100 · 100                        |
+| Tour 360° y recorrido    | 88–90       | 2,5–2,6 s | 100 · 100 · 100                        |
+| Mapa                     | 69–76       | 1,8–2,0 s | 100 · 100 · 100                        |
 
-CLS 0 en todas. JavaScript inicial de unos 150 KB por página; el mapa y los visores 3D se descargan aparte, solo donde se usan.
+CLS de 0 a 0,002. JavaScript inicial de unos 150 KB por página; el mapa y los visores 3D se descargan aparte, solo donde se usan.
 
 **En un teléfono Android real** (CRT-NX3, Mali-G57, 4G, en producción, con el panel de medición `?medir`):
 
-| Qué                                 | Resultado                                   |
-| ----------------------------------- | ------------------------------------------- |
-| Primera escena del tour en pantalla | 1,46 s                                      |
-| 20 cambios de escena seguidos       | p95 de 0,95 s, ninguno sin terminar         |
-| Girar el panorama                   | 87 cuadros/s, sin cuadros largos            |
-| Modelo 3D visible tras «Ver en 3D»  | 3,6 s                                       |
-| Mapa: LCP y vista completa          | 1,99 s y 3,25 s                             |
-| Mover el mapa                       | 82 cuadros/s, ningún cuadro de más de 50 ms |
+| Qué                                 | Resultado                                                |
+| ----------------------------------- | -------------------------------------------------------- |
+| Primera escena del tour en pantalla | 1,46 s                                                   |
+| 20 cambios de escena seguidos       | p95 de 0,95 s, ninguno sin terminar                      |
+| Girar el panorama                   | 87 cuadros/s, sin cuadros largos                         |
+| Modelo 3D visible tras «Ver en 3D»  | 3,6 s                                                    |
+| Mapa: LCP y vista completa          | 1,99 s y 3,25 s                                          |
+| Mover el mapa                       | 82 cuadros/s, ningún cuadro de más de 50 ms              |
+| Panorama de 8192 px en teselas      | primera escena en 1,11 s (wifi) y 1,86 s (datos móviles) |
 
 **Pruebas** (todas en cada PR):
 
-- 702 tests unitarios y 1.063 aserciones pgTAP de RLS, aislamiento e invariantes.
+- 810 tests unitarios y 1.345 aserciones pgTAP de RLS, aislamiento e invariantes.
 - Integración contra la pila real de Supabase: Data API, Storage, colas, correo y una matriz de acceso por rol.
 - E2E en un navegador real:
   - portales (161 verificaciones);
-  - contratos de regresión RC-09/10/11/12 (189): sin desbordes de 360 a 1280 px, axe sin hallazgos graves, ningún enlace roto y SEO por municipio;
+  - contratos de regresión RC-09/10/11/12 (202): sin desbordes de 360 a 1280 px, axe sin hallazgos graves, ningún enlace roto y SEO por municipio;
   - ubicación RC-06 (35), sin que la posición salga del teléfono;
   - tours RC-01/07/08: recorridos completos, respuestas tardías y la memoria del visor 3D;
   - comparación de color de los modelos 3D;
-  - asistente (6 casos): fuentes de su municipio, citas inventadas descartadas, planes sin coordenadas, cuota agotada y dictado con un micrófono simulado.
-- Evaluación del asistente con el modelo real (Groq), sobre una demo en producción: 38 de 40 en el gold de preguntas (las otras 2 fallaron al leer la respuesta, ya corregido) y 11 de 11 en planes y guía del tour, sin citas inventadas.
+  - asistente (6 casos): fuentes de su municipio, citas inventadas descartadas, planes sin coordenadas, cuota agotada y dictado con un micrófono simulado;
+  - segundo factor, Copilot, métricas, evaluación, reemplazo de medios, cambio de dirección y borrar o mover un tour.
+- Evaluación con el modelo real (Groq) en producción ([detalle](docs/gold-modelo-real.md)): el asistente con 119 de 120 en las preguntas reservadas y 120 de 120 en seguridad, sin fugas ni citas inventadas; el Copilot, 14 de 14 sin acciones no autorizadas.
+- Respaldo diario cifrado y un ensayo semanal que lo restaura en una pila nueva y lo verifica.
 - Lighthouse con presupuesto en cada PR y sobre producción después de cada merge.
 - Un control diario en producción.
 

@@ -4,10 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C0 — Ucureña lista como vitrina. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C0 · Paso 3 — borrar un tour o pasarlo a otro destino o evento ✅
-- **En curso:** C0 · Paso 4 — carga del contenido real de Ucureña (parte 1 lista)
-- **Rama:** `fix/portal-photo-lcp` → PR hacia `main`
+- **Fase:** C0 — Ucureña lista como vitrina ✅. P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10). Sigue C1.
+- **Último paso completado:** C0 · Paso 4 — contenido real de Ucureña, Lighthouse y README con capturas ✅
+- **Rama:** `docs/c0-step4-readme` → PR hacia `main`
 
 ## Historial
 
@@ -1806,7 +1805,7 @@ Lo que encontró el CI, ya corregido:
 
 **Verificación en producción (2026-11-10):** el usuario pasó un tour de «Concierto de la banda» a «Festival de invierno» y lo devolvió (dos `tour.moved` en la auditoría, consulta de solo lectura), y creó, publicó y borró un tour de prueba. Las direcciones viejas llevaron a donde correspondía.
 
-### C0 · Paso 4 — contenido real de Ucureña (en curso)
+### C0 · Paso 4 — contenido real de Ucureña ✅
 
 Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, eventos y el libro; 2: panoramas, los modelos 3D que están bien, tours y el orden del recorrido general; 3: capturas y README); las capturas las saca él.
 
@@ -1831,14 +1830,39 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - En local, `next start` no agrega las cabeceras de `vercel.json`: la CSP de `/medios` y la caché (`x-vercel-cache`) se comprueban en producción.
 - Una foto borrada puede seguir en la caché de Vercel hasta 30 días; se purga desde su panel si hace falta.
 
+**Verificación en producción de `fix/portal-photo-lcp` (2026-11-12):**
+
+- Las fotos salen de `/medios` (200 `image/webp`, con la CSP `sandbox` y `nosniff`) y se ven bien en el celular del usuario.
+- «Lighthouse on production» en verde, con el contenido real: inicio de Ucureña 2,09 s, `/destinos` 2,29 s, ficha de la iglesia 2,11 s, ficha del carnaval 2,38 s (antes 3,6–4,1 s), rendimiento 98–100.
+- **Vercel no guarda las fotos en caché** (`x-vercel-cache: MISS` siempre): Storage responde con una cookie de Cloudflare y Vercel no guarda respuestas con `Set-Cookie`. La mejora viene de la misma conexión, no de la caché. Anotado como corrección en [ADR-050](../adr/ADR-050-portal-media-same-origin.md).
+
+**Parte 2 (2026-11-12), cargada por el usuario:** 14 panoramas, 5 modelos 3D y 7 tours publicados, todos en el recorrido general. Revisado (consultas de solo lectura y un navegador contra producción):
+
+- inicio, `/destinos`, una ficha de cada tipo, `/recorrido` y tres tours a 360 y 1280 px: sin desbordes, axe sin hallazgos críticos ni graves y sin imágenes rotas;
+- Lighthouse: tour de la plaza 2,55 s y `/recorrido` 2,50 s (límite 3 s), rendimiento 89–90; `/mapa` 76;
+- almacenamiento: Ucureña 309 de sus 600 MB; el proyecto, 416 MB de 1 GB del plan gratuito;
+- el portal ya no lleva `noindex` (tiene contenido publicado) y `robots.txt` permite todo.
+
+**Parte 3 (2026-11-12), `docs/c0-step4-readme`:**
+
+- El usuario sacó las capturas en su Android y en el panel; elegimos 9 y las recorté (sin barras del celular, del navegador ni su perfil de Chrome). Antes corrigió el título del libro («Libro histórico de Ucureña», versión 2, leída por el asistente en sus 144 pasajes) y repitió la captura de Chaski.
+- README en español e inglés: Ucureña primero en «Pruébalo en vivo», con un tour; sección **«Capturas»**; estado con P6 aprobado y C0; 50 ADR (suma 046 y 050); Lighthouse del 12 de noviembre con el contenido real; las teselas en Android; 810 unitarios y 1.345 pgTAP; la evaluación con el modelo real y el respaldo.
+- Las imágenes no entran al repositorio (CONTRIBUTING §1.5): van como archivos de la release `readme-capturas-2026-11`, que crea el usuario (mi entorno no puede crear releases). El README las enlaza desde ahí.
+- ADR-050 con su corrección, arquitectura y presupuesto de rendimiento al día; C0 · Paso 4 ✅ en el roadmap.
+
+**Desviaciones:**
+
+- Las capturas se ven en el README cuando la release existe con esos nombres de archivo.
+- Pendiente del usuario, sin captura: «Television» → «Televisión» en el punto del modelo 3D del museo, y «Comidas Tipicas» → «Típicas».
+
 ## Cómo verificarlo
 
-- Tras el merge, `curl -sI https://rikuy-ucurena.vercel.app/medios/…` (una dirección de foto de la página) responde 200 `image/webp` con `content-security-policy: default-src 'none'; sandbox`, y la segunda vez `x-vercel-cache: HIT`.
-- «Lighthouse on production» en verde para las páginas con fotos de Ucureña.
+- Tras crear la release y hacer el merge, el README de GitHub muestra las 9 capturas.
+- `rikuy-ucurena.vercel.app` responde sin `noindex` y «Lighthouse on production» sigue en verde.
 
 ## Siguiente paso
 
-**C0 · Paso 4, parte 2** — el usuario sube panoramas, los modelos 3D que están bien, arma los tours y el orden del recorrido general; después reviso (Lighthouse, desbordes, axe, cuota) y seguimos con la parte 3 (capturas y README).
+**C1 — métricas y estrategia** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): lo más visto, escaneos QR, lo que preguntan los visitantes sin respuesta, recomendaciones del Copilot e informe mensual para la alcaldía. Antes de empezar, definir con el usuario los pasos de C1 y escribirlos en el roadmap.
 
 ## Decisiones pendientes del usuario
 

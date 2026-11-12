@@ -13,17 +13,41 @@
 
 | What                             | Address                                                                                  | What to look at                                                                     |
 | -------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Ucureña                          | [rikuy-ucurena.vercel.app](https://rikuy-ucurena.vercel.app)                             | The first real municipality: places, events, 7 360° tours and Chaski, its assistant |
+| A tour in Ucureña                | [Museo de Ucureña](https://rikuy-ucurena.vercel.app/destinos/museo-de-ucurena/tour)      | Real panoramas, a 3D model and photos inside the tour                               |
 | Demo portal                      | [rikuy-demo-norte.vercel.app](https://rikuy-demo-norte.vercel.app)                       | Places, events, the map with "Use my location", the 360° tours and the "Asistente"  |
 | A 360° tour                      | [Mirador del Valle](https://rikuy-demo-norte.vercel.app/destinos/mirador-del-valle/tour) | Two scenes linked by arrows, a 3D model loaded on demand and a jump to another tour |
 | General tour                     | [/recorrido](https://rikuy-demo-norte.vercel.app/recorrido)                              | Every tour of the municipality in a single viewer, with the "Tours" menu            |
 | Another municipality, same build | [rikuy-demo-sur.vercel.app](https://rikuy-demo-sur.vercel.app)                           | A different brand, colors and content, without a single line of different code      |
-| Ucureña                          | [rikuy-ucurena.vercel.app](https://rikuy-ucurena.vercel.app)                             | The first real municipality, being prepared: its content is loaded from the panel   |
 
 The admin panel ([rikuy-app-admin.vercel.app](https://rikuy-app-admin.vercel.app/login)) is invitation-only: there is no public sign-up.
 
-> The demo portals use synthetic data. Each municipality uploads its real photos and panoramas from its panel.
+> The demo portals use synthetic data. Ucureña's photos, panoramas and history book are real, loaded by its team from the panel.
 
 The interface is in Spanish, the language of the municipalities it serves.
+
+## Screenshots
+
+Ucureña on an Android phone: the home page, a place page, a 360° tour, the general tour menu, Chaski answering with the history book as its source, and the map.
+
+<p>
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-inicio.webp" alt="Ucureña's portal home page" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-ficha.webp" alt="The Museo de Ucureña page" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-tour.webp" alt="The museum's 360° tour with an arrow to the other scene" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-recorrido.webp" alt="The general tour menu with the seven tours" width="200">
+</p>
+<p>
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-chaski-1.webp" alt="Chaski answers about the ch'ampa guerra" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-chaski-2.webp" alt="The answer's sources: the history book with its pages" width="200">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-mapa.webp" alt="The map with the museum's summary card" width="200">
+</p>
+
+The tour editor in the admin panel: scenes, starting view and each scene's points.
+
+<p>
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-panel-1.webp" alt="The museum tour editor: scenes and the 360° viewer" width="600">
+  <img src="https://github.com/jorgesolizvidal/rikuy/releases/download/readme-capturas-2026-11/ucurena-panel-2.webp" alt="The scene's points: go to another scene, 3D model and information" width="380">
+</p>
 
 ## What it does
 
@@ -51,7 +75,7 @@ The interface is in Spanish, the language of the municipalities it serves.
 
 ## Status
 
-Phases P1 to P4 and the **Demo / Portfolio** milestone are done: foundation, media, portal, tours, Ucureña ready for its content, sales demos, and a week running on free plans without outages. **P5** is done: the visitor assistant (a conversation with cited sources, plans, a tour guide and voice) and the admin Copilot for the municipality's team. Next is **P6**, the SaaS pilot gate. Details in the [roadmap](docs/roadmap.md) and the [checkpoint](docs/progress/CHECKPOINT.md) (in Spanish).
+Phases P1 to P4 and the **Demo / Portfolio** milestone are done: foundation, media, portal, tours, sales demos, and a week running on free plans without outages. **P5** is done: the visitor assistant (a conversation with cited sources, plans, a tour guide and voice) and the admin Copilot. **P6**, the SaaS pilot gate, was approved on November 10, 2026: two-factor authentication for owners and admins, per-municipality metrics, an evaluation with the real model, and daily backups with a tested restore. Now in progress: **C0**, Ucureña as the showcase, with its real content. Details in the [roadmap](docs/roadmap.md) and the [checkpoint](docs/progress/CHECKPOINT.md) (in Spanish).
 
 ## Architecture
 
@@ -80,60 +104,65 @@ More in [architecture](docs/architecture.md) (in Spanish).
 
 ## Key decisions
 
-All 42 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish). Some of them:
+All 50 decisions are recorded as ADRs ([index](docs/adr/README.md), in Spanish). Some of them:
 
-| ADR                                                        | Decision                                                                                      |
-| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------- |
-| 003 · 015                                                  | Shared tables with `tenant_id` and RLS; the municipality is resolved from a registered domain |
-| [020](docs/adr/ADR-020-panorama-delivery-by-resolution.md) | Panoramas: a single image up to 4096 px, tiled levels above that, and a preview ≤ 40 KB       |
-| [021](docs/adr/ADR-021-visitor-location.md)                | The visitor's location is computed on the device and never stored                             |
-| [024](docs/adr/ADR-024-portal-page-cache.md)               | Page cache per municipality (ISR), invalidated on publish                                     |
-| [025](docs/adr/ADR-025-job-runner-wake-up.md)              | The database wakes the job runner (Vercel Hobby's cron runs once a day)                       |
-| [026](docs/adr/ADR-026-glb-pipeline.md)                    | 3D models with Meshopt and KTX2, with colors compared before and after                        |
-| [027](docs/adr/ADR-027-usage-quotas.md)                    | Per-municipality quotas with atomic reservations and real measurement in Storage              |
-| [030](docs/adr/ADR-030-tour-publication.md)                | Publishing a tour copies its public media first, then seals                                   |
-| [033](docs/adr/ADR-033-tour-models.md)                     | In a tour, a 3D model is an image first; the viewer and the GLB load only on request          |
-| [035](docs/adr/ADR-035-free-plan-operations.md)            | Running on free plans: a daily check, email alerts and automatic cleanup                      |
-| [036](docs/adr/ADR-036-ai-gateway.md)                      | All AI goes through a gateway that reserves the quota before calling the model                |
-| [038](docs/adr/ADR-038-visitor-assistant.md)               | The assistant answers only from published passages and drops any made-up citation             |
+| ADR                                                        | Decision                                                                                            |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| 003 · 015                                                  | Shared tables with `tenant_id` and RLS; the municipality is resolved from a registered domain       |
+| [020](docs/adr/ADR-020-panorama-delivery-by-resolution.md) | Panoramas: a single image up to 4096 px, tiled levels above that, and a preview ≤ 40 KB             |
+| [021](docs/adr/ADR-021-visitor-location.md)                | The visitor's location is computed on the device and never stored                                   |
+| [024](docs/adr/ADR-024-portal-page-cache.md)               | Page cache per municipality (ISR), invalidated on publish                                           |
+| [025](docs/adr/ADR-025-job-runner-wake-up.md)              | The database wakes the job runner (Vercel Hobby's cron runs once a day)                             |
+| [026](docs/adr/ADR-026-glb-pipeline.md)                    | 3D models with Meshopt and KTX2, with colors compared before and after                              |
+| [027](docs/adr/ADR-027-usage-quotas.md)                    | Per-municipality quotas with atomic reservations and real measurement in Storage                    |
+| [030](docs/adr/ADR-030-tour-publication.md)                | Publishing a tour copies its public media first, then seals                                         |
+| [033](docs/adr/ADR-033-tour-models.md)                     | In a tour, a 3D model is an image first; the viewer and the GLB load only on request                |
+| [035](docs/adr/ADR-035-free-plan-operations.md)            | Running on free plans: a daily check, email alerts and automatic cleanup                            |
+| [036](docs/adr/ADR-036-ai-gateway.md)                      | All AI goes through a gateway that reserves the quota before calling the model                      |
+| [038](docs/adr/ADR-038-visitor-assistant.md)               | The assistant answers only from published passages and drops any made-up citation                   |
+| [046](docs/adr/ADR-046-backup-restore.md)                  | Encrypted daily backup of the database and the files, with a weekly restore drill                   |
+| [050](docs/adr/ADR-050-portal-media-same-origin.md)        | Portal photos are served from the portal's own address, over the connection the page already opened |
 
 ## Real numbers
 
-**Lighthouse on production** (October 31, 2026, simulated mobile with 4G and 4× CPU slowdown, median of 3 runs):
+**Lighthouse on production** (November 12, 2026, with Ucureña's real content and both demos; simulated mobile with 4G and 4× CPU slowdown, median of 3 runs):
 
-| Page                     | Performance | LCP       | Accessibility · Best practices · SEO |
-| ------------------------ | ----------- | --------- | ------------------------------------ |
-| Home                     | 98–99       | 1.9–2.0 s | 100 · 100 · 100                      |
-| Places and a place page  | 99–100      | 1.4–1.8 s | 100 · 100 · 100                      |
-| Events and an event page | 99–100      | 1.7–1.8 s | 100 · 100 · 100                      |
-| 360° tour                | 77–78       | 2.4–2.6 s | 100 · 100 · 100                      |
-| Map                      | 68–69       | 2.0 s     | 100 · 100 · 100                      |
+| Page                       | Performance | LCP       | Accessibility · Best practices · SEO |
+| -------------------------- | ----------- | --------- | ------------------------------------ |
+| Home                       | 99          | 1.9–2.1 s | 100 · 100 · 100                      |
+| Places and a place page    | 98–100      | 1.8–2.3 s | 100 · 100 · 100                      |
+| Events and an event page   | 98–100      | 1.6–2.4 s | 100 · 100 · 100                      |
+| 360° tour and general tour | 88–90       | 2.5–2.6 s | 100 · 100 · 100                      |
+| Map                        | 69–76       | 1.8–2.0 s | 100 · 100 · 100                      |
 
-CLS is 0 on every page. Initial JavaScript is about 150 KB per page; the map and the 3D viewers download separately, only where they are used.
+CLS from 0 to 0.002. Initial JavaScript is about 150 KB per page; the map and the 3D viewers download separately, only where they are used.
 
 **On a real Android phone** (CRT-NX3, Mali-G57, 4G, in production, with the `?medir` measurement panel):
 
-| What                                | Result                              |
-| ----------------------------------- | ----------------------------------- |
-| First tour scene on screen          | 1.46 s                              |
-| 20 scene changes in a row           | p95 of 0.95 s, none left unfinished |
-| Turning the panorama                | 87 fps, no long frames              |
-| 3D model visible after "View in 3D" | 3.6 s                               |
-| Map: LCP and complete view          | 1.99 s and 3.25 s                   |
-| Moving the map                      | 82 fps, no frame over 50 ms         |
+| What                                | Result                                                |
+| ----------------------------------- | ----------------------------------------------------- |
+| First tour scene on screen          | 1.46 s                                                |
+| 20 scene changes in a row           | p95 of 0.95 s, none left unfinished                   |
+| Turning the panorama                | 87 fps, no long frames                                |
+| 3D model visible after "View in 3D" | 3.6 s                                                 |
+| Map: LCP and complete view          | 1.99 s and 3.25 s                                     |
+| Moving the map                      | 82 fps, no frame over 50 ms                           |
+| An 8192 px panorama in tiles        | first scene in 1.11 s (wifi) and 1.86 s (mobile data) |
 
 **Tests** (all of them on every PR):
 
-- 702 unit tests and 1,063 pgTAP assertions on RLS, isolation and invariants.
+- 810 unit tests and 1,345 pgTAP assertions on RLS, isolation and invariants.
 - Integration against the real Supabase stack: Data API, Storage, queues, email and a per-role access matrix.
 - End-to-end in a real browser:
   - portals (161 checks);
-  - regression contracts RC-09/10/11/12 (189): no overflow from 360 to 1280 px, no serious axe findings, no broken links, and SEO per municipality;
+  - regression contracts RC-09/10/11/12 (202): no overflow from 360 to 1280 px, no serious axe findings, no broken links, and SEO per municipality;
   - location RC-06 (35), with the position never leaving the phone;
   - tours RC-01/07/08: full walkthroughs, late responses and the 3D viewer's memory;
   - a color comparison of the 3D models;
-  - the assistant (6 cases): sources from its own municipality, made-up citations dropped, plans without coordinates, an exhausted quota and dictation with a fake microphone.
-- The assistant evaluated with the real model (Groq) on a demo in production: 38 of 40 on the gold questions (the other 2 failed when reading the answer, since fixed) and 11 of 11 on plans and the tour guide, with no made-up citations.
+  - the assistant (6 cases): sources from its own municipality, made-up citations dropped, plans without coordinates, an exhausted quota and dictation with a fake microphone;
+  - two-factor authentication, the Copilot, metrics, the evaluation, replacing media, changing an address, and deleting or moving a tour.
+- Evaluation with the real model (Groq) in production ([details](docs/gold-modelo-real.md), in Spanish): the assistant scored 119 of 120 on the held-out questions and 120 of 120 on safety, with no leaks or made-up citations; the Copilot, 14 of 14 with no unauthorized actions.
+- An encrypted daily backup, and a weekly drill that restores it on a fresh stack and verifies it.
 - Lighthouse with a budget on every PR, and on production after every merge.
 - A daily check on production.
 

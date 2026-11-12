@@ -40,3 +40,18 @@ Decisión del usuario (2026-11-11): **servir las fotos desde la misma dirección
 - **Una foto borrada puede seguir en la caché de Vercel hasta 30 días** (y en la del navegador, como antes). Hoy los medios publicados que dejan de usarse ya quedan públicos (ADR-035); si un municipio necesita retirar una foto al momento, se purga la caché de Vercel desde su panel.
 - En local, `next start` reenvía la _rewrite_ pero no agrega las cabeceras de `vercel.json`: la CSP de `/medios` se comprueba en producción.
 - Los medios del panel (vistas previas con URL firmada) no cambian.
+
+## Corrección (2026-11-12): Vercel no guarda las fotos
+
+Medido en producción tras el merge (`fix/portal-photo-lcp`, PR #65):
+
+- **Los tiempos mejoraron como se esperaba.** «Lighthouse on production» sobre el contenido real de Ucureña: inicio de 3,63 a 2,09 s, `/destinos` de 3,91 a 2,29 s, ficha de un lugar de 3,77 a 2,11 s y ficha de un evento de 4,14 a 2,38 s, con rendimiento de 98–99 y todo el presupuesto en verde.
+- **Pero la caché del punto 2 no funciona:** `/medios` responde siempre `x-vercel-cache: MISS`. Storage (detrás de Cloudflare) agrega a cada imagen una cookie `__cf_bm` (`Set-Cookie`, del dominio `supabase.co`), y Vercel no guarda en su caché una respuesta con `Set-Cookie`. `vercel.json` puede agregar cabeceras, pero no quitar una que trae el origen.
+
+Qué significa:
+
+- Cada foto pasa por Vercel hasta Storage. Storage la sirve desde su propia CDN (`cf-cache-status: HIT`), así que la respuesta es rápida igual. La mejora del LCP viene de usar la conexión que la página ya abrió, no de la caché.
+- La transferencia de Vercel cuenta cada foto (y la de Storage, como antes). Con derivados de 30–150 KB alcanza holgado para la vitrina; se revisa con el tráfico real (C1).
+- La consecuencia de «una foto borrada puede seguir 30 días en la caché de Vercel» no aplica: queda solo la caché del navegador, como antes.
+- La cookie de Storage llega al navegador del visitante con `Domain=supabase.co`; el navegador la descarta porque no es de la dirección del portal.
+- Las cabeceras de `vercel.json` se mantienen: la CSP `sandbox` y `nosniff` funcionan (comprobado con `curl`), y las de caché no hacen daño. Si hiciera falta la caché, la alternativa es una ruta propia que lea la imagen de Storage y la responda sin la cookie (una invocación de función por foto que no esté en caché).
