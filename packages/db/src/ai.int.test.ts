@@ -98,6 +98,54 @@ describe.runIf(reachable)("the AI gateway (real PostgreSQL, role rikuy_ai)", () 
     }
   });
 
+  it("keeps an unanswered question of an assistant request, masked, once (ADR-053)", async () => {
+    const ledger = ledgerOf();
+    try {
+      const assistant = await runAiRequest(
+        { tenantId: SUR, profile: "assistant", messages: PROBE_MESSAGES, visitor: "198.51.100.40" },
+        { ledger, provider: createSimulatedAiProvider() },
+      );
+      const probe = await runAiRequest(
+        { tenantId: SUR, profile: "probe", messages: PROBE_MESSAGES },
+        { ledger, provider: createSimulatedAiProvider() },
+      );
+      if (assistant.outcome !== "answered" || probe.outcome !== "answered") {
+        throw new Error("the simulated model did not answer");
+      }
+      const question = {
+        requestId: assistant.requestId,
+        question: "¿Hay cajero? Mi CI es 9876543",
+        lang: "es" as const,
+        page: { kind: "destination" as const, slug: "laguna-espejo" },
+        sceneId: null,
+      };
+      expect(await ledger.recordUnansweredQuestion(SUR, question)).toBe("recorded");
+      expect(await ledger.recordUnansweredQuestion(SUR, question)).toBe("ignored");
+      // Only for the visitor's assistant, and only in its own municipality.
+      expect(
+        await ledger.recordUnansweredQuestion(SUR, { ...question, requestId: probe.requestId }),
+      ).toBe("ignored");
+      expect(
+        await ledger.recordUnansweredQuestion("5eed1000-0000-4000-8000-000000000001", question),
+      ).toBe("ignored");
+      const rows = await admin`
+        select q.question_text, q.page_kind, i.slug
+        from public.unanswered_questions q
+        left join public.content_items i on i.tenant_id = q.tenant_id and i.id = q.content_id
+        where q.request_id = ${assistant.requestId}::uuid
+      `;
+      expect(rows.map((row) => ({ ...row }))).toEqual([
+        {
+          question_text: "¿Hay cajero? Mi CI es [número]",
+          page_kind: "destination",
+          slug: "laguna-espejo",
+        },
+      ]);
+    } finally {
+      await ledger.close();
+    }
+  });
+
   it("never lets eight requests at once pass the municipality's quota", async () => {
     const now = await aiBucket();
     await setAiLimit(now.consumed + now.reserved + 3 * RESERVE + Math.floor(RESERVE / 2));

@@ -4,6 +4,7 @@ import type {
   DictationLedger,
   KnowledgePassage,
   TourGuideContext,
+  UnansweredQuestion,
 } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
@@ -44,8 +45,18 @@ export interface PostgresAiLedger extends AiLedger, DictationLedger {
     sceneId: string | null,
     hotspotId: string | null,
   ): Promise<TourGuideContext | null>;
+  /**
+   * ai_api.record_unanswered_question (ADR-053): keeps a question the assistant just failed to
+   * answer, for the municipality. The database masks personal data again.
+   */
+  recordUnansweredQuestion(
+    tenantId: string,
+    question: UnansweredQuestion,
+  ): Promise<"recorded" | "ignored" | "capped">;
   close(): Promise<void>;
 }
+
+const recordedSchema = z.enum(["recorded", "ignored", "capped"]);
 
 const tourContextSchema = z.discriminatedUnion("status", [
   z.object({
@@ -151,6 +162,16 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
         hotspotStatus: context.hotspotStatus,
         passages: context.passages.map((passage) => mapPassageRow(passage)),
       };
+    },
+
+    async recordUnansweredQuestion(tenantId, question) {
+      const [row] = await sql`
+        select ai_api.record_unanswered_question(
+          ${tenantId}::uuid, ${question.requestId}::uuid, ${question.question}, ${question.lang},
+          ${question.page.kind}, ${question.page.slug}::text, ${question.sceneId}::uuid
+        ) as outcome
+      `;
+      return recordedSchema.parse(row?.outcome);
     },
 
     async close() {

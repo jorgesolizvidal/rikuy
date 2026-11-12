@@ -19,6 +19,7 @@ import {
   type SpeechTranscriber,
   type TourGuideContext,
   transcribeDictation,
+  type UnansweredQuestion,
 } from "@rikuy/core";
 import {
   createGroqProvider,
@@ -41,7 +42,10 @@ import {
 const jsonAiLogger: AiLogger = {
   event(name, fields) {
     const level =
-      name === "ai.begin_failed" || name === "ai.finish_failed" || name === "ai.setup_failed"
+      name === "ai.begin_failed" ||
+      name === "ai.finish_failed" ||
+      name === "ai.setup_failed" ||
+      name === "ai.unanswered_failed"
         ? "warn"
         : "info";
     console.log(JSON.stringify({ level, event: name, ...fields, at: new Date().toISOString() }));
@@ -188,6 +192,28 @@ export async function searchAiKnowledge(
   const deps = env === null ? null : depsFor(env);
   if (deps === null) return [];
   return deps.ledger.searchKnowledge(tenantId, query, limit);
+}
+
+/**
+ * ai_api.record_unanswered_question (ADR-053): keeps, for the municipality, a question the
+ * assistant just could not answer. Called after the answer is sent; a failure is logged (the
+ * outcome only, never the text) and the visitor never notices.
+ */
+export async function recordUnansweredQuestion(
+  tenantId: string,
+  question: UnansweredQuestion,
+): Promise<void> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return;
+  try {
+    const outcome = await deps.ledger.recordUnansweredQuestion(tenantId, question);
+    jsonAiLogger.event("ai.unanswered_recorded", { outcome });
+  } catch (error) {
+    jsonAiLogger.event("ai.unanswered_failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    });
+  }
 }
 
 /** ai_api.tour_context (ADR-040): the tour's scene and point, checked against what is published. */

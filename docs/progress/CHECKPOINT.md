@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C1 · Paso 2 — panel «Estadísticas» del municipio ✅
-- **Rama:** `ci/faster-pipeline` → PR hacia `main`
+- **Último paso completado:** C1 · Paso 3 — lo que preguntan los visitantes ✅
+- **Rama:** `feat/c1-step3-unanswered-questions` → PR hacia `main`
 
 ## Historial
 
@@ -1952,14 +1952,87 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 
 - Si dos PR se mezclan sin actualizar uno con el otro, la combinación no pasa por las pruebas en navegador hasta el siguiente PR o una corrida manual en `main`.
 
+**Resultado (PR #70, 2026-11-12):** el CI del PR tardó 7 min 20 s y el de `main`, tras el merge, 1 min 49 s, los dos en verde.
+
+### C1 · Paso 3 — lo que preguntan los visitantes ✅
+
+- Decisiones del usuario ([ADR-053](../adr/ADR-053-unanswered-questions.md)), 2026-11-12:
+  - **todos los miembros** las ven, como «Estadísticas»;
+  - **solo cuando no sabía**: el asistente buscó y no encontró nada publicado. No cuando faltó cuota ni cuando falló el proveedor;
+  - **agrupar las iguales, sin IA**: sin mayúsculas, tildes ni signos;
+  - **ocultar los datos personales** al guardar.
+- Base de datos (`20261116000000_c1_unanswered_questions.sql`, solo expand):
+  - `unanswered_questions`:
+    - texto enmascarado, clave de grupo, idioma, día del municipio, tipo de página, lugar y escena;
+    - FK compuesta a `ai_requests` (un pedido por pregunta, se borra con él) y a `content_items`;
+    - RLS sin permisos para nadie;
+    - una restricción rechaza un correo o seis dígitos seguidos;
+  - `private.mask_question_text`: la base vuelve a enmascarar correos, enlaces y seis dígitos seguidos, aunque el llamador lo haya olvidado. `private.question_key` arma la clave sin mayúsculas, tildes ni signos;
+  - `ai_api.record_unanswered_question` (solo `rikuy_ai`):
+    - solo para un pedido del asistente del visitante, del mismo municipio, de los últimos 15 minutos, una vez;
+    - guarda el lugar si es de ese municipio y la escena si su tour la tiene;
+    - como mucho 1.000 por municipio y día;
+  - `tenant_unanswered_questions(tenant, 7 | 30 | 90)` (cualquier miembro, propietarios y administradores con segundo factor):
+    - grupos, los más preguntados primero, hasta 200;
+    - de cada grupo: redacción más reciente, veces, personas (distintas por día, con la huella del pedido, que no sale de la base), idiomas y las tres páginas con el nombre del lugar y de la escena;
+  - tarea `rikuy-forget-unanswered-questions` (08:27 UTC): las borra a los 90 días.
+- `@rikuy/core`:
+  - `domain/assistant/unanswered`:
+    - `maskPersonalData` cambia correos, enlaces, números con «+» y celulares bolivianos (8 dígitos que empiezan con 6 o 7) por `[correo]`, `[enlace]` y `[teléfono]`, y 6 o más dígitos, aunque estén separados, por `[número]`. Las fechas, los rangos de años, los precios y las horas quedan como están;
+    - `unansweredText` quita el saludo del principio y descarta «hola», «gracias» y «ok»;
+  - `askAssistant` devuelve `unanswered` solo en una abstención que no es la negativa a copiar su contexto;
+  - `loadUnansweredQuestions` y los períodos de 7, 30 y 90 días.
+- `@rikuy/db`: `recordUnansweredQuestion` en la conexión de la IA y `createUnansweredQuestionsRepository`. Antes de la migración, «todavía no hay preguntas».
+- Web:
+  - `POST /asistente` guarda la pregunta con `after()`, después de responder. Un fallo queda en el registro (`ai.unanswered_failed`, sin el texto) y el visitante no lo nota;
+  - **«Lo que preguntan los visitantes»** (`/o/{slug}/preguntas`, enlazada desde la página del municipio):
+    - períodos de 7, 30 y 90 días;
+    - totales de preguntas, preguntas distintas y personas;
+    - la lista agrupada con veces, personas, última vez, idioma y dónde se preguntó (enlace al editor del lugar);
+    - **«Probar esta pregunta en «Conocimiento del asistente»»** abre la búsqueda de prueba con la pregunta escrita (`?pregunta=`);
+    - «Cómo se guardan»;
+  - privacidad: el asistente ahora dice qué pregunta se guarda, sin qué y por cuánto tiempo, y pide no escribir datos personales.
+- Tests:
+  - 857 unitarios (core 574, db 178, web 45, worker 46, config 14): enmascarado (correos, enlaces, celular, internacional, carnet, tarjeta; fechas, años, precios y horas sin tocar), saludos, qué se guarda y qué no (respuesta, agradecimiento, eco S03, aviso del gateway) y el adaptador;
+  - 1.439 pgTAP (39 nuevos, `041_unanswered_questions`):
+    - nadie escribe ni lee la tabla salvo por las funciones;
+    - la base enmascara aunque el llamador no lo haga;
+    - un pedido de otro municipio, de la prueba del operador, viejo o desconocido no guarda nada;
+    - vacía, solo signos, idioma o página desconocidos;
+    - lugar y escena de este municipio, sí; los ajenos, no;
+    - la restricción de la tabla;
+    - agrupar con otras mayúsculas, tildes y signos, personas, redacción más reciente, página;
+    - 30 y 90 días;
+    - analista y editor leen; propietario sin segundo factor y otro municipio, no;
+    - olvido a los 90 días y con su pedido;
+    - `027` ahora exceptúa esta tabla de «ninguna columna guarda preguntas»;
+  - integración (`ai.int.test.ts`): con el rol `rikuy_ai` real, una pregunta guardada enmascarada con su lugar, una sola vez; la prueba del operador y otro municipio no;
+  - **e2e en un navegador real** (`unanswered.e2e.test.ts`, nuevo paso del job de contratos, 3 casos):
+    - el visitante pregunta en Demo Norte desde una ficha y desde el inicio, con otras mayúsculas: se guardan con su página y su lugar;
+    - una pregunta con correo y celular se guarda enmascarada;
+    - un agradecimiento y una falla del proveedor no se guardan;
+    - el propietario las ve agrupadas («2 veces · 1 persona», «Ficha de «Mirador del Valle» (1), Inicio (1)») y la prueba en «Conocimiento» abre con la pregunta escrita;
+    - un editor las ve; el propietario de Demo Sur recibe 404;
+    - axe sin hallazgos y sin desbordes a 390 y 1280 px;
+  - contratos RC-09/10/11/12: 216 (7 nuevos, `/preguntas`).
+- Verificado en local, en el navegador, a 390 y 1280 px.
+
+**Desviaciones:**
+
+- Agrupar por las mismas palabras no junta «¿hay wifi?» con «¿dónde hay internet?»: quedan como dos preguntas.
+- Un nombre o una dirección escritos en la pregunta quedan guardados; la página de privacidad pide no escribirlos.
+- «Personas» es por día, sumado, como en «Estadísticas».
+- No hay botón para borrar o marcar como resuelta una pregunta (no se pidió); se olvidan solas a los 90 días.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel: Ucureña → «Estadísticas». Debe mostrar las visitas desde el 12 de noviembre, «sin comparación» y desde cuándo se cuenta, el museo con su escaneo de QR y «BO · Punata» en «De dónde vienen».
-- Con la sesión de un analista o editor, la misma página; las dos descargas se abren en Excel con sus acentos.
+- Tras el merge y «Deploy database», en un portal en línea (por ejemplo, Demo Norte o Ucureña), preguntarle al asistente algo que no esté publicado: «¿Hay teleférico?». Después, otra con un correo o un celular inventados.
+- En el panel: el municipio → «Lo que preguntan los visitantes». Deben aparecer las dos preguntas, la segunda con `[correo]` o `[teléfono]`, con la página donde se hicieron. «Probar esta pregunta…» abre «Conocimiento del asistente» con la pregunta escrita.
+- Un «gracias» o una pregunta que el asistente sí responde no aparecen.
 
 ## Siguiente paso
 
-**C1 · Paso 3 — lo que preguntan los visitantes** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): el texto de las preguntas que el asistente no pudo responder, sin datos del visitante, por 90 días. Antes de empezar, confirmar con el usuario quién las ve, si se agrupan las parecidas y qué se hace con una pregunta que trae datos personales.
+**C1 · Paso 4 — recomendaciones del Copilot a partir de las métricas** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): cada recomendación cita los números en los que se basa y nunca publica sola. Antes de empezar, confirmar con el usuario dónde se muestran, cada cuánto se generan (y su costo de IA) y qué fuentes usan (visitas, preguntas sin respuesta, revisión del contenido).
 
 ## Decisiones pendientes del usuario
 

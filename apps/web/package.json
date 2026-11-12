@@ -21,7 +21,8 @@
     "test:e2e-media": "vitest run --config vitest.e2e.config.ts e2e/media.e2e.test.ts",
     "test:e2e-tour-removal": "vitest run --config vitest.e2e.config.ts e2e/tour-removal.e2e.test.ts",
     "test:e2e-visits": "vitest run --config vitest.e2e.config.ts e2e/visits.e2e.test.ts",
-    "test:e2e-statistics": "vitest run --config vitest.e2e.config.ts e2e/statistics.e2e.test.ts"
+    "test:e2e-statistics": "vitest run --config vitest.e2e.config.ts e2e/statistics.e2e.test.ts",
+    "test:e2e-unanswered": "vitest run --config vitest.e2e.config.ts e2e/unanswered.e2e.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",

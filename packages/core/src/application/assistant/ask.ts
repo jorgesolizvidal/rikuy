@@ -18,6 +18,7 @@ import {
   parseAssistantRequest,
   type AssistantRequest,
 } from "../../domain/assistant/request";
+import { unansweredText, type UnansweredQuestion } from "../../domain/assistant/unanswered";
 import type { PlanIntent } from "../../domain/plan/engine";
 import { detectPlanIntent } from "../../domain/plan/intent";
 import {
@@ -155,6 +156,12 @@ export const ECHO_REFUSAL = {
 export interface AssistantResult {
   readonly reply: AssistantReply;
   readonly trace: AssistantTrace | null;
+  /**
+   * The question, masked, when nothing published could answer it (C1 · Paso 3, ADR-053): the
+   * portal keeps it for the municipality after answering. Never for a plan, a notice (quota,
+   * provider) or a refusal to copy the model's context.
+   */
+  readonly unanswered?: UnansweredQuestion;
 }
 
 function today(now: Date, timezone: string): string {
@@ -426,6 +433,7 @@ export async function askAssistant(
   const contact = noticeContext.contact;
   const phone = contact.phone?.trim();
   const email = contact.email?.trim();
+  const kept = parsed.abstained && !parsed.echoed ? unansweredText(request.question) : null;
   return {
     reply: {
       status: "answered",
@@ -441,6 +449,17 @@ export async function askAssistant(
           : null,
     },
     trace,
+    ...(kept
+      ? {
+          unanswered: {
+            requestId: session.requestId,
+            question: kept,
+            lang,
+            page: request.page,
+            sceneId: guide && guide.scene.status !== "unknown" ? guide.scene.sceneId : null,
+          },
+        }
+      : {}),
   };
 }
 
