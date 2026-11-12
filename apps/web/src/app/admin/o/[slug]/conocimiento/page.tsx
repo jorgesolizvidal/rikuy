@@ -34,10 +34,13 @@ const NUMBER = new Intl.NumberFormat("es-BO");
 
 interface KnowledgePageProps {
   readonly params: Promise<{ slug: string }>;
+  readonly searchParams: Promise<{ pregunta?: string | string[] }>;
 }
 
-export default async function KnowledgePage({ params }: KnowledgePageProps) {
+export default async function KnowledgePage({ params, searchParams }: KnowledgePageProps) {
   const membership = await requireOrganization((await params).slug);
+  const asked = (await searchParams).pregunta;
+  const question = typeof asked === "string" ? asked.slice(0, 300) : undefined;
   const session = await adminSession();
   const [items, overview] = await Promise.all([
     listKnowledge(membership, session.knowledge),
@@ -69,7 +72,7 @@ export default async function KnowledgePage({ params }: KnowledgePageProps) {
           Escribe una pregunta como la haría un visitante y mira qué pasajes encontraría el
           asistente. Solo busca en lo publicado; no usa la IA ni gasta la cuota.
         </p>
-        <KnowledgeSearchForm org={membership.slug} />
+        <KnowledgeSearchForm org={membership.slug} defaultQuery={question} />
       </section>
 
       <section aria-labelledby="documentos" className="knowledge-section">

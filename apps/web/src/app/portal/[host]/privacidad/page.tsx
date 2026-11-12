@@ -155,9 +155,17 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               los lugares elegidos.
             </li>
             <li>
-              Ni {siteName} ni la plataforma guardan el texto de las preguntas o las respuestas:
-              solo cuántas se responden, cuánto tardan y cuánto cuestan. Para limitar el uso a 10
-              preguntas por hora, se cuenta tu dirección IP con una huella que cambia cada día.
+              Ni {siteName} ni la plataforma guardan las respuestas, ni las preguntas que el
+              asistente responde: solo cuántas se responden, cuánto tardan y cuánto cuestan. Para
+              limitar el uso a 10 preguntas por hora, se cuenta tu dirección IP con una huella que
+              cambia cada día.
+            </li>
+            <li>
+              Cuando el asistente no encuentra nada publicado para responder, se guarda el texto de
+              esa pregunta (y la página donde la hiciste) para que el equipo de {siteName} sepa qué
+              falta publicar. Se guarda sin nada que te identifique: los correos, teléfonos, números
+              de documento y enlaces se reemplazan antes de guardarla. Se borra a los 90 días. No
+              escribas tu nombre ni otros datos personales en las preguntas.
             </li>
             <li>
               Si tocas el micrófono para dictar, el navegador te pide permiso y graba solo mientras

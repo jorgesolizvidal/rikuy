@@ -1,3 +1,6 @@
+import { after } from "next/server";
+
+import { recordUnansweredQuestion } from "@/server/ai-gateway";
 import { askPortalAssistant } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalView } from "@/server/portal-view";
@@ -39,7 +42,13 @@ async function handle(request: Request, { params }: AssistantContext) {
     body = null;
   }
 
-  const { reply } = await askPortalAssistant(view, body, visitorKey(request));
+  const { reply, unanswered } = await askPortalAssistant(view, body, visitorKey(request));
+  // A question nothing published could answer is kept for the municipality (ADR-053), after
+  // the answer is on its way.
+  if (unanswered) {
+    const tenantId = view.context.tenant.tenantId;
+    after(() => recordUnansweredQuestion(tenantId, unanswered));
+  }
   return Response.json(reply, {
     status: reply.status === "invalid" ? 400 : 200,
     headers: NO_STORE,

@@ -365,6 +365,15 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-tour-removal 2>&1 | tee ../../tour-removal.log
+      # ADR-053: a question nothing published answers is kept masked with its page; a greeting
+      # and a provider failure are not; the panel groups them, an editor sees them and another
+      # municipality does not.
+      - name: Unanswered questions in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-unanswered 2>&1 | tee ../../unanswered.log
       # Fails the PR when a public page breaks lighthouse-budget.json (median of 3 runs).
       - name: Lighthouse budget (mobile)
         if: matrix.suite == 'lighthouse' && (success() || failure())
@@ -463,7 +472,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log metrics.log visits.log statistics.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log metrics.log visits.log statistics.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

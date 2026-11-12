@@ -107,6 +107,8 @@ export * from "./domain/assistant/page";
 export * from "./domain/assistant/persona";
 export * from "./domain/assistant/prompts";
 export * from "./domain/assistant/request";
+export * from "./domain/assistant/unanswered";
+export * from "./application/assistant/unanswered";
 export * from "./contracts/copilot";
 export * from "./application/copilot/copilot";
 export * from "./application/copilot/ports";

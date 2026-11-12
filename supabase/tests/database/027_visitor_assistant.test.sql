@@ -83,9 +83,11 @@ select is_empty(
     where table_schema in ('public', 'private', 'ai_api')
       and column_name ~* '(question|answer|prompt|message|conversation)'
       -- Error messages of jobs and of server errors (cut at «?», ADR-044), and the operator's
-      -- evaluation answers about the demos' sample content (ADR-045): never a visitor's text.
-      and table_name not in ('job_attempts', 'background_jobs', 'request_errors', 'eval_results')$$,
-  'no column stores questions, answers or conversations'
+      -- evaluation answers about the demos' sample content (ADR-045); and, since C1 · Paso 3
+      -- (ADR-053), the unanswered questions alone, masked and without the visitor.
+      and table_name not in ('job_attempts', 'background_jobs', 'request_errors', 'eval_results',
+                             'unanswered_questions')$$,
+  'no column stores answers or conversations; only unanswered questions are kept'
 );
 
 select * from finish();

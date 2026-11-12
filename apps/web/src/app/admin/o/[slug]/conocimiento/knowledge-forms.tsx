@@ -79,7 +79,14 @@ const PREVIEW = 280;
  * «Probar la búsqueda»: the passages the assistant would read to answer, with the citation
  * a visitor would see. No AI involved, no tokens spent.
  */
-export function KnowledgeSearchForm({ org }: { readonly org: string }) {
+export function KnowledgeSearchForm({
+  org,
+  defaultQuery,
+}: {
+  readonly org: string;
+  /** A question to try, from «Lo que preguntan los visitantes» (ADR-053). */
+  readonly defaultQuery?: string | undefined;
+}) {
   const id = useId();
   const [state, action, pending] = useActionState(searchKnowledgeAction, {
     status: "idle",
@@ -97,6 +104,7 @@ export function KnowledgeSearchForm({ org }: { readonly org: string }) {
             type="search"
             maxLength={300}
             required
+            defaultValue={defaultQuery}
             placeholder="¿Qué se conmemora el 2 de agosto?"
           />
         </div>

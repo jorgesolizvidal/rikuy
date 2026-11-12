@@ -53,6 +53,7 @@ export {
   createUsageRepository,
 } from "./usage";
 export { createStatisticsRepository } from "./statistics";
+export { createUnansweredQuestionsRepository } from "./unanswered-questions";
 export {
   createGeneralTourRepository,
   createSupabasePublishedTourReader,

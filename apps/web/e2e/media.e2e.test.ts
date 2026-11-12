@@ -251,8 +251,11 @@ describe("replacing and deleting panoramas and models (ADR-048)", () => {
         .jpeg()
         .toBuffer(),
     });
+    // The panel says «Versión nueva subida»; while it processes, the card refreshes itself and
+    // may already show the new version in process instead.
     await card
-      .getByText("Versión nueva subida")
+      .getByText(/Versión nueva subida|Versión nueva \(procesando\)/u)
+      .first()
       .waitFor({ timeout: 20_000 })
       .catch(async (error: unknown) => {
         // Say what the panel showed instead (a refusal, a failed upload…).
