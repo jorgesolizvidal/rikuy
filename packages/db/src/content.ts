@@ -432,7 +432,7 @@ export interface SupabasePublishedContentReaderOptions {
   readonly fetch?: typeof fetch;
 }
 
-const publicImageSchema = z.object({
+export const publicImageSchema = z.object({
   assetId: z.uuid(),
   version: z.number().int(),
   alt: z.string(),

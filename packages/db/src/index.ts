@@ -56,6 +56,7 @@ export { createStatisticsRepository } from "./statistics";
 export { createUnansweredQuestionsRepository } from "./unanswered-questions";
 export { createRecommendationsRepository } from "./copilot-recommendations";
 export { createMonthlyReportRepository } from "./monthly-reports";
+export { createPassportRepository, createSupabasePublishedPassportReader } from "./passport";
 export {
   createGeneralTourRepository,
   createSupabasePublishedTourReader,

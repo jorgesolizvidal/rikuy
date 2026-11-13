@@ -11,6 +11,7 @@ import {
   type PublishedMapReader,
   type PublishedPresentationReader,
   type PublishedRedirectReader,
+  type PublishedPassportReader,
   type PublishedTourReader,
   type PublishedTourRedirectReader,
   type TenantDirectory,
@@ -21,6 +22,7 @@ import {
   createSupabasePublishedEventReader,
   createSupabasePublishedMapReader,
   createSupabasePublishedRedirectReader,
+  createSupabasePublishedPassportReader,
   createSupabasePublishedTourReader,
   createSupabasePublishedTourRedirectReader,
   createSupabaseTenantDirectory,
@@ -153,6 +155,19 @@ export function publishedEventReader(): PublishedEventReader {
 let publishedTours: PublishedTourReader | undefined;
 
 /** Anonymous tour reader (sealed manifests), read fresh: tour pages are cached per host. */
+let publishedPassport: PublishedPassportReader | undefined;
+
+/** The tourist passport's published circuits (anonymous, ADR-056). */
+export function publishedPassportReader(): PublishedPassportReader {
+  if (publishedPassport) return publishedPassport;
+  const { env } = platformSettings();
+  publishedPassport = createSupabasePublishedPassportReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedPassport;
+}
+
 export function publishedTourReader(): PublishedTourReader {
   if (publishedTours) return publishedTours;
   const { env } = platformSettings();

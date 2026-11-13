@@ -1,0 +1,63 @@
+/* The passport's circuits in the panel (C2 · Paso 1). Panel-only styles stay out of the
+   stylesheet the portal shares. */
+.circuit-stops {
+  display: grid;
+  gap: 0.5rem;
+  margin: 1rem 0;
+  padding: 0;
+  list-style: none;
+}
+
+.circuit-stops li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+  border-radius: 0.75rem;
+}
+
+.circuit-stop-place {
+  display: grid;
+  place-items: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--fg) 8%, var(--bg));
+  font-weight: 700;
+}
+
+.circuit-stop-text {
+  display: grid;
+  flex: 1;
+  min-width: min(100%, 12rem);
+  overflow-wrap: anywhere;
+}
+
+.circuit-stop-actions,
+.circuit-add,
+.circuit-save {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.5rem;
+}
+
+.circuit-add .field {
+  flex: 1;
+  min-width: min(100%, 14rem);
+  margin: 0;
+}
+
+.circuit-add select {
+  max-width: 100%;
+}
+
+.circuit-save {
+  margin: 1.5rem 0;
+}
+
+.circuit-delete {
+  margin-top: 1.5rem;
+}

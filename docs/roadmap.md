@@ -174,6 +174,17 @@ Pasos confirmados por el usuario (2026-11-12). Sin cookies ni datos personales; 
 | 4 ✅ | Recomendaciones del Copilot a partir de las métricas ([ADR-054](adr/ADR-054-copilot-recommendations.md)): a pedido en «Estadísticas», con visitas, preguntas sin respuesta, la revisión del contenido y la agenda                                                          | Cada recomendación cita los números en los que se basa y nunca publica sola                                                  |
 | 5 ✅ | Informe mensual para la alcaldía ([ADR-055](adr/ADR-055-monthly-report.md)): página imprimible en el panel y un correo el día 1 con el resumen y el enlace                                                                                                                 | El informe del mes llega solo y se entiende sin el panel                                                                     |
 
+### C2 — Pasaporte turístico con sellos QR
+
+Pasos confirmados por el usuario (2026-11-13). El sello es un QR firmado por lugar (más la ubicación si el visitante la comparte); los sellos se guardan solo en el teléfono, sin cuenta; el premio se canjea con un comprobante con código que el local verifica una vez.
+
+| Paso | Qué                                                                                                                                    | Terminado cuando                                                                                 |
+| ---- | -------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ |
+| 1 ✅ | Circuitos ([ADR-056](adr/ADR-056-passport-circuits.md)): el municipio arma circuitos de destinos con su premio y el portal los muestra | Un circuito publicado se ve en el portal con sus lugares y su premio, y solo los de su municipio |
+| 2    | Sellos con QR en cada lugar, guardados en el teléfono                                                                                  | Un sello solo se consigue con el QR de ese lugar, y sin cuenta                                   |
+| 3    | Premio y canje al completar el circuito                                                                                                | Un comprobante se canjea una sola vez, en el local, sin cuenta                                   |
+| 4    | Métricas del pasaporte en «Estadísticas» y en el informe mensual                                                                       | El municipio ve cuántos sellos y circuitos completos hubo, sin datos de nadie                    |
+
 **Más adelante** (sin fase todavía): audioguías grabadas por la propia comunidad, en español y quechua, que además alimentan el conocimiento del asistente; WhatsApp (botones a cada local y, con clientes que paguen, el asistente dentro de WhatsApp); entradas a eventos con pago por QR.
 
 ## Expansión y migración

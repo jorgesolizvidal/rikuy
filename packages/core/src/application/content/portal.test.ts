@@ -132,6 +132,18 @@ describe("portal links and metadata", () => {
       "Sitemap: https://demo.example/sitemap.xml",
     );
   });
+  it("adds the passport and each published circuit, and nothing without circuits", () => {
+    const xml = buildSitemap(
+      "https://demo.example",
+      [destination],
+      [],
+      [],
+      [{ slug: "ruta-del-valle", publishedAt: "2026-11-12T00:00:00Z" }],
+    );
+    expect(xml).toContain("<loc>https://demo.example/pasaporte</loc>");
+    expect(xml).toContain("<loc>https://demo.example/pasaporte/ruta-del-valle</loc>");
+    expect(buildSitemap("https://demo.example", [destination])).not.toContain("/pasaporte");
+  });
 });
 
 describe("cached published destination reader", () => {
