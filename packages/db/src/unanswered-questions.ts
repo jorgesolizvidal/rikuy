@@ -17,7 +17,7 @@ import type { SessionClient } from "./session-client";
 const count = z.union([z.number(), z.string()]).transform(Number);
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
 
-const unansweredSchema = z.object({
+export const unansweredSchema = z.object({
   from: day,
   to: day,
   since: day.nullable(),

@@ -140,9 +140,25 @@ export interface RecommendationQuestion {
   readonly place: string | null;
 }
 
+/** How the facts name their period and the one it is compared with. */
+export interface RecommendationPeriod {
+  /** After the dates, in parentheses («últimos 30 días»); null: only the dates. */
+  readonly name: string | null;
+  /** «los 30 días anteriores», «el mes anterior». */
+  readonly previous: string;
+}
+
+/** «Estadísticas» (C1 · Paso 4): the last 30 days against the 30 before. */
+export const LAST_30_DAYS: RecommendationPeriod = {
+  name: "últimos 30 días",
+  previous: "los 30 días anteriores",
+};
+
 export interface RecommendationInput {
-  /** «Estadísticas» of the last 30 days (with the previous 30 when they were counted). */
+  /** The visits of the period (with the previous one when it was counted). */
   readonly statistics: StatisticsSummary;
+  /** Default: the last 30 days. */
+  readonly period?: RecommendationPeriod;
   readonly questions: {
     readonly from: string;
     readonly to: string;
@@ -156,16 +172,14 @@ export interface RecommendationInput {
   readonly snapshot: readonly CopilotSnapshotRow[];
 }
 
-function changeWords(value: number, previous: number | null, unit: string): string {
+function changeWords(value: number, previous: number | null, unit: string, before: string): string {
   if (previous === null) return "";
   if (previous === 0) {
-    return value === 0
-      ? `; en los 30 días anteriores tampoco hubo ${unit}`
-      : `; en los 30 días anteriores no hubo ninguna`;
+    return value === 0 ? `; en ${before} tampoco hubo ${unit}` : `; en ${before} no hubo ninguna`;
   }
   const percent = Math.round((Math.abs(value - previous) / previous) * 100);
-  if (percent === 0) return `; igual que en los 30 días anteriores (${n(previous)})`;
-  return `; en los 30 días anteriores fueron ${n(previous)} (un ${n(percent)} % ${value > previous ? "más" : "menos"} ahora)`;
+  if (percent === 0) return `; igual que en ${before} (${n(previous)})`;
+  return `; en ${before} fueron ${n(previous)} (un ${n(percent)} % ${value > previous ? "más" : "menos"} ahora)`;
 }
 
 /** The facts the model reads, computed by the platform from the four sources. */
@@ -175,7 +189,8 @@ export function recommendationFacts(input: RecommendationInput): RecommendationF
     facts.push({ ...fact, text: line(fact.text, RECOMMENDATION_LIMITS.factText) });
   };
   const { statistics: stats } = input;
-  const period = `${formatDateRange(stats.range)} (últimos 30 días)`;
+  const named = input.period ?? LAST_30_DAYS;
+  const period = `${formatDateRange(stats.range)}${named.name ? ` (${named.name})` : ""}`;
 
   // Visits and actions.
   if (stats.empty) {
@@ -184,7 +199,7 @@ export function recommendationFacts(input: RecommendationInput): RecommendationF
     const views = stats.totals.views;
     add({
       source: "visits",
-      text: `Portal, ${period}: ${plural(views.value, "vista", "vistas")} de páginas y ${plural(stats.totals.visitors.value, "visitante", "visitantes")} (sumados por día)${stats.compared ? changeWords(views.value, views.previous, "vistas") : ""}.`,
+      text: `Portal, ${period}: ${plural(views.value, "vista", "vistas")} de páginas y ${plural(stats.totals.visitors.value, "visitante", "visitantes")} (sumados por día)${stats.compared ? changeWords(views.value, views.previous, "vistas", named.previous) : ""}.`,
       target: null,
     });
     if (stats.totals.visitors.value < RECOMMENDATION_LIMITS.fewVisitors) {
@@ -366,6 +381,7 @@ export function recommendationMessages(input: {
     "Los hechos son [H1], [H2]…: visitas del portal, preguntas que el asistente del portal no supo responder, lo que le falta al contenido y la agenda.",
     "Reglas:",
     "1. Escribe de 3 a 6 recomendaciones, la más útil primero. Cada una es algo que el equipo puede hacer hoy desde el panel, de esta lista: completar o mejorar un texto (resumen, texto o descripción de una escena), agregar fotos, publicar lo que está en borrador, crear un evento, crear un tour 360°, escribir un texto de conocimiento que responda una pregunta frecuente, o difundir el portal fuera de él (imprimir y colocar los códigos QR de las fichas, compartir sus enlaces).",
+    "Recomienda publicar solo lo que un hecho dice que está en borrador o con cambios sin publicar: lo que ya está publicado no se publica de nuevo.",
     "2. El portal ya tiene en cada ficha «Cómo llegar», «Compartir» y su código QR, y en cada evento «Añadir al calendario». Nunca recomiendes agregarlos ni crear botones, funciones o páginas nuevas: que se usen poco no significa que falten.",
     "3. Cada recomendación se basa en uno o más hechos y los nombra. Usa SOLO las cifras de los hechos que nombra, tal cual, sin recalcular, sumar ni redondear. No escribas ninguna otra cifra. Describe las cifras como son: no digas que un grupo «no tuvo vistas» si alguno sí tuvo.",
     "4. No inventes datos, lugares ni resultados, y no expliques por qué pasó algo (por ejemplo, que una ficha tuvo pocas vistas por sus fotos o su texto): los hechos dicen qué pasó, no por qué.",
@@ -432,14 +448,40 @@ const LABEL =
 
 export interface ParsedRecommendations {
   readonly items: Recommendation[];
-  /** Recommendations dropped: no known fact, a number not in its facts, a link, empty. */
+  /**
+   * Recommendations dropped: no known fact, a number not in its facts, a link, empty, or
+   * publishing what is already published.
+   */
   readonly dropped: number;
+}
+
+const PUBLISH = /\bpublic(?:a|ar|ad|alo|ala|alos|alas|arlo|arla|arlos|arlas)\b/iu;
+
+/**
+ * «Publicar» what every place it cites is already published (and without pending changes):
+ * there is nothing to publish (the model sometimes asks for it anyway).
+ */
+function publishesThePublished(
+  title: string,
+  cited: readonly RecommendationFact[],
+  published: ReadonlySet<string>,
+): boolean {
+  if (!PUBLISH.test(title)) return false;
+  const places = cited
+    .map((fact) => fact.target)
+    .filter(
+      (target): target is Extract<RecommendationTarget, { type: "content" }> =>
+        target?.type === "content",
+    );
+  return places.length > 0 && places.every((target) => published.has(target.contentId));
 }
 
 /** The model's recommendations that cite known facts with only their numbers; at most six. */
 export function parseRecommendations(
   answer: string,
   facts: readonly RecommendationFact[],
+  /** The places that are published without pending changes (their content ids). */
+  published: ReadonlySet<string> = new Set(),
 ): ParsedRecommendations {
   const byId = new Map(facts.map((fact) => [fact.id, fact]));
   const blocks: { title: string; why: string[]; facts: string }[] = [];
@@ -483,6 +525,7 @@ export function parseRecommendations(
       why.length > 0 &&
       !/https?:\/\/|www\./iu.test(`${title} ${why}`) &&
       numbersBacked(`${title} ${why}`, cited) &&
+      !publishesThePublished(title, cited, published) &&
       !titles.has(key);
     if (!valid || items.length >= RECOMMENDATION_LIMITS.items) {
       dropped += 1;

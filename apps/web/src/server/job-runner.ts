@@ -23,6 +23,7 @@ import {
 } from "@rikuy/db/worker";
 import { createProcessors, LONG_JOB_KINDS } from "@rikuy/worker";
 
+import { runAiWork } from "./ai-gateway";
 import { mediaAdmin } from "./media-admin";
 import { platformSettings } from "./platform";
 
@@ -160,6 +161,8 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           pdf: createPdfTextReader(),
           knowledge: ledger.knowledge,
           probes: ledger.probes,
+          reports: ledger.reports,
+          ai: runAiWork,
           portalProbe: {
             portalOrigin: platformSettings().portalOrigin,
             publicMediaBase: platformSettings().env.NEXT_PUBLIC_SUPABASE_URL,

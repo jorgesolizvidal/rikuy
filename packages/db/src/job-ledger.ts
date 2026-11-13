@@ -7,6 +7,7 @@ import type {
   HeartbeatOutcome,
   InvitationMailStore,
   JobLedger,
+  MonthlyReportStore,
   OperationsReport,
   UnusedMediaStore,
   ModelStore,
@@ -15,6 +16,8 @@ import type {
 import { operationsReportSchema } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
+
+import { createPostgresMonthlyReportStore } from "./monthly-reports";
 
 /**
  * Durable job ledger, WORKLOAD side (migrations 20261020000000 and 20261024000000): a direct PostgreSQL
@@ -51,6 +54,8 @@ export interface PostgresJobLedger extends JobLedger {
   readonly knowledge: KnowledgeIndexStore;
   /** metrics.probe_portal: worker_api.portal_probe_target / record_portal_probe (ADR-044). */
   readonly probes: PortalProbeStore;
+  /** reports.monthly: worker_api.monthly_report_source / _data / save / mark (ADR-055). */
+  readonly reports: MonthlyReportStore;
   /** The daily report (worker_api.operations_report): no lease, changes nothing. */
   operationsReport(): Promise<OperationsReport>;
   close(): Promise<void>;
@@ -219,6 +224,8 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
         }
       },
     },
+
+    reports: createPostgresMonthlyReportStore(sql, leaseLost),
 
     probes: {
       async target(lease) {

@@ -20,6 +20,8 @@ export const JOB_KINDS = {
   indexKnowledge: "knowledge.index",
   /** Times the home, /mapa and one public image of a municipality online (ADR-044). */
   probePortal: "metrics.probe_portal",
+  /** The monthly report: the Copilot's recommendations and the email (ADR-055). */
+  monthlyReport: "reports.monthly",
 } as const;
 
 export type JobKind = (typeof JOB_KINDS)[keyof typeof JOB_KINDS];
@@ -49,6 +51,14 @@ export const indexKnowledgePayloadSchema = z
   .strict();
 /** The membership only: the runner reads the address under the job's lease. */
 export const membershipInvitationMailPayloadSchema = z.object({ membershipId: z.uuid() }).strict();
+
+/** Same shape the database accepts; the job's tenant is the report's. */
+export const monthlyReportPayloadSchema = z
+  .object({
+    month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])-01$/u),
+    manual: z.boolean(),
+  })
+  .strict();
 
 export type JobStatus = "pending" | "running" | "succeeded" | "dead_letter";
 export type JobAttemptOutcome = "running" | "succeeded" | "retry" | "failed" | "lease_expired";
