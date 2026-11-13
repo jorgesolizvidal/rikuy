@@ -176,7 +176,7 @@ as $$
 declare
   v_fact jsonb;
   v_item jsonb;
-  v_ids text[] := '{}';
+  v_ids text[] := '{}'::text[];
   v_cited text[];
   v_text text;
   v_id uuid;
