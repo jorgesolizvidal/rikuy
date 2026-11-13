@@ -13,7 +13,11 @@ const MESSAGES: Record<string, string> = {
   error: "No pudimos guardar la clave. Intenta de nuevo.",
 };
 
-/** Sets the shop's key; it is never shown again (only its hash is kept). */
+/**
+ * Sets the shop's key; only its hash is kept. The field is plain text (not a password field)
+ * so the person sees what they save and no password manager fills or changes it: a key typed
+ * blind was saved wrong once in production. The confirmation repeats it, once.
+ */
 export function RedeemPinForm({
   org,
   circuitId,
@@ -31,10 +35,11 @@ export function RedeemPinForm({
   function save(event: FormEvent) {
     event.preventDefault();
     startTransition(async () => {
-      const result = await setRedeemPinAction(org, circuitId, pin);
+      const saved = pin;
+      const result = await setRedeemPinAction(org, circuitId, saved);
       if (result.status === "saved") {
         setPin("");
-        setMessage("Se guardó la clave. Dásela al local que entrega el premio.");
+        setMessage(`Se guardó la clave ${saved}. Anótala y dásela al local que entrega el premio.`);
         router.refresh();
         return;
       }
@@ -47,20 +52,25 @@ export function RedeemPinForm({
       <label className="field">
         <span>{hasPin ? "Clave nueva del local" : "Clave del local"}</span>
         <input
-          name="pin"
-          type="password"
+          name="shop-key"
+          type="text"
           inputMode="numeric"
-          autoComplete="new-password"
+          autoComplete="off"
+          spellCheck={false}
+          data-1p-ignore=""
+          data-lpignore="true"
+          data-form-type="other"
           pattern="[0-9]{4,8}"
           minLength={4}
           maxLength={8}
           value={pin}
-          onChange={(event) => setPin(event.target.value)}
+          onChange={(event) => setPin(event.target.value.replace(/\s/gu, ""))}
           aria-describedby="clave-ayuda"
           required
         />
         <span id="clave-ayuda" className="field-hint">
-          De 4 a 8 números. No se vuelve a mostrar: anótala para dársela al local.
+          De 4 a 8 números. Después de guardarla no se vuelve a mostrar: anótala para dársela al
+          local.
           {hasPin ? " Al cambiarla, la anterior deja de servir." : ""}
         </span>
       </label>
