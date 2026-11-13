@@ -91,3 +91,16 @@ Decisiones del usuario (2026-11-12):
 - Agrupar por las mismas palabras no junta «¿hay wifi?» con «¿dónde hay internet?»: son dos grupos. Agrupar por significado gastaría cuota de IA y podría equivocarse; se revisa con el uso real.
 - Un nombre o una dirección escritos en una pregunta quedan guardados. La página de privacidad pide no escribirlos.
 - Las preguntas alimentan las recomendaciones del Copilot (C1 · Paso 4) y el informe mensual (Paso 5).
+
+## Corrección (2026-11-12, `fix/unanswered-contact-referral`)
+
+En la primera prueba en producción (Ucureña), el usuario escribió «Éste es el número de Ucureña 67680034». Chaski respondió «No dispongo de información sobre el número 67680034. Puedes consultar al portal llamando al … o enviando un correo a …» y citó «Datos del portal».
+
+Como la regla 2 de sus instrucciones le pide sugerir el teléfono o el correo del portal cuando no sabe, el modelo cita `[M]` justo en esos casos. Para el código, eso no era una abstención, así que la pregunta no se guardó.
+
+Ahora la pregunta se guarda si la respuesta no cita ningún pasaje publicado y además:
+
+- no cita nada (la abstención de siempre), o
+- dice que no tiene la información, aunque sugiera el contacto del portal: «no tengo / no dispongo de / no encontré información o datos», «no aparece publicado», «I don't have information», «couldn't find any details» (`admitsNotKnowing`).
+
+Una respuesta que sí sale de los datos del portal («El teléfono de la oficina de turismo es…») no se guarda. Lo que ve el visitante no cambia.

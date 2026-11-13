@@ -254,6 +254,45 @@ describe("askAssistant", () => {
     });
   });
 
+  it("keeps a question it does not know even when it suggests the portal's contact", async () => {
+    // As in production (2026-11-12): no published text, the portal's phone and email suggested,
+    // and [M] cited for them. The visitor's reply does not change.
+    const simulated = createSimulatedAiProvider();
+    const provider: AiProvider = {
+      ...simulated,
+      async complete(request, signal) {
+        const done = await simulated.complete(request, signal);
+        return {
+          ...done,
+          text: "No dispongo de información sobre ese número. Puedes llamar al portal.\nFUENTES: M",
+        };
+      },
+    };
+    const { deps } = setup({ provider, found: [] });
+    const { reply, unanswered } = await askAssistant(
+      tenant,
+      { question: "Éste es el número de Ucureña 67680034" },
+      null,
+      deps,
+    );
+    expect(reply).toMatchObject({ status: "answered", abstained: false });
+    expect(unanswered?.question).toBe("Éste es el número de Ucureña [teléfono]");
+
+    // Answered from the portal's details: nothing to keep.
+    const contact: AiProvider = {
+      ...simulated,
+      async complete(request, signal) {
+        const done = await simulated.complete(request, signal);
+        return { ...done, text: "El teléfono del portal es +591 4 000 0000.\nFUENTES: M" };
+      },
+    };
+    const answered = setup({ provider: contact, found: [] });
+    expect(
+      (await askAssistant(tenant, { question: "¿Cuál es el teléfono?" }, null, answered.deps))
+        .unanswered,
+    ).toBeUndefined();
+  });
+
   it("keeps nothing for an answer, small talk, a notice or a refusal to copy its context", async () => {
     const answered = setup({ found: [passage("museo-comunitario")] });
     expect(

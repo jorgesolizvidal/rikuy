@@ -119,7 +119,12 @@ describe("anonymous visit counts (ADR-051)", () => {
       if (request.url().endsWith("/visita")) beacons.push(request.postData() ?? "");
     });
 
+    // The page counts itself once it is hydrated: leaving right after «load» can take the
+    // beacon with it, so wait for it before going on.
+    const sent = () => page.waitForRequest((request) => request.url().endsWith("/visita"));
+    const home = sent();
     await page.goto(`${SUR_PORTAL}/`, { waitUntil: "load" });
+    await home;
     await page.goto(`${SUR_PORTAL}/destinos/${PLACE}?qr=1`, { waitUntil: "load" });
     await expect.poll(() => new URL(page.url()).search).toBe("");
 
