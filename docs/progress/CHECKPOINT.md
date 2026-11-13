@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C2 — pasaporte turístico. C0 y C1 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C2 · Paso 2 — sellos con QR en cada lugar ✅
-- **Rama:** `feat/c2-step2-passport-stamps` → PR hacia `main`
+- **Último paso completado:** C2 · Paso 3 — premio y canje ✅
+- **Rama:** `feat/c2-step3-passport-rewards` → PR hacia `main`
 
 ## Historial
 
@@ -2216,16 +2216,57 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - Los sellos y la página `/sello` todavía no se cuentan en «Estadísticas» (Paso 4), y `/sellar` no tiene medición de latencia propia.
 - El premio todavía no se pide: la página dice «Muy pronto podrás pedir aquí tu premio» (Paso 3).
 
+**Verificación en producción (2026-11-13):** tras el merge (PR #77), el usuario hizo las cuatro pruebas en Ucureña: los QR de los 4 lugares de «Corazón de Ucureña» en el panel, sellar desde el celular («sin ubicación» lejos del lugar, con la distancia), el avance en `/pasaporte/corazon-de-ucurena` y «Renovar el QR» (el anterior dejó de sellar y el nuevo selló).
+
+### C2 · Paso 3 — premio y canje ✅
+
+- Decisiones del usuario ([ADR-058](../adr/ADR-058-passport-rewards.md)), 2026-11-13:
+  - **clave del local** por circuito, que pone el municipio y pide la página de canje;
+  - **todos los sellos valen**; el comprobante dice cuántos fueron con ubicación;
+  - **una sola vez** por pasaporte y circuito;
+  - **el comprobante vence a los 30 días**; mientras no se canjee, se puede pedir otro.
+- Base de datos (`20261121000000_c2_passport_rewards.sql`, solo expand):
+  - `passport_circuits.redeem_pin_hash` / `redeem_pin_set_at` y `set_passport_redeem_pin` (propietarios y administradores, 4 a 8 números, hash bcrypt, auditado `passport.redeem_pin_set`); `tenant_passport_rewards` (cualquier miembro) dice qué circuitos la tienen;
+  - `passport_vouchers` (RLS sin permisos): código de 8 caracteres sin 0, O, 1 ni I, sellos y sellos con ubicación, emisión, vencimiento y canje, y solo una huella del pasaporte; un índice único impide canjear dos veces el mismo circuito con el mismo pasaporte;
+  - `portal_request_voucher` (anónima): comprueba la firma de cada sello contra las paradas publicadas; responde `issued`, `active` (el mismo comprobante), `redeemed`, `incomplete` con cuántas faltan, `no_reward` o `not_found`; un candado por pasaporte y circuito;
+  - `portal_redeem_voucher` (anónima): con el código y la clave, comprueba o canjea una vez (auditado `passport.voucher_redeemed`); `already_redeemed`, `expired`, `no_pin`; código o clave equivocados dan `wrong` y cuentan; 30 fallos por hora y municipio → `too_many`;
+  - tarea `rikuy-forget-passport-vouchers` (08:47 UTC): comprobantes de más de 400 días y fallos de más de 2 días.
+- `@rikuy/core`:
+  - `domain/passport/rewards` (también en `@rikuy/core/passport-client`): código del comprobante (normalizar, formatear), la clave, si sigue vigente; el pasaporte del teléfono guarda el comprobante de cada circuito;
+  - `application/passport/rewards`: `requestVoucher`, `redeemVoucher` (validan antes de preguntar), `setRedeemPin` y `canSetRedeemPin`;
+  - `PORTAL_PATHS.requestVoucher`, `redeem` y `redeemCheck`.
+- `@rikuy/db`: `createPassportRewardRepository` y `createSupabasePublishedRewardReader`; antes de la migración, sin claves ni comprobantes.
+- Portal:
+  - en la página del circuito, con todo sellado: **«Pedir mi premio»** → «Tu comprobante» con el código grande, el premio, hasta cuándo vale y los sellos con ubicación; se guarda en el teléfono y al volver dice si ya se canjeó («Premio recibido») o da uno nuevo si venció;
+  - la página del sello enlaza a «Pedir mi premio» al completar un circuito;
+  - **`/canje`** («Canjear un premio», `noindex`, sin el botón del asistente): código, clave del local, «Comprobar» y «Marcar como canjeado y entregar el premio»;
+  - `POST /premio` y `POST /canje/verificar`, solo desde el mismo portal;
+  - «Cómo funciona» y la página de privacidad al día.
+- Panel, editor del circuito: **«Premio y canje»** con la dirección de `/canje` para el local, si tiene clave y desde cuándo, y el formulario para guardarla o cambiarla (propietarios y administradores).
+- CI: nuevo paso **«Passport prize in a real browser»** (suite `lighthouse`).
+- Tests:
+  - unitarios: core 664 (+11), db 201 (+3);
+  - 1.656 pgTAP (42 nuevos, `046_passport_rewards`): pasaporte inválido; incompleto y cuántos faltan; un sello cambiado, copiado de otro teléfono o con la hora mal formada no cuenta; sin premio, otro municipio, circuito desconocido; el comprobante con su código, sellos con ubicación y 30 días; el mismo al pedir de nuevo; nadie lee los comprobantes y el pasaporte es solo una huella; editor y otro municipio no ponen la clave; la clave es de 4 a 8 números, solo hash y auditada; cualquier miembro ve si la tiene, otro municipio no; clave o código equivocados, código de otro municipio; minúsculas y guion; comprobar sin canjear; canjear una vez; el teléfono sabe que se canjeó y no recibe otro; auditado; sin clave no se canjea; vencido no se canjea y el teléfono recibe uno nuevo; 30 fallos detienen la página; nadie lee los fallos; municipio suspendido;
+  - **e2e en un navegador real** (`rewards.e2e.test.ts`, 2 casos): sellar los dos lugares de «Ruta del valle», «Pedir mi premio» desde la página del sello, el comprobante (el mismo al recargar), otro teléfono con los sellos copiados no recibe nada, el local sin clave, el propietario la pone en el panel (hash, auditada), clave equivocada, «Comprobante válido», canjear una vez, «ya se canjeó» y «Premio recibido» en el teléfono; el editor ve la sección sin el formulario; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - sellos (3, con los textos nuevos), pasaporte (3), visitas (2) y contratos RC-09/10/11/12 (216) en verde; `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador (390 px): el comprobante en la página del circuito y la página del local con un comprobante válido.
+- Lo que encontraron las pruebas, ya corregido: el botón del asistente tapaba «Marcar como canjeado» en el celular (ya no aparece en `/canje`); al guardar el comprobante se volvía a preguntar por él enseguida.
+
+**Desviaciones:**
+
+- La clave del local es una por circuito: si dos locales entregan el mismo premio, comparten la clave.
+- Quien borra los datos del navegador empieza un pasaporte nuevo y podría juntar los sellos otra vez (con una visita o una foto de cada QR); se mitiga renovando los QR.
+- Los comprobantes todavía no se cuentan en «Estadísticas» ni en el informe mensual (Paso 4).
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Pasaporte turístico» aparece «Códigos de sello de cada lugar» con el QR de los 4 lugares de «Corazón de Ucureña».
-- Escanea con el celular el QR de un lugar (en la pantalla o impreso): abre «Sello del pasaporte» con «Sellar con mi ubicación». Lejos del lugar, el sello queda «sin ubicación» y la página dice a qué distancia estás; en el lugar, «con ubicación».
-- En `/pasaporte/corazon-de-ucurena` se ve «Tienes 1 de 4 sellos en este teléfono» y «Sellado el … · …» en esa parada.
-- «Renovar el QR» de un lugar: el QR anterior abre «Este código no sella» y el nuevo sí sella.
+- Tras el merge, en el panel de Ucureña → «Pasaporte turístico» → «Corazón de Ucureña» → «Premio y canje»: guarda una clave del local (por ejemplo, 4 a 6 números) y anótala.
+- En el celular, sella los 4 lugares (los QR en la pantalla sirven) y abre `/pasaporte/corazon-de-ucurena`: «Pedir mi premio» muestra el comprobante con su código.
+- En otro teléfono o en la PC, abre `rikuy-ucurena.vercel.app/canje`, escribe el código y la clave: «Comprobante válido» → «Marcar como canjeado y entregar el premio». Al volver a comprobarlo dice que ya se canjeó, y en el celular la página del circuito dice «Premio recibido».
 
 ## Siguiente paso
 
-**C2 · Paso 3 — premio y canje al completar el circuito** ([roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr)): al completar un circuito, el teléfono pide un comprobante con un código corto (la base comprueba las firmas de los sellos), y el local lo verifica una sola vez en una página del portal, sin cuenta. Antes de empezar, confirmar con el usuario quién verifica el comprobante (cualquiera con la página o con una clave del local), si exige sellos «con ubicación» y si un mismo pasaporte puede canjear el premio de un circuito más de una vez.
+**C2 · Paso 4 — métricas del pasaporte en «Estadísticas» y en el informe mensual** ([roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr)): cuántos sellos (con y sin ubicación) y comprobantes pedidos y canjeados hubo, por lugar y por circuito, sin datos de nadie. Antes de empezar, confirmar con el usuario si los sellos se cuentan como visitas reales en el lugar (con ubicación aparte), si las cifras van también a las recomendaciones del Copilot y si el informe mensual suma una sección del pasaporte.
 
 ## Decisiones pendientes del usuario
 

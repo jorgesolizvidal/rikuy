@@ -13,7 +13,11 @@ export function PassportHowItWorks() {
           Los sellos se guardan en tu teléfono, sin cuenta: un sello vale para todos los circuitos
           que tienen ese lugar, y no vence.
         </li>
-        <li>Con todos los sellos del circuito, recibe el premio. Muy pronto en este portal.</li>
+        <li>
+          Con todos los sellos del circuito, pulsa «Pedir mi premio» en su página: recibes un
+          comprobante con un código. Muéstralo donde se entrega el premio; vale 30 días y se canjea
+          una sola vez.
+        </li>
       </ol>
     </section>
   );

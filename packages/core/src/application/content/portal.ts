@@ -46,6 +46,12 @@ export const PORTAL_PATHS = {
   stamp: (code: string) => `/sello/${encodeURIComponent(code)}`,
   /** POST: a stamp for the visitor's phone (ADR-057). */
   collectStamp: "/sellar",
+  /** POST: the prize's voucher of a completed circuit (ADR-058). */
+  requestVoucher: "/premio",
+  /** Where the shop redeems a voucher (ADR-058): not linked from the portal, never indexed. */
+  redeem: "/canje",
+  /** POST: check or redeem a voucher (ADR-058). */
+  redeemCheck: "/canje/verificar",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;

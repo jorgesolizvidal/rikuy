@@ -1,0 +1,5 @@
+/* The shop's page is not for visitors: the assistant's floating button would cover the
+   «Marcar como canjeado» button on a phone. */
+.portal-assistant-launcher {
+  display: none;
+}

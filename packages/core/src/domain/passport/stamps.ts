@@ -47,10 +47,19 @@ export interface PassportStamp {
   readonly signature: string;
 }
 
+/** The prize's voucher of a circuit, as the phone keeps it (ADR-058). */
+export interface StoredVoucher {
+  readonly code: string;
+  readonly expiresAt: string;
+  readonly redeemedAt: string | null;
+}
+
 export interface StoredPassport {
   readonly id: string;
   /** By place: one stamp per place. */
   readonly stamps: Readonly<Record<string, PassportStamp>>;
+  /** By circuit address: the voucher of its prize, if the visitor asked for it. */
+  readonly vouchers?: Readonly<Record<string, StoredVoucher>>;
 }
 
 /** Where the phone keeps its passport (one per portal: each portal is its own origin). */
@@ -105,11 +114,50 @@ export function parseStoredPassport(raw: string | null): StoredPassport | null {
       if (stamp) stamps[stamp.placeId] = stamp;
     }
   }
-  return { id: record.id, stamps };
+  const vouchers: Record<string, StoredVoucher> = {};
+  if (typeof record.vouchers === "object" && record.vouchers !== null) {
+    for (const [circuit, entry] of Object.entries(record.vouchers)) {
+      const voucher = voucherFrom(entry);
+      if (voucher && /^[a-z0-9-]{1,80}$/u.test(circuit)) vouchers[circuit] = voucher;
+    }
+  }
+  return Object.keys(vouchers).length > 0
+    ? { id: record.id, stamps, vouchers }
+    : { id: record.id, stamps };
+}
+
+function voucherFrom(value: unknown): StoredVoucher | null {
+  if (typeof value !== "object" || value === null) return null;
+  const voucher = value as Record<string, unknown>;
+  if (
+    typeof voucher.code !== "string" ||
+    !/^[23456789ABCDEFGHJKLMNPQRSTUVWXYZ]{8}$/u.test(voucher.code) ||
+    typeof voucher.expiresAt !== "string" ||
+    Number.isNaN(Date.parse(voucher.expiresAt)) ||
+    (voucher.redeemedAt !== null &&
+      (typeof voucher.redeemedAt !== "string" || Number.isNaN(Date.parse(voucher.redeemedAt))))
+  ) {
+    return null;
+  }
+  return { code: voucher.code, expiresAt: voucher.expiresAt, redeemedAt: voucher.redeemedAt };
 }
 
 export function serializePassport(passport: StoredPassport): string {
-  return JSON.stringify({ v: 1, id: passport.id, stamps: passport.stamps });
+  return JSON.stringify({
+    v: 1,
+    id: passport.id,
+    stamps: passport.stamps,
+    ...(passport.vouchers ? { vouchers: passport.vouchers } : {}),
+  });
+}
+
+/** Keeps the voucher of a circuit's prize (replacing an older one of the same circuit). */
+export function rememberVoucher(
+  passport: StoredPassport,
+  circuit: string,
+  voucher: StoredVoucher,
+): StoredPassport {
+  return { ...passport, vouchers: { ...passport.vouchers, [circuit]: voucher } };
 }
 
 export type AddStampOutcome =

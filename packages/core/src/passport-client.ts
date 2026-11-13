@@ -3,3 +3,4 @@
  * browser code (the main entry carries the zod contracts).
  */
 export * from "./domain/passport/stamps";
+export * from "./domain/passport/rewards";

@@ -273,9 +273,18 @@ export function StampCollector({
             return (
               <li key={circuit.slug} data-complete={progress.complete}>
                 <a href={circuit.href}>{circuit.name}</a>:{" "}
-                {progress.complete
-                  ? `¡completaste el circuito! Muy pronto podrás pedir aquí tu premio${circuit.reward ? `: ${sentence(circuit.reward)}` : "."}`
-                  : `${progress.collected} de ${progress.total} sellos.`}
+                {progress.complete ? (
+                  circuit.reward ? (
+                    <>
+                      ¡completaste el circuito! Premio: {sentence(circuit.reward)}{" "}
+                      <a href={`${circuit.href}#premio`}>Pedir mi premio</a>
+                    </>
+                  ) : (
+                    "¡completaste el circuito!"
+                  )
+                ) : (
+                  `${progress.collected} de ${progress.total} sellos.`
+                )}
               </li>
             );
           })}

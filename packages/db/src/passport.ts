@@ -1,12 +1,18 @@
 import type {
+  CircuitRedeemPin,
   CircuitWriteOutcome,
   CreateCircuitOutcome,
   DeleteCircuitOutcome,
   PassportCircuit,
   PassportRepository,
+  PassportRewardRepository,
   PassportStamp,
   PortalCircuit,
   PublishedPassportReader,
+  PublishedRewardReader,
+  RedeemVoucherOutcome,
+  RequestVoucherOutcome,
+  SetRedeemPinOutcome,
   PublishedStampReader,
   RenewStampCodeOutcome,
   StampCode,
@@ -320,6 +326,122 @@ export function createSupabasePublishedStampReader(
         located: stamp.located,
         signature: stamp.signature,
       };
+    },
+  };
+}
+
+// ── The prize (migration 20261121000000, ADR-058) ────────────────────────────
+
+/** The shop's key of each circuit, with the signed-in user's session. */
+export function createPassportRewardRepository(client: SessionClient): PassportRewardRepository {
+  return {
+    async pins(tenantId): Promise<CircuitRedeemPin[]> {
+      const { data, error } = await client.rpc("tenant_passport_rewards", {
+        p_tenant_id: tenantId,
+      });
+      if (isMissingFunction(error)) return [];
+      if (error) throw unexpected("Reading the shops' keys", error);
+      return z
+        .array(z.object({ circuitId: z.uuid(), pinSetAt: z.string().nullable() }))
+        .parse(data);
+    },
+
+    async setPin(tenantId, circuitId, pin): Promise<SetRedeemPinOutcome> {
+      const { data, error, status } = await client.rpc("set_passport_redeem_pin", {
+        p_tenant_id: tenantId,
+        p_circuit_id: circuitId,
+        p_pin: pin,
+      });
+      if (error) {
+        if (error.code === "42501" || status === 403) return { status: "forbidden" };
+        if (error.code === "P0002") return { status: "not_found" };
+        if (error.code === "22023") return { status: "invalid" };
+        throw unexpected("Setting a shop's key", error);
+      }
+      return { status: "saved", pinSetAt: z.string().parse(data) };
+    },
+  };
+}
+
+const voucherSchema = z.object({
+  code: z.string(),
+  circuit: z.string(),
+  circuitName: z.string(),
+  reward: z.string(),
+  stampsTotal: z.number().int(),
+  stampsLocated: z.number().int(),
+  issuedAt: z.string(),
+  expiresAt: z.string(),
+  redeemedAt: z.string().nullable(),
+});
+
+const requestSchema = z.discriminatedUnion("status", [
+  voucherSchema.extend({ status: z.enum(["issued", "active", "redeemed"]) }),
+  z.object({ status: z.literal("incomplete"), missing: z.number().int() }),
+  z.object({ status: z.enum(["no_reward", "not_found"]) }),
+]);
+
+const redeemSchema = z.discriminatedUnion("status", [
+  voucherSchema.extend({ status: z.enum(["valid", "redeemed", "already_redeemed", "expired"]) }),
+  z.object({ status: z.literal("no_pin"), circuitName: z.string() }),
+  z.object({ status: z.enum(["wrong", "too_many"]) }),
+]);
+
+function voucherOf(row: z.infer<typeof voucherSchema>) {
+  return {
+    code: row.code,
+    circuit: row.circuit,
+    circuitName: row.circuitName,
+    reward: row.reward,
+    stampsTotal: row.stampsTotal,
+    stampsLocated: row.stampsLocated,
+    issuedAt: new Date(row.issuedAt).toISOString(),
+    expiresAt: new Date(row.expiresAt).toISOString(),
+    redeemedAt: row.redeemedAt === null ? null : new Date(row.redeemedAt).toISOString(),
+  };
+}
+
+/** The portal's anonymous prize: asking for a voucher and redeeming it. */
+export function createSupabasePublishedRewardReader(
+  options: SupabasePublishedContentReaderOptions,
+): PublishedRewardReader {
+  const client = createClient(options.url, options.publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
+  });
+  const timeoutMs = options.timeoutMs ?? 5_000;
+  return {
+    async requestVoucher(tenantId, circuit, passportId, stamps): Promise<RequestVoucherOutcome> {
+      const { data, error } = await client
+        .rpc("portal_request_voucher", {
+          p_tenant_id: tenantId,
+          p_circuit_slug: circuit,
+          p_passport: passportId,
+          p_stamps: stamps,
+        })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (isMissingFunction(error)) return { status: "not_found" };
+      if (error?.code === "22023") return { status: "invalid" };
+      if (error) throw unexpected("Asking for a voucher", error);
+      const row = requestSchema.parse(data);
+      if ("code" in row) return { status: row.status, voucher: voucherOf(row) };
+      return row;
+    },
+
+    async redeemVoucher(tenantId, code, pin, redeem): Promise<RedeemVoucherOutcome> {
+      const { data, error } = await client
+        .rpc("portal_redeem_voucher", {
+          p_tenant_id: tenantId,
+          p_code: code,
+          p_pin: pin,
+          p_redeem: redeem,
+        })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (isMissingFunction(error)) return { status: "wrong" };
+      if (error) throw unexpected("Redeeming a voucher", error);
+      const row = redeemSchema.parse(data);
+      if ("code" in row) return { status: row.status, voucher: voucherOf(row) };
+      return row;
     },
   };
 }

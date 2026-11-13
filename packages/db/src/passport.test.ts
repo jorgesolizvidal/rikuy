@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   createPassportRepository,
+  createPassportRewardRepository,
   createStampCodeRepository,
   createSupabasePublishedPassportReader,
+  createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
 } from "./passport";
 import { createSessionClient } from "./session-client";
@@ -36,6 +38,7 @@ function session(respond: (path: string, body: unknown) => Response) {
   return {
     repo: createPassportRepository(client),
     codes: createStampCodeRepository(client),
+    rewards: createPassportRewardRepository(client),
     calls,
   };
 }
@@ -249,5 +252,118 @@ describe("stamps (portal)", () => {
       },
     ]);
     expect(await reader(() => json(null)).collect(TENANT, "x", "y", false)).toBeNull();
+  });
+});
+
+describe("the prize", () => {
+  const voucher = {
+    code: "M5WFU54M",
+    circuit: "ruta-del-valle",
+    circuitName: "Ruta del valle",
+    reward: "Una postal.",
+    stampsTotal: 2,
+    stampsLocated: 1,
+    issuedAt: "2026-11-13T12:00:00+00:00",
+    expiresAt: "2026-12-13T12:00:00+00:00",
+    redeemedAt: null,
+  };
+
+  function reader(respond: (path: string, body: unknown) => Response) {
+    return createSupabasePublishedRewardReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      fetch: async (input, init = {}) =>
+        respond(new URL(String(input)).pathname, init.body ? JSON.parse(String(init.body)) : null),
+    });
+  }
+
+  it("asks for a voucher with the stamps and reads what comes back", async () => {
+    const sent: unknown[] = [];
+    const stamp = { placeId: PLAZA, at: 1_800_000_000, located: true, signature: "a".repeat(43) };
+    const outcome = await reader((path, body) => {
+      sent.push({ path, body });
+      return json({ status: "issued", ...voucher });
+    }).requestVoucher(TENANT, "ruta-del-valle", "AbCdEfGhIjKlMnOpQrSt_-", [stamp]);
+    expect(outcome).toEqual({
+      status: "issued",
+      voucher: {
+        ...voucher,
+        issuedAt: "2026-11-13T12:00:00.000Z",
+        expiresAt: "2026-12-13T12:00:00.000Z",
+      },
+    });
+    expect(sent).toEqual([
+      {
+        path: "/rest/v1/rpc/portal_request_voucher",
+        body: {
+          p_tenant_id: TENANT,
+          p_circuit_slug: "ruta-del-valle",
+          p_passport: "AbCdEfGhIjKlMnOpQrSt_-",
+          p_stamps: [stamp],
+        },
+      },
+    ]);
+    expect(
+      await reader(() => json({ status: "incomplete", missing: 1 })).requestVoucher(
+        TENANT,
+        "r",
+        "p",
+        [],
+      ),
+    ).toEqual({ status: "incomplete", missing: 1 });
+    expect(await reader(() => pgError("22023", 400)).requestVoucher(TENANT, "r", "p", [])).toEqual({
+      status: "invalid",
+    });
+    expect(
+      await reader(() => pgError("PGRST202", 404)).requestVoucher(TENANT, "r", "p", []),
+    ).toEqual({
+      status: "not_found",
+    });
+  });
+
+  it("checks and redeems with the code and the key", async () => {
+    const sent: unknown[] = [];
+    const outcome = await reader((_path, body) => {
+      sent.push(body);
+      return json({ status: "redeemed", ...voucher, redeemedAt: "2026-11-14T10:00:00+00:00" });
+    }).redeemVoucher(TENANT, "M5WFU54M", "2468", true);
+    expect(outcome).toMatchObject({
+      status: "redeemed",
+      voucher: { redeemedAt: "2026-11-14T10:00:00.000Z" },
+    });
+    expect(sent).toEqual([
+      { p_tenant_id: TENANT, p_code: "M5WFU54M", p_pin: "2468", p_redeem: true },
+    ]);
+    expect(
+      await reader(() => json({ status: "wrong" })).redeemVoucher(TENANT, "c", "p", false),
+    ).toEqual({
+      status: "wrong",
+    });
+    expect(
+      await reader(() => json({ status: "no_pin", circuitName: "Ruta" })).redeemVoucher(
+        TENANT,
+        "c",
+        "p",
+        false,
+      ),
+    ).toEqual({ status: "no_pin", circuitName: "Ruta" });
+  });
+
+  it("sets the shop's key from the panel", async () => {
+    const { rewards, calls } = session(() => json("2026-11-13T12:00:00+00:00"));
+    expect(await rewards.setPin(TENANT, PLAZA, "2468")).toEqual({
+      status: "saved",
+      pinSetAt: "2026-11-13T12:00:00+00:00",
+    });
+    expect(calls[0]).toEqual({
+      path: "/rest/v1/rpc/set_passport_redeem_pin",
+      body: { p_tenant_id: TENANT, p_circuit_id: PLAZA, p_pin: "2468" },
+    });
+    expect(
+      await session(() => pgError("42501", 403)).rewards.setPin(TENANT, PLAZA, "2468"),
+    ).toEqual({
+      status: "forbidden",
+    });
+    expect(await session(() => pgError("PGRST202", 404)).rewards.pins(TENANT)).toEqual([]);
   });
 });

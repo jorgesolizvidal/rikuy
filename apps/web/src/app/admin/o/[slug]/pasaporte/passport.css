@@ -97,3 +97,20 @@
 .stamp-code-renew p {
   margin: 0.5rem 0;
 }
+
+/* Prize and redemption (ADR-058). */
+.redeem-section {
+  margin-top: 2.5rem;
+  max-width: 44rem;
+}
+
+.redeem-pin-form {
+  display: grid;
+  gap: 0.75rem;
+  max-width: 24rem;
+  margin-top: 1rem;
+}
+
+.redeem-section a {
+  overflow-wrap: anywhere;
+}
