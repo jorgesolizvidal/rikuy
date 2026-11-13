@@ -104,8 +104,9 @@ select is(public.portal_collect_stamp(:'ta', 'NoEsUnCodigoValido_123', :'p1', tr
 select is(public.portal_collect_stamp(:'tb', (select code from code_of where name = 'plaza'), :'p1', true), null,
   'nor a code of another municipality');
 reset role;
-select is((select sum(stamps)::int from public.passport_daily_stamps), 3, 'and counts nothing');
-select is((select day from public.passport_daily_stamps limit 1), (now() at time zone 'America/La_Paz')::date,
+select is((select sum(stamps)::int from public.passport_daily_stamps where tenant_id in (:'ta', :'tb')), 3,
+  'and counts nothing');
+select is((select day from public.passport_daily_stamps where tenant_id = :'ta' limit 1), (now() at time zone 'America/La_Paz')::date,
   'the day is the municipality''s');
 select ok((select bool_and(m.hash ~ '^[0-9a-f]{64}$' and m.hash not like '%' || :'p1' || '%')
            from private.visit_marks m where m.scope in ('stamp', 'stamp_located')),
