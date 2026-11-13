@@ -6,7 +6,7 @@
 
 - **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
 - **Último paso completado:** C1 · Paso 4 — recomendaciones del Copilot a partir de las métricas ✅
-- **Rama:** `feat/c1-step4-copilot-recommendations` → PR hacia `main`
+- **Rama:** `fix/copilot-recommendations-quality` → PR hacia `main`
 
 ## Historial
 
@@ -2085,12 +2085,26 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - Las recomendaciones miran siempre los últimos 30 días, aunque la página muestre otro período (la sección lo dice).
 - Con el modelo real, la calidad se revisa a mano en producción; un gold formal de recomendaciones queda para cuando haya más uso.
 
+**Verificación en producción (2026-11-12):** tras el merge (PR #73), el usuario generó las recomendaciones de Ucureña con el modelo real. Cumplen el criterio (cada cifra está en sus hechos, nada se publicó) y la primera es buena: escribir textos de conocimiento para las tres preguntas sin respuesta (gasolina, cajero, teleférico), con un enlace para probar cada una. Pero:
+
+- la segunda pedía «publicar botones de «Cómo llegar» y «Compartir»», que toda ficha ya tiene;
+- con 1 visitante en 30 días, la tercera atribuyó las 0 vistas del Tambo Cultural a sus fotos, y la cuarta dijo que los eventos «no generaron vistas» aunque el carnaval tuvo 5;
+- los enlaces se repetían iguales («Abrir en el editor» tres veces).
+
+**Corrección posterior (`fix/copilot-recommendations-quality`, [ADR-054](../adr/ADR-054-copilot-recommendations.md#corrección-2026-11-12-fixcopilot-recommendations-quality)):**
+
+- las instrucciones limitan las recomendaciones a lo que el equipo puede hacer en el panel, dicen lo que el portal ya tiene y prohíben explicar causas y sacar conclusiones con pocas visitas;
+- un hecho nuevo de la plataforma: con menos de 50 visitantes en 30 días, «Todavía hay pocas visitas para comparar fichas…»;
+- cada enlace dice a qué lugar, tour o pregunta lleva (nombres de `copilot_snapshot`).
+
+Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las reglas nuevas y los enlaces con nombre); e2e de recomendaciones (2) y estadísticas (2) en verde.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Estadísticas» → al final, «Recomendaciones del Copilot» → «Generar recomendaciones».
-- En unos segundos aparecen de 3 a 6 recomendaciones. En cada una, «En qué se basa» muestra las cifras de la plataforma: toda cifra del texto tiene que estar ahí.
-- Los enlaces llevan al editor, a «Proponer con el Copilot» o a «Conocimiento del asistente» con la pregunta escrita. Nada se publica solo.
-- Desde la página del Copilot, el enlace nuevo lleva a esa sección.
+- Tras el merge, en el panel de Ucureña → «Estadísticas» → «Generar recomendaciones nuevas».
+- Ninguna recomendación pide botones, funciones o páginas nuevas, ni explica por qué una ficha tuvo pocas vistas.
+- «En qué se basa» incluye «Todavía hay pocas visitas para comparar fichas…» si alguna recomendación habla de visitas.
+- Cada enlace dice a qué lugar, tour o pregunta lleva.
 
 ## Siguiente paso
 

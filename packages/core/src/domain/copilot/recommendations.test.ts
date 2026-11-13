@@ -214,6 +214,17 @@ describe("recommendationFacts", () => {
     expect(visits.some((line) => line.includes("Bolivia 30"))).toBe(true);
   });
 
+  it("says when there are still too few visits to compare pages", () => {
+    expect(text("visits")[1]).toBe(
+      "Todavía hay pocas visitas para comparar fichas: 40 visitantes del 14 oct al 12 nov de 2026 (últimos 30 días). Con tan pocas, que una ficha tenga más o menos vistas no dice nada de su contenido.",
+    );
+    const many = { ...data(RANGE, 1234), days: [{ day: RANGE.to, views: 1249, visitors: 60 }] };
+    const enough = recommendationFacts(
+      input({ statistics: summarizeStatistics(RANGE, many, null, "2026-09-01") }),
+    );
+    expect(enough.some((fact) => fact.text.startsWith("Todavía hay pocas visitas"))).toBe(false);
+  });
+
   it("names the published places nobody opened (never a draft nor an ended event)", () => {
     const quiet = text("visits").filter((line) => line.includes("no tuvo vistas"));
     expect(quiet).toEqual([
@@ -313,6 +324,15 @@ describe("recommendationMessages", () => {
     expect(system?.content).not.toContain("cajero");
     expect(user?.content).toContain("Preguntas que el asistente del portal no supo responder:\n[H");
     expect(user?.content).toContain("Agenda:\n[H");
+  });
+
+  it("keeps the model to what the panel can do, without causes nor new buttons", () => {
+    const [system] = recommendationMessages({ site: "Demo", today: "hoy", facts: [] });
+    expect(system?.content).toContain(
+      "ya tiene en cada ficha «Cómo llegar», «Compartir» y su código QR",
+    );
+    expect(system?.content).toContain("no expliques por qué pasó algo");
+    expect(system?.content).toContain("pocas visitas, no saques conclusiones");
   });
 });
 

@@ -105,6 +105,14 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
     loadRecommendations(membership, session.recommendations),
     session.statistics.calendar(membership.tenantId),
   ]);
+  // The names of the places the recommendations link to (their links say which one).
+  const names = new Map(
+    saved
+      ? ((await session.copilot.snapshot(membership.tenantId).catch(() => null))?.items ?? []).map(
+          (item) => [item.contentId, item.title] as const,
+        )
+      : [],
+  );
   const { range, totals } = summary;
   const base = `/o/${membership.slug}/estadisticas`;
   const editorOf = (kind: string | null, contentId: string) =>
@@ -427,7 +435,7 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
                 const facts = item.facts
                   .map((id) => saved.facts.find((fact) => fact.id === id))
                   .filter((fact) => fact !== undefined);
-                const links = recommendationLinks(membership, item, saved.facts);
+                const links = recommendationLinks(membership, item, saved.facts, names);
                 return (
                   <li key={`${index}-${item.title}`} className="recommendation">
                     <h3>{item.title}</h3>

@@ -91,3 +91,24 @@ Decisiones del usuario (2026-11-12):
 - Generar usa unos miles de tokens de la cuota diaria del municipio, compartida con el asistente y el Copilot. Por eso es a pedido.
 - Las recomendaciones miran siempre los últimos 30 días, aunque la página muestre otro período: lo dice la sección.
 - Con el modelo real, la calidad se verifica a mano en producción; el gold formal de recomendaciones queda para cuando haya más uso.
+
+## Corrección (2026-11-12, `fix/copilot-recommendations-quality`)
+
+La primera generación en producción (Ucureña, modelo real) cumplió el criterio: cada cifra estaba en sus hechos. Pero dos de sus cuatro recomendaciones no servían:
+
+- **Pidió algo que ya existe:** «Publicar botones de «Cómo llegar» y «Compartir»» en el museo y la plaza, porque tenían 0 usos. Toda ficha ya los tiene.
+- **Inventó causas con muy pocos datos:** con 1 visitante en 30 días, dijo que el Tambo Cultural no tuvo vistas porque «el contenido visual es insuficiente», y que los eventos «no generaron vistas» aunque el carnaval tuvo 5.
+
+Además, sus enlaces se repetían iguales («Abrir en el editor» tres veces) sin decir a qué lugar llevaban.
+
+Cambios:
+
+- **Instrucciones:**
+  - las recomendaciones salen de una lista cerrada de cosas que el equipo puede hacer en el panel (completar o mejorar un texto, fotos, publicar un borrador, crear un evento o un tour 360°, un texto de conocimiento, difundir los QR y los enlaces);
+  - el portal ya tiene «Cómo llegar», «Compartir», el QR y «Añadir al calendario»: nunca recomendar botones, funciones ni páginas nuevas;
+  - no explicar por qué pasó algo; describir las cifras como son;
+  - con pocas visitas, no sacar conclusiones de las vistas de cada ficha.
+- **Un hecho nuevo, calculado por la plataforma:** con menos de 50 visitantes (sumados por día) en 30 días, «Todavía hay pocas visitas para comparar fichas: N visitantes… no dice nada de su contenido».
+- **Enlaces con su nombre:** «Abrir «Museo de Ucureña» en el editor», «Proponer un texto para «…»», «Abrir el tour de «…»», «Probar «¿Hay cajero…?» en «Conocimiento del asistente»». Los nombres salen de la foto del Copilot (`copilot_snapshot`); sin ella, los textos de antes.
+
+Sin cambios en la base de datos. La calidad con el modelo real se revisa generando otra vez en producción.
