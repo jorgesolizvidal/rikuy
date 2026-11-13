@@ -4,8 +4,14 @@ import type {
   DeleteCircuitOutcome,
   PassportCircuit,
   PassportRepository,
+  PassportStamp,
   PortalCircuit,
   PublishedPassportReader,
+  PublishedStampReader,
+  RenewStampCodeOutcome,
+  StampCode,
+  StampCodeRepository,
+  StampPlace,
 } from "@rikuy/core";
 import { createClient, type PostgrestError } from "@supabase/supabase-js";
 import { z } from "zod";
@@ -151,6 +157,8 @@ const portalCircuitSchema = z.object({
   publishedAt: z.string().transform((value) => new Date(value).toISOString()),
   stops: z.array(
     z.object({
+      // Since 20261120000000 (the web app may be deployed a few minutes before it).
+      id: z.uuid().optional(),
       slug: z.string(),
       title: z.string(),
       summary: z.string(),
@@ -183,6 +191,7 @@ export function createSupabasePublishedPassportReader(
         .map((circuit) => ({
           ...circuit,
           stops: circuit.stops.map((stop) => ({
+            id: stop.id ?? null,
             slug: stop.slug,
             title: stop.title,
             summary: stop.summary,
@@ -193,6 +202,124 @@ export function createSupabasePublishedPassportReader(
             cover: stop.cover,
           })),
         }));
+    },
+  };
+}
+
+// ── Stamps (migration 20261120000000, ADR-057) ───────────────────────────────
+
+const stampCodeSchema = z.object({
+  contentId: z.uuid(),
+  slug: z.string(),
+  title: z.string(),
+  published: z.boolean(),
+  code: z.string(),
+  version: z.number().int(),
+  createdAt: z.string(),
+  renewedAt: z.string().nullable(),
+  circuits: z.array(z.object({ name: z.string(), status: z.enum(["draft", "published"]) })),
+});
+
+/** The stamp codes of the stops, with the signed-in user's session. */
+export function createStampCodeRepository(client: SessionClient): StampCodeRepository {
+  return {
+    async list(tenantId): Promise<StampCode[]> {
+      const { data, error } = await client.rpc("tenant_passport_stamp_codes", {
+        p_tenant_id: tenantId,
+      });
+      if (isMissingFunction(error)) return [];
+      if (error) throw unexpected("Listing the stamp codes", error);
+      return z.array(stampCodeSchema).parse(data);
+    },
+
+    async renew(tenantId, contentId, version): Promise<RenewStampCodeOutcome> {
+      const { data, error, status } = await client.rpc("renew_passport_stamp_code", {
+        p_tenant_id: tenantId,
+        p_content_id: contentId,
+        p_version: version,
+      });
+      if (error) {
+        if (error.code === "42501" || status === 403) return { status: "forbidden" };
+        if (error.code === "PT409") return { status: "stale" };
+        if (error.code === "P0002") return { status: "not_found" };
+        throw unexpected("Renewing a stamp code", error);
+      }
+      return { status: "renewed", version: z.number().int().parse(data) };
+    },
+  };
+}
+
+const stampPlaceSchema = z.object({
+  id: z.uuid(),
+  slug: z.string(),
+  title: z.string(),
+  summary: z.string(),
+  latitude: z.number().nullable(),
+  longitude: z.number().nullable(),
+  cover: publicImageSchema.nullable(),
+});
+
+const collectedSchema = z.object({
+  id: z.uuid(),
+  slug: z.string(),
+  title: z.string(),
+  at: z.number().int(),
+  located: z.boolean(),
+  signature: z.string(),
+});
+
+/** The portal's anonymous stamping (publishable key; the functions check the code). */
+export function createSupabasePublishedStampReader(
+  options: SupabasePublishedContentReaderOptions,
+): PublishedStampReader {
+  const client = createClient(options.url, options.publishableKey, {
+    auth: { persistSession: false, autoRefreshToken: false, detectSessionInUrl: false },
+    ...(options.fetch ? { global: { fetch: options.fetch } } : {}),
+  });
+  const timeoutMs = options.timeoutMs ?? 3_000;
+  return {
+    async place(tenantId, code): Promise<StampPlace | null> {
+      const { data, error } = await client
+        .rpc("portal_stamp_place", { p_tenant_id: tenantId, p_code: code })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (isMissingFunction(error)) return null;
+      if (error) throw unexpected("Reading a stamp's place", error);
+      if (data === null) return null;
+      const place = stampPlaceSchema.parse(data);
+      return {
+        id: place.id,
+        slug: place.slug,
+        title: place.title,
+        summary: place.summary,
+        location:
+          place.latitude === null || place.longitude === null
+            ? null
+            : { lat: place.latitude, lng: place.longitude },
+        cover: place.cover,
+      };
+    },
+
+    async collect(tenantId, code, passportId, located): Promise<PassportStamp | null> {
+      const { data, error } = await client
+        .rpc("portal_collect_stamp", {
+          p_tenant_id: tenantId,
+          p_code: code,
+          p_passport: passportId,
+          p_located: located,
+        })
+        .abortSignal(AbortSignal.timeout(timeoutMs));
+      if (isMissingFunction(error)) return null;
+      if (error) throw unexpected("Collecting a stamp", error);
+      if (data === null) return null;
+      const stamp = collectedSchema.parse(data);
+      return {
+        placeId: stamp.id,
+        slug: stamp.slug,
+        title: stamp.title,
+        at: stamp.at,
+        located: stamp.located,
+        signature: stamp.signature,
+      };
     },
   };
 }

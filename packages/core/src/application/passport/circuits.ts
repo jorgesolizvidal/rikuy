@@ -204,6 +204,8 @@ export async function deleteCircuit(
 // ── The portal ──────────────────────────────────────────────────────────────
 
 export interface PortalCircuitStop {
+  /** The place (content id) its stamps are kept by; null until the stamps migration runs. */
+  readonly id: string | null;
   readonly slug: string;
   readonly title: string;
   readonly summary: string;

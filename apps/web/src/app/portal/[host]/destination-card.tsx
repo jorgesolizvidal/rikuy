@@ -1,4 +1,5 @@
 import { PORTAL_PATHS, type PublishedDestinationSummary } from "@rikuy/core";
+import type { ReactNode } from "react";
 
 import { responsiveImage } from "@/server/portal-content";
 
@@ -13,6 +14,7 @@ export function DestinationCard({
   destination,
   headingLevel = 3,
   priority = false,
+  extra = null,
 }: {
   readonly tenantId: string;
   readonly destination: Pick<
@@ -21,6 +23,8 @@ export function DestinationCard({
   >;
   readonly headingLevel?: 2 | 3;
   readonly priority?: boolean;
+  /** Below the text, inside the link (the passport's stamp of the place). */
+  readonly extra?: ReactNode;
 }) {
   const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
@@ -38,6 +42,7 @@ export function DestinationCard({
         <Heading className="portal-card-title">{destination.title}</Heading>
         {destination.summary ? <p className="portal-card-text">{destination.summary}</p> : null}
         {destination.location ? <DistanceText point={destination.location} compact /> : null}
+        {extra}
       </a>
     </li>
   );

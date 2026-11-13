@@ -188,6 +188,27 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
         </>
       ) : null}
 
+      <h2 id="pasaporte">El pasaporte turístico</h2>
+      <p>
+        Al escanear el código del pasaporte en un lugar y pulsar «Sellar», el sello se guarda en tu
+        teléfono, en el almacenamiento de este navegador. No hace falta cuenta.
+      </p>
+      <ul>
+        <li>
+          Al sellar, tu navegador envía el código escaneado, un identificador al azar del pasaporte
+          (lo crea tu teléfono; no dice quién eres) y si estás o no en el lugar. Tu posición no se
+          envía: si compartes tu ubicación, la distancia al lugar se calcula en tu teléfono.
+        </li>
+        <li>
+          {siteName} firma el sello para que no se pueda falsificar y te lo devuelve. No guarda nada
+          de eso: ni tus sellos, ni el identificador, ni dónde estabas.
+        </li>
+        <li>
+          Los sellos no vencen. Si borras los datos de este sitio en tu navegador, o usas otro
+          navegador o teléfono, no los verás ahí.
+        </li>
+      </ul>
+
       <h2>Enlaces a otros servicios</h2>
       <p>
         «Cómo llegar» abre Google Maps, «Ver en OpenStreetMap» abre OpenStreetMap y los enlaces a
