@@ -241,7 +241,7 @@ describe("«Recomendaciones del Copilot» (ADR-054)", () => {
       has: page.getByRole("heading", { name: "Recomendaciones del Copilot" }),
     });
     await expect.poll(() => section.locator(".recommendation").count()).toBeGreaterThan(0);
-    expect(await section.getByRole("link", { name: "Proponer con el Copilot" }).count()).toBe(0);
+    expect(await section.getByRole("link", { name: /^Proponer/u }).count()).toBe(0);
     expect(await section.getByRole("link", { name: "Abrir la agenda" }).count()).toBeGreaterThan(0);
     expect((await saved(SUR)).length).toBe(1);
     await context.close();

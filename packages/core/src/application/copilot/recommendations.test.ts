@@ -234,7 +234,7 @@ describe("recommendationLinks", () => {
         href: `/o/demo-norte/copilot/proponer?contenido=${MUSEO}`,
       },
       {
-        label: "Probar en «Conocimiento del asistente»",
+        label: "Probar «¿hay cajero?» en «Conocimiento del asistente»",
         href: "/o/demo-norte/conocimiento?pregunta=%C2%BFhay%20cajero%3F",
       },
       { label: "Abrir la agenda", href: "/o/demo-norte/agenda" },
@@ -246,9 +246,23 @@ describe("recommendationLinks", () => {
     ]);
     expect(recommendationLinks(member("analyst"), item, facts).map((link) => link.label)).toEqual([
       "Abrir en el editor",
-      "Probar en «Conocimiento del asistente»",
+      "Probar «¿hay cajero?» en «Conocimiento del asistente»",
       "Abrir la agenda",
       "Abrir el tour",
+    ]);
+  });
+
+  it("names the place each link opens, so several links are never alike", () => {
+    const names = new Map([[MUSEO, "Museo «de» Ucureña"]]);
+    expect(
+      recommendationLinks(member("editor"), item, facts, names).map((link) => link.label),
+    ).toEqual([
+      "Abrir «Museo de Ucureña» en el editor",
+      "Proponer un texto para «Museo de Ucureña»",
+      "Probar «¿hay cajero?» en «Conocimiento del asistente»",
+      "Abrir la agenda",
+      "Abrir el tour de «Museo de Ucureña»",
+      "Proponer la descripción de la escena (tour de «Museo de Ucureña»)",
     ]);
   });
 });

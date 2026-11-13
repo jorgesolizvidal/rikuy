@@ -167,11 +167,16 @@ export interface RecommendationLink {
   readonly href: string;
 }
 
-/** Where a recommendation leads: the editors of what its facts point at, never the model's. */
+/**
+ * Where a recommendation leads: the editors of what its facts point at, never the model's.
+ * With `names` (content id → its name, from the snapshot), each link says which place it
+ * opens, so three «Abrir en el editor» never sit side by side.
+ */
 export function recommendationLinks(
   membership: OrganizationMembership,
   item: Recommendation,
   facts: readonly RecommendationFact[],
+  names: ReadonlyMap<string, string> = new Map(),
 ): RecommendationLink[] {
   const org = membership.slug;
   const editing = canPropose(membership);
@@ -182,25 +187,37 @@ export function recommendationLinks(
     seen.add(href);
     links.push({ label, href });
   };
+  const quoted = (text: string) => `«${text.replace(/[«»]/gu, "")}»`;
   const targets = item.facts
     .map((id) => facts.find((fact) => fact.id === id)?.target)
     .filter((target): target is RecommendationTarget => target !== null && target !== undefined);
   for (const target of targets) {
     switch (target.type) {
-      case "content":
-        add("Abrir en el editor", COPILOT_PATHS.editor(org, target.kind, target.contentId));
+      case "content": {
+        const name = names.get(target.contentId);
+        add(
+          name ? `Abrir ${quoted(name)} en el editor` : "Abrir en el editor",
+          COPILOT_PATHS.editor(org, target.kind, target.contentId),
+        );
         if (editing && target.proposable) {
           add(
-            "Proponer con el Copilot",
+            name ? `Proponer un texto para ${quoted(name)}` : "Proponer con el Copilot",
             COPILOT_PATHS.propose(org, { type: "content", contentId: target.contentId }),
           );
         }
         break;
-      case "scene":
-        add("Abrir el tour", COPILOT_PATHS.tour(org, target.tourId));
+      }
+      case "scene": {
+        const name = names.get(target.contentId);
+        add(
+          name ? `Abrir el tour de ${quoted(name)}` : "Abrir el tour",
+          COPILOT_PATHS.tour(org, target.tourId),
+        );
         if (editing) {
           add(
-            "Proponer con el Copilot",
+            name
+              ? `Proponer la descripción de la escena (tour de ${quoted(name)})`
+              : "Proponer con el Copilot",
             COPILOT_PATHS.propose(org, {
               type: "scene",
               tourId: target.tourId,
@@ -209,9 +226,10 @@ export function recommendationLinks(
           );
         }
         break;
+      }
       case "question":
         add(
-          "Probar en «Conocimiento del asistente»",
+          `Probar ${quoted(target.question.length > 80 ? `${target.question.slice(0, 79).trimEnd()}…` : target.question)} en «Conocimiento del asistente»`,
           `/o/${org}/conocimiento?pregunta=${encodeURIComponent(target.question)}`,
         );
         break;
