@@ -31,6 +31,7 @@ function member(role: OrganizationMembership["role"]): OrganizationMembership {
 
 const statistics: StatisticsRepository = {
   calendar: async () => ({ timezone: "America/La_Paz", firstDay: "2026-11-01" }),
+  passport: async () => null,
   statistics: async (_tenant, range) => ({
     ...range,
     items: [
@@ -249,6 +250,30 @@ describe("recommendationLinks", () => {
       "Probar «¿hay cajero?» en «Conocimiento del asistente»",
       "Abrir la agenda",
       "Abrir el tour",
+    ]);
+  });
+
+  it("opens a passport circuit, with its name when known", () => {
+    const circuit = "44444444-0000-4000-8000-000000000001";
+    const passportFacts: RecommendationFact[] = [
+      {
+        id: "H1",
+        source: "passport",
+        text: "Ruta: 3.",
+        target: { type: "circuit", circuitId: circuit },
+      },
+    ];
+    const one = { title: "Coloca los QR", why: "Por algo.", facts: ["H1"] };
+    expect(recommendationLinks(member("analyst"), one, passportFacts)).toEqual([
+      { label: "Abrir el pasaporte turístico", href: `/o/demo-norte/pasaporte/${circuit}` },
+    ]);
+    expect(
+      recommendationLinks(member("analyst"), one, passportFacts, new Map([[circuit, "Ruta"]])),
+    ).toEqual([
+      {
+        label: "Abrir el circuito «Ruta» del pasaporte",
+        href: `/o/demo-norte/pasaporte/${circuit}`,
+      },
     ]);
   });
 

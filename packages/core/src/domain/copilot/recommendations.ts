@@ -5,15 +5,16 @@ import type {
   CopilotSnapshotRow,
 } from "../../contracts/copilot";
 import { formatDateRange, formatShortDate, type StatisticsSummary } from "../visits/statistics";
+import type { PassportSummary } from "../passport/statistics";
 import { formatEventSchedule } from "../events/schedule";
 import { COPILOT_ISSUE_LABELS, proposableFields } from "./issues";
 
 /**
  * The Copilot's recommendations from the metrics (C1 · Paso 4, ADR-054).
  *
- * The platform — never the model — turns four sources into short facts labeled H1, H2…:
- * visits and actions of the last 30 days, the questions the assistant could not answer,
- * what the content review finds and the agenda. The model writes up to six recommendations,
+ * The platform — never the model — turns its sources into short facts labeled H1, H2…:
+ * visits and actions of the last 30 days, the tourist passport (C2 · Paso 4, ADR-059), the
+ * questions the assistant could not answer, what the content review finds and the agenda. The model writes up to six recommendations,
  * each naming the facts it rests on; this module keeps only those that cite known facts and
  * whose every number is in those facts (the database checks it again). Each fact knows where
  * it leads in the panel, so the links are the platform's, never the model's.
@@ -37,13 +38,22 @@ export const RECOMMENDATION_LIMITS = {
   questions: 8,
   review: 12,
   events: 5,
+  passportCircuits: 2,
+  passportPlaces: 4,
 } as const;
 
-export const RECOMMENDATION_SOURCES = ["visits", "questions", "review", "agenda"] as const;
+export const RECOMMENDATION_SOURCES = [
+  "visits",
+  "passport",
+  "questions",
+  "review",
+  "agenda",
+] as const;
 export type RecommendationSource = (typeof RECOMMENDATION_SOURCES)[number];
 
 export const RECOMMENDATION_SOURCE_LABELS: Readonly<Record<RecommendationSource, string>> = {
   visits: "Visitas y acciones",
+  passport: "Pasaporte turístico",
   questions: "Preguntas sin respuesta",
   review: "Revisión del contenido",
   agenda: "Agenda",
@@ -65,6 +75,7 @@ export type RecommendationTarget =
       readonly tourId: string;
       readonly sceneId: string;
     }
+  | { readonly type: "circuit"; readonly circuitId: string }
   | { readonly type: "question"; readonly question: string }
   | { readonly type: "agenda" };
 
@@ -170,12 +181,14 @@ export interface RecommendationInput {
   };
   readonly review: readonly CopilotReviewRow[];
   readonly snapshot: readonly CopilotSnapshotRow[];
+  /** The tourist passport of the same period; null or absent: no facts about it. */
+  readonly passport?: PassportSummary | null;
 }
 
 function changeWords(value: number, previous: number | null, unit: string, before: string): string {
   if (previous === null) return "";
   if (previous === 0) {
-    return value === 0 ? `; en ${before} tampoco hubo ${unit}` : `; en ${before} no hubo ninguna`;
+    return value === 0 ? `; en ${before} tampoco hubo ${unit}` : `; en ${before} no hubo ${unit}`;
   }
   const percent = Math.round((Math.abs(value - previous) / previous) * 100);
   if (percent === 0) return `; igual que en ${before} (${n(previous)})`;
@@ -258,6 +271,45 @@ export function recommendationFacts(input: RecommendationInput): RecommendationF
         source: "visits",
         text: `Origen de las vistas ${period}: ${countries.map((c) => `${countryName(c.country)} ${n(c.views)}`).join(", ")}.`,
         target: null,
+      });
+    }
+  }
+
+  // The tourist passport: stamps in the places and completed circuits.
+  const passport = input.passport;
+  if (passport?.active) {
+    const t = passport.totals;
+    add({
+      source: "passport",
+      text: `Pasaporte turístico, ${period}: ${plural(t.stamps.value, "sello", "sellos")} en los lugares (${n(t.located.value)} con ubicación: visitas comprobadas en el lugar), ${plural(t.completed.value, "circuito completado", "circuitos completados")} y ${plural(t.redeemed.value, "premio canjeado", "premios canjeados")}${passport.compared ? changeWords(t.stamps.value, t.stamps.previous, "sellos", named.previous) : ""}.`,
+      target: null,
+    });
+    for (const circuit of passport.circuits
+      .filter((item) => item.published)
+      .slice(0, RECOMMENDATION_LIMITS.passportCircuits)) {
+      add({
+        source: "passport",
+        text: `Circuito ${quoted(circuit.name)} del pasaporte, ${period}: ${plural(circuit.completed, "persona lo completó", "personas lo completaron")} y ${plural(circuit.redeemed, "premio canjeado", "premios canjeados")}.`,
+        target: { type: "circuit", circuitId: circuit.circuitId },
+      });
+    }
+    // The most and the least stamped stops (the places phones can stamp now).
+    const stops = passport.places.filter((place) => place.stop);
+    const half = RECOMMENDATION_LIMITS.passportPlaces / 2;
+    const chosen =
+      stops.length <= RECOMMENDATION_LIMITS.passportPlaces
+        ? stops
+        : [...stops.slice(0, half), ...stops.slice(-half)];
+    for (const place of chosen) {
+      add({
+        source: "passport",
+        text: `Destino ${quoted(place.title)}, parada del pasaporte, ${period}: ${plural(place.stamps, "sello", "sellos")} (${n(place.located)} con ubicación) y ${plural(place.views, "vista", "vistas")} de su ficha.`,
+        target: {
+          type: "content",
+          kind: "destination",
+          contentId: place.contentId,
+          proposable: false,
+        },
       });
     }
   }
@@ -365,6 +417,7 @@ export function recommendationFacts(input: RecommendationInput): RecommendationF
 
 const SECTION_NAMES: Readonly<Record<RecommendationSource, string>> = {
   visits: "Visitas y acciones",
+  passport: "Pasaporte turístico (sellos con QR en los lugares y premios)",
   questions: "Preguntas que el asistente del portal no supo responder",
   review: "Lo que le falta al contenido",
   agenda: "Agenda",
@@ -378,9 +431,9 @@ export function recommendationMessages(input: {
   const system = [
     RECOMMEND_TAG,
     `Eres el Copilot del panel del portal de turismo «${input.site}». Lees los hechos del municipio, calculados por la plataforma, y escribes recomendaciones concretas para su equipo.`,
-    "Los hechos son [H1], [H2]…: visitas del portal, preguntas que el asistente del portal no supo responder, lo que le falta al contenido y la agenda.",
+    "Los hechos son [H1], [H2]…: visitas del portal, el pasaporte turístico (sellos con QR en los lugares, circuitos completados y premios), preguntas que el asistente del portal no supo responder, lo que le falta al contenido y la agenda.",
     "Reglas:",
-    "1. Escribe de 3 a 6 recomendaciones, la más útil primero. Cada una es algo que el equipo puede hacer hoy desde el panel, de esta lista: completar o mejorar un texto (resumen, texto o descripción de una escena), agregar fotos, publicar lo que está en borrador, crear un evento, crear un tour 360°, escribir un texto de conocimiento que responda una pregunta frecuente, o difundir el portal fuera de él (imprimir y colocar los códigos QR de las fichas, compartir sus enlaces).",
+    "1. Escribe de 3 a 6 recomendaciones, la más útil primero. Cada una es algo que el equipo puede hacer hoy desde el panel, de esta lista: completar o mejorar un texto (resumen, texto o descripción de una escena), agregar fotos, publicar lo que está en borrador, crear un evento, crear un tour 360°, escribir un texto de conocimiento que responda una pregunta frecuente, o difundir el portal fuera de él (imprimir y colocar los códigos QR de las fichas o los de sello del pasaporte en cada lugar, compartir sus enlaces).",
     "Recomienda publicar solo lo que un hecho dice que está en borrador o con cambios sin publicar: lo que ya está publicado no se publica de nuevo.",
     "2. El portal ya tiene en cada ficha «Cómo llegar», «Compartir» y su código QR, y en cada evento «Añadir al calendario». Nunca recomiendes agregarlos ni crear botones, funciones o páginas nuevas: que se usen poco no significa que falten.",
     "3. Cada recomendación se basa en uno o más hechos y los nombra. Usa SOLO las cifras de los hechos que nombra, tal cual, sin recalcular, sumar ni redondear. No escribas ninguna otra cifra. Describe las cifras como son: no digas que un grupo «no tuvo vistas» si alguno sí tuvo.",

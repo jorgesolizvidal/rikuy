@@ -188,14 +188,15 @@ describe("«Recomendaciones del Copilot» (ADR-054)", () => {
 
     await generate(page);
     const items = section.locator(".recommendation");
-    // One per source of facts; the invented figure and the unknown fact were dropped.
-    await expect.poll(() => items.count()).toBe(4);
+    // One per source of facts (the passport too: Demo Norte has a published circuit); the
+    // invented figure and the unknown fact were dropped.
+    await expect.poll(() => items.count()).toBe(5);
     const text = await section.innerText();
     expect(text).not.toContain("98765");
     expect(text).not.toContain("un dato que no existe");
     expect(text).toMatch(/Generadas el .+ · visitas del .+ al .+/u);
 
-    for (let index = 0; index < 4; index += 1) {
+    for (let index = 0; index < 5; index += 1) {
       const item = items.nth(index);
       const why = await item.locator("p").first().innerText();
       const facts = await item.locator(".recommendation-facts li").allInnerTexts();
@@ -210,6 +211,17 @@ describe("«Recomendaciones del Copilot» (ADR-054)", () => {
     expect(await questions.locator(".recommendation-source").first().innerText()).toBe(
       "Preguntas sin respuesta",
     );
+    // The passport's facts (C2 · Paso 4) lead to the circuit, by its name.
+    const passport = items.filter({ hasText: "Pasaporte turístico" });
+    expect(await passport.locator(".recommendation-source").first().innerText()).toBe(
+      "Pasaporte turístico",
+    );
+    const [circuitFact] = await db<{ count: number }[]>`
+      select count(*)::int as count
+      from public.copilot_recommendations r, jsonb_array_elements(r.facts) f
+      where r.tenant_id = ${NORTE} and f->>'source' = 'passport'
+        and f->'target'->>'type' = 'circuit' and f->>'text' like '%«Ruta del valle»%'`;
+    expect(circuitFact?.count).toBe(1);
     const agenda = items.filter({ has: page.getByRole("link", { name: "Abrir la agenda" }) });
     expect(await agenda.getByRole("link", { name: "Abrir la agenda" }).getAttribute("href")).toBe(
       "/o/demo-norte/agenda",
@@ -218,7 +230,7 @@ describe("«Recomendaciones del Copilot» (ADR-054)", () => {
     await accessible(page);
 
     const first = await saved(NORTE);
-    expect(first).toEqual([{ id: expect.any(String), items: 4 }]);
+    expect(first).toEqual([{ id: expect.any(String), items: 5 }]);
     // Nothing published, no draft touched, no proposal made.
     expect(await contentState(NORTE)).toBe(before);
     const [audit] = await db<{ count: number }[]>`

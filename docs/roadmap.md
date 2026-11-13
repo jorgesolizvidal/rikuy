@@ -183,7 +183,7 @@ Pasos confirmados por el usuario (2026-11-13). El sello es un QR firmado por lug
 | 1 ✅ | Circuitos ([ADR-056](adr/ADR-056-passport-circuits.md)): el municipio arma circuitos de destinos con su premio y el portal los muestra | Un circuito publicado se ve en el portal con sus lugares y su premio, y solo los de su municipio |
 | 2 ✅ | Sellos con QR en cada lugar ([ADR-057](adr/ADR-057-passport-stamps.md)), guardados en el teléfono                                      | Un sello solo se consigue con el QR de ese lugar, y sin cuenta                                   |
 | 3 ✅ | Premio y canje al completar el circuito ([ADR-058](adr/ADR-058-passport-rewards.md))                                                   | Un comprobante se canjea una sola vez, en el local, sin cuenta                                   |
-| 4    | Métricas del pasaporte en «Estadísticas» y en el informe mensual                                                                       | El municipio ve cuántos sellos y circuitos completos hubo, sin datos de nadie                    |
+| 4 ✅ | Métricas del pasaporte en «Estadísticas» y en el informe mensual ([ADR-059](adr/ADR-059-passport-metrics.md))                          | El municipio ve cuántos sellos y circuitos completos hubo, sin datos de nadie                    |
 
 **Más adelante** (sin fase todavía): audioguías grabadas por la propia comunidad, en español y quechua, que además alimentan el conocimiento del asistente; WhatsApp (botones a cada local y, con clientes que paguen, el asistente dentro de WhatsApp); entradas a eventos con pago por QR.
 

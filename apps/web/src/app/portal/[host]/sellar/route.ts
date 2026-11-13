@@ -15,7 +15,8 @@ const NO_STORE = { "cache-control": "no-store" };
  * POST /sellar on the portal's host (ADR-057): `{ code, passport, located }` → a stamp signed
  * by the municipality for the visitor's phone to keep. The municipality comes from the host;
  * the request must come from a page of this same portal. The position is never sent: only
- * whether the phone was within the place's radius. Nothing of it is stored.
+ * whether the phone was within the place's radius. Nothing that identifies the phone is
+ * stored: the database adds the stamp to the place's daily totals (ADR-059).
  */
 export async function POST(request: Request, { params }: StampContext) {
   const view = await portalView((await params).host);

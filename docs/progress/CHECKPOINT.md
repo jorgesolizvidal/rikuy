@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C2 — pasaporte turístico. C0 y C1 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C2 · Paso 3 — premio y canje ✅
-- **Rama:** `feat/c2-step3-passport-rewards` → PR hacia `main`
+- **Fase:** C2 — pasaporte turístico, terminada con este paso. C0 y C1 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C2 · Paso 4 — métricas del pasaporte ✅
+- **Rama:** `feat/c2-step4-passport-metrics` → PR hacia `main`
 
 ## Historial
 
@@ -2268,15 +2268,57 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - los espacios que se cuelan al escribir o pegar la clave se quitan.
 - Tests: e2e del premio (2) con el tipo de los dos campos, la clave en la confirmación y un 500 del servidor que no se informa como clave equivocada; contratos RC-09/10/11/12 (216) en verde.
 
+**Verificación en producción de la corrección (2026-11-13):** tras el merge (PR #79), el usuario volvió a poner la clave del local, esta vez a la vista, y canjeó JPSG-4H2C en `/canje` desde su PC: «¡Canjeado! Entrega el premio.» a las 14:40. Comprobado con una consulta de solo lectura: el comprobante quedó canjeado y auditado (`passport.voucher_redeemed`), y la clave registra sus dos cambios.
+
+### C2 · Paso 4 — métricas del pasaporte ✅
+
+- Decisiones del usuario ([ADR-059](../adr/ADR-059-passport-metrics.md)), 2026-11-13:
+  - **contar una vez por teléfono, lugar y día**, con una huella diaria que se borra a los dos días, como las visitas;
+  - **los sellos con ubicación son «visitas comprobadas en el lugar»**, una cifra aparte de las vistas;
+  - **sus cifras entran en las recomendaciones del Copilot**;
+  - **el informe mensual suma «Pasaporte turístico»**, en la página y en el correo.
+- Base de datos (`20261122000000_c2_passport_metrics.sql`, solo expand):
+  - `passport_daily_stamps` (municipio, día del municipio, lugar, sellos y sellos con ubicación; RLS sin permisos);
+  - `portal_collect_stamp` suma cada sello con `private.record_passport_stamp` después de firmarlo (la respuesta no cambia): una vez por teléfono, lugar y día, y «con ubicación» una vez más si ese día sella desde el lugar. Quién ya se contó queda como huella en las marcas diarias de las visitas (sin el identificador), que se borran a los dos días. Como mucho 2.000 por municipio y día;
+  - `tenant_passport_statistics` (cualquier miembro): sellos por lugar (con cero las paradas que hoy se pueden sellar), circuitos completados (teléfonos distintos con comprobante) y premios canjeados, por período o por día, y desde cuándo se cuentan los sellos;
+  - `worker_api.monthly_report_data` suma el pasaporte del mes y del anterior; las recomendaciones aceptan la fuente `passport` y el destino `circuit` (un circuito de este municipio);
+  - seed: 70 días de sellos en las dos paradas publicadas de «Ruta del valle» y seis comprobantes (cuatro canjeados).
+- `@rikuy/core`:
+  - `domain/passport/statistics`: `summarizePassport` (totales comparados solo con períodos contados enteros, cada lugar con las vistas de su ficha, circuitos) y `passportCsv`;
+  - «Estadísticas» lee el pasaporte junto con las visitas y suma la descarga «pasaporte»;
+  - hechos del Copilot: los totales, hasta 2 circuitos y hasta 4 paradas (las más y las menos selladas); las instrucciones suman «colocar en cada lugar su código QR de sello»;
+  - informe mensual: el pasaporte en la página, en los hechos y en el correo (totales con la comparación, los lugares más sellados y los que no tuvieron sellos).
+- `@rikuy/db`: `passport()` en el repositorio de estadísticas (nada antes de la migración) y el pasaporte en los datos del informe.
+- Panel:
+  - **«Pasaporte turístico»** en «Estadísticas» y en el informe mensual: sellos, visitas comprobadas en el lugar, circuitos completados y premios canjeados; cada lugar con las vistas de su ficha al lado de sus sellos; cada circuito con su enlace;
+  - descarga **«Pasaporte turístico por día» (CSV)**;
+  - las recomendaciones enlazan al circuito por su nombre;
+  - un municipio sin circuitos no ve la sección.
+- Portal: la página de privacidad explica que se suman sellos por lugar y día con una huella que se borra a los dos días.
+- CI: nuevo paso **«Passport metrics in a real browser»** (suite `lighthouse`).
+- Tests:
+  - unitarios: core 675 (+11), db 202 (+1);
+  - 1.688 pgTAP (32 nuevos, `047_passport_metrics`; `043` con el pasaporte en los datos del informe): una vez por teléfono, lugar y día; «con ubicación» al volver desde el lugar sin otro sello; cada lugar por separado; códigos desconocidos o de otro municipio no cuentan; el día del municipio; solo huellas y ninguna columna sobre el teléfono; el tope diario (el sello se firma igual); nadie lee la tabla ni cuenta a mano; un circuito completado y su premio; analista, editor y propietario leen lo mismo; período inválido, propietario sin segundo factor, otro municipio y visitantes no; el borrador nunca publicado no aparece; una parada sin sellos aparece en cero; un hecho del Copilot lleva a un circuito de este municipio, nunca de otro;
+  - **e2e en un navegador real** (`passport-metrics.e2e.test.ts`, 2 casos): un teléfono sella la plaza dos veces y otra desde el lugar, y cuenta un sello y una visita comprobada; el propietario ve en «Estadísticas» los mismos totales que suma la base, la plaza, el circuito y el CSV del día; el informe del mes tiene la sección; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px; Demo Sur, sin circuitos, no tiene la sección;
+  - recomendaciones (ahora 5 por la fuente nueva), informe mensual, estadísticas, sellos, premio, pasaporte y contratos RC-09/10/11/12 (216) en verde; `plpgsql_check` sin hallazgos.
+- Lo que encontraron las pruebas, ya corregido: el `CHECK` de la tabla se evalúa sobre la fila propuesta antes del `ON CONFLICT`, así que sumar solo «con ubicación» con un `INSERT … ON CONFLICT` fallaba (0 sellos y 1 con ubicación). Ahora ese caso es un `UPDATE`.
+
+**Desviaciones:**
+
+- Los sellos de antes de este paso no se cuentan (el servidor no los guardaba); los comprobantes sí, desde el Paso 3.
+- «Con ubicación» es lo que dice el teléfono: un GPS falseado lo engaña. Es una señal, no una prueba.
+- Un teléfono que sella el mismo lugar dos días cuenta dos veces, una por día, como los visitantes.
+
 ## Cómo verificarlo
 
-- Tras el merge de `fix/passport-redeem-pin`, en el panel de Ucureña → «Pasaporte turístico» → «Corazón de Ucureña» → «Premio y canje»: escribe la clave nueva (se ve mientras la escribes), pulsa «Cambiar la clave» y anótala tal como la repite el mensaje.
-- El comprobante JPSG-4H2C que ya tienes sigue valiendo (no se canjeó y vence el 13 de diciembre): no hace falta volver a sellar.
-- En otro teléfono o en la PC, abre `rikuy-ucurena.vercel.app/canje`, escribe JPSG-4H2C y la clave nueva: «Comprobante válido» → «Marcar como canjeado y entregar el premio». Al volver a comprobarlo dice que ya se canjeó, y en el celular la página del circuito dice «Premio recibido».
+- Tras el merge, en el celular, sella un lugar de «Corazón de Ucureña» (su QR en el panel sirve). Sellar otra vez el mismo lugar el mismo día no suma.
+- En el panel de Ucureña → «Estadísticas»: la sección «Pasaporte turístico» muestra los sellos, las visitas comprobadas en el lugar, el circuito completado y el premio canjeado de hoy, cada lugar con las vistas de su ficha, y «Pasaporte turístico por día (CSV)» al final.
+- En «Informe mensual» → «Noviembre de 2026 (en curso)», la misma sección; con «Generar recomendaciones» en «Estadísticas», una puede apoyarse en el pasaporte.
+- Los sellos de antes de este merge no aparecen: se cuentan desde ahora.
 
 ## Siguiente paso
 
-**C2 · Paso 4 — métricas del pasaporte en «Estadísticas» y en el informe mensual** ([roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr)): cuántos sellos (con y sin ubicación) y comprobantes pedidos y canjeados hubo, por lugar y por circuito, sin datos de nadie. Antes de empezar, confirmar con el usuario si los sellos se cuentan como visitas reales en el lugar (con ubicación aparte), si las cifras van también a las recomendaciones del Copilot y si el informe mensual suma una sección del pasaporte.
+**C3 — rediseño de la interfaz** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): sistema de diseño white-label (colores, logo y tipografía siguen siendo datos de cada municipio) y las pantallas clave del portal y del panel, dentro del presupuesto de rendimiento y los contratos de accesibilidad. Antes de empezar, confirmar con el usuario los pasos de C3, qué pantallas primero y con qué herramienta se explora el diseño (Google Stitch u otra).
 
 ## Decisiones pendientes del usuario
 

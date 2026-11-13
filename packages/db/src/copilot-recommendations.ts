@@ -29,6 +29,7 @@ const targetSchema = z
       tourId: z.uuid(),
       sceneId: z.uuid(),
     }),
+    z.object({ type: z.literal("circuit"), circuitId: z.uuid() }),
     z.object({ type: z.literal("question"), question: z.string() }),
     z.object({ type: z.literal("agenda") }),
   ])

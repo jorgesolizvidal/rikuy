@@ -14,6 +14,7 @@ import Link from "next/link";
 
 import { Change } from "@/components/statistics/change";
 import { DailyChart } from "@/components/statistics/daily-chart";
+import { PassportSection } from "@/components/statistics/passport-section";
 import { countryName, formatCount } from "@/components/statistics/format";
 import { RecommendationList } from "@/components/statistics/recommendation-list";
 import { adminSession } from "@/server/admin-session";
@@ -74,7 +75,10 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
   const { summary, status, questions, review, activity } = view;
   const saved = status.report;
   const timezone = view.snapshot.timezone;
-  const names = new Map(view.snapshot.items.map((item) => [item.contentId, item.title] as const));
+  const names = new Map([
+    ...view.snapshot.items.map((item) => [item.contentId, item.title] as const),
+    ...(view.passport?.circuits ?? []).map((circuit) => [circuit.circuitId, circuit.name] as const),
+  ]);
   const editorOf = (kind: string | null, contentId: string) =>
     `/o/${membership.slug}/${kind === "event" ? "agenda" : kind === "knowledge" ? "conocimiento" : "destinos"}/${contentId}`;
   const places = summary.places.filter((place) => place.views > 0).slice(0, 10);
@@ -99,9 +103,9 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
           {view.current ? " (hasta hoy)" : ""}
         </h1>
         <p className="lead">
-          El portal de {membership.displayName} en el mes: visitas, lo más visto, lo que los
-          visitantes preguntaron sin respuesta, el estado del contenido y las recomendaciones del
-          Copilot.
+          El portal de {membership.displayName} en el mes: visitas, lo más visto, el pasaporte
+          turístico, lo que los visitantes preguntaron sin respuesta, el estado del contenido y las
+          recomendaciones del Copilot.
         </p>
       </div>
 
@@ -213,6 +217,15 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
           </>
         ) : null}
       </section>
+
+      {view.passport?.active ? (
+        <PassportSection
+          org={membership.slug}
+          passport={view.passport}
+          headingId="pasaporte"
+          period="en el mes"
+        />
+      ) : null}
 
       <section aria-labelledby="preguntas" className="metrics-section">
         <h2 id="preguntas">Preguntas sin respuesta</h2>
@@ -382,6 +395,10 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
           </li>
           <li>
             «Lo que falta completar» es la revisión del contenido de hoy, no la del fin de mes.
+          </li>
+          <li>
+            Pasaporte turístico: un teléfono cuenta una vez por lugar y día; «comprobadas en el
+            lugar» son los sellos con la ubicación del teléfono dentro del lugar.
           </li>
           <li>Los días son los del municipio, en su hora.</li>
         </ul>

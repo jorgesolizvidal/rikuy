@@ -300,7 +300,8 @@ function totalsOf(data: VisitStatisticsData): Record<StatisticsTotal, number> {
   };
 }
 
-function measure(value: number, previous: number | null): Measure {
+/** A value and how it changed from the previous period's (null: nothing to compare). */
+export function measure(value: number, previous: number | null): Measure {
   return {
     value,
     previous,
@@ -509,7 +510,7 @@ export const VISIT_EVENT_LABELS: Readonly<Record<VisitEvent, string>> = {
 const CSV_SEPARATOR = ";";
 const BOM = "﻿";
 
-function cell(value: string | number | null): string {
+function csvCell(value: string | number | null): string {
   if (value === null) return "";
   if (typeof value === "number") return String(value);
   // A cell that starts like a formula is opened as text, never run by the spreadsheet.
@@ -517,8 +518,12 @@ function cell(value: string | number | null): string {
   return /[";\n\r,]/u.test(safe) ? `"${safe.replaceAll('"', '""')}"` : safe;
 }
 
-function csv(header: readonly string[], rows: readonly (readonly (string | number | null)[])[]) {
-  return `${BOM}${[header, ...rows].map((row) => row.map(cell).join(CSV_SEPARATOR)).join("\r\n")}\r\n`;
+/** A CSV that Excel in Spanish opens as is: «;», BOM, formulas as text. */
+export function statisticsCsv(
+  header: readonly string[],
+  rows: readonly (readonly (string | number | null)[])[],
+): string {
+  return `${BOM}${[header, ...rows].map((row) => row.map(csvCell).join(CSV_SEPARATOR)).join("\r\n")}\r\n`;
 }
 
 /** One row per day, page or place, scene and action (from the per-day data). */
@@ -542,7 +547,7 @@ export function visitsCsv(data: VisitStatisticsData): string {
       item.views,
       item.visitors,
     ]);
-  return csv(
+  return statisticsCsv(
     ["fecha", "página", "lugar", "dirección", "escena", "acción", "veces", "visitantes"],
     rows,
   );
@@ -560,5 +565,5 @@ export function originsCsv(data: VisitStatisticsData): string {
         (a.city ?? "~").localeCompare(b.city ?? "~"),
     )
     .map((origin) => [origin.day, origin.country, origin.city, origin.views, origin.visitors]);
-  return csv(["fecha", "país", "ciudad", "vistas", "visitantes"], rows);
+  return statisticsCsv(["fecha", "país", "ciudad", "vistas", "visitantes"], rows);
 }

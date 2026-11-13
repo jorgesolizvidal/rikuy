@@ -8,6 +8,7 @@ import {
   type VisitStatisticsData,
   type VisitStatisticsItem,
 } from "../visits/statistics";
+import { summarizePassport, type PassportStatisticsData } from "../passport/statistics";
 import {
   numbersBacked,
   parseRecommendations,
@@ -309,6 +310,90 @@ describe("recommendationFacts", () => {
       title: `Lugar ${index}`,
     }));
     expect(recommendationFacts(input({ review: many })).length).toBeLessThanOrEqual(40);
+  });
+});
+
+describe("the passport's facts", () => {
+  const RUTA = "44444444-0000-4000-8000-000000000001";
+  const stops = ["Plaza", "Museo", "Mirador", "Iglesia", "Tambo", "Puente"].map((title, index) => ({
+    day: null,
+    contentId: `55555555-0000-4000-8000-00000000000${index}`,
+    slug: title.toLowerCase(),
+    title,
+    stop: true,
+    stamps: 10 - index,
+    located: 5 - Math.min(index, 5),
+  }));
+  function passport(stamps: number): PassportStatisticsData {
+    return {
+      from: RANGE.from,
+      to: RANGE.to,
+      since: "2026-09-01",
+      places: stops.map((stop) => ({ ...stop, stamps: stop.stamps + stamps })),
+      circuits: [
+        {
+          day: null,
+          circuitId: RUTA,
+          slug: "ruta",
+          name: "Ruta",
+          published: true,
+          completed: 3,
+          redeemed: 2,
+        },
+      ],
+    };
+  }
+  const summary = summarizePassport(
+    RANGE,
+    passport(0),
+    passport(-1),
+    new Map([[stops[0]?.contentId ?? "", 40]]),
+  );
+
+  it("come after the visits: totals, each circuit and the most and least stamped stops", () => {
+    const facts = recommendationFacts(input({ passport: summary }));
+    expect([...new Set(facts.map((fact) => fact.source))]).toEqual([
+      "visits",
+      "passport",
+      "questions",
+      "review",
+      "agenda",
+    ]);
+    const lines = facts.filter((fact) => fact.source === "passport");
+    expect(lines[0]?.text).toContain(
+      "45 sellos en los lugares (15 con ubicación: visitas comprobadas en el lugar), 3 circuitos completados y 2 premios canjeados",
+    );
+    expect(lines[0]?.text).toContain("en los 30 días anteriores fueron 39");
+    expect(lines[1]).toMatchObject({
+      text: expect.stringContaining("Circuito «Ruta» del pasaporte"),
+      target: { type: "circuit", circuitId: RUTA },
+    });
+    expect(lines.slice(2).map((fact) => fact.text.split(",")[0])).toEqual([
+      "Destino «Plaza»",
+      "Destino «Museo»",
+      "Destino «Tambo»",
+      "Destino «Puente»",
+    ]);
+    expect(lines[2]?.text).toContain("10 sellos (5 con ubicación) y 40 vistas de su ficha");
+    expect(lines[2]?.target).toMatchObject({
+      type: "content",
+      kind: "destination",
+      proposable: false,
+    });
+  });
+
+  it("are left out without circuits, and the model learns about the stamp QR codes", () => {
+    const none = summarizePassport(RANGE, { ...passport(0), places: [], circuits: [] }, null);
+    expect(
+      recommendationFacts(input({ passport: none })).some((f) => f.source === "passport"),
+    ).toBe(false);
+    expect(recommendationFacts(input()).some((f) => f.source === "passport")).toBe(false);
+    const facts = recommendationFacts(input({ passport: summary }));
+    const [system, user] = recommendationMessages({ site: "Demo", today: "hoy", facts });
+    expect(system?.content).toContain("los de sello del pasaporte en cada lugar");
+    expect(user?.content).toContain(
+      "Pasaporte turístico (sellos con QR en los lugares y premios):\n[H",
+    );
   });
 });
 

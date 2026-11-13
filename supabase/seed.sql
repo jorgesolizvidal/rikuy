@@ -299,5 +299,28 @@ cross join (values
   (null, null, 1)
 ) as v (country, city, base);
 
+-- The passport in «Estadísticas» (C2 · Paso 4, ADR-059), synthetic: stamps of the two
+-- published stops of «Ruta del valle» for 70 days, and six completed circuits (four prizes
+-- redeemed) in the last 60 days.
+insert into public.passport_daily_stamps (tenant_id, day, content_id, stamps, located)
+select '5eed1000-0000-4000-8000-000000000001', d.day, v.content_id::uuid,
+       v.base + (d.n % 3), (v.base + (d.n % 3)) / 2
+from (
+  select n, ((now() at time zone 'America/La_Paz')::date - n) as day from generate_series(0, 69) n
+) d
+cross join (values
+  ('5eed4100-0000-4000-8000-000000000004', 2),
+  ('5eed4100-0000-4000-8000-000000000001', 1)
+) as v (content_id, base);
+
+insert into public.passport_vouchers (tenant_id, circuit_id, passport_hash, code, stamps_total,
+                                      stamps_located, issued_at, expires_at, redeemed_at)
+select '5eed1000-0000-4000-8000-000000000001', '5eed4600-0000-4000-8000-000000000001',
+       encode(sha256(convert_to('seed-passport-' || n, 'UTF8')), 'hex'),
+       'SEEDAA' || substr('ABCDEF', n, 1) || '2', 2, n % 2,
+       now() - make_interval(days => n * 9), now() - make_interval(days => n * 9) + interval '30 days',
+       case when n <= 4 then now() - make_interval(days => n * 9) + interval '2 hours' end
+from generate_series(1, 6) n;
+
 insert into public.audit_events (scope, action, outcome, diff)
 values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3, "events": 4, "jobs": 2}');

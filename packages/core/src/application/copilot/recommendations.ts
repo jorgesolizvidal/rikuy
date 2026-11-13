@@ -12,6 +12,7 @@ import {
   type RecommendationPeriod,
   type RecommendationTarget,
 } from "../../domain/copilot/recommendations";
+import type { PassportSummary } from "../../domain/passport/statistics";
 import type { StatisticsSummary } from "../../domain/visits/statistics";
 import { reservationFor } from "../ai/gateway";
 import type {
@@ -134,6 +135,8 @@ export interface RecommendationRun {
   /** The person who asked; null when the platform does (the monthly report). */
   readonly actorId: string | null;
   readonly statistics: StatisticsSummary;
+  /** The tourist passport of the same period (null: not counted yet). */
+  readonly passport?: PassportSummary | null;
   readonly period?: RecommendationPeriod;
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
@@ -159,6 +162,7 @@ export async function runRecommendations(
 ): Promise<RecommendationRunOutcome> {
   const facts = recommendationFacts({
     statistics: run.statistics,
+    passport: run.passport ?? null,
     ...(run.period ? { period: run.period } : {}),
     questions: recommendationQuestions(run.questions),
     review: run.review,
@@ -210,6 +214,7 @@ export async function generateRecommendations(
     now,
     actorId,
     statistics: stats.summary,
+    passport: stats.passport,
     questions,
     review,
     snapshot: snapshot.items,
@@ -245,7 +250,7 @@ export interface RecommendationLink {
 
 /**
  * Where a recommendation leads: the editors of what its facts point at, never the model's.
- * With `names` (content id → its name, from the snapshot), each link says which place it
+ * With `names` (content or circuit id → its name), each link says which place or circuit it
  * opens, so three «Abrir en el editor» never sit side by side.
  */
 export function recommendationLinks(
@@ -301,6 +306,14 @@ export function recommendationLinks(
             }),
           );
         }
+        break;
+      }
+      case "circuit": {
+        const name = names.get(target.circuitId);
+        add(
+          name ? `Abrir el circuito ${quoted(name)} del pasaporte` : "Abrir el pasaporte turístico",
+          `/o/${org}/pasaporte/${encodeURIComponent(target.circuitId)}`,
+        );
         break;
       }
       case "question":
