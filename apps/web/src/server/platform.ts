@@ -12,6 +12,7 @@ import {
   type PublishedPresentationReader,
   type PublishedRedirectReader,
   type PublishedPassportReader,
+  type PublishedStampReader,
   type PublishedTourReader,
   type PublishedTourRedirectReader,
   type TenantDirectory,
@@ -23,6 +24,7 @@ import {
   createSupabasePublishedMapReader,
   createSupabasePublishedRedirectReader,
   createSupabasePublishedPassportReader,
+  createSupabasePublishedStampReader,
   createSupabasePublishedTourReader,
   createSupabasePublishedTourRedirectReader,
   createSupabaseTenantDirectory,
@@ -151,10 +153,6 @@ export function publishedEventReader(): PublishedEventReader {
   return publishedEvents;
 }
 
-/** Anonymous map reader: places by area (snapped to a ~1 km grid) cached for 30 s. */
-let publishedTours: PublishedTourReader | undefined;
-
-/** Anonymous tour reader (sealed manifests), read fresh: tour pages are cached per host. */
 let publishedPassport: PublishedPassportReader | undefined;
 
 /** The tourist passport's published circuits (anonymous, ADR-056). */
@@ -168,6 +166,22 @@ export function publishedPassportReader(): PublishedPassportReader {
   return publishedPassport;
 }
 
+let publishedStamps: PublishedStampReader | undefined;
+
+/** The passport's stamping (anonymous: the stamp code is what allows it, ADR-057). */
+export function publishedStampReader(): PublishedStampReader {
+  if (publishedStamps) return publishedStamps;
+  const { env } = platformSettings();
+  publishedStamps = createSupabasePublishedStampReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedStamps;
+}
+
+let publishedTours: PublishedTourReader | undefined;
+
+/** Anonymous tour reader (sealed manifests), read fresh: tour pages are cached per host. */
 export function publishedTourReader(): PublishedTourReader {
   if (publishedTours) return publishedTours;
   const { env } = platformSettings();
@@ -194,6 +208,7 @@ export function publishedTourRedirectReader(): PublishedTourRedirectReader {
   return publishedTourRedirects;
 }
 
+/** Anonymous map reader: places by area (snapped to a ~1 km grid) cached for 30 s. */
 export function publishedMapReader(): PublishedMapReader {
   if (publishedMap) return publishedMap;
   const { env } = platformSettings();

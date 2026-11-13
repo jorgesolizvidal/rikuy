@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { createPassportRepository, createSupabasePublishedPassportReader } from "./passport";
+import {
+  createPassportRepository,
+  createStampCodeRepository,
+  createSupabasePublishedPassportReader,
+  createSupabasePublishedStampReader,
+} from "./passport";
 import { createSessionClient } from "./session-client";
 
 const BASE = "http://127.0.0.1:54321";
@@ -28,7 +33,11 @@ function session(respond: (path: string, body: unknown) => Response) {
       return respond(url.pathname, body);
     },
   });
-  return { repo: createPassportRepository(client), calls };
+  return {
+    repo: createPassportRepository(client),
+    codes: createStampCodeRepository(client),
+    calls,
+  };
 }
 
 describe("passport adapter (panel)", () => {
@@ -107,6 +116,7 @@ describe("passport reader (portal)", () => {
             publishedAt: "2026-11-12T02:31:06.36-04:00",
             stops: [
               {
+                id: PLAZA,
                 slug: "plaza",
                 title: "Plaza",
                 summary: "",
@@ -133,5 +143,111 @@ describe("passport reader (portal)", () => {
       { lat: -17.39, lng: -66.15 },
       null,
     ]);
+    // A stop without its place (before the stamps migration) has none.
+    expect(circuit?.stops.map((stop) => stop.id)).toEqual([PLAZA, null]);
+  });
+});
+
+describe("stamp codes (panel)", () => {
+  it("lists the code of each stop", async () => {
+    const { codes, calls } = session(() =>
+      json([
+        {
+          contentId: PLAZA,
+          slug: "plaza",
+          title: "Plaza",
+          published: true,
+          code: "7qVtpcGPSWzBExzRe9Bp4w",
+          version: 1,
+          createdAt: "2026-11-13T00:00:00Z",
+          renewedAt: null,
+          circuits: [{ name: "Ruta", status: "published" }],
+        },
+      ]),
+    );
+    expect(await codes.list(TENANT)).toMatchObject([{ code: "7qVtpcGPSWzBExzRe9Bp4w" }]);
+    expect(calls[0]?.path).toBe("/rest/v1/rpc/tenant_passport_stamp_codes");
+  });
+
+  it("renews with the version and turns the codes into outcomes", async () => {
+    const { codes, calls } = session(() => json(2));
+    expect(await codes.renew(TENANT, PLAZA, 1)).toEqual({ status: "renewed", version: 2 });
+    expect(calls[0]?.body).toEqual({ p_tenant_id: TENANT, p_content_id: PLAZA, p_version: 1 });
+    for (const [response, outcome] of [
+      [pgError("PT409", 409, "stale"), { status: "stale" }],
+      [pgError("42501", 403), { status: "forbidden" }],
+      [pgError("P0002", 404), { status: "not_found" }],
+    ] as const) {
+      expect(await session(() => response.clone()).codes.renew(TENANT, PLAZA, 1)).toEqual(outcome);
+    }
+  });
+
+  it("before the migration there are none", async () => {
+    expect(await session(() => pgError("PGRST202", 404)).codes.list(TENANT)).toEqual([]);
+  });
+});
+
+describe("stamps (portal)", () => {
+  function reader(respond: (path: string, body: unknown) => Response) {
+    return createSupabasePublishedStampReader({
+      url: BASE,
+      publishableKey: "sb_publishable_test",
+      fetch: async (input, init = {}) => {
+        const url = new URL(String(input));
+        return respond(url.pathname, init.body ? JSON.parse(String(init.body)) : null);
+      },
+    });
+  }
+
+  it("reads the place of a code", async () => {
+    const place = await reader(() =>
+      json({
+        id: PLAZA,
+        slug: "plaza",
+        title: "Plaza",
+        summary: "",
+        latitude: -17.39,
+        longitude: -66.15,
+        cover: null,
+      }),
+    ).place(TENANT, "7qVtpcGPSWzBExzRe9Bp4w");
+    expect(place).toMatchObject({ id: PLAZA, location: { lat: -17.39, lng: -66.15 } });
+    expect(await reader(() => json(null)).place(TENANT, "x")).toBeNull();
+    expect(await reader(() => pgError("PGRST202", 404)).place(TENANT, "x")).toBeNull();
+  });
+
+  it("collects a signed stamp, sending only «near»", async () => {
+    const sent: unknown[] = [];
+    const stamp = await reader((path, body) => {
+      sent.push({ path, body });
+      return json({
+        id: PLAZA,
+        slug: "plaza",
+        title: "Plaza",
+        at: 1_800_000_000,
+        located: true,
+        signature: "a".repeat(43),
+      });
+    }).collect(TENANT, "7qVtpcGPSWzBExzRe9Bp4w", "AbCdEfGhIjKlMnOpQrSt_-", true);
+    expect(stamp).toEqual({
+      placeId: PLAZA,
+      slug: "plaza",
+      title: "Plaza",
+      at: 1_800_000_000,
+      located: true,
+      signature: "a".repeat(43),
+    });
+    expect(sent).toEqual([
+      {
+        path: "/rest/v1/rpc/portal_collect_stamp",
+        body: {
+          p_tenant_id: TENANT,
+          p_code: "7qVtpcGPSWzBExzRe9Bp4w",
+          p_passport: "AbCdEfGhIjKlMnOpQrSt_-",
+          p_located: true,
+        },
+      },
+    ]);
+    expect(await reader(() => json(null)).collect(TENANT, "x", "y", false)).toBeNull();
   });
 });

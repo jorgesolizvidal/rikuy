@@ -61,3 +61,39 @@
 .circuit-delete {
   margin-top: 1.5rem;
 }
+
+/* Stamp codes of each place (ADR-057). */
+.stamp-codes-section {
+  margin-top: 2.5rem;
+}
+
+.stamp-codes {
+  list-style: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 16rem), 1fr));
+}
+
+.stamp-code {
+  padding: 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 15%, transparent);
+  border-radius: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.stamp-code h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.stamp-code .qr {
+  display: block;
+  margin-top: 0.75rem;
+  background: #fff;
+}
+
+.stamp-code-renew p {
+  margin: 0.5rem 0;
+}

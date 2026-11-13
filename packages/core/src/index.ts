@@ -122,6 +122,8 @@ export * from "./domain/copilot/recommendations";
 export * from "./domain/reports/monthly";
 export * from "./domain/passport/circuits";
 export * from "./application/passport/circuits";
+export * from "./domain/passport/stamps";
+export * from "./application/passport/stamps";
 export * from "./application/reports/monthly";
 export * from "./contracts/knowledge";
 export * from "./domain/knowledge/text";

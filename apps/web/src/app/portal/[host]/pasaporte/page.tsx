@@ -7,6 +7,7 @@ import { portalView } from "@/server/portal-view";
 
 import "../passport.css";
 import { PassportHowItWorks } from "../passport-how";
+import { CircuitProgressLine, PassportSummary } from "../passport-progress";
 
 interface PassportPageProps {
   readonly params: Promise<{ host: string }>;
@@ -46,6 +47,7 @@ export default async function PassportPage({ params }: PassportPageProps) {
         Recorre los lugares de un circuito de {view.resolved.presentation.identity.siteName} y
         llévate el premio del municipio.
       </p>
+      {circuits.length > 0 ? <PassportSummary /> : null}
       {circuits.length === 0 ? (
         <p className="portal-empty">Pronto publicaremos aquí los circuitos del pasaporte.</p>
       ) : (
@@ -64,6 +66,7 @@ export default async function PassportPage({ params }: PassportPageProps) {
                   <strong>Premio:</strong> {circuit.reward}
                 </p>
               ) : null}
+              <CircuitProgressLine stopIds={circuit.stops.map((stop) => stop.id)} />
             </li>
           ))}
         </ul>

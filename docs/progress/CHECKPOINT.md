@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C2 — pasaporte turístico. C0 y C1 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C2 · Paso 1 — circuitos del pasaporte ✅
-- **Rama:** `feat/c2-step1-passport-circuits` → PR hacia `main`
+- **Último paso completado:** C2 · Paso 2 — sellos con QR en cada lugar ✅
+- **Rama:** `feat/c2-step2-passport-stamps` → PR hacia `main`
 
 ## Historial
 
@@ -2172,15 +2172,60 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - Las visitas a `/pasaporte` todavía no se cuentan en «Estadísticas» (Paso 4).
 - «Ver el recorrido en el mapa» muestra hasta 6 paradas (el límite de la ruta de ADR-039).
 
+**Verificación en producción (2026-11-13):** tras el merge (PR #76), el usuario creó y publicó en Ucureña «Corazón de Ucureña» con sus 4 destinos de sur a norte (museo, plaza, iglesia y Tambo Cultural) y un premio. En el portal se ven «Pasaporte» en la cabecera, el circuito con sus lugares en ese orden y el premio, y «Ver el recorrido en el mapa» numera la ruta con unos 120–150 m entre paradas.
+
+### C2 · Paso 2 — sellos con QR en cada lugar ✅
+
+- Decisiones del usuario ([ADR-057](../adr/ADR-057-passport-stamps.md)), 2026-11-13:
+  - **radio:** el de «Estás cerca de…» de la marca (150 m por defecto);
+  - **renovar el QR:** propietarios y administradores; el impreso deja de sellar;
+  - **un solo sello por lugar**, para todos los circuitos que lo tienen;
+  - **los sellos no vencen.**
+- Base de datos (`20261120000000_c2_passport_stamps.sql`, solo expand):
+  - `pgcrypto` en `extensions` (Supabase ya lo tiene);
+  - `passport_stamp_codes`: un código al azar de 22 caracteres base64url (128 bits) por destino, creado por un trigger cuando entra en un circuito y conservado si sale y vuelve; los existentes reciben el suyo al migrar. RLS sin permisos;
+  - `private.passport_keys`: una clave de 32 bytes por municipio, que solo leen las funciones;
+  - `tenant_passport_stamp_codes` (propietarios, administradores y editores; no analistas) y `renew_passport_stamp_code` (propietarios y administradores, con la versión, auditado `passport.stamp_code_renewed`);
+  - `portal_stamp_place` y `portal_collect_stamp` (anónimas): solo un código vigente de un destino publicado que es parada de un circuito publicado, en un municipio en línea. El sello lleva el lugar, la hora del servidor, el pasaporte, si estaba cerca y la firma HMAC-SHA256 con la clave del municipio. No se guarda nada del visitante;
+  - `private.passport_stamp_valid` comprueba una firma (para el Paso 3);
+  - `portal_passport` suma el id de cada parada.
+- `@rikuy/core`:
+  - `domain/passport/stamps` (también en la entrada `@rikuy/core/passport-client`, sin esquemas): formatos, el pasaporte del teléfono (leer, escribir, un sello por lugar que solo mejora a «con ubicación»), el avance de un circuito y `stampLocation` (cerca, lejos o imprecisa, con el radio);
+  - `application/passport/stamps`: `loadStampCodes`, `renewStampCode`, `stampUrl` y `collectStamp`;
+  - `PORTAL_PATHS.stamp` y `collectStamp`.
+- `@rikuy/db`: `createStampCodeRepository` y `createSupabasePublishedStampReader`; antes de la migración no hay códigos, no se sella y las paradas no tienen id.
+- Portal:
+  - **`/sello/{código}`** (por petición, `noindex`, sin `Referer`): «Sellar con mi ubicación» o «Sellar sin compartir mi ubicación», el resultado en palabras («Con ubicación…», «Sin ubicación: tu teléfono dice que estás a 3,4 km…», sin permiso, sin señal o imprecisa) y el avance de cada circuito con ese lugar; «Ya tienes el sello…» y, si era sin ubicación, «Sellar de nuevo con mi ubicación». Un código renovado, de otro municipio, de un borrador o inventado dice «Este código no sella»;
+  - **`POST /sellar`**: solo desde una página del mismo portal; envía el código, el pasaporte y «cerca: sí o no», nunca la posición;
+  - el pasaporte en `localStorage` (`lib/passport-store.ts`); nada se escribe hasta pulsar «Sellar»;
+  - `/pasaporte` y cada circuito muestran lo que tiene este teléfono («Tienes 2 sellos», «Tienes 1 de 2 sellos», «Sellado el 13 nov · con ubicación» en cada parada, «¡Completaste el circuito!»), en un espacio reservado;
+  - «Cómo funciona» y la página de privacidad (nueva sección «El pasaporte turístico»).
+- Panel, «Pasaporte turístico»: **«Códigos de sello de cada lugar»** con el QR de cada parada (PNG y SVG, `sello-{dirección}-{versión}`), sus circuitos, un aviso si todavía no sella y «Renovar el QR» con confirmación.
+- CI: nuevo paso **«Passport stamps in a real browser»** (suite `lighthouse`).
+- Tests:
+  - unitarios: core 653 (+19), db 198 (+5);
+  - 1.614 pgTAP (39 nuevos, `045_passport_stamps`): un código por parada (también de un circuito en borrador), formato y únicos, se conserva al salir y volver; nadie lee los códigos ni las claves; propietario y editor los ven, analista, propietario sin segundo factor y otro municipio no; renovar (editor no, otro municipio no, versión vieja, código nuevo, auditado); sellar solo con un código vigente de un destino publicado en un circuito publicado y de ese municipio; la firma vale y no vale si cambia «cerca», el pasaporte o el municipio; pasaporte inválido; municipio suspendido; ninguna fila del visitante;
+  - **e2e en un navegador real** (`stamps.e2e.test.ts`, 3 casos): sellar en el mirador «con ubicación» (solo código, pasaporte y «cerca» salen del teléfono; ninguna petición lleva las coordenadas) con la firma válida en la base; la plaza desde lejos queda «sin ubicación» y completa el circuito; la página del circuito y el pasaporte lo muestran; de vuelta en la plaza el sello pasa a «con ubicación»; sin compartir la ubicación también sella; otro municipio, un código inventado, uno de un borrador y otro origen no sellan; el propietario renueva (el impreso deja de sellar, auditado), el editor ve sin renovar y el analista no ve los códigos; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - pasaporte (3), visitas (2) y contratos RC-09/10/11/12 (216) en verde; `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador (390 px): la página del sello antes y después, y la del circuito con el sello de la parada.
+
+**Desviaciones:**
+
+- La marca «con ubicación» es lo que dice el teléfono: un GPS falseado la engaña. Una foto del QR compartida sella hasta renovarlo.
+- Borrar los datos del navegador o cambiar de teléfono deja los sellos atrás (no hay cuenta).
+- Los sellos y la página `/sello` todavía no se cuentan en «Estadísticas» (Paso 4), y `/sellar` no tiene medición de latencia propia.
+- El premio todavía no se pide: la página dice «Muy pronto podrás pedir aquí tu premio» (Paso 3).
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Pasaporte turístico» → «Nuevo circuito»: un nombre, el premio y al menos dos destinos publicados; «Guardar» y «Publicar el circuito».
-- En el portal de Ucureña aparece «Pasaporte» en la cabecera (en el celular también) y el circuito en `/pasaporte`, con sus lugares en orden y el premio; «Ver el recorrido en el mapa» abre la ruta.
-- «Retirar del portal» lo quita en la siguiente visita.
+- Tras el merge, en el panel de Ucureña → «Pasaporte turístico» aparece «Códigos de sello de cada lugar» con el QR de los 4 lugares de «Corazón de Ucureña».
+- Escanea con el celular el QR de un lugar (en la pantalla o impreso): abre «Sello del pasaporte» con «Sellar con mi ubicación». Lejos del lugar, el sello queda «sin ubicación» y la página dice a qué distancia estás; en el lugar, «con ubicación».
+- En `/pasaporte/corazon-de-ucurena` se ve «Tienes 1 de 4 sellos en este teléfono» y «Sellado el … · …» en esa parada.
+- «Renovar el QR» de un lugar: el QR anterior abre «Este código no sella» y el nuevo sí sella.
 
 ## Siguiente paso
 
-**C2 · Paso 2 — sellos con QR en cada lugar** ([roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr)): el QR de sello de cada destino (distinto del de la ficha), el sello guardado en el teléfono sin cuenta, la ubicación opcional y el pasaporte del visitante en el portal. Antes de empezar, confirmar con el usuario el radio de «estar cerca» para marcar el sello con ubicación y si el QR de sello cambia (por ejemplo, al reimprimirlo).
+**C2 · Paso 3 — premio y canje al completar el circuito** ([roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr)): al completar un circuito, el teléfono pide un comprobante con un código corto (la base comprueba las firmas de los sellos), y el local lo verifica una sola vez en una página del portal, sin cuenta. Antes de empezar, confirmar con el usuario quién verifica el comprobante (cualquiera con la página o con una clave del local), si exige sellos «con ubicación» y si un mismo pasaporte puede canjear el premio de un circuito más de una vez.
 
 ## Decisiones pendientes del usuario
 

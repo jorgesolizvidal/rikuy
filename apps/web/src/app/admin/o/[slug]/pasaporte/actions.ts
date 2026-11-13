@@ -5,12 +5,14 @@ import {
   deleteCircuit,
   openOrganization,
   publishCircuit,
+  renewStampCode,
   saveCircuit,
   withdrawCircuit,
   type CircuitWriteOutcome,
   type CreateCircuitOutcome,
   type DeleteCircuitOutcome,
   type OrganizationMembership,
+  type RenewStampCodeOutcome,
 } from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
@@ -127,5 +129,18 @@ export async function deleteCircuitAction(
 ): Promise<DeleteCircuitState> {
   return run(org, async (membership) =>
     deleteCircuit(membership, (await adminSession()).passport, circuitId, editNo),
+  );
+}
+
+export type RenewStampCodeState = RenewStampCodeOutcome | SessionProblem;
+
+/** «Renovar el QR» (ADR-057): the printed code of the place stops stamping. */
+export async function renewStampCodeAction(
+  org: string,
+  contentId: string,
+  version: number,
+): Promise<RenewStampCodeState> {
+  return run(org, async (membership) =>
+    renewStampCode(membership, (await adminSession()).stampCodes, contentId, version),
   );
 }

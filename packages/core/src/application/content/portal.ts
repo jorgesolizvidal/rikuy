@@ -42,6 +42,10 @@ export const PORTAL_PATHS = {
   /** The tourist passport: the published circuits (C2, ADR-056). */
   passport: "/pasaporte",
   passportCircuit: (slug: string) => `/pasaporte/${encodeURIComponent(slug)}`,
+  /** What a stamp QR opens (ADR-057): not linked from anywhere, never indexed. */
+  stamp: (code: string) => `/sello/${encodeURIComponent(code)}`,
+  /** POST: a stamp for the visitor's phone (ADR-057). */
+  collectStamp: "/sellar",
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;

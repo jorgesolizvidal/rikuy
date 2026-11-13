@@ -1,4 +1,4 @@
-/** Until the stamps arrive (C2 · Paso 2), the passport says how it will work. */
+/** How the passport works (ADR-056, ADR-057), at the end of its pages. */
 export function PassportHowItWorks() {
   return (
     <section className="passport-how" aria-labelledby="como-funciona">
@@ -6,10 +6,14 @@ export function PassportHowItWorks() {
       <ol>
         <li>Elige un circuito y visita sus lugares, en el orden que prefieras.</li>
         <li>
-          En cada lugar, escanea el código del pasaporte para guardar su sello en tu teléfono. Muy
-          pronto en este portal.
+          En cada lugar, escanea el código del pasaporte y pulsa «Sellar». Si compartes tu
+          ubicación, el sello queda «con ubicación»; si no, vale igual.
         </li>
-        <li>Con todos los sellos del circuito, recibe el premio.</li>
+        <li>
+          Los sellos se guardan en tu teléfono, sin cuenta: un sello vale para todos los circuitos
+          que tienen ese lugar, y no vence.
+        </li>
+        <li>Con todos los sellos del circuito, recibe el premio. Muy pronto en este portal.</li>
       </ol>
     </section>
   );

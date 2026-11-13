@@ -1,12 +1,15 @@
-import { loadPassport } from "@rikuy/core";
+import { canRenewStampCodes, loadPassport, loadStampCodes } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
+import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { NewCircuitForm } from "./new-circuit-form";
+import { StampCodes } from "./stamp-codes";
+import "./passport.css";
 
 export const metadata: Metadata = { title: "Pasaporte turístico" };
 
@@ -25,10 +28,11 @@ interface PassportPageProps {
 export default async function PassportAdminPage({ params }: PassportPageProps) {
   const membership = await requireOrganization((await params).slug);
   const session = await adminSession();
-  const { circuits, canEdit } = await loadPassport(membership, {
-    passport: session.passport,
-    content: session.content,
-  });
+  const [{ circuits, canEdit }, codes, hostname] = await Promise.all([
+    loadPassport(membership, { passport: session.passport, content: session.content }),
+    loadStampCodes(membership, session.stampCodes),
+    session.content.portalHostname(membership.tenantId),
+  ]);
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
@@ -104,6 +108,16 @@ export default async function PassportAdminPage({ params }: PassportPageProps) {
             </tbody>
           </table>
         </div>
+      )}
+
+      {codes === null ? null : (
+        <StampCodes
+          org={membership.slug}
+          codes={codes}
+          portalOrigin={hostname ? platformSettings().portalOrigin(hostname) : null}
+          portalOnline={membership.tenantStatus === "active"}
+          canRenew={canRenewStampCodes(membership.role)}
+        />
       )}
     </main>
   );

@@ -8,6 +8,7 @@ import { portalView } from "@/server/portal-view";
 import { DestinationCard } from "../../destination-card";
 import "../../passport.css";
 import { PassportHowItWorks } from "../../passport-how";
+import { CircuitProgressLine, StopStamp } from "../../passport-progress";
 
 interface CircuitPageProps {
   readonly params: Promise<{ host: string; slug: string }>;
@@ -66,6 +67,7 @@ export default async function CircuitPage({ params }: CircuitPageProps) {
         </p>
       ) : null}
       <h2 className="passport-stops-title">{circuit.stops.length} lugares, en el orden sugerido</h2>
+      <CircuitProgressLine stopIds={circuit.stops.map((stop) => stop.id)} />
       {located.length >= 2 ? (
         <p className="passport-map-link">
           <a href={mapRoutePath(located.map((stop) => `destination:${stop.slug}`))}>
@@ -81,6 +83,7 @@ export default async function CircuitPage({ params }: CircuitPageProps) {
             destination={stop}
             headingLevel={3}
             priority={index < 2}
+            extra={<StopStamp placeId={stop.id} />}
           />
         ))}
       </ol>
