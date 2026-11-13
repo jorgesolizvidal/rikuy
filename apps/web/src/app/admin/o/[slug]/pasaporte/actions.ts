@@ -6,6 +6,7 @@ import {
   openOrganization,
   publishCircuit,
   renewStampCode,
+  setRedeemPin,
   saveCircuit,
   withdrawCircuit,
   type CircuitWriteOutcome,
@@ -13,6 +14,7 @@ import {
   type DeleteCircuitOutcome,
   type OrganizationMembership,
   type RenewStampCodeOutcome,
+  type SetRedeemPinOutcome,
 } from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
@@ -142,5 +144,18 @@ export async function renewStampCodeAction(
 ): Promise<RenewStampCodeState> {
   return run(org, async (membership) =>
     renewStampCode(membership, (await adminSession()).stampCodes, contentId, version),
+  );
+}
+
+export type SetRedeemPinState = SetRedeemPinOutcome | SessionProblem;
+
+/** «Clave del local» (ADR-058): what the shop types to redeem a voucher of this circuit. */
+export async function setRedeemPinAction(
+  org: string,
+  circuitId: string,
+  pin: string,
+): Promise<SetRedeemPinState> {
+  return run(org, async (membership) =>
+    setRedeemPin(membership, (await adminSession()).rewards, circuitId, pin),
   );
 }

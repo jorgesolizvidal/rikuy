@@ -5,10 +5,12 @@ import {
   parseStoredPassport,
   PASSPORT_STORAGE_KEY,
   passportIdFrom,
+  rememberVoucher,
   serializePassport,
   type AddStampOutcome,
   type PassportStamp,
   type StoredPassport,
+  type StoredVoucher,
 } from "@rikuy/core/passport-client";
 import { useSyncExternalStore } from "react";
 
@@ -82,4 +84,19 @@ export function keepStamp(passportId: string, stamp: PassportStamp): AddStampOut
   const { passport: next, outcome } = addStamp(passport, stamp);
   if (outcome === "kept") return outcome;
   return write(next) ? outcome : null;
+}
+
+/** Keeps the voucher of a circuit's prize (ADR-058); false when it could not be kept. */
+export function keepVoucher(circuit: string, voucher: StoredVoucher): boolean {
+  const passport = current();
+  if (passport === null) return false;
+  const kept = passport.vouchers?.[circuit];
+  if (
+    kept?.code === voucher.code &&
+    kept.expiresAt === voucher.expiresAt &&
+    kept.redeemedAt === voucher.redeemedAt
+  ) {
+    return true;
+  }
+  return write(rememberVoucher(passport, circuit, voucher));
 }

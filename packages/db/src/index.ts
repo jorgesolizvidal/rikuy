@@ -58,8 +58,10 @@ export { createRecommendationsRepository } from "./copilot-recommendations";
 export { createMonthlyReportRepository } from "./monthly-reports";
 export {
   createPassportRepository,
+  createPassportRewardRepository,
   createStampCodeRepository,
   createSupabasePublishedPassportReader,
+  createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
 } from "./passport";
 export {

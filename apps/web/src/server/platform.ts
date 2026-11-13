@@ -12,6 +12,7 @@ import {
   type PublishedPresentationReader,
   type PublishedRedirectReader,
   type PublishedPassportReader,
+  type PublishedRewardReader,
   type PublishedStampReader,
   type PublishedTourReader,
   type PublishedTourRedirectReader,
@@ -24,6 +25,7 @@ import {
   createSupabasePublishedMapReader,
   createSupabasePublishedRedirectReader,
   createSupabasePublishedPassportReader,
+  createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
   createSupabasePublishedTourReader,
   createSupabasePublishedTourRedirectReader,
@@ -177,6 +179,19 @@ export function publishedStampReader(): PublishedStampReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedStamps;
+}
+
+let publishedRewards: PublishedRewardReader | undefined;
+
+/** The passport's prize: asking for a voucher and redeeming it (anonymous, ADR-058). */
+export function publishedRewardReader(): PublishedRewardReader {
+  if (publishedRewards) return publishedRewards;
+  const { env } = platformSettings();
+  publishedRewards = createSupabasePublishedRewardReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedRewards;
 }
 
 let publishedTours: PublishedTourReader | undefined;

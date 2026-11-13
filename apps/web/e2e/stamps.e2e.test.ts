@@ -213,16 +213,20 @@ describe("the tourist passport's stamps (ADR-057)", () => {
       .getByText(/^Sin ubicación: tu teléfono dice que estás a .+ de este lugar/u)
       .waitFor();
     await page
-      .getByText(/¡completaste el circuito! .*Una postal del valle en la oficina de turismo\./u)
+      .getByText(
+        /¡completaste el circuito! Premio: Una postal del valle en la oficina de turismo\./u,
+      )
       .waitFor();
+    expect(await page.getByRole("link", { name: "Pedir mi premio" }).getAttribute("href")).toBe(
+      "/pasaporte/ruta-del-valle#premio",
+    );
     passport = await keptPassport(page);
     expect(passport!.stamps[plaza!.contentId]?.located).toBe(false);
 
     // The circuit's page and the passport show what this phone has.
     await page.goto(`${NORTE}/pasaporte/ruta-del-valle`);
-    await page
-      .getByText("¡Completaste el circuito! Muy pronto podrás pedir aquí tu premio.")
-      .waitFor();
+    await page.getByText("¡Completaste el circuito!", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Pedir mi premio" }).waitFor();
     const stamps = await page.locator(".passport-stops .passport-stop-stamp").allInnerTexts();
     expect(stamps[0]).toMatch(/Sellado el .+ · sin ubicación/u);
     expect(stamps[1]).toMatch(/Sellado el .+ · con ubicación/u);

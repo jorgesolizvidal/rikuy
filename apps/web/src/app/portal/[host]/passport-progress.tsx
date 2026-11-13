@@ -24,7 +24,7 @@ export function CircuitProgressLine({ stopIds }: { readonly stopIds: readonly (s
   if (passport !== undefined) {
     const progress = circuitProgress(stopIds, passport?.stamps ?? {});
     text = progress.complete
-      ? "¡Completaste el circuito! Muy pronto podrás pedir aquí tu premio."
+      ? "¡Completaste el circuito!"
       : progress.collected === 0
         ? "Todavía no tienes sellos de este circuito en este teléfono."
         : `Tienes ${progress.collected} de ${progress.total} sellos en este teléfono.`;

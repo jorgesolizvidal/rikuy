@@ -207,6 +207,13 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
           Los sellos no vencen. Si borras los datos de este sitio en tu navegador, o usas otro
           navegador o teléfono, no los verás ahí.
         </li>
+        <li>
+          Al pedir el premio de un circuito, tu navegador envía tus sellos y el identificador del
+          pasaporte. {siteName} comprueba las firmas y guarda el comprobante: su código, cuántos
+          sellos tenía y cuántos con ubicación, sus fechas y una huella del identificador (no el
+          identificador), para que el premio se canjee una sola vez. Lo guarda 400 días; nunca sabe
+          quién eres.
+        </li>
       </ul>
 
       <h2>Enlaces a otros servicios</h2>
