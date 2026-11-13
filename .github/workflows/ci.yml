@@ -431,6 +431,14 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-monthly-report 2>&1 | tee ../../monthly-report.log
+      # C2 · Paso 1 (ADR-056): the passport's circuits — the seed's circuit in the portal of
+      # Demo Norte only, the owner builds, publishes and withdraws one, an editor only drafts.
+      - name: Passport circuits in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-passport 2>&1 | tee ../../passport.log
       # RC-01/07/08 (P4): the reference tours (a museum and a four-scene carnival) walked in a
       # real browser — entry, information and gallery, every scene forward and back, arrows,
       # the 3D model loaded only on demand, another tour, out; fast taps and late answers never
@@ -490,7 +498,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

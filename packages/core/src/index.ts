@@ -120,6 +120,8 @@ export * from "./domain/copilot/paths";
 export * from "./domain/copilot/prompts";
 export * from "./domain/copilot/recommendations";
 export * from "./domain/reports/monthly";
+export * from "./domain/passport/circuits";
+export * from "./application/passport/circuits";
 export * from "./application/reports/monthly";
 export * from "./contracts/knowledge";
 export * from "./domain/knowledge/text";

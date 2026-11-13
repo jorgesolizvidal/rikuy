@@ -3,7 +3,12 @@ import "server-only";
 import { PORTAL_PATHS, tourPath } from "@rikuy/core";
 import { revalidatePath } from "next/cache";
 
-import { publishedContentReader, publishedEventReader, publishedTourReader } from "./platform";
+import {
+  publishedContentReader,
+  publishedEventReader,
+  publishedPassportReader,
+  publishedTourReader,
+} from "./platform";
 
 /**
  * Portal pages are cached per host (ADR-024). After a change visitors must see right away
@@ -21,10 +26,13 @@ export async function refreshPortal(
   try {
     const hostname = await hostnameOf(tenantId);
     if (!hostname) return;
-    const [destinations, events, tours] = await Promise.all([
+    const [destinations, events, tours, circuits] = await Promise.all([
       publishedContentReader().list(tenantId),
       publishedEventReader().list(tenantId),
       publishedTourReader().index(tenantId),
+      publishedPassportReader()
+        .circuits(tenantId)
+        .catch(() => []),
     ]);
     const base = `/portal/${encodeURIComponent(hostname)}`;
     const paths = [
@@ -37,6 +45,8 @@ export async function refreshPortal(
       ...events.map((event) => PORTAL_PATHS.event(event.slug)),
       PORTAL_PATHS.generalTour,
       ...tours.map((tour) => tourPath(tour.kind, tour.slug)),
+      PORTAL_PATHS.passport,
+      ...circuits.map((circuit) => PORTAL_PATHS.passportCircuit(circuit.slug)),
       ...extraPaths,
     ];
     for (const path of paths) revalidatePath(`${base}${path}`);

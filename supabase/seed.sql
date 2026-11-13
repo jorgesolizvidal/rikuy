@@ -156,6 +156,20 @@ from (values
 ) as v (id, published, published_at, draft)
 where i.id = v.id;
 
+-- The tourist passport (C2): Demo Norte has a published circuit with its two published
+-- destinations and the never-published draft (which the portal leaves out).
+insert into public.passport_circuits (id, tenant_id, slug, name, summary, reward, status, edit_no, published_at, created_by)
+values
+  ('5eed4600-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 'ruta-del-valle', 'Ruta del valle',
+   'De la plaza al mirador, a pie, en una mañana.', 'Una postal del valle en la oficina de turismo.', 'published', 2,
+   now() - interval '1 day', '5eed0000-0000-4000-8000-000000000001');
+
+insert into public.passport_circuit_stops (tenant_id, circuit_id, content_id, position)
+values
+  ('5eed1000-0000-4000-8000-000000000001', '5eed4600-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000004', 1),
+  ('5eed1000-0000-4000-8000-000000000001', '5eed4600-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001', 2),
+  ('5eed1000-0000-4000-8000-000000000001', '5eed4600-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000002', 3);
+
 -- Events (synthetic), dated relative to today in each tenant's time zone so the agenda
 -- always has something upcoming. Demo Norte: one upcoming (at a destination), one that
 -- already ended, one draft. Demo Sur: one upcoming all-day event.

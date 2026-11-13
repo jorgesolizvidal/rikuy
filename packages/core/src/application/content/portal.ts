@@ -39,6 +39,9 @@ export const PORTAL_PATHS = {
   assistantDictation: "/asistente/dictado",
   /** POST: an anonymous visit count, sent by the browser (ADR-051). */
   visit: "/visita",
+  /** The tourist passport: the published circuits (C2, ADR-056). */
+  passport: "/pasaporte",
+  passportCircuit: (slug: string) => `/pasaporte/${encodeURIComponent(slug)}`,
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
@@ -167,6 +170,7 @@ export function buildSitemap(
     readonly slug: string;
     readonly publishedAt: string;
   }[] = [],
+  circuits: readonly { readonly slug: string; readonly publishedAt: string }[] = [],
 ): string {
   const entry = (path: string, lastModified?: string) =>
     `<url><loc>${escapeXml(`${origin}${path}`)}</loc>${
@@ -198,6 +202,18 @@ export function buildSitemap(
         ]
       : []),
     ...tours.map((t) => entry(tourPath(t.kind, t.slug), t.publishedAt)),
+    ...(circuits.length > 0
+      ? [
+          entry(
+            PORTAL_PATHS.passport,
+            circuits
+              .map((c) => c.publishedAt)
+              .sort()
+              .at(-1),
+          ),
+        ]
+      : []),
+    ...circuits.map((c) => entry(PORTAL_PATHS.passportCircuit(c.slug), c.publishedAt)),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),
     "</urlset>",

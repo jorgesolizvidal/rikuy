@@ -19,6 +19,7 @@ import {
   publishedContentReader,
   publishedEventReader,
   publishedMapReader,
+  publishedPassportReader,
   publishedRedirectReader,
   publishedTourReader,
   publishedTourRedirectReader,
@@ -153,6 +154,16 @@ export const portalIsEmpty = cache(async (view: PortalView) =>
     (extent) => extent.destinations === 0 && extent.events === 0,
     () => false,
   ),
+);
+
+/**
+ * The tourist passport's published circuits (ADR-056), memoized per request: the layout's
+ * header link and the passport pages share it. Without it a page still works.
+ */
+export const portalPassport = cache(async (view: PortalView) =>
+  publishedPassportReader()
+    .circuits(view.context.tenant.tenantId)
+    .catch(() => []),
 );
 
 /** The published tour of a destination or event (also of an ended event), or null. */

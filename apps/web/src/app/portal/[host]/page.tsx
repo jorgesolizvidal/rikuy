@@ -2,7 +2,12 @@ import { PORTAL_PATHS } from "@rikuy/core";
 import { notFound } from "next/navigation";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { portalDestinations, portalEvents, portalTourIndex } from "@/server/portal-content";
+import {
+  portalDestinations,
+  portalEvents,
+  portalPassport,
+  portalTourIndex,
+} from "@/server/portal-content";
 import { portalView } from "@/server/portal-view";
 
 import { Contour } from "./contour";
@@ -45,10 +50,11 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
   if (view === null) notFound();
 
   const { identity, seo } = view.resolved.presentation;
-  const [destinations, events, tours] = await Promise.all([
+  const [destinations, events, tours, circuits] = await Promise.all([
     portalDestinations(view),
     portalEvents(view),
     portalTourIndex(view),
+    portalPassport(view),
   ]);
   // Only what this portal does not have yet (a new municipality shows all of it).
   const upcoming = [
@@ -116,6 +122,20 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
             </a>
           </div>
           <p className="portal-section-text">{TOURS_SOON.text}</p>
+        </section>
+      ) : null}
+
+      {circuits.length > 0 ? (
+        <section className="portal-section" aria-labelledby="pasaporte">
+          <div className="portal-section-head">
+            <h2 id="pasaporte">Pasaporte turístico</h2>
+            <a href={PORTAL_PATHS.passport}>
+              {circuits.length === 1 ? "Ver el circuito" : `Ver los ${circuits.length} circuitos`}
+            </a>
+          </div>
+          <p className="portal-section-text">
+            Recorre los lugares de un circuito y llévate el premio del municipio.
+          </p>
         </section>
       ) : null}
 

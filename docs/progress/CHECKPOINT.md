@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C1 — métricas y estrategia ✅. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C1 · Paso 5 — informe mensual para la alcaldía ✅
-- **Rama:** `feat/c1-step5-monthly-report` → PR hacia `main`
+- **Fase:** C2 — pasaporte turístico. C0 y C1 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C2 · Paso 1 — circuitos del pasaporte ✅
+- **Rama:** `feat/c2-step1-passport-circuits` → PR hacia `main`
 
 ## Historial
 
@@ -2142,16 +2142,45 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - El primer correo automático sale el 1 de diciembre (con noviembre); antes, se pide desde la página.
 - Al menos una vez: si el ejecutor muere entre enviar un correo y guardar su punto de control, esa persona puede recibirlo dos veces.
 
+**Verificación en producción (2026-11-13):** el usuario eligió «Noviembre de 2026 (en curso)», abrió la impresión (lista para imprimir o guardar como PDF) y pidió el correo. Comprobado con una consulta de solo lectura: el informe de noviembre de Ucureña tiene 4 recomendaciones (descripciones de dos escenas, un texto de conocimiento para la pregunta de la gasolina y difundir los QR), ninguna pide publicar algo ya publicado, y el correo salió a 2 personas 4 s después de generarse (trabajo `reports.monthly` terminado). **C1 ✅.**
+
+### C2 · Paso 1 — circuitos del pasaporte turístico ✅
+
+- Pasos de C2 confirmados por el usuario (2026-11-13): 1 circuitos, 2 sellos con QR en cada lugar guardados en el teléfono, 3 premio y canje, 4 métricas del pasaporte. Para toda la fase: sello con QR firmado por lugar más la ubicación si el visitante la comparte (si no, vale y queda marcado «sin ubicación»); sellos solo en el teléfono, sin cuenta; premio con un comprobante con código que el local verifica una vez. En el [roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr).
+- Decisiones de este paso ([ADR-056](../adr/ADR-056-passport-circuits.md)): **paradas solo destinos**; **cualquier orden** (el circuito sugiere uno); **varios circuitos** por municipio; **roles como los destinos** (editores arman borradores; propietarios y administradores publican, retiran y cambian lo publicado).
+- Base de datos (`20261119000000_c2_passport_circuits.sql`, solo expand):
+  - `passport_circuits` (dirección única por municipio, nombre, descripción y premio en una línea, estado, número de edición, primera publicación) y `passport_circuit_stops` (posición 1–30, FK compuestas; un trigger exige que sea un destino). RLS sin permisos para nadie;
+  - `tenant_passport_circuits` (cualquier miembro) con cada parada y si su destino está publicado;
+  - `create_passport_circuit`, `save_passport_circuit` (destinos del municipio, sin repetir, hasta 30; un circuito publicado solo lo cambian propietarios y administradores y nunca queda con menos de dos destinos publicados), `publish_passport_circuit` (dos paradas con destino publicado), `withdraw_passport_circuit` y `delete_passport_circuit` (solo uno que nunca se publicó), todas con el número de edición y auditadas;
+  - `portal_passport` (anónima, municipios en línea): los circuitos publicados con las paradas cuyo destino está publicado ahora, en orden, con su portada y ubicación; con menos de dos, no se muestra;
+  - seed: Demo Norte con «Ruta del valle» publicada (la plaza, el mirador y el borrador «Feria de los domingos», que el portal deja fuera).
+- `@rikuy/core`: `domain/passport/circuits` (límites, `parseCircuitDraft`, `circuitPublishIssues`) y `application/passport/circuits` (`loadPassport`, `createCircuit`, `saveCircuit`, `publishCircuit`, `withdrawCircuit`, `deleteCircuit`, `canChangeCircuit`, `suggestCircuitSlug`, el lector del portal); `PORTAL_PATHS.passport` y `passportCircuit`; el sitemap suma el pasaporte y cada circuito.
+- `@rikuy/db`: `createPassportRepository` (antes de la migración, sin circuitos) y `createSupabasePublishedPassportReader`.
+- Portal: «Pasaporte» en la cabecera cuando hay circuitos, una sección en el inicio, **`/pasaporte`** (circuitos con sus lugares y premio) y **`/pasaporte/{dirección}`** (paradas numeradas en el orden sugerido con la tarjeta de cada destino, el premio y «Ver el recorrido en el mapa»); «Cómo funciona» anuncia los sellos como «muy pronto». Estilos en su propia hoja (`passport.css`). Publicar, retirar o cambiar un circuito publicado invalida la caché del municipio.
+- Panel: **«Pasaporte turístico»** en la página del municipio (`/o/{slug}/pasaporte`): lista con estado y paradas, «Nuevo circuito» con la dirección sugerida, y el editor (nombre, descripción, premio, paradas con «Subir», «Bajar», «Quitar» y «Agregar un destino», «Guardar», «Publicar el circuito» con lo que falta, «Retirar del portal», «Borrar el circuito» si nunca se publicó, y el enlace y el QR cuando está publicado).
+- CI: nuevo paso **«Passport circuits in a real browser»** (suite `lighthouse`).
+- Tests:
+  - unitarios: core 634 (+10: el borrador del circuito, lo que falta para publicar, roles, los casos de uso, la dirección sugerida y el sitemap), db 193 (+5: el adaptador y el lector del portal);
+  - 1.575 pgTAP (41 nuevos, `044_passport_circuits`): crear, dirección única y con formato, una línea, guardar con paradas, número de edición viejo, un evento o un destino de otro municipio o repetido como parada rechazados, el premio hasta 200; el editor no publica; el analista lee y no crea; nadie lee las tablas; otro municipio no lee ni cambia; propietario sin segundo factor no publica; los visitantes no ven borradores; con un solo destino publicado no se publica; publicar auditado; el portal con las paradas publicadas en orden y el premio; el editor no cambia lo publicado y lo publicado conserva dos destinos; un circuito que se queda con un destino publicado o un municipio suspendido no se ven; retirar; lo publicado no se borra; el editor no borra; borrar un borrador;
+  - **e2e en un navegador real** (`passport.e2e.test.ts`, 3 casos): el portal de Demo Norte con «Pasaporte» en la cabecera, el circuito del seed con sus dos lugares en orden (sin el borrador), el premio, la ruta en el mapa y el sitemap, y nada de eso en Demo Sur (404 para el circuito de Norte); el propietario crea un circuito, no puede publicarlo con un solo destino publicado, agrega y ordena, publica (los visitantes lo ven en la siguiente visita) y lo retira (ya no se ve, y no se puede borrar); auditado; el pasaporte de Demo Sur da 404; un editor crea un borrador sin «Publicar» y ve el circuito publicado sin poder cambiarlo; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - `plpgsql_check` sin hallazgos.
+- Verificado en local, en el navegador (390 px): la página del circuito con el premio, las paradas numeradas y «Cómo funciona».
+
+**Desviaciones:**
+
+- Los sellos todavía no existen: «Cómo funciona» los anuncia como «muy pronto» hasta el Paso 2.
+- Las visitas a `/pasaporte` todavía no se cuentan en «Estadísticas» (Paso 4).
+- «Ver el recorrido en el mapa» muestra hasta 6 paradas (el límite de la ruta de ADR-039).
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Informe mensual»: por defecto, octubre; elegir «Noviembre de 2026 (en curso)» con el selector.
-- «Imprimir o guardar como PDF»: la vista previa no muestra la barra ni «Por correo».
-- «Enviar este informe ahora por correo»: en uno o dos minutos llega el correo a propietarios y administradores (puede caer en spam), con el resumen, las recomendaciones y el enlace. La página dice «Se envió el … a N personas».
-- Ninguna recomendación pide publicar algo que ya está publicado.
+- Tras el merge, en el panel de Ucureña → «Pasaporte turístico» → «Nuevo circuito»: un nombre, el premio y al menos dos destinos publicados; «Guardar» y «Publicar el circuito».
+- En el portal de Ucureña aparece «Pasaporte» en la cabecera (en el celular también) y el circuito en `/pasaporte`, con sus lugares en orden y el premio; «Ver el recorrido en el mapa» abre la ruta.
+- «Retirar del portal» lo quita en la siguiente visita.
 
 ## Siguiente paso
 
-**C2 — pasaporte turístico con sellos QR** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)). Antes de empezar, proponer los pasos de C2 y confirmarlos con el usuario (cómo se sella, qué guarda el visitante sin cuenta, premios, qué ve el municipio).
+**C2 · Paso 2 — sellos con QR en cada lugar** ([roadmap](../roadmap.md#c2--pasaporte-turístico-con-sellos-qr)): el QR de sello de cada destino (distinto del de la ficha), el sello guardado en el teléfono sin cuenta, la ubicación opcional y el pasaporte del visitante en el portal. Antes de empezar, confirmar con el usuario el radio de «estar cerca» para marcar el sello con ubicación y si el QR de sello cambia (por ejemplo, al reimprimirlo).
 
 ## Decisiones pendientes del usuario
 

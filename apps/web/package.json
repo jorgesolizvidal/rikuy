@@ -24,6 +24,7 @@
     "test:e2e-statistics": "vitest run --config vitest.e2e.config.ts e2e/statistics.e2e.test.ts",
     "test:e2e-recommendations": "vitest run --config vitest.e2e.config.ts e2e/recommendations.e2e.test.ts",
     "test:e2e-monthly-report": "vitest run --config vitest.e2e.config.ts e2e/monthly-report.e2e.test.ts",
+    "test:e2e-passport": "vitest run --config vitest.e2e.config.ts e2e/passport.e2e.test.ts",
     "test:e2e-unanswered": "vitest run --config vitest.e2e.config.ts e2e/unanswered.e2e.test.ts"
   },
   "dependencies": {

@@ -15,7 +15,10 @@ export function DestinationCard({
   priority = false,
 }: {
   readonly tenantId: string;
-  readonly destination: PublishedDestinationSummary;
+  readonly destination: Pick<
+    PublishedDestinationSummary,
+    "slug" | "title" | "summary" | "location" | "cover"
+  >;
   readonly headingLevel?: 2 | 3;
   readonly priority?: boolean;
 }) {

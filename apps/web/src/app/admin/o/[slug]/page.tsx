@@ -122,6 +122,17 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </Link>
         </li>
         <li>
+          <Link href={`/o/${membership.slug}/pasaporte`} className="org-card">
+            <span>
+              <span className="org-name">Pasaporte turístico</span>
+              <span className="org-detail">
+                Circuitos de destinos con un premio para quien los completa
+              </span>
+            </span>
+            <span className="org-role">Ver</span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/informe`} className="org-card">
             <span>
               <span className="org-name">Informe mensual</span>
