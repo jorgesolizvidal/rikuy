@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C1 · Paso 3 — lo que preguntan los visitantes ✅
-- **Rama:** `fix/unanswered-contact-referral` → PR hacia `main`
+- **Último paso completado:** C1 · Paso 4 — recomendaciones del Copilot a partir de las métricas ✅
+- **Rama:** `feat/c1-step4-copilot-recommendations` → PR hacia `main`
 
 ## Historial
 
@@ -2028,15 +2028,73 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 
 **Corrección posterior (`fix/unanswered-contact-referral`):** una respuesta que no cita nada publicado y dice que no tiene la información («no tengo / no dispongo de / no encontré información», «I don't have information»…) también guarda la pregunta, aunque cite los datos del portal para sugerir el contacto (`admitsNotKnowing`, [ADR-053](../adr/ADR-053-unanswered-questions.md#corrección-2026-11-12-fixunanswered-contact-referral)). Una respuesta que sí sale de esos datos («El teléfono es…») no. Lo que ve el visitante no cambia. Tests: core 577 (+3: frases de no saber en español e inglés, respuestas que no lo son, y el caso de producción con el contacto citado). El CI encontró además que la prueba de visitas fallaba a veces: dejaba el inicio justo al cargar y el conteo de esa página no llegaba a salir; ahora espera ese envío antes de seguir.
 
+**Verificación en producción de la corrección (2026-11-12):** el usuario volvió a preguntar desde su celular y su PC. «¿Hay cajero automático?» y la de la gasolina (que dijeron no tener la información y sugirieron el contacto citando los datos del portal) quedaron guardadas, agrupadas y enmascaradas. La del número 67680034 se respondió desde los datos del portal («no corresponde a los datos que tenemos; el teléfono de contacto es…») y la del hospital citó el libro histórico (págs. 128–129): las dos tenían respuesta, así que no se guardaron, como corresponde.
+
+### C1 · Paso 4 — recomendaciones del Copilot a partir de las métricas ✅
+
+- Decisiones del usuario ([ADR-054](../adr/ADR-054-copilot-recommendations.md)), 2026-11-12:
+  - **en «Estadísticas»**, en una sección al final; la página del Copilot enlaza ahí;
+  - **a pedido**, con «Generar recomendaciones», y se guarda la última con su fecha y sus cifras;
+  - **fuentes:** visitas y acciones, preguntas sin respuesta y la revisión del contenido; además, la agenda (sugerida por mí y aceptada);
+  - **enlace al editor y «Proponer con el Copilot»** cuando se trata de un texto. Nunca publica sola.
+- Base de datos (`20261117000000_c1_copilot_recommendations.sql`, solo expand):
+  - `copilot_recommendations`: una fila por municipio, la última. Guarda el período, los hechos, las recomendaciones, el pedido de IA (FK compuesta; se borra con él a los 90 días), quién y cuándo. RLS sin permisos para nadie.
+  - `private.recommendation_numbers`: las cifras de un texto, normalizadas («1.234» = «1234», «09» = «9»; «360°» y «H2» no cuentan).
+  - `save_copilot_recommendations` (cualquier miembro; propietarios y administradores con segundo factor). Valida:
+    - los hechos: etiquetas únicas H1–H99, fuente, texto en una línea de hasta 400 caracteres;
+    - el destino de cada hecho: contenido de este municipio y del tipo correcto, escena del tour de ese contenido, pregunta o agenda. Un id que no es un id se rechaza como inválido, sin error de conversión;
+    - de 1 a 6 recomendaciones, cada una con 1 a 8 hechos conocidos y sin enlaces;
+    - **que cada cifra escrita esté en los hechos que cita**;
+    - un pedido `copilot` completado por la misma persona, en el mismo municipio, en la última hora.
+
+    Reemplaza la anterior y audita `copilot.recommendations_generated`.
+
+  - `latest_copilot_recommendations` (cualquier miembro).
+- `@rikuy/core`:
+  - `domain/copilot/recommendations`:
+    - `recommendationFacts`: hasta 40 hechos de las cuatro fuentes, cada uno con su destino en el panel. Visitas de los últimos 30 días comparadas con los 30 anteriores; los 5 lugares más vistos con sus acciones; los publicados que nadie abrió; tours; origen; las 8 preguntas sin respuesta más frecuentes; hasta 12 filas de la revisión; los eventos próximos (también borradores);
+    - `recommendationMessages` (`[tarea:copilot-recomendar]`, instrucciones fijas, los hechos como datos);
+    - `parseRecommendations`: descarta las que citan un hecho desconocido, escriben una cifra que no está en sus hechos, tienen un enlace, están vacías o se repiten; como mucho 6;
+  - `application/copilot/recommendations`: `generateRecommendations` (un pedido al gateway con el perfil `copilot`), `loadRecommendations` y `recommendationLinks` (los enlaces salen de los hechos, nunca del modelo; «Proponer» solo para editores o más);
+  - el modelo simulado escribe una recomendación por fuente; con `[simular:cifra-inventada]` en los hechos (por ejemplo, en una pregunta de un visitante) agrega una con una cifra inventada y otra con un hecho que no existe;
+  - la regla 3 del chat del Copilot y el uso del plan ya no dicen que «la plataforma todavía no mide visitas»: dicen que están en «Estadísticas», con las recomendaciones. El caso C02 del gold del Copilot espera «Estadísticas» (versión nueva del conjunto).
+- `@rikuy/db`: `createRecommendationsRepository`. Antes de la migración, «todavía no hay recomendaciones».
+- Panel:
+  - **«Recomendaciones del Copilot»** al final de `/o/{slug}/estadisticas`:
+    - qué lee;
+    - cuándo se generaron y el período de las visitas, con un aviso si tienen más de 7 días;
+    - cada recomendación con **«En qué se basa»**: los hechos citados, palabra por palabra, con su fuente;
+    - sus enlaces: «Abrir en el editor», «Proponer con el Copilot», «Abrir el tour», «Probar en «Conocimiento del asistente»», «Abrir la agenda»;
+    - «Generar recomendaciones» (o «… nuevas»), con su costo en la cuota de IA. Sin IA configurada, el botón no aparece y lo dice;
+  - la página del Copilot enlaza a la sección.
+- Tests:
+  - 883 unitarios (core 597, db 181, web 45, worker 46, config 14): hechos de las cuatro fuentes (comparación, lugares sin vistas, preguntas como datos en una línea, revisión con su destino, agenda con borradores, sin visitas ni preguntas, tope de 40), cifras, el lector (etiquetas con tilde o negrita, porqué en varias líneas, descartes, tope de 6), el modelo simulado, el caso de uso (pedido como la persona, avisos, rechazos de la base) y los enlaces por rol;
+  - 1.477 pgTAP (38 nuevos, `042_copilot_recommendations`): cifras normalizadas; un analista guarda y lee; un editor lee; otro municipio, un propietario sin segundo factor y un visitante no; nadie lee la tabla; una cifra que no está en sus hechos o que está en un hecho que no cita; un hecho desconocido o ninguno; vacío o más de 6; enlace; salto de línea; etiqueta repetida; destino de otro municipio, de otro tipo, id que no es un id, escena de otro contenido, tipo desconocido; período invertido; pedido de otra persona, de hace más de una hora, que no es del Copilot o sin respuesta; la última reemplaza a la anterior; auditoría; se borra con su pedido de IA;
+  - **e2e en un navegador real** (`recommendations.e2e.test.ts`, nuevo paso del job de contratos, 2 casos):
+    - un visitante pregunta en Demo Norte algo sin respuesta con la marca `[simular:cifra-inventada]`;
+    - el propietario llega desde el Copilot, genera y ve 4 recomendaciones: cada cifra está en los hechos que muestra, la inventada y la del hecho que no existe no aparecen;
+    - nada se publicó ni cambió y no hay propuestas; queda auditado; generar otra vez la reemplaza;
+    - axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+    - un analista de Demo Sur también las genera, sin «Proponer con el Copilot».
+- Verificado en local, en el navegador (390 y 1280 px), con el seed de Demo Norte: 15 hechos y 4 recomendaciones. Unanswered (3), Copilot (2) y estadísticas (2) siguen en verde.
+- Lo que encontraron las pruebas, ya corregido: la línea de la fecha usaba la clase del período de «Estadísticas» y la prueba de esa página encontraba dos.
+
+**Desviaciones:**
+
+- La comprobación de cifras es estricta: una buena recomendación que agrega una cifra propia («sube 3 fotos») se descarta.
+- Las recomendaciones miran siempre los últimos 30 días, aunque la página muestre otro período (la sección lo dice).
+- Con el modelo real, la calidad se revisa a mano en producción; un gold formal de recomendaciones queda para cuando haya más uso.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el portal de Ucureña, escribir otra vez algo que el asistente no sepa y que lo lleve a sugerir el contacto (por ejemplo, «Éste es el número de Ucureña 67680034» o «¿Hay cajero automático?»).
-- En el panel → «Lo que preguntan los visitantes»: la pregunta aparece, con `[teléfono]` en lugar del número.
-- «¿Cuál es el teléfono de turismo?» (que sí responde con los datos del portal) no aparece.
+- Tras el merge, en el panel de Ucureña → «Estadísticas» → al final, «Recomendaciones del Copilot» → «Generar recomendaciones».
+- En unos segundos aparecen de 3 a 6 recomendaciones. En cada una, «En qué se basa» muestra las cifras de la plataforma: toda cifra del texto tiene que estar ahí.
+- Los enlaces llevan al editor, a «Proponer con el Copilot» o a «Conocimiento del asistente» con la pregunta escrita. Nada se publica solo.
+- Desde la página del Copilot, el enlace nuevo lleva a esa sección.
 
 ## Siguiente paso
 
-**C1 · Paso 4 — recomendaciones del Copilot a partir de las métricas** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): cada recomendación cita los números en los que se basa y nunca publica sola. Antes de empezar, confirmar con el usuario dónde se muestran, cada cuánto se generan (y su costo de IA) y qué fuentes usan (visitas, preguntas sin respuesta, revisión del contenido).
+**C1 · Paso 5 — informe mensual para la alcaldía** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): página imprimible en el panel y un correo el día 1 con el resumen y el enlace. Antes de empezar, confirmar con el usuario qué incluye el informe (visitas, preguntas, recomendaciones), a quién llega el correo y si el informe lleva las recomendaciones del Copilot.
 
 ## Decisiones pendientes del usuario
 

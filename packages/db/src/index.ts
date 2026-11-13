@@ -54,6 +54,7 @@ export {
 } from "./usage";
 export { createStatisticsRepository } from "./statistics";
 export { createUnansweredQuestionsRepository } from "./unanswered-questions";
+export { createRecommendationsRepository } from "./copilot-recommendations";
 export {
   createGeneralTourRepository,
   createSupabasePublishedTourReader,

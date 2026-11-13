@@ -333,7 +333,7 @@ describe("Copilot domain (ADR-042)", () => {
     ).toEqual([
       "Almacenamiento: 12 MB de 300 MB.",
       "IA hoy: 1614 de 40.000 tokens.",
-      "Visitas y estadísticas de visitantes: la plataforma todavía no las mide.",
+      "Visitas y preguntas de los visitantes: están en «Estadísticas», con las recomendaciones del Copilot (este chat no las lee).",
     ]);
   });
 });

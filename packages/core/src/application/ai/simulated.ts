@@ -1,6 +1,7 @@
 import type { AiMessage } from "../../contracts/ai";
 import { ANSWER_TAG, EXPLAIN_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
 import { COPILOT_ASK_TAG, COPILOT_PROPOSE_TAG } from "../../domain/copilot/prompts";
+import { RECOMMEND_TAG } from "../../domain/copilot/recommendations";
 import type { SpeechTranscriber } from "./dictation";
 import { AiProviderError, estimateTokens, type AiProvider } from "./gateway";
 
@@ -43,13 +44,15 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
         ? simulatedCopilotAnswer(text)
         : system.startsWith(COPILOT_PROPOSE_TAG)
           ? simulatedProposal(system, text)
-          : system.startsWith(PLAN_TAG)
-            ? simulatedPlan(text)
-            : system.startsWith(ANSWER_TAG)
-              ? simulatedAssistantAnswer(text)
-              : system.startsWith(EXPLAIN_TAG)
-                ? simulatedExplanation(text)
-                : simulatedAnswer(text);
+          : system.startsWith(RECOMMEND_TAG)
+            ? simulatedRecommendations(text)
+            : system.startsWith(PLAN_TAG)
+              ? simulatedPlan(text)
+              : system.startsWith(ANSWER_TAG)
+                ? simulatedAssistantAnswer(text)
+                : system.startsWith(EXPLAIN_TAG)
+                  ? simulatedExplanation(text)
+                  : simulatedAnswer(text);
       return {
         text: answer,
         inputTokens: estimateTokens(request.messages),
@@ -119,6 +122,34 @@ function simulatedProposal(system: string, text: string): string {
   }
   lines.push(`FUENTES: A${text.includes("[F1]") ? ", F1" : ""}`);
   return lines.join("\n");
+}
+
+/**
+ * Recommendations: one per section of facts, resting on its first fact and repeating its
+ * figures. «[simular:cifra-inventada]» anywhere in the facts (a visitor's question, say) adds
+ * one with a figure no fact has and one citing a fact that does not exist: both are dropped.
+ */
+function simulatedRecommendations(text: string): string {
+  const blocks: string[] = [];
+  for (const section of text.split(/\n\n/u)) {
+    const first = /^\[(H\d+)\] (.+)$/mu.exec(section);
+    if (!first) continue;
+    const name = section.split("\n")[0]?.replace(/:$/u, "") ?? "";
+    blocks.push(
+      [
+        `RECOMENDACION: Revisa «${name}» en el panel`,
+        `POR QUE: La plataforma dice: ${first[2]}`,
+        `HECHOS: ${first[1]}`,
+      ].join("\n"),
+    );
+  }
+  if (text.includes("[simular:cifra-inventada]")) {
+    blocks.push(
+      "RECOMENDACION: Duplica las visitas del portal\nPOR QUE: Con 98765 vistas más el portal crecería.\nHECHOS: H1",
+      "RECOMENDACION: Revisa un dato que no existe\nPOR QUE: Lo dice un hecho que no está.\nHECHOS: H99",
+    );
+  }
+  return blocks.join("\n\n");
 }
 
 function simulatedAnswer(question: string): string {
