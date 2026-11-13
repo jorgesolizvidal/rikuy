@@ -6,7 +6,7 @@
 
 - **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
 - **Último paso completado:** C1 · Paso 3 — lo que preguntan los visitantes ✅
-- **Rama:** `feat/c1-step3-unanswered-questions` → PR hacia `main`
+- **Rama:** `fix/unanswered-contact-referral` → PR hacia `main`
 
 ## Historial
 
@@ -2024,11 +2024,15 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 - «Personas» es por día, sumado, como en «Estadísticas».
 - No hay botón para borrar o marcar como resuelta una pregunta (no se pidió); se olvidan solas a los 90 días.
 
+**Verificación en producción (2026-11-12):** tras el merge, el usuario preguntó desde su celular en Ucureña. «¿Hay algún teleférico en Ucureña?» quedó guardada con la ficha «Carnaval de Ucureña» donde la hizo, y el «gracias» no se guardó. Pero «Éste es el número de Ucureña 67680034» no se guardó. Chaski respondió «No dispongo de información sobre el número…» y sugirió el teléfono y el correo del portal, citando «Datos del portal», y eso contaba como respondida. Una consulta de solo lectura mostró 7 pedidos de Ucureña entre las 20:03 y las 20:08 y una sola pregunta guardada: las 4 de su PC, parecidas, probablemente tampoco se guardaron por lo mismo.
+
+**Corrección posterior (`fix/unanswered-contact-referral`):** una respuesta que no cita nada publicado y dice que no tiene la información («no tengo / no dispongo de / no encontré información», «I don't have information»…) también guarda la pregunta, aunque cite los datos del portal para sugerir el contacto (`admitsNotKnowing`, [ADR-053](../adr/ADR-053-unanswered-questions.md#corrección-2026-11-12-fixunanswered-contact-referral)). Una respuesta que sí sale de esos datos («El teléfono es…») no. Lo que ve el visitante no cambia. Tests: core 577 (+3: frases de no saber en español e inglés, respuestas que no lo son, y el caso de producción con el contacto citado).
+
 ## Cómo verificarlo
 
-- Tras el merge y «Deploy database», en un portal en línea (por ejemplo, Demo Norte o Ucureña), preguntarle al asistente algo que no esté publicado: «¿Hay teleférico?». Después, otra con un correo o un celular inventados.
-- En el panel: el municipio → «Lo que preguntan los visitantes». Deben aparecer las dos preguntas, la segunda con `[correo]` o `[teléfono]`, con la página donde se hicieron. «Probar esta pregunta…» abre «Conocimiento del asistente» con la pregunta escrita.
-- Un «gracias» o una pregunta que el asistente sí responde no aparecen.
+- Tras el merge, en el portal de Ucureña, escribir otra vez algo que el asistente no sepa y que lo lleve a sugerir el contacto (por ejemplo, «Éste es el número de Ucureña 67680034» o «¿Hay cajero automático?»).
+- En el panel → «Lo que preguntan los visitantes»: la pregunta aparece, con `[teléfono]` en lugar del número.
+- «¿Cuál es el teléfono de turismo?» (que sí responde con los datos del portal) no aparece.
 
 ## Siguiente paso
 

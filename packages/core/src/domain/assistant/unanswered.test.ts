@@ -1,6 +1,12 @@
 import { describe, expect, it } from "vitest";
 
-import { isSmallTalk, maskPersonalData, questionWords, unansweredText } from "./unanswered";
+import {
+  admitsNotKnowing,
+  isSmallTalk,
+  maskPersonalData,
+  questionWords,
+  unansweredText,
+} from "./unanswered";
 
 describe("maskPersonalData", () => {
   it("masks emails and links", () => {
@@ -67,5 +73,32 @@ describe("unansweredText", () => {
 
   it("splits words as the database groups them", () => {
     expect(questionWords("¿HAY WiFí, señor?")).toEqual(["hay", "wifi", "senor"]);
+  });
+});
+
+describe("admitsNotKnowing", () => {
+  it("hears the assistant say it does not know, in Spanish and English", () => {
+    for (const answer of [
+      "No dispongo de información sobre el número. Puedes consultar al portal llamando al 4573035.",
+      "No tengo información sobre la existencia de un teleférico en Ucureña.",
+      "No tengo esa información publicada; escribe a la oficina de turismo.",
+      "Lo siento, no encontré datos sobre cajeros.",
+      "Ese horario no aparece publicado en el portal.",
+      "I don't have information about a cable car. You can call the tourism office.",
+      "I couldn’t find any details about that.",
+    ]) {
+      expect(admitsNotKnowing(answer), answer).toBe(true);
+    }
+  });
+
+  it("does not take an answer for not knowing", () => {
+    for (const answer of [
+      "El teléfono de la oficina de turismo es 4573035.",
+      "Puedes escribir a turismo@ejemplo.bo de lunes a viernes.",
+      "No hay que pagar entrada: el mirador es gratuito.",
+      "The tourism office is at the main square.",
+    ]) {
+      expect(admitsNotKnowing(answer), answer).toBe(false);
+    }
   });
 });

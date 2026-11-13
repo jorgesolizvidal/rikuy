@@ -18,7 +18,11 @@ import {
   parseAssistantRequest,
   type AssistantRequest,
 } from "../../domain/assistant/request";
-import { unansweredText, type UnansweredQuestion } from "../../domain/assistant/unanswered";
+import {
+  admitsNotKnowing,
+  unansweredText,
+  type UnansweredQuestion,
+} from "../../domain/assistant/unanswered";
 import type { PlanIntent } from "../../domain/plan/engine";
 import { detectPlanIntent } from "../../domain/plan/intent";
 import {
@@ -433,7 +437,14 @@ export async function askAssistant(
   const contact = noticeContext.contact;
   const phone = contact.phone?.trim();
   const email = contact.email?.trim();
-  const kept = parsed.abstained && !parsed.echoed ? unansweredText(request.question) : null;
+  // Nothing published answered it (ADR-053): no citation at all, or only the portal's details
+  // while saying it does not know (suggesting the phone or email is not an answer).
+  const kept =
+    !parsed.echoed &&
+    parsed.passages.length === 0 &&
+    (parsed.abstained || admitsNotKnowing(parsed.text))
+      ? unansweredText(request.question)
+      : null;
   return {
     reply: {
       status: "answered",

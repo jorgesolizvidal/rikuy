@@ -111,6 +111,27 @@ export function isSmallTalk(text: string): boolean {
   return words.length > 0 && words.every((word) => SMALL_TALK.has(word));
 }
 
+/**
+ * The answer says it does not know: «No tengo información sobre…», «No dispongo de datos…»,
+ * «I don't have information…». The assistant is told to suggest the portal's phone or email
+ * when it does not know (and then cites [M]), so citing only the portal's details does not make
+ * an answer: these words do.
+ */
+const NOT_KNOWING = [
+  /\bno (?:tengo|tenemos|dispongo de|disponemos de|cuento con|contamos con|encontre|encuentro|encontramos|hay|se tiene) (?:ninguna |esa |ese |esos |esas |mas |suficiente |la )?(?:informacion|datos|registros?|detalles)\b/u,
+  /\bno (?:aparece|figura|esta|se menciona|se encuentra|se indica)(?: publicad| en (?:las fuentes|lo publicado|los textos))/u,
+  /\bsin (?:informacion|datos) (?:publicad|sobre|de)/u,
+  /\bi (?:don ?t|do not) have (?:any |that |the |enough )?(?:information|details|data)\b/u,
+  /\b(?:couldn ?t|could not|can ?t|cannot) find (?:any |that |the )?(?:information|details|data)\b/u,
+  /\bno (?:information|details|data) (?:about|on|regarding)\b/u,
+  /\bis(?:n ?t| not) (?:mentioned|published)\b/u,
+];
+
+export function admitsNotKnowing(answer: string): boolean {
+  const text = questionWords(answer.replace(/[’']/gu, " ")).join(" ");
+  return NOT_KNOWING.some((pattern) => pattern.test(text));
+}
+
 /** «Hola, ¿hay wifi?» is kept as «¿hay wifi?», so it groups with the same question. */
 const GREETING =
   /^\s*(?:hola|buenas(?:\s+(?:tardes|noches))?|buen(?:os)?\s+d[ií]as|hello|hi|hey)\b[\s,.;:!¡]*/iu;
