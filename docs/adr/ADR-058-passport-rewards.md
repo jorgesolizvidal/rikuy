@@ -55,3 +55,11 @@ Decisiones del usuario para este paso (2026-11-13):
 - La clave del local es una por circuito: si dos locales entregan el mismo premio, comparten la clave. Cambiarla obliga a avisar a todos.
 - El servidor guarda del visitante solo la huella del pasaporte en cada comprobante, sin datos personales.
 - Las cifras de comprobantes pedidos y canjeados llegan a «Estadísticas» y al informe mensual en el Paso 4.
+
+## Corrección (2026-11-13, `fix/passport-redeem-pin`)
+
+En producción, la primera clave del local se guardó distinta de la que la persona anotó: el campo del panel era de contraseña, sin confirmación, y lo guardado no se podía ver (un error al escribir o el gestor de contraseñas del navegador). En `/canje`, Chrome también ofrecía sus contraseñas guardadas en el campo de la clave.
+
+- La clave del local es un código corto para el mostrador, no una contraseña de una cuenta: en el panel y en `/canje` se escribe en un campo de texto visible, sin autocompletar ni gestores de contraseñas.
+- Al guardarla, el panel la repite una vez en la confirmación; después solo queda su hash, como antes.
+- En `/canje`, un error del servidor se informa como tal, no como «código o clave no son correctos».

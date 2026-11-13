@@ -2258,11 +2258,21 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - Quien borra los datos del navegador empieza un pasaporte nuevo y podría juntar los sellos otra vez (con una visita o una foto de cada QR); se mitiga renovando los QR.
 - Los comprobantes todavía no se cuentan en «Estadísticas» ni en el informe mensual (Paso 4).
 
+**Verificación en producción (2026-11-13):** el usuario completó «Corazón de Ucureña» en su celular y recibió el comprobante (4 sellos, 2 con ubicación), pero en `/canje` el código con la clave que había puesto respondía «El código o la clave del local no son correctos.». Comprobado con consultas de solo lectura: el comprobante existe, vigente y sin canjear, en Ucureña; la clave se guardó una sola vez (16:57, auditada) y el hash bcrypt funciona en producción, pero **no corresponde a la clave que el usuario anotó**. El campo de la clave en el panel era de contraseña (puntos, sin confirmación), así que lo que se guardó no se podía ver: un error al escribir o el gestor de contraseñas del navegador.
+
+**Corrección posterior (`fix/passport-redeem-pin`, [ADR-058](../adr/ADR-058-passport-rewards.md#corrección-2026-11-13-fixpassport-redeem-pin)):**
+
+- en el panel, la clave se escribe en un campo de texto visible, sin autocompletar ni gestores de contraseñas (`autoComplete="off"`, `data-1p-ignore`, `data-lpignore`), y la confirmación la repite una vez: «Se guardó la clave 334001. Anótala y dásela al local…»;
+- en `/canje`, el campo de la clave también es de texto visible y sin autocompletar (en la captura del usuario, Chrome ofrecía sus contraseñas guardadas);
+- un error del servidor ya no se muestra como «código o clave no son correctos», sino «No pudimos comprobarlo ahora…»;
+- los espacios que se cuelan al escribir o pegar la clave se quitan.
+- Tests: e2e del premio (2) con el tipo de los dos campos, la clave en la confirmación y un 500 del servidor que no se informa como clave equivocada; contratos RC-09/10/11/12 (216) en verde.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Pasaporte turístico» → «Corazón de Ucureña» → «Premio y canje»: guarda una clave del local (por ejemplo, 4 a 6 números) y anótala.
-- En el celular, sella los 4 lugares (los QR en la pantalla sirven) y abre `/pasaporte/corazon-de-ucurena`: «Pedir mi premio» muestra el comprobante con su código.
-- En otro teléfono o en la PC, abre `rikuy-ucurena.vercel.app/canje`, escribe el código y la clave: «Comprobante válido» → «Marcar como canjeado y entregar el premio». Al volver a comprobarlo dice que ya se canjeó, y en el celular la página del circuito dice «Premio recibido».
+- Tras el merge de `fix/passport-redeem-pin`, en el panel de Ucureña → «Pasaporte turístico» → «Corazón de Ucureña» → «Premio y canje»: escribe la clave nueva (se ve mientras la escribes), pulsa «Cambiar la clave» y anótala tal como la repite el mensaje.
+- El comprobante JPSG-4H2C que ya tienes sigue valiendo (no se canjeó y vence el 13 de diciembre): no hace falta volver a sellar.
+- En otro teléfono o en la PC, abre `rikuy-ucurena.vercel.app/canje`, escribe JPSG-4H2C y la clave nueva: «Comprobante válido» → «Marcar como canjeado y entregar el premio». Al volver a comprobarlo dice que ya se canjeó, y en el celular la página del circuito dice «Premio recibido».
 
 ## Siguiente paso
 

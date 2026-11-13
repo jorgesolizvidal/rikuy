@@ -216,13 +216,15 @@ describe("the tourist passport's prize (ADR-058)", () => {
       )
       .waitFor();
     expect(await owner.page.getByRole("link", { name: `${NORTE}/canje` }).count()).toBe(1);
+    // Plain text so the person sees the key and no password manager fills it.
+    expect(await owner.page.getByLabel("Clave del local").getAttribute("type")).toBe("text");
     await owner.page.getByLabel("Clave del local").fill("12");
     await owner.page.getByRole("button", { name: "Guardar la clave" }).click();
     expect(await owner.page.getByText("Se guardó la clave").count()).toBe(0);
     await owner.page.getByLabel("Clave del local").fill(PIN);
     await owner.page.getByRole("button", { name: "Guardar la clave" }).click();
     await owner.page
-      .getByText("Se guardó la clave. Dásela al local que entrega el premio.")
+      .getByText(`Se guardó la clave ${PIN}. Anótala y dásela al local que entrega el premio.`)
       .waitFor();
     await owner.page.getByText(/^Clave del local guardada el /u).waitFor();
     await accessible(owner.page);
@@ -236,6 +238,17 @@ describe("the tourist passport's prize (ADR-058)", () => {
     await counter.getByLabel("Clave del local").fill("0000");
     await counter.getByRole("button", { name: "Comprobar" }).click();
     await counter.getByText("El código o la clave del local no son correctos.").waitFor();
+    expect(await counter.getByLabel("Clave del local").getAttribute("type")).toBe("text");
+    // A failing server is not reported as a wrong key.
+    await counter.route("**/canje/verificar", (route) =>
+      route.fulfill({ status: 500, contentType: "text/html", body: "<h1>Error</h1>" }),
+    );
+    await counter.getByLabel("Clave del local").fill(PIN);
+    await counter.getByRole("button", { name: "Comprobar" }).click();
+    await counter
+      .getByText("No pudimos comprobarlo ahora. Revisa la conexión e intenta de nuevo.")
+      .waitFor();
+    await counter.unroute("**/canje/verificar");
     await counter.getByLabel("Clave del local").fill(PIN);
     await counter.getByRole("button", { name: "Comprobar" }).click();
     await counter.getByRole("heading", { name: "Comprobante válido" }).waitFor();

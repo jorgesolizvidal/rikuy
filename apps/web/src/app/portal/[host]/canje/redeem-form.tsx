@@ -19,7 +19,7 @@ type Answer =
       readonly voucher: VoucherDto;
     }
   | { readonly status: "no_pin"; readonly circuitName: string }
-  | { readonly status: "wrong" | "too_many" | "invalid" | "forbidden" };
+  | { readonly status: "wrong" | "too_many" | "invalid" | "forbidden" | "error" };
 
 const WHEN: Intl.DateTimeFormatOptions = {
   day: "numeric",
@@ -38,6 +38,7 @@ const PROBLEMS: Record<string, string> = {
   too_many: "Hubo demasiados intentos fallidos en esta hora. Espera un rato e inténtalo de nuevo.",
   invalid: "Revisa el código (8 letras y números) y la clave (4 a 8 números).",
   forbidden: "Abre esta página desde la dirección del portal.",
+  error: "No pudimos comprobarlo ahora. Revisa la conexión e intenta de nuevo.",
 };
 
 /** Check the voucher first; then mark it as redeemed, once. The key stays only in this page. */
@@ -57,9 +58,11 @@ export function RedeemForm() {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ code, pin, redeem }),
       });
-      next = ((await response.json().catch(() => null)) as Answer | null) ?? { status: "wrong" };
+      // A failure of the server is not a wrong key: saying so sends the shop after the wrong
+      // problem.
+      next = ((await response.json().catch(() => null)) as Answer | null) ?? { status: "error" };
     } catch {
-      next = { status: "invalid" };
+      next = { status: "error" };
     }
     setBusy(false);
     setAnswer(next);
@@ -100,14 +103,20 @@ export function RedeemForm() {
         </label>
         <label>
           <span>Clave del local</span>
+          {/* Plain text, not a password field: the browser's password manager would fill it
+              with a saved password instead of the shop's key. */}
           <input
-            name="pin"
-            type="password"
+            name="shop-key"
+            type="text"
             inputMode="numeric"
             autoComplete="off"
+            spellCheck={false}
+            data-1p-ignore=""
+            data-lpignore="true"
+            data-form-type="other"
             value={pin}
             onChange={(event) => {
-              setPin(event.target.value);
+              setPin(event.target.value.replace(/\s/gu, ""));
               setAnswer(null);
             }}
             maxLength={8}
@@ -173,7 +182,7 @@ export function RedeemForm() {
           <p className="redeem-problem" role="alert">
             {answer.status === "no_pin"
               ? `El circuito «${answer.circuitName}» todavía no tiene clave del local: pídesela al municipio.`
-              : (PROBLEMS[answer.status] ?? PROBLEMS.wrong)}
+              : (PROBLEMS[answer.status] ?? PROBLEMS.error)}
           </p>
         )}
       </div>
