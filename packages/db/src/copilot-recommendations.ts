@@ -42,18 +42,25 @@ const factSchema = z.object({
   target: targetSchema,
 });
 
+/** Saved facts: one a newer database knows and this build does not is dropped. */
+export const factsSchema = z.array(z.unknown()).transform((items) =>
+  items.flatMap((item): RecommendationFact[] => {
+    const parsed = factSchema.safeParse(item);
+    return parsed.success ? [parsed.data] : [];
+  }),
+);
+
+export const recommendationItemsSchema = z.array(
+  z.object({ title: z.string(), why: z.string(), facts: z.array(z.string()) }),
+);
+
 const savedSchema = z.object({
   id: z.uuid(),
   createdAt: z.string(),
   from: day,
   to: day,
-  facts: z.array(z.unknown()).transform((items) =>
-    items.flatMap((item): RecommendationFact[] => {
-      const parsed = factSchema.safeParse(item);
-      return parsed.success ? [parsed.data] : [];
-    }),
-  ),
-  items: z.array(z.object({ title: z.string(), why: z.string(), facts: z.array(z.string()) })),
+  facts: factsSchema,
+  items: recommendationItemsSchema,
   mine: z.boolean(),
 });
 

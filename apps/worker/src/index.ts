@@ -23,6 +23,7 @@ import {
   createIndexKnowledgeProcessor,
   type IndexKnowledgeDeps,
 } from "./processors/index-knowledge";
+import { createMonthlyReportProcessor, type MonthlyReportDeps } from "./processors/monthly-report";
 import { createProcessModelProcessor, type ProcessModelDeps } from "./processors/process-model";
 import {
   createProcessPanoramaProcessor,
@@ -44,6 +45,7 @@ export {
   createExtractDocumentProcessor,
   createIndexKnowledgeProcessor,
   createMembershipInvitationMailProcessor,
+  createMonthlyReportProcessor,
   createProcessModelProcessor,
   createProcessPanoramaProcessor,
   createProbePortalProcessor,
@@ -56,6 +58,7 @@ export type {
   ExtractDocumentDeps,
   IndexKnowledgeDeps,
   MembershipInvitationMailDeps,
+  MonthlyReportDeps,
   ProcessModelDeps,
   ProcessPanoramaDeps,
   ProbePortalDeps,
@@ -69,6 +72,7 @@ export type ProcessorDeps = ExpireAbandonedUploadDeps &
   MembershipInvitationMailDeps &
   RemoveUnusedMediaDeps &
   ProbePortalDeps &
+  MonthlyReportDeps &
   Omit<ExtractDocumentDeps, "media"> &
   Omit<IndexKnowledgeDeps, "media">;
 
@@ -90,5 +94,6 @@ export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
     createExtractDocumentProcessor(deps),
     createIndexKnowledgeProcessor(deps),
     createProbePortalProcessor(deps),
+    createMonthlyReportProcessor(deps),
   ];
 }

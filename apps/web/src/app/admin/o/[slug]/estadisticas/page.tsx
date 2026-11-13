@@ -3,14 +3,11 @@ import {
   formatShortDate,
   loadRecommendations,
   loadStatistics,
-  RECOMMENDATION_SOURCE_LABELS,
   RECOMMENDATIONS_FRESH_DAYS,
-  recommendationLinks,
   recommendationsAge,
   parseStatisticsPeriod,
   STATISTICS_PERIOD_LABELS,
   STATISTICS_PERIODS,
-  type Measure,
   type PortalPageTarget,
   type StatisticsTotal,
 } from "@rikuy/core";
@@ -18,7 +15,9 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DailyChart } from "@/components/statistics/daily-chart";
-import { changeLabel, countryName, formatCount } from "@/components/statistics/format";
+import { Change } from "@/components/statistics/change";
+import { countryName, formatCount } from "@/components/statistics/format";
+import { RecommendationList } from "@/components/statistics/recommendation-list";
 import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
@@ -66,28 +65,6 @@ function generatedAt(iso: string, timezone: string): string {
   } catch {
     return formatShortDate(iso.slice(0, 10));
   }
-}
-
-function Change({ measure }: { readonly measure: Measure }) {
-  const change = changeLabel(measure);
-  if (!change) return null;
-  return (
-    <span
-      className="stats-change"
-      data-trend={
-        measure.change === null
-          ? "flat"
-          : measure.change > 0
-            ? "up"
-            : measure.change < 0
-              ? "down"
-              : "flat"
-      }
-    >
-      <span aria-hidden="true">{change.short}</span>
-      <span className="visually-hidden">{change.long}</span>
-    </span>
-  );
 }
 
 interface StatisticsPageProps {
@@ -430,42 +407,12 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
                 nuevas para ver las cifras de ahora.
               </p>
             ) : null}
-            <ol className="recommendations">
-              {saved.items.map((item, index) => {
-                const facts = item.facts
-                  .map((id) => saved.facts.find((fact) => fact.id === id))
-                  .filter((fact) => fact !== undefined);
-                const links = recommendationLinks(membership, item, saved.facts, names);
-                return (
-                  <li key={`${index}-${item.title}`} className="recommendation">
-                    <h3>{item.title}</h3>
-                    <p>{item.why}</p>
-                    <div className="recommendation-facts">
-                      <p className="recommendation-facts-title">En qué se basa</p>
-                      <ul>
-                        {facts.map((fact) => (
-                          <li key={fact.id}>
-                            <span className="recommendation-source">
-                              {RECOMMENDATION_SOURCE_LABELS[fact.source]}
-                            </span>{" "}
-                            {fact.text}
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                    {links.length > 0 ? (
-                      <ul className="recommendation-links">
-                        {links.map((link) => (
-                          <li key={link.href}>
-                            <Link href={link.href}>{link.label}</Link>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </li>
-                );
-              })}
-            </ol>
+            <RecommendationList
+              membership={membership}
+              items={saved.items}
+              facts={saved.facts}
+              names={names}
+            />
           </>
         ) : (
           <p className="field-hint">Todavía no hay recomendaciones para este municipio.</p>
@@ -476,6 +423,11 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
           hasSaved={saved !== null}
         />
       </section>
+
+      <p className="field-hint">
+        Para la alcaldía: el <Link href={`/o/${membership.slug}/informe`}>informe mensual</Link>,
+        para imprimir o guardar como PDF, con las recomendaciones del mes.
+      </p>
 
       <section aria-labelledby="como-se-cuenta" className="metrics-section">
         <h2 id="como-se-cuenta">Cómo se cuenta</h2>

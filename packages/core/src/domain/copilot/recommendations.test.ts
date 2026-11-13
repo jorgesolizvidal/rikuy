@@ -455,3 +455,74 @@ describe("parseRecommendations", () => {
     expect(parsed.items.every((entry) => entry.facts.length === 1)).toBe(true);
   });
 });
+
+describe("the period of the facts", () => {
+  it("names a month and compares it with the month before (the monthly report)", () => {
+    const range = statisticsRange("mes-anterior", "2026-11-01");
+    const facts = recommendationFacts(
+      input({
+        statistics: summarizeStatistics(
+          range,
+          data(range, 1234),
+          data(range.previous, 1000),
+          "2026-09-01",
+        ),
+        period: { name: "octubre de 2026", previous: "el mes anterior" },
+      }),
+    );
+    const portal = facts.find((fact) => fact.text.startsWith("Portal"))?.text ?? "";
+    expect(portal).toContain("del 1 oct al 31 oct de 2026 (octubre de 2026)");
+    expect(portal).toContain("en el mes anterior fueron 1.015");
+    expect(portal).not.toContain("30 días");
+  });
+});
+
+describe("publishing what is already published", () => {
+  const facts: RecommendationFact[] = [
+    {
+      id: "H1",
+      source: "visits",
+      text: "Destino «Tambo» está publicado y su ficha no tuvo vistas.",
+      target: { type: "content", kind: "destination", contentId: PLAZA, proposable: true },
+    },
+    {
+      id: "H2",
+      source: "agenda",
+      text: "Evento «Feria» (borrador, nunca publicado): sábado.",
+      target: { type: "content", kind: "event", contentId: FERIA, proposable: false },
+    },
+  ];
+  const published = new Set([MUSEO, PLAZA]);
+
+  it("drops «publicar» when every place it cites is already published", () => {
+    const answer = [
+      "RECOMENDACION: Publicar la ficha del Tambo",
+      "POR QUE: Está publicada y no tuvo vistas.",
+      "HECHOS: H1",
+      "",
+      "RECOMENDACION: Publica el borrador de la feria",
+      "POR QUE: Está en borrador.",
+      "HECHOS: H2",
+      "",
+      "RECOMENDACION: Comparte el enlace del Tambo",
+      "POR QUE: Su ficha no tuvo vistas.",
+      "HECHOS: H1",
+    ].join("\n");
+    const parsed = parseRecommendations(answer, facts, published);
+    expect(parsed.items.map((item) => item.title)).toEqual([
+      "Publica el borrador de la feria",
+      "Comparte el enlace del Tambo",
+    ]);
+    expect(parsed.dropped).toBe(1);
+  });
+
+  it("keeps it when nothing says what is published", () => {
+    const answer = "RECOMENDACION: Publicar la ficha del Tambo\nPOR QUE: Sin vistas.\nHECHOS: H1";
+    expect(parseRecommendations(answer, facts).items).toHaveLength(1);
+  });
+
+  it("tells the model to publish only drafts and pending changes", () => {
+    const [system] = recommendationMessages({ site: "Demo", today: "hoy", facts: [] });
+    expect(system?.content).toContain("lo que ya está publicado no se publica de nuevo");
+  });
+});

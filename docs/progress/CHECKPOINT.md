@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C1 — métricas y estrategia. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C1 · Paso 4 — recomendaciones del Copilot a partir de las métricas ✅
-- **Rama:** `fix/copilot-recommendations-quality` → PR hacia `main`
+- **Fase:** C1 — métricas y estrategia ✅. C0 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C1 · Paso 5 — informe mensual para la alcaldía ✅
+- **Rama:** `feat/c1-step5-monthly-report` → PR hacia `main`
 
 ## Historial
 
@@ -2099,16 +2099,59 @@ Decisiones del usuario (2026-11-10): carga por partes (1: marca, destinos, event
 
 Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las reglas nuevas y los enlaces con nombre); e2e de recomendaciones (2) y estadísticas (2) en verde.
 
+**Verificación en producción de la corrección (2026-11-12):** el usuario generó las recomendaciones nuevas de Ucureña. Los enlaces dicen a qué lugar llevan y ninguna pide botones ni explica causas, pero la sexta pidió «publicar la ficha del Tambo…», que ya está publicada. Se corrige en el Paso 5, que usa las mismas recomendaciones.
+
+### C1 · Paso 5 — informe mensual para la alcaldía ✅
+
+- Decisiones del usuario ([ADR-055](../adr/ADR-055-monthly-report.md)), 2026-11-12:
+  - **contenido:** visitas y acciones, lo más visto, preguntas sin respuesta y el estado del contenido;
+  - **el correo** llega a propietarios y administradores;
+  - **recomendaciones del Copilot** generadas solas el día 1, con las cifras del mes;
+  - **página imprimible** en el panel (imprimir o guardar como PDF desde el navegador).
+- Base de datos (`20261118000000_c1_monthly_report.sql`, solo expand):
+  - las lecturas de «Estadísticas», las preguntas sin respuesta, la revisión del contenido y la foto del Copilot pasan a funciones privadas que reciben el municipio (`private.visit_statistics`, `unanswered_questions_between`, `content_review`, `content_snapshot`); las públicas conservan su control de rol y las llaman, con las mismas respuestas;
+  - nuevas, para cualquier miembro: `tenant_unanswered_questions_between` (hasta 92 días) y `tenant_content_activity` (lo publicado en un período, nuevo o actualizado, también los tours);
+  - las comprobaciones de las recomendaciones, en una función compartida (`private.assert_valid_recommendations`) que usan el panel y el informe;
+  - `monthly_reports`: una fila por municipio y mes con las recomendaciones (o el motivo por el que no hay), cuándo se generaron y cuándo y a cuántos se envió; las cifras no se guardan. RLS sin permisos para nadie;
+  - tipo de trabajo `reports.monthly` (cola `mail`, 4 intentos). La tarea `rikuy-monthly-reports` (11:37 UTC) encola el mes que terminó para cada municipio en línea, en los 3 primeros días de su mes, uno por mes, nunca antes del alta;
+  - `request_monthly_report` (propietarios y administradores, en línea, hasta 3 por día, `PT429`, auditado) y `tenant_monthly_report` (cualquier miembro);
+  - para el ejecutor, bajo el arrendamiento y para su municipio: `worker_api.monthly_report_source`, `monthly_report_data`, `save_monthly_report` (mismas comprobaciones, más un pedido `copilot` completado por la plataforma en la última hora) y `mark_monthly_report_mailed` (una vez por trabajo); auditan `report.monthly_generated` y `report.monthly_mailed`;
+  - `rikuy-forget-monthly-recommendations` borra las recomendaciones y sus hechos a los 90 días (pueden citar una pregunta de un visitante).
+- `@rikuy/core`:
+  - `domain/reports/monthly`: meses (`parseReportMonth`, los 12 anteriores), el período (el mes que terminó contra el anterior completo; el mes en curso contra los mismos días del anterior);
+  - `recommendationFacts` dice su período («octubre de 2026» frente a «el mes anterior»); `runRecommendations` compartido por «Estadísticas» y el informe;
+  - **«publicar lo publicado»:** una regla nueva en las instrucciones y `parseRecommendations` descarta «publicar» cuando todo lo que cita está publicado sin cambios pendientes;
+  - `application/reports/monthly`: `loadMonthlyReport`, `requestMonthlyReport`, `produceMonthlyReport` (un reintento no vuelve a preguntar ni reenvía a quien ya recibió el correo) y `monthlyReportEmail` (texto y HTML simple: visitas con su comparación, lo más visto, preguntas, estado del contenido, recomendaciones o por qué no hay, y el enlace).
+- `@rikuy/db`: `createMonthlyReportRepository` (panel) y el almacén del ejecutor en el ledger (`ledger.reports`).
+- `apps/worker`: procesador `reports.monthly` (punto de control `sent`; un 5xx del servidor de correo va a «Fallidos»). El ejecutor usa el gateway de IA (`runAiWork`) como la plataforma.
+- Panel:
+  - **«Informe mensual»** en la página del municipio (`/o/{slug}/informe?mes=AAAA-MM`, enlazada también desde «Estadísticas»): selector de mes, «Imprimir o guardar como PDF», visitas con su comparación y el gráfico, lo más visto, preguntas sin respuesta con «Probar en «Conocimiento del asistente»», lo publicado en el mes y lo que falta completar, las recomendaciones del mes con «En qué se basa», «Por correo» (cuándo salió y a cuántos, y «Enviar este informe ahora por correo» para propietarios y administradores) y «Cómo se cuenta»;
+  - estilos de impresión: sin barra, selector, correo ni enlaces del panel;
+  - `Change` y la lista de recomendaciones pasan a componentes compartidos con «Estadísticas».
+- CI: nuevo paso **«Monthly report in a real browser»** (suite `lighthouse`).
+- Tests:
+  - 921 unitarios (core 624, db 188, web 45, worker 50, config 14): meses y períodos (enero contra diciembre, el 31 de marzo), el período de los hechos, «publicar lo publicado», el informe con IA, sin cuota, sin SMTP, en un reintento y con un correo rechazado, el correo (escapado, con el enlace), la página por rol, el adaptador y el procesador;
+  - 1.534 pgTAP (57 nuevos, `043_monthly_report`): las lecturas del panel responden igual; lo publicado en el mes (nuevo y actualizado); otro municipio sin acceso; el mes en curso hasta hoy, uno futuro o que no es el día 1 rechazado; editor, analista y propietario sin segundo factor no piden el correo; 3 por día y el cuarto `PT429`; municipio no en línea `PT409`; la tarea diaria una vez por mes, no después del día 3 ni antes del alta; el trabajo solo bajo su arrendamiento y solo para su mes; destinatarios solo propietarios y administradores; recomendaciones con el pedido de una persona, de otro municipio o con una cifra inventada rechazadas; sin recomendaciones dice por qué; el correo se registra una vez; olvido a los 90 días;
+  - **e2e en un navegador real** (`monthly-report.e2e.test.ts`, 2 casos): el propietario de Demo Norte llega desde la página del municipio (mes anterior por defecto), elige el mes en curso con el selector, las vistas coinciden con la base, la impresión oculta la barra y el correo, axe sin hallazgos y sin desbordes a 390 y 1280 px; «Enviar este informe ahora por correo» → el procesador real guarda las recomendaciones (cada cifra en sus hechos) y envía el resumen con el enlace a propietarios y administradores; nada publicado ni propuesto; auditado; el informe de Demo Sur da 404; un editor lo lee sin el botón;
+  - estadísticas (2) y recomendaciones (2) en verde.
+- Verificado en local, en el navegador (1280 y 390 px) y en PDF (A4, con márgenes).
+
+**Desviaciones:**
+
+- «Lo que falta completar» es la revisión del día en que se mira el informe (o del día 1 en el correo), no una foto del fin de mes; la página lo dice.
+- El primer correo automático sale el 1 de diciembre (con noviembre); antes, se pide desde la página.
+- Al menos una vez: si el ejecutor muere entre enviar un correo y guardar su punto de control, esa persona puede recibirlo dos veces.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Estadísticas» → «Generar recomendaciones nuevas».
-- Ninguna recomendación pide botones, funciones o páginas nuevas, ni explica por qué una ficha tuvo pocas vistas.
-- «En qué se basa» incluye «Todavía hay pocas visitas para comparar fichas…» si alguna recomendación habla de visitas.
-- Cada enlace dice a qué lugar, tour o pregunta lleva.
+- Tras el merge, en el panel de Ucureña → «Informe mensual»: por defecto, octubre; elegir «Noviembre de 2026 (en curso)» con el selector.
+- «Imprimir o guardar como PDF»: la vista previa no muestra la barra ni «Por correo».
+- «Enviar este informe ahora por correo»: en uno o dos minutos llega el correo a propietarios y administradores (puede caer en spam), con el resumen, las recomendaciones y el enlace. La página dice «Se envió el … a N personas».
+- Ninguna recomendación pide publicar algo que ya está publicado.
 
 ## Siguiente paso
 
-**C1 · Paso 5 — informe mensual para la alcaldía** ([roadmap](../roadmap.md#c1--métricas-y-estrategia)): página imprimible en el panel y un correo el día 1 con el resumen y el enlace. Antes de empezar, confirmar con el usuario qué incluye el informe (visitas, preguntas, recomendaciones), a quién llega el correo y si el informe lleva las recomendaciones del Copilot.
+**C2 — pasaporte turístico con sellos QR** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)). Antes de empezar, proponer los pasos de C2 y confirmarlos con el usuario (cómo se sella, qué guarda el visitante sin cuenta, premios, qué ve el municipio).
 
 ## Decisiones pendientes del usuario
 

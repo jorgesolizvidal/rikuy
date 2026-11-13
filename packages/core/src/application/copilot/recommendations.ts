@@ -1,3 +1,5 @@
+import type { AiRefusal } from "../../contracts/ai";
+import type { CopilotReviewRow, CopilotSnapshotRow } from "../../contracts/copilot";
 import type { OrganizationMembership } from "../../contracts/organization";
 import { COPILOT_PATHS } from "../../domain/copilot/paths";
 import {
@@ -6,10 +8,16 @@ import {
   recommendationMessages,
   type Recommendation,
   type RecommendationFact,
+  type RecommendationInput,
+  type RecommendationPeriod,
   type RecommendationTarget,
 } from "../../domain/copilot/recommendations";
+import type { StatisticsSummary } from "../../domain/visits/statistics";
 import { reservationFor } from "../ai/gateway";
-import type { UnansweredQuestionsRepository } from "../assistant/unanswered";
+import type {
+  UnansweredQuestionsData,
+  UnansweredQuestionsRepository,
+} from "../assistant/unanswered";
 import { loadStatistics, type StatisticsRepository } from "../statistics/statistics";
 import { canPropose, COPILOT_NOTICES, type CopilotAiRunner } from "./copilot";
 import type { CopilotRepository } from "./ports";
@@ -92,7 +100,97 @@ function today(now: Date, timezone: string): string {
   }
 }
 
-/** Computes the facts, asks the model once and keeps what rests on the facts. Any member. */
+/** The unanswered questions as the facts read them. */
+export function recommendationQuestions(
+  data: UnansweredQuestionsData,
+): RecommendationInput["questions"] {
+  return {
+    from: data.from,
+    to: data.to,
+    total: data.total,
+    people: data.people,
+    distinct: data.groups.length,
+    groups: data.groups.map((group) => ({
+      text: group.text,
+      times: group.times,
+      people: group.people,
+      lastDay: group.lastDay,
+      place: group.pages.find((page) => page.title)?.title ?? null,
+    })),
+  };
+}
+
+/** The places published without pending changes: «publicar» them asks for nothing. */
+export function publishedPlaces(snapshot: readonly CopilotSnapshotRow[]): Set<string> {
+  return new Set(snapshot.filter((row) => row.status === "published").map((row) => row.contentId));
+}
+
+export interface RecommendationRun {
+  readonly tenantId: string;
+  /** The municipality's name. */
+  readonly site: string;
+  readonly timezone: string;
+  readonly now: Date;
+  /** The person who asked; null when the platform does (the monthly report). */
+  readonly actorId: string | null;
+  readonly statistics: StatisticsSummary;
+  readonly period?: RecommendationPeriod;
+  readonly questions: UnansweredQuestionsData;
+  readonly review: readonly CopilotReviewRow[];
+  readonly snapshot: readonly CopilotSnapshotRow[];
+  readonly ai: CopilotAiRunner;
+}
+
+export type RecommendationRunOutcome =
+  | {
+      readonly status: "answered";
+      readonly requestId: string;
+      readonly facts: RecommendationFact[];
+      readonly items: Recommendation[];
+      readonly dropped: number;
+    }
+  /** The model answered, but nothing it wrote rests on the facts. */
+  | { readonly status: "nothing"; readonly dropped: number }
+  | { readonly status: "refused"; readonly outcome: AiRefusal };
+
+/** Computes the facts, asks the model once and keeps what rests on the facts. */
+export async function runRecommendations(
+  run: RecommendationRun,
+): Promise<RecommendationRunOutcome> {
+  const facts = recommendationFacts({
+    statistics: run.statistics,
+    ...(run.period ? { period: run.period } : {}),
+    questions: recommendationQuestions(run.questions),
+    review: run.review,
+    snapshot: run.snapshot,
+  });
+  const messages = recommendationMessages({
+    site: run.site,
+    today: today(run.now, run.timezone),
+    facts,
+  });
+  const result = await run.ai(
+    {
+      tenantId: run.tenantId,
+      profile: "copilot",
+      reserveTokens: reservationFor("copilot", messages),
+      actorId: run.actorId,
+    },
+    async (call) => (await call({ messages })).text,
+  );
+  if (result.outcome !== "answered") return { status: "refused", outcome: result.outcome };
+  const parsed = parseRecommendations(result.value, facts, publishedPlaces(run.snapshot));
+  if (parsed.items.length === 0) return { status: "nothing", dropped: parsed.dropped };
+  return {
+    status: "answered",
+    requestId: result.requestId,
+    facts,
+    items: parsed.items,
+    dropped: parsed.dropped,
+  };
+}
+
+/** «Generar recomendaciones» in «Estadísticas»: the last 30 days. Any member. */
 export async function generateRecommendations(
   membership: OrganizationMembership,
   actorId: string,
@@ -105,59 +203,37 @@ export async function generateRecommendations(
     deps.copilot.review(membership.tenantId),
     deps.copilot.snapshot(membership.tenantId),
   ]);
-  const facts = recommendationFacts({
+  const run = await runRecommendations({
+    tenantId: membership.tenantId,
+    site: membership.displayName,
+    timezone: snapshot.timezone,
+    now,
+    actorId,
     statistics: stats.summary,
-    questions: {
-      from: questions.from,
-      to: questions.to,
-      total: questions.total,
-      people: questions.people,
-      distinct: questions.groups.length,
-      groups: questions.groups.map((group) => ({
-        text: group.text,
-        times: group.times,
-        people: group.people,
-        lastDay: group.lastDay,
-        place: group.pages.find((page) => page.title)?.title ?? null,
-      })),
-    },
+    questions,
     review,
     snapshot: snapshot.items,
+    ai: deps.ai,
   });
-  const messages = recommendationMessages({
-    site: membership.displayName,
-    today: today(now, snapshot.timezone),
-    facts,
-  });
-  const result = await deps.ai(
-    {
-      tenantId: membership.tenantId,
-      profile: "copilot",
-      reserveTokens: reservationFor("copilot", messages),
-      actorId,
-    },
-    async (call) => (await call({ messages })).text,
-  );
-  if (result.outcome !== "answered") {
-    return { status: "notice", message: COPILOT_NOTICES[result.outcome] };
+  if (run.status === "refused") {
+    return { status: "notice", message: COPILOT_NOTICES[run.outcome] };
   }
-  const parsed = parseRecommendations(result.value, facts);
-  if (parsed.items.length === 0) {
+  if (run.status === "nothing") {
     return { status: "notice", message: RECOMMENDATION_NOTICES.nothing };
   }
   const saved = await deps.recommendations.save({
     tenantId: membership.tenantId,
-    aiRequestId: result.requestId,
+    aiRequestId: run.requestId,
     from: stats.summary.range.from,
     to: stats.summary.range.to,
-    facts,
-    items: parsed.items,
+    facts: run.facts,
+    items: run.items,
   });
   if (saved.status === "forbidden") return { status: "forbidden" };
   if (saved.status !== "saved") {
     return { status: "notice", message: RECOMMENDATION_NOTICES.failed };
   }
-  return { status: "saved", count: parsed.items.length, dropped: parsed.dropped };
+  return { status: "saved", count: run.items.length, dropped: run.dropped };
 }
 
 // ── What the panel shows ────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import {
   eventScheduleSchema,
   richTextSchema,
   type CopilotRepository,
+  type CopilotReviewRow,
   type ProposalChanges,
   type ProposalField,
   type ProposalTarget,
@@ -21,7 +22,7 @@ import type { SessionClient } from "./session-client";
 const statusSchema = z.enum(["draft", "published", "changed"]);
 const fieldSchema = z.enum(["title", "summary", "body", "description"]);
 
-const reviewRowSchema = z.object({
+export const reviewRowSchema = z.object({
   kind: z.enum(["destination", "event"]),
   content_id: z.uuid(),
   slug: z.string(),
@@ -40,7 +41,7 @@ const reviewRowSchema = z.object({
     ),
 });
 
-const snapshotSchema = z.object({
+export const snapshotSchema = z.object({
   timezone: z.string(),
   items: z.array(
     z.object({
@@ -121,25 +122,30 @@ function common(row: Omit<z.infer<typeof viewRowSchema>, "changes" | "sources">)
   };
 }
 
+/** copilot_content_review's rows (or the same rows as JSON, for the monthly report's job). */
+export function parseReviewRows(data: unknown): CopilotReviewRow[] {
+  return z
+    .array(reviewRowSchema)
+    .parse(data)
+    .map((row) => ({
+      kind: row.kind,
+      contentId: row.content_id,
+      slug: row.slug,
+      tourId: row.tour_id,
+      sceneId: row.scene_id,
+      title: row.title,
+      sceneTitle: row.scene_title,
+      status: row.status,
+      issues: row.issues,
+    }));
+}
+
 export function createCopilotRepository(client: SessionClient): CopilotRepository {
   return {
     async review(tenantId) {
       const { data, error } = await client.rpc("copilot_content_review", { p_tenant_id: tenantId });
       if (error) throw unexpected("Reading the content review", error);
-      return z
-        .array(reviewRowSchema)
-        .parse(data)
-        .map((row) => ({
-          kind: row.kind,
-          contentId: row.content_id,
-          slug: row.slug,
-          tourId: row.tour_id,
-          sceneId: row.scene_id,
-          title: row.title,
-          sceneTitle: row.scene_title,
-          status: row.status,
-          issues: row.issues,
-        }));
+      return parseReviewRows(data);
     },
 
     async snapshot(tenantId) {
