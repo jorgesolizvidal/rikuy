@@ -60,6 +60,8 @@ function visits(range: { from: string; to: string }, views: number) {
 }
 
 const DATA: MonthlyReportData = {
+  passport: null,
+  passportPrevious: null,
   current: visits({ from: "2026-10-01", to: "2026-10-31" }, 12),
   previous: visits({ from: "2026-09-01", to: "2026-09-30" }, 6),
   questions: {
@@ -151,7 +153,7 @@ function source(overrides: Partial<Extract<MonthlyReportSource, { state: "run" }
   };
 }
 
-function fakeStore(src: MonthlyReportSource) {
+function fakeStore(src: MonthlyReportSource, data: MonthlyReportData = DATA) {
   const calls = {
     data: [] as unknown[],
     saved: [] as Parameters<MonthlyReportStore["save"]>[1][],
@@ -161,7 +163,7 @@ function fakeStore(src: MonthlyReportSource) {
     source: async () => src,
     data: async (_lease, range, previous) => {
       calls.data.push({ range, previous });
-      return DATA;
+      return data;
     },
     save: async (_lease, input) => {
       calls.saved.push(input);
@@ -296,6 +298,84 @@ describe("produceMonthlyReport", () => {
     expect(outcome).toMatchObject({ mailed: "already" });
   });
 
+  it("adds the passport: facts for the Copilot and its section in the email", async () => {
+    const circuit = "5eed4600-0000-4000-8000-000000000001";
+    const plaza = "5eed4100-0000-4000-8000-000000000004";
+    const passport = (stamps: number) => ({
+      from: "2026-10-01",
+      to: "2026-10-31",
+      since: "2026-09-01",
+      places: [
+        {
+          day: null,
+          contentId: plaza,
+          slug: "plaza",
+          title: "Plaza",
+          stop: true,
+          stamps,
+          located: 2,
+        },
+        {
+          day: null,
+          contentId: "5eed4100-0000-4000-8000-000000000002",
+          slug: "feria",
+          title: "Feria",
+          stop: true,
+          stamps: 0,
+          located: 0,
+        },
+      ],
+      circuits: [
+        {
+          day: null,
+          circuitId: circuit,
+          slug: "ruta",
+          name: "Ruta",
+          published: true,
+          completed: 2,
+          redeemed: 1,
+        },
+      ],
+    });
+    const { store, calls } = fakeStore(source(), {
+      ...DATA,
+      passport: passport(5),
+      passportPrevious: { ...passport(4), from: "2026-09-01", to: "2026-09-30" },
+    });
+    const { mailer, sent } = fakeMailer();
+    await produceMonthlyReport(LEASE, {
+      store,
+      ai: simulatedAi().ai,
+      mailer,
+      adminOrigin: "https://panel.example.test",
+      sent: 0,
+      saveProgress: async () => undefined,
+      now: NOW,
+    });
+    expect(calls.saved[0]?.facts?.filter((fact) => fact.source === "passport")).toHaveLength(4);
+    const text = sent[0]?.text ?? "";
+    expect(text).toContain("PASAPORTE TURÍSTICO");
+    expect(text).toContain(
+      "5 sellos en los lugares (▲ 25 %; el mes anterior: 4), 2 con la ubicación del teléfono en el lugar",
+    );
+    expect(text).toContain("2 circuitos completados y 1 premio canjeado.");
+    expect(text).toContain("1. Plaza: 5 sellos (2 con ubicación).");
+    expect(text).toContain("Sin sellos en el período: Feria.");
+    // Without the passport, no section.
+    const plain = fakeStore(source());
+    const other = fakeMailer();
+    await produceMonthlyReport(LEASE, {
+      store: plain.store,
+      ai: simulatedAi().ai,
+      mailer: other.mailer,
+      adminOrigin: "https://panel.example.test",
+      sent: 0,
+      saveProgress: async () => undefined,
+      now: NOW,
+    });
+    expect(other.sent[0]?.text).not.toContain("PASAPORTE");
+  });
+
   it("without AI quota the report goes without recommendations and says why", async () => {
     const { store, calls } = fakeStore(source());
     const { mailer, sent } = fakeMailer();
@@ -399,6 +479,7 @@ describe("monthlyReportEmail", () => {
 describe("the panel", () => {
   const statistics: StatisticsRepository = {
     calendar: async () => ({ timezone: "America/La_Paz", firstDay: "2026-10-05" }),
+    passport: async () => null,
     statistics: async (_tenant, range) => visits(range, 4),
   };
   const copilot = {

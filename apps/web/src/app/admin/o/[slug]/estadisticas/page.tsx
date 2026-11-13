@@ -15,6 +15,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DailyChart } from "@/components/statistics/daily-chart";
+import { PassportSection } from "@/components/statistics/passport-section";
 import { Change } from "@/components/statistics/change";
 import { countryName, formatCount } from "@/components/statistics/format";
 import { RecommendationList } from "@/components/statistics/recommendation-list";
@@ -77,19 +78,20 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
   const membership = await requireOrganization((await params).slug);
   const period = parseStatisticsPeriod((await searchParams).periodo);
   const session = await adminSession();
-  const [{ summary, firstDay }, saved, calendar] = await Promise.all([
+  const [{ summary, passport, firstDay }, saved, calendar] = await Promise.all([
     loadStatistics(membership, session.statistics, period),
     loadRecommendations(membership, session.recommendations),
     session.statistics.calendar(membership.tenantId),
   ]);
-  // The names of the places the recommendations link to (their links say which one).
-  const names = new Map(
-    saved
+  // The names of the places and circuits the recommendations link to (their links say which).
+  const names = new Map([
+    ...(saved
       ? ((await session.copilot.snapshot(membership.tenantId).catch(() => null))?.items ?? []).map(
           (item) => [item.contentId, item.title] as const,
         )
-      : [],
-  );
+      : []),
+    ...(passport?.circuits ?? []).map((circuit) => [circuit.circuitId, circuit.name] as const),
+  ]);
   const { range, totals } = summary;
   const base = `/o/${membership.slug}/estadisticas`;
   const editorOf = (kind: string | null, contentId: string) =>
@@ -275,6 +277,15 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
         )}
       </section>
 
+      {passport?.active ? (
+        <PassportSection
+          org={membership.slug}
+          passport={passport}
+          headingId="pasaporte"
+          period="en este período"
+        />
+      ) : null}
+
       <section aria-labelledby="paginas" className="metrics-section">
         <h2 id="paginas">Páginas del portal</h2>
         <div className="table-wrap" role="region" aria-label="Páginas del portal" tabIndex={0}>
@@ -384,16 +395,23 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
               Origen por día (CSV)
             </a>
           </li>
+          {passport?.active ? (
+            <li>
+              <a href={download("pasaporte")} download>
+                Pasaporte turístico por día: sellos y circuitos (CSV)
+              </a>
+            </li>
+          ) : null}
         </ul>
       </section>
 
       <section aria-labelledby="recomendaciones" className="metrics-section">
         <h2 id="recomendaciones">Recomendaciones del Copilot</h2>
         <p className="field-hint">
-          Con las visitas de los últimos 30 días, las preguntas que el asistente no supo responder,
-          la revisión del contenido y la agenda. Cada recomendación muestra las cifras en las que se
-          basa. Nada se publica ni cambia solo: los enlaces llevan a donde lo hace una persona del
-          equipo.
+          Con las visitas de los últimos 30 días, el pasaporte turístico, las preguntas que el
+          asistente no supo responder, la revisión del contenido y la agenda. Cada recomendación
+          muestra las cifras en las que se basa. Nada se publica ni cambia solo: los enlaces llevan
+          a donde lo hace una persona del equipo.
         </p>
         {saved ? (
           <>
@@ -443,6 +461,12 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
           <li>
             Los escaneos de QR cuentan con los códigos que se descargan del panel desde que se
             cuentan las visitas; uno impreso antes funciona igual, pero no se cuenta.
+          </li>
+          <li>
+            Pasaporte turístico: un teléfono cuenta una vez por lugar y día, con una huella que
+            cambia cada día y se borra a los dos días. «Comprobadas en el lugar» son los sellos con
+            la ubicación del teléfono dentro del lugar; un sello sin ubicación vale igual para el
+            circuito.
           </li>
           <li>Los días son los del municipio, en su hora.</li>
         </ul>

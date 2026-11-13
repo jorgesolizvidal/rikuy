@@ -1,6 +1,12 @@
 import type { OrganizationMembership } from "../../contracts/organization";
 import { localClock } from "../../domain/plan/clock";
 import {
+  passportCsv,
+  summarizePassport,
+  type PassportStatisticsData,
+  type PassportSummary,
+} from "../../domain/passport/statistics";
+import {
   originsCsv,
   statisticsRange,
   summarizeStatistics,
@@ -24,10 +30,21 @@ export interface StatisticsRepository {
   ): Promise<{ readonly timezone: string; readonly firstDay: string | null }>;
   /** The totals of a period; per day when `daily`. */
   statistics(tenantId: string, range: DateRange, daily: boolean): Promise<VisitStatisticsData>;
+  /**
+   * The tourist passport of a period (C2 · Paso 4, ADR-059); per day when `daily`. Null
+   * before the database has it (the web app may be deployed a few minutes earlier).
+   */
+  passport(
+    tenantId: string,
+    range: DateRange,
+    daily: boolean,
+  ): Promise<PassportStatisticsData | null>;
 }
 
 export interface StatisticsView {
   readonly summary: StatisticsSummary;
+  /** Null before the database counts the passport. */
+  readonly passport: PassportSummary | null;
   readonly firstDay: string | null;
   /** The municipality's date today. */
   readonly today: string;
@@ -53,14 +70,30 @@ export async function loadStatistics(
   const { range, firstDay, today } = await rangeFor(membership, repository, period, now);
   // Nothing to compare with when the previous period was not counted entirely.
   const comparable = firstDay !== null && range.previous.from >= firstDay;
-  const [current, previous] = await Promise.all([
-    repository.statistics(membership.tenantId, { from: range.from, to: range.to }, false),
+  const days = { from: range.from, to: range.to };
+  const [current, previous, passport, passportBefore] = await Promise.all([
+    repository.statistics(membership.tenantId, days, false),
     comparable ? repository.statistics(membership.tenantId, range.previous, false) : null,
+    repository.passport(membership.tenantId, days, false),
+    repository.passport(membership.tenantId, range.previous, false),
   ]);
-  return { summary: summarizeStatistics(range, current, previous, firstDay), firstDay, today };
+  const summary = summarizeStatistics(range, current, previous, firstDay);
+  return {
+    summary,
+    passport: passport
+      ? summarizePassport(range, passport, passportBefore, viewsOf(summary))
+      : null,
+    firstDay,
+    today,
+  };
 }
 
-export const STATISTICS_DOWNLOADS = ["visitas", "origen"] as const;
+/** The views of each place's page (content id → views), for the passport's table. */
+export function viewsOf(summary: StatisticsSummary): Map<string, number> {
+  return new Map(summary.places.map((place) => [place.contentId, place.views]));
+}
+
+export const STATISTICS_DOWNLOADS = ["visitas", "origen", "pasaporte"] as const;
 export type StatisticsDownload = (typeof STATISTICS_DOWNLOADS)[number];
 
 export function parseStatisticsDownload(raw: unknown): StatisticsDownload | null {
@@ -81,13 +114,15 @@ export async function downloadStatistics(
   now: Date = new Date(),
 ): Promise<StatisticsFile> {
   const { range } = await rangeFor(membership, repository, period, now);
-  const data = await repository.statistics(
-    membership.tenantId,
-    { from: range.from, to: range.to },
-    true,
-  );
-  return {
-    filename: `${membership.slug}-${kind}-${range.from}-a-${range.to}.csv`,
-    body: kind === "visitas" ? visitsCsv(data) : originsCsv(data),
-  };
+  const days = { from: range.from, to: range.to };
+  const filename = `${membership.slug}-${kind}-${range.from}-a-${range.to}.csv`;
+  if (kind === "pasaporte") {
+    const data = await repository.passport(membership.tenantId, days, true);
+    return {
+      filename,
+      body: passportCsv(data ?? { ...days, since: null, places: [], circuits: [] }),
+    };
+  }
+  const data = await repository.statistics(membership.tenantId, days, true);
+  return { filename, body: kind === "visitas" ? visitsCsv(data) : originsCsv(data) };
 }

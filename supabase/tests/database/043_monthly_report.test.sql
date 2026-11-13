@@ -181,7 +181,8 @@ select throws_ok(format('select worker_api.monthly_report_source(%L, 8)', (selec
 select is(
   (select array_agg(k order by k) from jsonb_object_keys(worker_api.monthly_report_data(
     (select id from ids where name = 'manual'), 7, :'month', :'today', null, null)) k),
-  array['activity', 'current', 'previous', 'questions', 'review', 'snapshot'], 'it reads the month''s data');
+  array['activity', 'current', 'passport', 'passportPrevious', 'previous', 'questions', 'review', 'snapshot'],
+  'it reads the month''s data (with the passport, C2 · Paso 4)');
 select throws_ok(format('select worker_api.monthly_report_data(%L, 7, %L, %L, null, null)',
   (select id from ids where name = 'manual'), (:'month'::date - 1), :'today'), '22023', null,
   'only of the job''s month');

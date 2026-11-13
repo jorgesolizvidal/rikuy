@@ -24,6 +24,8 @@ const DATA: MonthlyReportData = {
   review: [],
   snapshot: { timezone: "America/La_Paz", items: [] },
   activity: { from: "2026-10-01", to: "2026-10-31", total: 0, items: [] },
+  passport: null,
+  passportPrevious: null,
 };
 
 function fakes(options: { failures?: Error[] } = {}) {

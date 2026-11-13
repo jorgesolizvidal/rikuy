@@ -14,6 +14,11 @@ import {
   type ReportMonth,
 } from "../../domain/reports/monthly";
 import {
+  summarizePassport,
+  type PassportStatisticsData,
+  type PassportSummary,
+} from "../../domain/passport/statistics";
+import {
   formatDateRange,
   summarizeStatistics,
   type DateRange,
@@ -26,7 +31,7 @@ import type { CopilotRepository } from "../copilot/ports";
 import { runRecommendations } from "../copilot/recommendations";
 import type { JobLease } from "../jobs/ports";
 import { MailDeliveryError, type Mailer, type OutgoingEmail } from "../mail/invitations";
-import type { StatisticsRepository } from "../statistics/statistics";
+import { viewsOf, type StatisticsRepository } from "../statistics/statistics";
 
 /**
  * The monthly report for the town hall (C1 · Paso 5, ADR-055).
@@ -132,6 +137,8 @@ export interface MonthlyReportView {
   /** The month has not ended: its numbers run to today. */
   readonly current: boolean;
   readonly summary: StatisticsSummary;
+  /** The tourist passport of the month (null: not counted yet). */
+  readonly passport: PassportSummary | null;
   readonly firstDay: string | null;
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
@@ -165,21 +172,26 @@ export async function loadMonthlyReport(
   const days = { from: range.from, to: range.to };
   const comparable = calendar.firstDay !== null && range.previous.from >= calendar.firstDay;
   const tenant = membership.tenantId;
-  const [current, previous, questions, activity, review, snapshot, status] = await Promise.all([
-    deps.statistics.statistics(tenant, days, false),
-    comparable ? deps.statistics.statistics(tenant, range.previous, false) : null,
-    deps.reports.questions(tenant, days),
-    deps.reports.activity(tenant, days),
-    deps.copilot.review(tenant),
-    deps.copilot.snapshot(tenant),
-    deps.reports.status(tenant, month),
-  ]);
+  const [current, previous, questions, activity, review, snapshot, status, passport, before] =
+    await Promise.all([
+      deps.statistics.statistics(tenant, days, false),
+      comparable ? deps.statistics.statistics(tenant, range.previous, false) : null,
+      deps.reports.questions(tenant, days),
+      deps.reports.activity(tenant, days),
+      deps.copilot.review(tenant),
+      deps.copilot.snapshot(tenant),
+      deps.reports.status(tenant, month),
+      deps.statistics.passport(tenant, days, false),
+      deps.statistics.passport(tenant, range.previous, false),
+    ]);
+  const summary = summarizeStatistics(range, current, previous, calendar.firstDay);
   return {
     month,
     months: reportMonths(today),
     today,
     current: isCurrentMonth(month, today),
-    summary: summarizeStatistics(range, current, previous, calendar.firstDay),
+    summary,
+    passport: passport ? summarizePassport(range, passport, before, viewsOf(summary)) : null,
     firstDay: calendar.firstDay,
     questions,
     review,
@@ -235,6 +247,9 @@ export interface MonthlyReportData {
   readonly review: readonly CopilotReviewRow[];
   readonly snapshot: CopilotSnapshotData;
   readonly activity: ContentActivity;
+  /** The tourist passport of the month and of the one compared (null: not counted yet). */
+  readonly passport: PassportStatisticsData | null;
+  readonly passportPrevious: PassportStatisticsData | null;
 }
 
 /** worker_api, always under the job's lease and for the job's own municipality. */
@@ -321,6 +336,9 @@ export async function produceMonthlyReport(
   const data = await deps.store.data(lease, days, comparable ? range.previous : null);
   if (data === "lease_lost") throw lost();
   const summary = summarizeStatistics(range, data.current, data.previous, source.firstDay);
+  const passport = data.passport
+    ? summarizePassport(range, data.passport, data.passportPrevious, viewsOf(summary))
+    : null;
 
   let items: readonly Recommendation[] | null = source.items;
   let note: string | null = source.note;
@@ -332,6 +350,7 @@ export async function produceMonthlyReport(
       now,
       actorId: null,
       statistics: summary,
+      passport,
       period: monthlyRecommendationPeriod(month, source.today),
       questions: data.questions,
       review: data.review,
@@ -380,6 +399,7 @@ export async function produceMonthlyReport(
           month,
           current: isCurrentMonth(month, source.today),
           summary,
+          passport,
           questions: data.questions,
           review: data.review,
           activity: data.activity,
@@ -458,6 +478,8 @@ export interface MonthlyEmailInput {
   /** The month has not ended (sent from the panel before the 1st). */
   readonly current: boolean;
   readonly summary: StatisticsSummary;
+  /** The tourist passport of the month (null or inactive: no section). */
+  readonly passport?: PassportSummary | null;
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
   readonly activity: ContentActivity;
@@ -505,6 +527,36 @@ export function monthlyEmailSections(input: MonthlyEmailInput): EmailSection[] {
     );
   }
 
+  const passport = input.passport?.active ? input.passport : null;
+  const passportLines: string[] = [];
+  if (passport) {
+    const p = passport.totals;
+    const comparePassport = (value: number, previous: number | null) => {
+      const words = passport.compared ? changeLine(value, previous, before) : "";
+      return words ? ` (${words})` : "";
+    };
+    passportLines.push(
+      `${plural(p.stamps.value, "sello", "sellos")} en los lugares${comparePassport(p.stamps.value, p.stamps.previous)}, ${n(p.located.value)} con la ubicación del teléfono en el lugar (visitas comprobadas en el lugar).`,
+      `${plural(p.completed.value, "circuito completado", "circuitos completados")} y ${plural(p.redeemed.value, "premio canjeado", "premios canjeados")}.`,
+    );
+    const stamped = passport.places.filter((place) => place.stamps > 0).slice(0, 5);
+    passportLines.push(
+      ...stamped.map(
+        (place, index) =>
+          `${index + 1}. ${plain(place.title, 80)}: ${plural(place.stamps, "sello", "sellos")} (${n(place.located)} con ubicación).`,
+      ),
+    );
+    const unstamped = passport.places.filter((place) => place.stop && place.stamps === 0);
+    if (unstamped.length > 0) {
+      passportLines.push(
+        `Sin sellos en el período: ${unstamped
+          .slice(0, 5)
+          .map((place) => plain(place.title, 60))
+          .join(", ")}.`,
+      );
+    }
+  }
+
   const q = input.questions;
   const questions =
     q.total === 0
@@ -542,6 +594,7 @@ export function monthlyEmailSections(input: MonthlyEmailInput): EmailSection[] {
   return [
     { title: "Visitas", lines: visits },
     ...(places.length > 0 ? [{ title: "Lo más visto", lines: places }] : []),
+    ...(passportLines.length > 0 ? [{ title: "Pasaporte turístico", lines: passportLines }] : []),
     { title: "Preguntas sin respuesta", lines: questions },
     { title: "Estado del contenido", lines: content },
     { title: "Recomendaciones del Copilot", lines: recommendations },

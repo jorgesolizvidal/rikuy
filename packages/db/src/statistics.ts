@@ -1,6 +1,7 @@
 import {
   VISIT_EVENTS,
   VISIT_TARGETS,
+  type PassportStatisticsData,
   type StatisticsRepository,
   type VisitStatisticsData,
 } from "@rikuy/core";
@@ -48,6 +49,35 @@ export const statisticsSchema = z.object({
   ),
 });
 
+/** The tourist passport of a period (migration 20261122000000, ADR-059). */
+export const passportStatisticsSchema = z.object({
+  from: day,
+  to: day,
+  since: day.nullable(),
+  places: z.array(
+    z.object({
+      day: day.nullable(),
+      contentId: z.uuid(),
+      slug: z.string().nullable(),
+      title: z.string().nullable(),
+      stop: z.boolean(),
+      stamps: count,
+      located: count,
+    }),
+  ),
+  circuits: z.array(
+    z.object({
+      day: day.nullable(),
+      circuitId: z.uuid(),
+      slug: z.string(),
+      name: z.string(),
+      published: z.boolean(),
+      completed: count,
+      redeemed: count,
+    }),
+  ),
+});
+
 const calendarSchema = z.array(z.object({ timezone: z.string(), first_day: day.nullable() }));
 
 export function createStatisticsRepository(client: SessionClient): StatisticsRepository {
@@ -72,6 +102,19 @@ export function createStatisticsRepository(client: SessionClient): StatisticsRep
       if (isMissingFunction(error)) return { ...range, items: [], days: [], origins: [] };
       if (error) throw new Error(`Reading the statistics failed (${error.code || "unknown"})`);
       return statisticsSchema.parse(data);
+    },
+    async passport(tenantId, range, daily): Promise<PassportStatisticsData | null> {
+      const { data, error } = await client.rpc("tenant_passport_statistics", {
+        p_tenant_id: tenantId,
+        p_from: range.from,
+        p_to: range.to,
+        p_daily: daily,
+      });
+      // The web app may be deployed a few minutes before the migration.
+      if (isMissingFunction(error)) return null;
+      if (error)
+        throw new Error(`Reading the passport statistics failed (${error.code || "unknown"})`);
+      return passportStatisticsSchema.parse(data);
     },
   };
 }

@@ -242,3 +242,9 @@
   justify-items: start;
   margin-top: 1rem;
 }
+
+/* The tourist passport (C2 · Paso 4). */
+.passport-stats-subtitle {
+  margin: 1.25rem 0 0.5rem;
+  font-size: 1rem;
+}

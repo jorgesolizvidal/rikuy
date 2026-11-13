@@ -30,9 +30,15 @@
   font: inherit;
 }
 
-.report-subtitle {
+.report-subtitle,
+.passport-stats-subtitle {
   margin: 1.25rem 0 0.5rem;
   font-size: 1rem;
+}
+
+/* The report's tiles carry no hints (C2 · Paso 4: the passport's come from «Estadísticas»). */
+.report .passport-tile-hint {
+  display: none;
 }
 
 .report-questions li {

@@ -200,8 +200,11 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
           envía: si compartes tu ubicación, la distancia al lugar se calcula en tu teléfono.
         </li>
         <li>
-          {siteName} firma el sello para que no se pueda falsificar y te lo devuelve. No guarda nada
-          de eso: ni tus sellos, ni el identificador, ni dónde estabas.
+          {siteName} firma el sello para que no se pueda falsificar y te lo devuelve. No guarda tus
+          sellos, ni el identificador, ni dónde estabas: solo suma, por lugar y por día, cuántos
+          teléfonos sellaron y cuántos dijeron estar en el lugar. Para contar cada teléfono una sola
+          vez por lugar y día usa una huella del identificador que cambia cada día y se borra a los
+          dos días, como en las estadísticas de visitas.
         </li>
         <li>
           Los sellos no vencen. Si borras los datos de este sitio en tu navegador, o usas otro

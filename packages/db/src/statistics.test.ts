@@ -97,4 +97,49 @@ describe("statistics adapter", () => {
     const denied = createStatisticsRepository(client({ error: { code: "42501" } }).session);
     await expect(denied.calendar("t")).rejects.toThrow("42501");
   });
+
+  it("reads the passport of a period, and nothing before the migration", async () => {
+    const circuit = "5eed4600-0000-4000-8000-000000000001";
+    const { session, calls } = client({
+      data: {
+        from: "2026-11-01",
+        to: "2026-11-02",
+        since: "2026-10-30",
+        places: [
+          {
+            day: null,
+            contentId: MUSEO,
+            slug: "museo",
+            title: "Museo",
+            stop: true,
+            stamps: "4",
+            located: 3,
+          },
+        ],
+        circuits: [
+          {
+            day: null,
+            circuitId: circuit,
+            slug: "ruta",
+            name: "Ruta",
+            published: true,
+            completed: "2",
+            redeemed: 1,
+          },
+        ],
+      },
+    });
+    const range = { from: "2026-11-01", to: "2026-11-02" };
+    const data = await createStatisticsRepository(session).passport("t", range, false);
+    expect(data?.places[0]).toMatchObject({ stamps: 4, located: 3, stop: true });
+    expect(data?.circuits[0]).toMatchObject({ completed: 2, redeemed: 1 });
+    expect(calls[0]).toEqual({
+      fn: "tenant_passport_statistics",
+      args: { p_tenant_id: "t", p_from: "2026-11-01", p_to: "2026-11-02", p_daily: false },
+    });
+    const missing = createStatisticsRepository(client({ error: { code: "PGRST202" } }).session);
+    expect(await missing.passport("t", range, false)).toBeNull();
+    const denied = createStatisticsRepository(client({ error: { code: "42501" } }).session);
+    await expect(denied.passport("t", range, false)).rejects.toThrow("42501");
+  });
 });
