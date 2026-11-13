@@ -160,3 +160,85 @@
   margin: 0;
   padding-left: 1.1rem;
 }
+
+/* Recomendaciones del Copilot (ADR-054) */
+.recommendations-meta {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+}
+
+.recommendations {
+  display: grid;
+  gap: 0.875rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: recommendation;
+}
+
+.recommendation {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
+  border-radius: 0.75rem;
+  counter-increment: recommendation;
+  overflow-wrap: anywhere;
+}
+
+.recommendation h3 {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.recommendation h3::before {
+  content: counter(recommendation) ". ";
+}
+
+.recommendation p {
+  margin: 0;
+}
+
+.recommendation-facts {
+  padding: 0.625rem 0.75rem;
+  border-radius: 0.5rem;
+  background: color-mix(in srgb, var(--fg) 5%, transparent);
+}
+
+.recommendation-facts-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+}
+
+.recommendation-facts ul {
+  display: grid;
+  gap: 0.375rem;
+  margin: 0.375rem 0 0;
+  padding-left: 1.1rem;
+  font-size: 0.9375rem;
+}
+
+.recommendation-source {
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.recommendation-source::after {
+  content: ":";
+}
+
+.recommendation-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recommendations-form {
+  display: grid;
+  gap: 0.375rem;
+  justify-items: start;
+  margin-top: 1rem;
+}

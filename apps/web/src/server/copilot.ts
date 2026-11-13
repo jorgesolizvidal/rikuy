@@ -7,6 +7,7 @@ import {
   type CopilotAiRunner,
   type CopilotAskDeps,
   type CopilotProposeDeps,
+  type GenerateRecommendationsDeps,
   type OrganizationMembership,
 } from "@rikuy/core";
 
@@ -49,6 +50,18 @@ export async function copilotProposeDeps(): Promise<CopilotProposeDeps> {
     content: session.content,
     tours: session.tours,
     knowledge: session.knowledge,
+    ai,
+  };
+}
+
+/** «Recomendaciones del Copilot» (ADR-054): the four sources and the gateway, as the person. */
+export async function recommendationsDeps(): Promise<GenerateRecommendationsDeps> {
+  const session = await adminSession();
+  return {
+    recommendations: session.recommendations,
+    copilot: session.copilot,
+    statistics: session.statistics,
+    questions: session.questions,
     ai,
   };
 }

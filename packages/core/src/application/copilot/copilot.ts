@@ -193,7 +193,9 @@ export function usageLines(input: {
       `IA hoy: ${input.ai.used.toLocaleString("es")} de ${input.ai.limit.toLocaleString("es")} tokens.`,
     );
   }
-  lines.push("Visitas y estadísticas de visitantes: la plataforma todavía no las mide.");
+  lines.push(
+    "Visitas y preguntas de los visitantes: están en «Estadísticas», con las recomendaciones del Copilot (este chat no las lee).",
+  );
   return lines;
 }
 

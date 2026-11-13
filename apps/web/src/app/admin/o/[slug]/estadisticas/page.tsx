@@ -1,7 +1,12 @@
 import {
   formatDateRange,
   formatShortDate,
+  loadRecommendations,
   loadStatistics,
+  RECOMMENDATION_SOURCE_LABELS,
+  RECOMMENDATIONS_FRESH_DAYS,
+  recommendationLinks,
+  recommendationsAge,
   parseStatisticsPeriod,
   STATISTICS_PERIOD_LABELS,
   STATISTICS_PERIODS,
@@ -15,9 +20,11 @@ import Link from "next/link";
 import { DailyChart } from "@/components/statistics/daily-chart";
 import { changeLabel, countryName, formatCount } from "@/components/statistics/format";
 import { adminSession } from "@/server/admin-session";
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
+import { RecommendationsForm } from "./recommendations-form";
 import "./statistics.css";
 
 export const metadata: Metadata = { title: "Estadísticas" };
@@ -44,6 +51,22 @@ const PAGE_LABELS: Readonly<Record<PortalPageTarget, string>> = {
 };
 
 const SHOWN = 20;
+
+/** «12 nov 2026, 19:40», in the municipality's time. */
+function generatedAt(iso: string, timezone: string): string {
+  try {
+    return new Intl.DateTimeFormat("es-BO", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: timezone,
+    }).format(new Date(iso));
+  } catch {
+    return formatShortDate(iso.slice(0, 10));
+  }
+}
 
 function Change({ measure }: { readonly measure: Measure }) {
   const change = changeLabel(measure);
@@ -77,7 +100,11 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
   const membership = await requireOrganization((await params).slug);
   const period = parseStatisticsPeriod((await searchParams).periodo);
   const session = await adminSession();
-  const { summary, firstDay } = await loadStatistics(membership, session.statistics, period);
+  const [{ summary, firstDay }, saved, calendar] = await Promise.all([
+    loadStatistics(membership, session.statistics, period),
+    loadRecommendations(membership, session.recommendations),
+    session.statistics.calendar(membership.tenantId),
+  ]);
   const { range, totals } = summary;
   const base = `/o/${membership.slug}/estadisticas`;
   const editorOf = (kind: string | null, contentId: string) =>
@@ -373,6 +400,73 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
             </a>
           </li>
         </ul>
+      </section>
+
+      <section aria-labelledby="recomendaciones" className="metrics-section">
+        <h2 id="recomendaciones">Recomendaciones del Copilot</h2>
+        <p className="field-hint">
+          Con las visitas de los últimos 30 días, las preguntas que el asistente no supo responder,
+          la revisión del contenido y la agenda. Cada recomendación muestra las cifras en las que se
+          basa. Nada se publica ni cambia solo: los enlaces llevan a donde lo hace una persona del
+          equipo.
+        </p>
+        {saved ? (
+          <>
+            <p className="recommendations-meta">
+              Generadas el {generatedAt(saved.createdAt, calendar.timezone)} · visitas{" "}
+              {formatDateRange(saved)}
+            </p>
+            {recommendationsAge(saved) >= RECOMMENDATIONS_FRESH_DAYS ? (
+              <p className="notice" role="status">
+                Estas recomendaciones tienen más de {RECOMMENDATIONS_FRESH_DAYS} días: genera unas
+                nuevas para ver las cifras de ahora.
+              </p>
+            ) : null}
+            <ol className="recommendations">
+              {saved.items.map((item, index) => {
+                const facts = item.facts
+                  .map((id) => saved.facts.find((fact) => fact.id === id))
+                  .filter((fact) => fact !== undefined);
+                const links = recommendationLinks(membership, item, saved.facts);
+                return (
+                  <li key={`${index}-${item.title}`} className="recommendation">
+                    <h3>{item.title}</h3>
+                    <p>{item.why}</p>
+                    <div className="recommendation-facts">
+                      <p className="recommendation-facts-title">En qué se basa</p>
+                      <ul>
+                        {facts.map((fact) => (
+                          <li key={fact.id}>
+                            <span className="recommendation-source">
+                              {RECOMMENDATION_SOURCE_LABELS[fact.source]}
+                            </span>{" "}
+                            {fact.text}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    {links.length > 0 ? (
+                      <ul className="recommendation-links">
+                        {links.map((link) => (
+                          <li key={link.href}>
+                            <Link href={link.href}>{link.label}</Link>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </li>
+                );
+              })}
+            </ol>
+          </>
+        ) : (
+          <p className="field-hint">Todavía no hay recomendaciones para este municipio.</p>
+        )}
+        <RecommendationsForm
+          org={membership.slug}
+          enabled={aiGatewayStatus().configured}
+          hasSaved={saved !== null}
+        />
       </section>
 
       <section aria-labelledby="como-se-cuenta" className="metrics-section">

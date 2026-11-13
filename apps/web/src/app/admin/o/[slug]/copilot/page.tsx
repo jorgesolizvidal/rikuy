@@ -82,6 +82,13 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
           publica ni cambia nada por su cuenta: lo aceptado queda como borrador, y publicar sigue
           siendo tu decisión.
         </p>
+        <p className="field-hint">
+          Las recomendaciones a partir de las visitas y de lo que preguntan los visitantes están en{" "}
+          <Link href={`/o/${org}/estadisticas#recomendaciones`}>
+            «Estadísticas» → Recomendaciones del Copilot
+          </Link>
+          .
+        </p>
       </div>
 
       <section aria-labelledby="preguntar" className="members-invite">

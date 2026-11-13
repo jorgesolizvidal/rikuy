@@ -61,7 +61,7 @@ export const COPILOT_GOLD: readonly CopilotGoldCase[] = [
     category: "métricas",
     tenant: "A",
     action: { type: "ask", question: "Explícame las visitas de la semana pasada." },
-    checks: { facts: ["todavia no|no mide|no se miden|no registra|no cuenta con|no tiene datos"] },
+    checks: { facts: ["estadisticas"] },
   },
   {
     id: "C03",
