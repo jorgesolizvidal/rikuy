@@ -103,7 +103,7 @@ declare
   v_position integer := 0;
   v_id uuid;
   v_name text;
-  v_kept uuid[] := '{}';
+  v_kept uuid[] := array[]::uuid[];
   v_before jsonb;
 begin
   perform private.assert_content_role(p_tenant_id, array['owner', 'admin']::public.membership_role[]);

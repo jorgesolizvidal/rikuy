@@ -16,9 +16,7 @@ const threeVersion = versionOf(join(dirname(require.resolve("three")), "..", "pa
 const jakartaVersion = versionOf(
   require.resolve("@fontsource-variable/plus-jakarta-sans/package.json"),
 );
-const bricolageVersion = versionOf(
-  require.resolve("@fontsource-variable/bricolage-grotesque/package.json"),
-);
+const bricolageVersion = versionOf(require.resolve("@fontsource/bricolage-grotesque/package.json"));
 
 /**
  * Baseline security headers. A full Content-Security-Policy is introduced with the portal

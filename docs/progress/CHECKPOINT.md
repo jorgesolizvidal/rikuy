@@ -2422,7 +2422,7 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
   - **tarjetas con datos reales**: la categoría, «Recorrido 360°» y «Sello del pasaporte»;
   - **destinos y agenda** con encabezado, cifras de la lista, búsqueda (sin tildes ni mayúsculas) y categorías, filtradas en el navegador y guardadas en la dirección (`?categoria=…&q=…`); la agenda con la foto de cada evento y su fecha encima; la franja del pasaporte al final;
   - **barra inferior en el celular** (< 48 rem) con lo que el municipio tiene, la sección actual marcada y «Más» si no cabe; el encabezado deja solo el nombre. No aparece en los tours;
-  - estilos en `listing.css` y `home.css` (solo en esas páginas); en «Inmersivo», la foto de la portada va de fondo.
+  - estilos en `listing.css` (solo en el inicio, destinos y agenda); en «Inmersivo», la foto de la portada va de fondo.
 - Panel:
   - **«Categorías»** (`/o/{slug}/categorias`, en la página del municipio y en las listas de destinos y agenda): nombres, orden, agregar y quitar; editores y analistas solo leen;
   - campo **«Categoría»** en los editores de destinos y eventos;
@@ -2435,7 +2435,15 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
   - `modules.e2e.test.ts`: a 390 px las secciones de Demo Sur se buscan en la barra inferior;
   - portales 161, contratos RC-09/10/11/12 216, ubicación RC-06 35, temas 4, módulos 4, pasaporte 3, sellos 3, premio 2 y visitas 2 en verde.
 - Verificado en local, en el navegador (390 y 1280 px, los dos temas): portada con foto, cifras propias, secciones reordenadas y en otra variante, categorías en las tarjetas y en los filtros; axe sin hallazgos críticos ni graves y sin desbordes en inicio, destinos, agenda, «Categorías» y «Marca del portal».
-- Lighthouse local (móvil, CPU ×4, seed): inicio 97–98, destinos 91–99, agenda 96–99 y fichas 93–98 en los dos temas; LCP 1,5–2,5 s, CLS 0 y JS 149–151 KB. `/mapa` no se puede medir en mi entorno (no llega a OpenFreeMap): lo mide el CI.
+- Lighthouse local (móvil, CPU ×4, seed), con las correcciones: inicio 97–99, destinos 98, agenda 98 y fichas 97–98 en los dos temas; LCP 2,0–2,4 s, CLS 0 y JS 149–151 KB. `/mapa` no se puede medir en mi entorno (no llega a OpenFreeMap): lo mide el CI.
+
+Lo que encontró el CI del push, ya corregido:
+
+- el lint de SQL rechazó `v_kept uuid[] := '{}'` en `save_content_categories` (un texto convertido a `uuid[]`): ahora `array[]::uuid[]`;
+- el inicio de Demo Sur daba un LCP de 2,53 s en las 5 corridas (límite 2,5 s; las demás páginas, ~2,38 s). Su LCP es el título de la portada, en la fuente de «Inmersivo» (41 KB), mientras que en las demás páginas es un párrafo con la letra del sistema. Tres correcciones, medidas en local (2.535 → 2.309 ms):
+  - «Inmersivo» usa Bricolage en un solo grosor, 700 (22 KB en lugar de 41 KB; [corrección de ADR-061](../adr/ADR-061-portal-themes.md#corrección-2026-11-14-c3--paso-3)); se ve igual;
+  - los estilos del inicio pasaron a `listing.css` (una petición menos que bloquea la primera pintura);
+  - las curvas de nivel de la portada se dibujan con coordenadas enteras y relativas: de 8 KB a 4 KB, y la página las lleva dos veces (HTML y datos de React).
 
 **Desviaciones:**
 

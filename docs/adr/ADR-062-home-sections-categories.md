@@ -28,7 +28,7 @@ Decisiones del usuario (2026-11-14):
 5. **Filtros en el navegador:** la página está en caché entera; la búsqueda (sin tildes ni mayúsculas) y las categorías filtran lo que ya tiene, y la dirección guarda el filtro (`?categoria=…&q=…`). Solo se ofrecen las categorías que tiene algo publicado (en la agenda, algo próximo). Nada se envía.
 6. **Barra inferior en el celular** (< 48 rem): Inicio y Destinos, y después Agenda, Pasaporte, Mapa y Tours 360° si el municipio los tiene (módulo y, para tours y pasaporte, algo publicado); con más de cinco, la quinta es «Más». Fija abajo (no mueve la página), con `aria-current` en la sección actual; en el celular el encabezado deja solo el nombre. No aparece en las páginas de tour, que usan la pantalla entera.
 7. **Panel:** «Inicio del portal» en «Marca del portal» (portada, destino, cifras, secciones con «Mostrar», variante, «Subir» y «Bajar»); página «Categorías» (`/o/{slug}/categorias`) y el campo «Categoría» en los editores de destinos y eventos.
-8. **Estilos:** lo nuevo de las listas va en `listing.css` (inicio, destinos y agenda) y lo del inicio en `home.css`; en la hoja común solo quedan las etiquetas de las tarjetas y la barra inferior. Cada tema tiene sus variantes: en «Inmersivo», la foto de la portada va de fondo con el texto encima.
+8. **Estilos:** lo nuevo de las listas y del inicio va en una sola hoja, `listing.css` (inicio, destinos y agenda): una hoja aparte para el inicio era otra petición que bloquea la primera pintura y le sumaba ~150 ms de LCP en el CI; en la hoja común solo quedan las etiquetas de las tarjetas y la barra inferior. Cada tema tiene sus variantes: en «Inmersivo», la foto de la portada va de fondo con el texto encima.
 
 ## Consecuencias
 

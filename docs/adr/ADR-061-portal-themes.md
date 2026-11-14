@@ -36,3 +36,7 @@ Decisiones del usuario (2026-11-14):
 - Las páginas con estilos propios (tour, asistente, pasaporte, mapa) heredan colores y fuentes del tema, pero su forma se rehace en los pasos 4 a 6 de C3. El inicio por secciones (con su portada con foto como variante) llega en el Paso 3.
 - Un portal Editorial descarga 14 KB menos de fuente que antes (Plus Jakarta Sans en lugar de Bricolage).
 - La vista previa del panel es una copia pequeña: el portal publicado es la referencia.
+
+## Corrección (2026-11-14, C3 · Paso 3)
+
+«Inmersivo» usa Bricolage Grotesque **en un solo grosor (700)**, el de sus títulos (`@fontsource/bricolage-grotesque`, 22 KB), en lugar del archivo variable de 41 KB. Con el inicio por secciones ([ADR-062](ADR-062-home-sections-categories.md)), el título de la portada de Demo Sur pasó a ser su LCP y medía 2,53 s en el CI (límite 2,5 s): la fuente competía con el HTML y el CSS por el ancho de banda. El texto de lectura de «Inmersivo» ya era la letra del sistema, y los títulos piden 700–780, así que se ven igual (780 se muestra en 700). Las medidas de la cara de respaldo se recalcularon para el archivo nuevo (comprobadas en `theme-fonts.test.ts`).

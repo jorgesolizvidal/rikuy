@@ -1,5 +1,4 @@
 import "./listing.css";
-import "./home.css";
 
 import {
   assistantPersona,
