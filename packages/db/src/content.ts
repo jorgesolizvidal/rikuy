@@ -274,7 +274,10 @@ export function createContentRepository(client: SessionClient): ContentRepositor
       if (error) {
         const kind = failure(error, status);
         if (kind === "invalid") {
-          const reason = error.hint === "media" || error.hint === "venue" ? error.hint : "shape";
+          const reason =
+            error.hint === "media" || error.hint === "venue" || error.hint === "category"
+              ? error.hint
+              : "shape";
           return { status: "invalid", reason };
         }
         if (kind === null) throw unexpected("Saving the draft", error);
