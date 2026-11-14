@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 2 — temas del portal ✅
-- **Rama:** `feat/c3-step2-design-themes` → PR hacia `main`
+- **Último paso completado:** C3 · Paso 3 — inicio por secciones, destinos y agenda ✅
+- **Rama:** `feat/c3-step3-home-sections` → PR hacia `main`
 
 ## Historial
 
@@ -2398,16 +2398,62 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - La portada con foto llega con el inicio por secciones (Paso 3), como variante; las páginas con estilos propios (tour, asistente, pasaporte, mapa) heredan colores y fuentes del tema, pero su forma se rehace en los Pasos 4 a 6.
 - La vista previa del panel es una copia pequeña; el portal publicado es la referencia.
 
+### C3 · Paso 3 — inicio por secciones, destinos y agenda ✅
+
+- Aclarado con el usuario (2026-11-14): el Paso 2 fue el sistema de diseño y los componentes compartidos; las páginas de Stitch llegan en los Pasos 3 a 6, sin los elementos que Stitch inventó (calificaciones, «Validado por…», folio y rango del pasaporte, paradas en orden, audios, quechua, guía GPS).
+- Decisiones del usuario ([ADR-062](../adr/ADR-062-home-sections-categories.md)), 2026-11-14:
+  - **portada con la foto de un destino** que elige el municipio;
+  - **cifras automáticas y propias** (hasta 2 escritas por el municipio);
+  - **barra inferior según los módulos**, sin configuración;
+  - **categorías del municipio** para filtrar destinos y eventos, con búsqueda.
+- Base de datos (`20261125000000_c3_home_categories.sql`, solo expand):
+  - `content_categories` (por municipio y tipo, hasta 20, nombres únicos sin importar mayúsculas, nunca se borran: quitar archiva); RLS sin permisos. `tenant_content_categories` (cualquier miembro, con cuántos la usan) y `save_content_categories` (propietarios y administradores; reemplaza la lista en orden; auditado `content.categories_saved`);
+  - `content_revisions.category_id` (FK compuesta): la categoría se publica con la revisión y vuelve con «Volver a esta versión». `save_content_draft` exige una categoría vigente del mismo municipio y tipo; los documentos de destino y evento aceptan `categoryId` opcional; `revision_document` lo incluye solo cuando hay uno (el panel ya desplegado sigue igual);
+  - `portal_content_index` (anónima): ids, direcciones y categorías vigentes de lo publicado, de municipios activos;
+  - la marca acepta `home` (`private.is_valid_home`: portada `text`/`photo` con destino o `null`, hasta 2 cifras de una línea, hasta 6 secciones únicas con su variante del catálogo); un trigger exige que el destino de la portada sea del mismo municipio;
+  - seed: categorías en Demo Norte (Miradores, Plazas y centro, Ferias) y Demo Sur (Naturaleza); Demo Sur con su propio inicio (cifra «4.100 m», eventos con foto primero, un destino destacado); Demo Norte con el inicio por defecto.
+- `@rikuy/core`:
+  - `domain/branding/home`: catálogo de secciones y variantes (con su módulo), `DEFAULT_HOME`, `visibleHomeSections`, `homeFigures` (las del municipio primero; nunca un cero ni un módulo ausente; hasta 4) y `bottomBar` (Inicio, Destinos, Agenda, Pasaporte, Mapa, Tours 360°; con más de 5, «Más»);
+  - contrato `home` en la marca y `homeOf`; `categoryId` en los documentos;
+  - `application/content/categories`: `loadCategories`, `saveCategories` (lista limpia y revisada antes de la base), `categoriesInUse` (solo las usadas por algo publicado, con dirección única) y `categoryBySlug`; motivo `category` en el guardado.
+- `@rikuy/db`: `createCategoryRepository` y `createSupabasePublishedContentIndexReader` (sin categorías antes de la migración).
+- Portal:
+  - **inicio por secciones**: portada con la foto del destino elegido (o el primero con foto; si no, la de texto), con «Empezar el recorrido 360°», «Ver los lugares» y «Ver la agenda»; franja de cifras; lugares (cuadrícula o uno destacado); eventos (lista o tarjetas con foto); franjas de recorridos 360° (con la vista previa del tour de inicio), pasaporte (con los sellos de este teléfono) y asistente (abre el mismo panel);
+  - **tarjetas con datos reales**: la categoría, «Recorrido 360°» y «Sello del pasaporte»;
+  - **destinos y agenda** con encabezado, cifras de la lista, búsqueda (sin tildes ni mayúsculas) y categorías, filtradas en el navegador y guardadas en la dirección (`?categoria=…&q=…`); la agenda con la foto de cada evento y su fecha encima; la franja del pasaporte al final;
+  - **barra inferior en el celular** (< 48 rem) con lo que el municipio tiene, la sección actual marcada y «Más» si no cabe; el encabezado deja solo el nombre. No aparece en los tours;
+  - estilos en `listing.css` y `home.css` (solo en esas páginas); en «Inmersivo», la foto de la portada va de fondo.
+- Panel:
+  - **«Categorías»** (`/o/{slug}/categorias`, en la página del municipio y en las listas de destinos y agenda): nombres, orden, agregar y quitar; editores y analistas solo leen;
+  - campo **«Categoría»** en los editores de destinos y eventos;
+  - **«Inicio del portal»** en «Marca del portal»: portada (con foto o texto), destino de la portada, cifras propias, y las secciones con «Mostrar», variante, «Subir» y «Bajar».
+- CI: nuevo paso **«Home and categories in a real browser»** (grupo «Lighthouse · visitas»).
+- Tests:
+  - 1.036 unitarios (core 709, db 210, web 53, worker 50, config 14);
+  - 1.802 pgTAP (56 nuevos, `050_home_categories`): quién define las categorías (editor, analista, sin segundo factor y otro municipio no); tipo desconocido, nombre repetido (también con otras mayúsculas), con salto de línea, vacío, con espacios, más de 20, id de otro municipio o de otro tipo, claves extra; renombrar y reordenar conservan el id; quitar archiva; una archivada no vuelve por su id, pero su nombre sí se puede reusar; auditoría; lectura por miembros y nadie toca la tabla; la categoría en el borrador (otro municipio, otro tipo, archivada, que no es un id y conocimiento rechazados; sin `categoryId` se borra); el índice del portal (solo lo publicado, sin categorías archivadas, nada de un municipio suspendido; la revisión sellada conserva su categoría); el inicio en la marca (variante, sección o clave desconocida, repetida, 3 cifras, cifra larga, enlaces; destino de otro municipio o que es un evento rechazados);
+  - **e2e en un navegador real** (`home.e2e.test.ts`, 4 casos): Demo Sur con su inicio y Demo Norte con el de siempre; filtros por categoría en destinos (con la dirección) y agenda; la barra inferior a 390 px y no a 1280; el propietario con categorías (nombre repetido rechazado), el editor y «Inicio del portal» que llegan al portal, y todo vuelve como el seed;
+  - `modules.e2e.test.ts`: a 390 px las secciones de Demo Sur se buscan en la barra inferior;
+  - portales 161, contratos RC-09/10/11/12 216, ubicación RC-06 35, temas 4, módulos 4, pasaporte 3, sellos 3, premio 2 y visitas 2 en verde.
+- Verificado en local, en el navegador (390 y 1280 px, los dos temas): portada con foto, cifras propias, secciones reordenadas y en otra variante, categorías en las tarjetas y en los filtros; axe sin hallazgos críticos ni graves y sin desbordes en inicio, destinos, agenda, «Categorías» y «Marca del portal».
+- Lighthouse local (móvil, CPU ×4, seed): inicio 97–98, destinos 91–99, agenda 96–99 y fichas 93–98 en los dos temas; LCP 1,5–2,5 s, CLS 0 y JS 149–151 KB. `/mapa` no se puede medir en mi entorno (no llega a OpenFreeMap): lo mide el CI.
+
+**Desviaciones:**
+
+- Un destino o evento guardado con el editor anterior (durante el despliegue) pierde su categoría; se recupera al guardarlo de nuevo.
+- La búsqueda aparece con más de 3 elementos en la lista; las categorías, cuando algo publicado tiene una.
+- La vista previa de «Marca del portal» no dibuja el inicio: el portal publicado es la referencia.
+- Stitch muestra duración de la visita y «Cómo llegar» en las listas: no existen como datos todavía y no se inventan.
+
 ## Cómo verificarlo
 
-- Tras el merge, abre Demo Norte y Demo Sur: el mismo tipo de contenido se ve como dos sitios distintos (Demo Sur de las demos de producción sigue en «Editorial» hasta que le cambies el tema).
-- En «Marca del portal» de Ucureña aparece **«Tema del portal»** con «Editorial» marcado. Para la paleta de Stitch, deja «Editorial» y «Claro», pon **Color principal `#14532d`** (8,7:1 sobre el fondo) y **Color de acento `#b45309`** (4,8:1) y publica: el portal cambia en la siguiente visita.
-- En una demo, elige «Inmersivo»: «Claro» queda deshabilitado y la vista previa pasa a oscuro con la foto de fondo en la tarjeta. Publica y mira el portal en el celular y en la PC.
-- En el celular, el botón «Instalar» y las fuentes no mueven la página.
+- Tras el merge, en «Marca del portal» de Ucureña aparece **«Inicio del portal»**: elige la portada «Con foto» y el destino (por ejemplo, la plaza), agrega una cifra propia (por ejemplo «1953 · Firma del Decreto de Reforma Agraria»), ordena las secciones y publica. El inicio cambia en la siguiente visita.
+- En **«Categorías»** (página del municipio) crea las de destinos y eventos; en cada destino y evento elige su categoría y publica. En el portal, `/destinos` y `/agenda` muestran los filtros, y las tarjetas su categoría.
+- En el celular, las secciones están en la barra inferior; en la PC, en el encabezado.
+- Los destinos con tour dicen «Recorrido 360°» y las paradas de un circuito «Sello del pasaporte».
 
 ## Siguiente paso
 
-**C3 · Paso 3 — inicio por secciones, destinos y agenda** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): qué secciones tiene el inicio, en qué orden y en qué variante (por ejemplo, portada con foto), como dato del municipio; destinos y agenda con el diseño nuevo; barra inferior en el celular según los módulos. Antes de empezar, confirmar con el usuario las secciones y variantes, y qué lleva la barra inferior.
+**C3 · Paso 4 — fichas de destino y evento, y mapa** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): las fichas con el diseño de Stitch (sin datos inventados) y el mapa. Antes de empezar, confirmar con el usuario qué lleva cada ficha y cómo se ve el mapa.
 
 ## Decisiones pendientes del usuario
 
