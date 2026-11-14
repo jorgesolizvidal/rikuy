@@ -3,7 +3,11 @@
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 
-import { ASSISTANT_ASK_EVENT, type AssistantAskDetail } from "@/lib/assistant-context";
+import {
+  ASSISTANT_ASK_EVENT,
+  ASSISTANT_OPEN_EVENT,
+  type AssistantAskDetail,
+} from "@/lib/assistant-context";
 
 import type { AssistantRequestFromPage } from "./assistant-panel";
 
@@ -47,8 +51,19 @@ export function AssistantLauncher(props: AssistantLauncherProps) {
       setLoaded(true);
       setOpen(true);
     };
+    // Opened without a question (the home's invitation).
+    const opened = (event: Event) => {
+      const detail = (event as CustomEvent<{ readonly returnFocus: HTMLElement | null }>).detail;
+      returnFocus.current = detail.returnFocus;
+      setLoaded(true);
+      setOpen(true);
+    };
     window.addEventListener(ASSISTANT_ASK_EVENT, asked);
-    return () => window.removeEventListener(ASSISTANT_ASK_EVENT, asked);
+    window.addEventListener(ASSISTANT_OPEN_EVENT, opened);
+    return () => {
+      window.removeEventListener(ASSISTANT_ASK_EVENT, asked);
+      window.removeEventListener(ASSISTANT_OPEN_EVENT, opened);
+    };
   }, []);
   const preload = useCallback(() => {
     void loadPanel();

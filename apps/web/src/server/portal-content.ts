@@ -18,6 +18,7 @@ import {
   platformSettings,
   publishedContentReader,
   publishedEventReader,
+  publishedIndexReader,
   publishedMapReader,
   publishedPassportReader,
   publishedRedirectReader,
@@ -174,6 +175,30 @@ export const portalPassport = cache(async (view: PortalView) =>
         .catch(() => [])
     : [],
 );
+
+/**
+ * Ids, addresses and categories of what is published (ADR-062), memoized per request. A
+ * failure leaves the filters and the chosen cover out; the page still renders.
+ */
+export const portalIndex = cache(async (view: PortalView) =>
+  publishedIndexReader()
+    .index(view.context.tenant.tenantId)
+    .catch(() => []),
+);
+
+/**
+ * What the cards say about each place besides its own data: it has a 360° tour, or it is a
+ * stop of a published circuit (its stamp). Keys are `destination:slug` and `event:slug`.
+ */
+export const portalBadges = cache(async (view: PortalView) => {
+  const [tours, circuits] = await Promise.all([portalTourIndex(view), portalPassport(view)]);
+  return {
+    tours: new Set(tours.map((entry) => `${entry.kind}:${entry.slug}`)),
+    stamps: new Set(
+      circuits.flatMap((circuit) => circuit.stops.map((stop) => `destination:${stop.slug}`)),
+    ),
+  };
+});
 
 /** The published tour of a destination or event (also of an ended event), or null. */
 export const portalTour = cache(

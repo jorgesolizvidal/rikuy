@@ -46,6 +46,10 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
           Lugares para visitar en {membership.displayName}. Los visitantes solo ven la versión
           publicada de cada uno; los borradores son privados.
         </p>
+        <p>
+          <Link href={`/o/${membership.slug}/categorias`}>Categorías</Link> para filtrar la lista en
+          el portal.
+        </p>
       </div>
 
       {canEdit ? (

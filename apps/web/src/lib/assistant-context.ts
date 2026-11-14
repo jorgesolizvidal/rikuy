@@ -37,3 +37,14 @@ export const ASSISTANT_ASK_EVENT = "rikuy:assistant-ask";
 export function requestAssistant(detail: AssistantAskDetail): void {
   window.dispatchEvent(new CustomEvent<AssistantAskDetail>(ASSISTANT_ASK_EVENT, { detail }));
 }
+
+export const ASSISTANT_OPEN_EVENT = "rikuy:assistant-open";
+
+/** Opens the assistant without a question (the home's invitation, ADR-062). */
+export function openAssistant(returnFocus?: HTMLElement | null): void {
+  window.dispatchEvent(
+    new CustomEvent<{ readonly returnFocus: HTMLElement | null }>(ASSISTANT_OPEN_EVENT, {
+      detail: { returnFocus: returnFocus ?? null },
+    }),
+  );
+}

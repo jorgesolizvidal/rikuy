@@ -3,6 +3,7 @@ import {
   eventImages,
   hasModule,
   type ImageReference,
+  loadCategories,
   listDestinations,
   loadEventEditor,
   richTextToMarkup,
@@ -81,6 +82,11 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
     ...image,
     previewUrl: previews.get(previewPath(image)) ?? null,
   });
+  // The municipality's categories of this kind (ADR-062). One archived meanwhile is not
+  // offered: the draft keeps it until it is saved without it.
+  const categories = (await loadCategories(membership, { categories: session.categories }))[
+    "event"
+  ].map((category) => ({ id: category.id, name: category.name }));
   const initial: EditorValues = {
     title: document.title,
     summary: document.summary,
@@ -90,6 +96,9 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
     gallery: document.gallery.map(withPreview),
     schedule: scheduleValues(document.schedule),
     venueId: document.venueId,
+    categoryId: categories.some((category) => category.id === document.categoryId)
+      ? (document.categoryId ?? null)
+      : null,
   };
   const live = record.history.find((entry) => entry.revisionId === record.published?.revisionId);
 
@@ -126,6 +135,8 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
           org={membership.slug}
           contentId={record.contentId}
           initial={initial}
+          categories={categories}
+          categoriesHref={`/o/${membership.slug}/categorias`}
           editCount={editor.editCount}
           canEdit={editor.canEdit}
           canPublish={editor.canPublish}

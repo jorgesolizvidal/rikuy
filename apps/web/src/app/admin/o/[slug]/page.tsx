@@ -123,10 +123,25 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </li>
         ) : null}
         <li>
+          <Link href={`/o/${membership.slug}/categorias`} className="org-card">
+            <span>
+              <span className="org-name">Categorías</span>
+              <span className="org-detail">
+                Para filtrar los destinos{has("agenda") ? " y los eventos" : ""} en el portal
+              </span>
+            </span>
+            <span className="org-role">
+              {canManageBranding(membership.role) ? "Editar" : "Ver"}
+            </span>
+          </Link>
+        </li>
+        <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
               <span className="org-name">Marca del portal</span>
-              <span className="org-detail">Nombre, colores, contacto y redes sociales</span>
+              <span className="org-detail">
+                Nombre, colores, tema, inicio del portal, contacto y redes sociales
+              </span>
             </span>
             <span className="org-role">
               {canManageBranding(membership.role) ? "Editar" : "Ver"}

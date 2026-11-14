@@ -193,11 +193,12 @@ describe("the modules of a municipality (ADR-060)", () => {
       await browser.newContext({ viewport: { width: 390, height: 800 } })
     ).newPage();
     await page.goto(SUR);
-    const nav = page.getByRole("navigation", { name: "Principal" });
+    // On a phone the sections are in the bottom bar (ADR-062): only what the municipality has.
+    const nav = page.getByRole("navigation", { name: "Secciones" });
     await nav.waitFor();
-    expect(await nav.getByRole("link", { name: "Destinos" }).count()).toBe(1);
+    expect(await nav.getByRole("link").allInnerTexts()).toEqual(["Inicio", "Destinos"]);
     for (const name of ["Agenda", "Mapa", "Tours 360°", "Pasaporte"]) {
-      expect(await nav.getByRole("link", { name, exact: true }).count(), name).toBe(0);
+      expect(await page.getByRole("link", { name, exact: true }).count(), name).toBe(0);
     }
     expect(await page.getByRole("heading", { name: "Próximos eventos" }).count()).toBe(0);
     await accessible(page, "inicio sin módulos");

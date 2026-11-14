@@ -159,4 +159,62 @@ describe("branding form mapping", () => {
       expect(fieldErrors(orphan.issues, []).assistantName).toMatch(/nombre del asistente/u);
     }
   });
+
+  it("builds the home from its fields, in their order (ADR-062)", () => {
+    const data = form({ ...filled, "home.hero.variant": "photo", "home.hero.destination": "" });
+    for (const key of ["events", "destinations", "figures", "tours", "passport", "assistant"]) {
+      data.append("home.order", key);
+    }
+    data.set("home.show.events", "on");
+    data.set("home.variant.events", "cards");
+    data.set("home.show.destinations", "on");
+    data.set("home.variant.destinations", "featured");
+    data.set("home.variant.figures", "band");
+    data.set("home.figure.1.value", "1953");
+    data.set("home.figure.1.label", "Firma del decreto");
+    data.set("home.figure.2.value", "");
+    data.set("home.figure.2.label", "");
+    const input = presentationInputFromForm(data);
+    expect(input.home).toEqual({
+      hero: { variant: "photo", destinationId: null },
+      figures: [{ value: "1953", label: "Firma del decreto" }],
+      sections: [
+        { key: "events", variant: "cards" },
+        { key: "destinations", variant: "featured" },
+      ],
+    });
+    const result = validatePresentation(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      const values = valuesFromPresentation(result.value).home;
+      // Hidden sections keep a place after the shown ones, in their default variant.
+      expect(values.sections.map((section) => [section.key, section.shown])).toEqual([
+        ["events", true],
+        ["destinations", true],
+        ["figures", false],
+        ["tours", false],
+        ["passport", false],
+        ["assistant", false],
+      ]);
+      expect(values.figures[0]).toEqual({ value: "1953", label: "Firma del decreto" });
+    }
+  });
+
+  it("a form without the home fields leaves the brand's home out (platform default)", () => {
+    expect(presentationInputFromForm(form(filled))).not.toHaveProperty("home");
+  });
+
+  it("explains a figure with only half of it, and an unknown variant", () => {
+    const data = form({ ...filled, "home.hero.variant": "text", "home.figure.2.value": "1953" });
+    data.append("home.order", "events");
+    data.set("home.show.events", "on");
+    data.set("home.variant.events", "featured");
+    const result = validatePresentation(presentationInputFromForm(data));
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      const errors = fieldErrors(result.issues, []);
+      expect(errors.homeFigure1).toMatch(/cifra/u);
+      expect(errors.homeSections).toMatch(/variante/u);
+    }
+  });
 });
