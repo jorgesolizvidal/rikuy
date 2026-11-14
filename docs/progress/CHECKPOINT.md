@@ -2444,6 +2444,8 @@ Lo que encontró el CI del push, ya corregido:
   - «Inmersivo» usa Bricolage en un solo grosor, 700 (22 KB en lugar de 41 KB; [corrección de ADR-061](../adr/ADR-061-portal-themes.md#corrección-2026-11-14-c3--paso-3)); se ve igual;
   - los estilos del inicio pasaron a `listing.css` (una petición menos que bloquea la primera pintura);
   - las curvas de nivel de la portada se dibujan con coordenadas enteras y relativas: de 8 KB a 4 KB, y la página las lleva dos veces (HTML y datos de React).
+  - en el CI: 2.422 ms.
+- la e2e nueva esperaba un solo destino publicado en Demo Sur, pero otro paso del mismo trabajo publica otro: ahora compara la cifra con lo que hay publicado en la base.
 
 **Desviaciones:**
 

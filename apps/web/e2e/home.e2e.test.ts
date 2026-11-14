@@ -29,6 +29,7 @@ const NORTE = `http://demo-norte.localhost:${PORT}`;
 const DB_URL =
   process.env.SUPABASE_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 const NORTE_ID = "5eed1000-0000-4000-8000-000000000001";
+const SUR_ID = "5eed1000-0000-4000-8000-000000000002";
 const OWNER_NORTE = "owner@demo-norte.example.test";
 const PLAZA = "5eed4100-0000-4000-8000-000000000004";
 
@@ -150,12 +151,22 @@ describe("home by sections, categories and bottom bar (ADR-062)", () => {
   it("each municipality arranges its home; without a home of its own, the default", async () => {
     const sur = await html(SUR);
     expect(sectionsOf(sur)).toEqual(["figures", "events", "destinations", "tours", "assistant"]);
-    // Its own figure first, then what the portal counts.
-    expect([...sur.matchAll(/home-figure-value">([^<]+)</gu)].map((match) => match[1])).toEqual([
-      "4.100 m",
-      "1",
-      "1",
+    // Its own figure first, then what the portal counts (other suites of the same job may
+    // publish more places in Demo Sur: the count is read from the database).
+    const [published] = await db<{ count: number }[]>`
+      select count(*)::int as count from public.content_items
+      where tenant_id = ${SUR_ID} and kind = 'destination' and published_revision_id is not null`;
+    const figures = [
+      ...sur.matchAll(
+        /home-figure-value">([^<]+)<\/span><span class="home-figure-label">([^<]+)</gu,
+      ),
+    ].map((match) => [match[1], match[2]]);
+    expect(figures[0]).toEqual(["4.100 m", "Altura de la laguna sobre el mar"]);
+    expect(figures[1]).toEqual([
+      String(published?.count),
+      published?.count === 1 ? "Lugar para visitar" : "Lugares para visitar",
     ]);
+    expect(figures.length).toBeLessThanOrEqual(4);
     expect(sur).toMatch(/data-variant="featured"/u);
     expect(sur).toMatch(/data-layout="cards"/u);
 
