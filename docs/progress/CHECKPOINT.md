@@ -2390,6 +2390,7 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
   - portales (161) y contratos RC-09/10/11/12 (216) en verde;
   - Lighthouse local de las páginas del seed (móvil, CPU ×4): Editorial 97–99 (LCP 1,4–2,2 s), Inmersivo 95–99 (LCP 1,9–2,5 s), CLS 0 y JS 147–150 KB en todas.
 - Lo que encontraron las pruebas, ya corregido: el nombre del sitio en Inmersivo, en dos líneas, era 1 px más alto que su fila a 360 px, y el botón «Instalar» movía la página (contrato RC-09).
+- Lo que encontró el CI del PR, ya corregido: en `/mapa` de Demo Norte (Editorial), la fuente llegaba después de la primera pintura y los párrafos se reacomodaban, moviendo el mapa entero (CLS 0,146 sobre el límite de 0,1, en las 5 corridas; en local no se reproducía). Ahora los párrafos de Editorial usan el mismo archivo como otra familia con `font-display: optional` (si no llegó para la primera pintura, se quedan con la de respaldo en esa visita) y los títulos siguen con `swap`; la cara de respaldo también acepta Liberation Sans y Arimo, que tienen las medidas de Arial. El medidor de Lighthouse ahora dice qué elementos movieron la página cuando el CLS no es 0.
 
 **Desviaciones:**
 

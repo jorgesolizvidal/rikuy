@@ -70,9 +70,20 @@ describe("theme fonts (ADR-061)", () => {
   it("writes only its own constants into the CSS", () => {
     const css = fonts.themeFontFaces("editorial");
     expect(css).toContain('font-family:"Rikuy Editorial"');
-    expect(css).toContain('font-family:"Rikuy Editorial Fallback";src:local("Arial")');
-    expect(css).toContain("font-display:swap");
+    expect(css).toContain(
+      'font-family:"Rikuy Editorial Fallback";src:local("Arial"),local("Liberation Sans"),local("Arimo")',
+    );
     expect(css).not.toContain("Rikuy Inmersivo");
     expect(fonts.themeFontFaces("immersive")).toContain(fonts.THEME_FONTS.immersive.href);
+  });
+
+  it("titles swap; reading text never reflows after the first paint", () => {
+    const css = fonts.themeFontFaces("editorial");
+    expect(css).toMatch(/font-family:"Rikuy Editorial";[^}]*font-display:swap/u);
+    expect(css).toMatch(/font-family:"Rikuy Editorial Text";[^}]*font-display:optional/u);
+    // One file for both families: a single download.
+    expect(css.split(fonts.THEME_FONTS.editorial.href).length - 1).toBe(2);
+    // Immersive reads in the system font: no text family.
+    expect(fonts.themeFontFaces("immersive")).not.toContain("Text");
   });
 });

@@ -22,7 +22,7 @@ Decisiones del usuario (2026-11-14):
    - Editorial: Plus Jakarta Sans para todo (27 KB, latin);
    - Inmersivo: Bricolage Grotesque para los títulos y la letra del sistema para leer (41 KB).
 
-   Cada portal **precarga solo el archivo de su tema** y declara su `@font-face` con la página; el otro nunca se descarga. Una cara de respaldo ajusta Arial a las medidas de la fuente (los mismos valores que calcula `next/font`, comprobados en un test), para que el texto casi no se mueva cuando llega.
+   Cada portal **precarga solo el archivo de su tema** y declara su `@font-face` con la página; el otro nunca se descarga. Una cara de respaldo ajusta Arial (o Liberation Sans y Arimo, con sus mismas medidas) a las medidas de la fuente (los mismos valores que calcula `next/font`, comprobados en un test), para que el texto casi no se mueva cuando llega. En Editorial, los títulos usan la fuente con `font-display: swap` y los párrafos el mismo archivo como otra familia con `font-display: optional`: si la fuente no llegó para la primera pintura, los párrafos se quedan con la de respaldo en esa visita en lugar de reacomodar la página (en el CI, `/mapa` de Demo Norte se movía entero al llegar la fuente: CLS 0,146).
 
 4. **Los componentes leen _tokens_** (`--font-display`, `--font-body`, `--radius-card`, `--radius-media`, `--radius-control`, `--shadow-card`, `--title-weight`, `--line`…) que cada tema fija en `.portal[data-theme]`, más unas reglas propias de cada tema:
    - **Editorial:** cabecera blanca con línea, títulos en 800, una barra del color de acento sobre cada sección, tarjetas blancas con sombra y la foto arriba, botones redondeados y el pie del color del municipio (con el color de texto pensado para él).

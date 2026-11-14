@@ -184,7 +184,8 @@ describe("portal themes (ADR-061)", () => {
     const norte = await look(NORTE);
     expect(norte.theme).toBe("editorial");
     expect(norte.titleFont).toMatch(/^"Rikuy Editorial"/u);
-    expect(norte.bodyFont).toMatch(/^"Rikuy Editorial"/u);
+    // Reading text: the same file as a family that never swaps after the first paint.
+    expect(norte.bodyFont).toMatch(/^"Rikuy Editorial Text"/u);
     expect(norte.titleOverPhoto).toBe(false);
     expect(norte.footerIsBrand).toBe(true);
     expect(norte.fonts.length).toBeGreaterThan(0);

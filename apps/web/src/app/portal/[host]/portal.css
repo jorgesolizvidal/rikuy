@@ -33,7 +33,8 @@
    rounded photos and pill buttons. */
 .portal[data-theme="editorial"] {
   --font-display: "Rikuy Editorial", "Rikuy Editorial Fallback", var(--font-sans);
-  --font-body: var(--font-display);
+  /* Same file, `font-display: optional` (src/lib/theme-fonts.ts): paragraphs never reflow. */
+  --font-body: "Rikuy Editorial Text", "Rikuy Editorial Fallback", var(--font-sans);
   --radius-card: 1.25rem;
   --radius-media: 1rem;
   --shadow-card:
