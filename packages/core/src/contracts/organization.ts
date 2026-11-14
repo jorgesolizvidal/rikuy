@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MODULE_KEYS } from "../domain/tenancy/modules";
+
 export const membershipRoleSchema = z.enum(["owner", "admin", "editor", "analyst"]);
 export type MembershipRole = z.infer<typeof membershipRoleSchema>;
 
@@ -18,6 +20,8 @@ export const organizationMembershipSchema = z.object({
    * the municipality does not open until they verify. Absent means nothing is missing.
    */
   needsSecondFactor: z.literal(true).optional(),
+  /** The modules it has (ADR-060). Absent: read before that migration, which means all. */
+  modules: z.array(z.enum(MODULE_KEYS)).optional(),
 });
 export type OrganizationMembership = z.infer<typeof organizationMembershipSchema>;
 

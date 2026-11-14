@@ -13,7 +13,7 @@ import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { CopilotChat } from "./copilot-chat";
@@ -57,7 +57,7 @@ interface CopilotPageProps {
 }
 
 export default async function CopilotPage({ params }: CopilotPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "copilot");
   const session = await adminSession();
   const { review, proposals } = await loadCopilot(membership, session.copilot);
   const enabled = aiGatewayStatus().configured;

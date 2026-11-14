@@ -1,10 +1,11 @@
 import {
   contentImagePath,
   documentImages,
+  hasModule,
+  type ImageReference,
   loadDestinationEditor,
   richTextToMarkup,
   ROLE_LABELS,
-  type ImageReference,
 } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -128,7 +129,9 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
           mapCenter={center}
         />
         <aside className="history">
-          {editor.canEdit && aiGatewayStatus().configured ? (
+          {editor.canEdit &&
+          aiGatewayStatus().configured &&
+          hasModule(membership.modules, "copilot") ? (
             <CopilotProposeLink
               org={membership.slug}
               target={{ type: "content", contentId: record.contentId }}

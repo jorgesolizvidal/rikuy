@@ -144,6 +144,18 @@ describe("portal links and metadata", () => {
     expect(xml).toContain("<loc>https://demo.example/pasaporte/ruta-del-valle</loc>");
     expect(buildSitemap("https://demo.example", [destination])).not.toContain("/pasaporte");
   });
+  it("leaves out the agenda and the map of a portal without them (ADR-060)", () => {
+    const all = buildSitemap("https://demo.example", [destination]);
+    expect(all).toContain("/agenda</loc>");
+    expect(all).toContain("/mapa</loc>");
+    const without = buildSitemap("https://demo.example", [destination], [], [], [], {
+      agenda: false,
+      map: false,
+    });
+    expect(without).not.toContain("/agenda</loc>");
+    expect(without).not.toContain("/mapa</loc>");
+    expect(without).toContain("/destinos</loc>");
+  });
 });
 
 describe("cached published destination reader", () => {

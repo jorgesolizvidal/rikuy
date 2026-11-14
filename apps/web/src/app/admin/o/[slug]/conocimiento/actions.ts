@@ -4,6 +4,7 @@ import {
   createKnowledge,
   discardKnowledgeDraft,
   openOrganization,
+  withModule,
   parseMarkup,
   publicCitation,
   publishKnowledge,
@@ -41,7 +42,9 @@ async function context(
   if (actor === null) return { status: "signed_out" };
   const session = await adminSession();
   const membership =
-    typeof slug === "string" ? await openOrganization(actor, slug, session.memberships) : null;
+    typeof slug === "string"
+      ? withModule(await openOrganization(actor, slug, session.memberships), "assistant")
+      : null;
   return membership === null ? { status: "forbidden" } : { membership, session };
 }
 

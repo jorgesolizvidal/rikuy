@@ -41,7 +41,7 @@ function megabytes(bytes: number): string {
 
 export function tourData(view: PortalView, tour: PublishedTour): TourDataDto {
   const tenantId = view.context.tenant.tenantId;
-  const model = tourViewerModel(tour);
+  const model = tourViewerModel(tour, view.context.tenant.modules);
 
   const pointDto = (point: TourViewerPoint): TourPointDto => {
     const base = { id: point.id, title: point.title, yaw: point.yaw, pitch: point.pitch };

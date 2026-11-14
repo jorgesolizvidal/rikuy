@@ -2,6 +2,7 @@
 
 import {
   openOrganization,
+  withModule,
   requestPanoramaUpload,
   submitPanorama,
   type OrganizationMembership,
@@ -20,7 +21,7 @@ async function membershipFor(
   if (actor === null) return { status: "signed_out" };
   const membership =
     typeof slug === "string"
-      ? await openOrganization(actor, slug, (await adminSession()).memberships)
+      ? withModule(await openOrganization(actor, slug, (await adminSession()).memberships), "tours")
       : null;
   return membership === null ? { status: "forbidden" } : { membership };
 }

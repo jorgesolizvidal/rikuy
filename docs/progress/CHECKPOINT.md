@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C2 — pasaporte turístico, terminada con este paso. C0 y C1 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C2 · Paso 4 — métricas del pasaporte ✅
-- **Rama:** `feat/c2-step4-passport-metrics` → PR hacia `main`
+- **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C3 · Paso 1 — módulos de cada municipio ✅
+- **Rama:** `feat/c3-step1-tenant-modules` → PR hacia `main`
 
 ## Historial
 
@@ -2309,16 +2309,70 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - «Con ubicación» es lo que dice el teléfono: un GPS falseado lo engaña. Es una señal, no una prueba.
 - Un teléfono que sella el mismo lugar dos días cuenta dos veces, una por día, como los visitantes.
 
+**Verificación en producción (2026-11-13):** tras el merge (PR #80; el CI del PR falló primero porque dos aserciones de `047` sumaban también los sellos del seed, corregido en la misma rama), el usuario abrió el informe de noviembre de Ucureña: «Pasaporte turístico» con 0 sellos (los de antes del merge no se contaron, como se esperaba), 1 circuito completado y 1 premio canjeado, y cada lugar con las vistas de su ficha. Preguntó si los sellos deberían borrarse al canjear el premio: se quedan como están (los sellos no vencen y el premio es uno por teléfono y circuito); un municipio que quiera que se repita publica un circuito nuevo por temporada. Si un circuito nuevo repite lugares, los sellos que el teléfono ya tiene valen para él (decisión del usuario: así está bien).
+
+### Revisión del diseño en Google Stitch (C3, documentación)
+
+- El usuario diseñó en Google Stitch el portal de Ucureña en web y celular (inicio, destinos, agenda, asistente, pasaporte y recorrido 360°, con la guía «Tierra Viva Editorial») y lo descargó a su computadora (fuera del repositorio). Mi entorno no llega a `stitch.googleapis.com` (el filtro de dominios responde 403), así que se revisó la exportación.
+- Se adopta como dirección visual (paleta verde, ocre, terracota y marfil; Plus Jakarta Sans; tarjetas con foto; bloques de fecha; barra inferior en el celular; sellos «estampados»), con estas correcciones antes de llevarlo al código:
+  - Stitch inventó contenido y funciones que Rikuy no tiene (estrellas de calificación, «Validado por AUSAPAU», folio y rango en el pasaporte, paradas bloqueadas en orden, «Sellar en 360°», audios, quechua, guía GPS): cada elemento debe salir de un dato real;
+  - todo lo de Ucureña (textos, colores, «Estado Plurinacional») pasa a ser dato del municipio;
+  - el visor 360° no puede arrancar en el inicio (presupuesto de JS y LCP);
+  - textos pequeños y el ocre `#D97706` no pasan el contraste;
+  - faltan la ficha, el mapa y la página del tour, que se diseñan con el mismo estilo.
+- Decisiones del usuario (2026-11-13): C3 ahora y no al final; cada municipio tiene que poder verse distinto (temas, no solo color y logo) y tener solo lo que contrata (módulos). Los pasos de C3 en el [roadmap](../roadmap.md#c3--rediseño-de-la-interfaz).
+
+### C3 · Paso 1 — módulos de cada municipio ✅
+
+- Decisiones del usuario ([ADR-060](../adr/ADR-060-tenant-modules.md)), 2026-11-13:
+  - **solo el operador** activa o desactiva los módulos;
+  - **apagar oculta y conserva**: nada se borra y vuelve como estaba;
+  - **paquete al dar de alta** («Completo» o «Solo información»); los municipios que ya existen quedan con todo.
+- Base de datos (`20261123000000_c3_tenant_modules.sql`, solo expand):
+  - `platform_modules` (agenda, mapa, tours, modelos 3D → tours, pasaporte, asistente, voz → asistente, Copilot) y `tenant_modules`, con RLS sin permisos para nadie;
+  - un trigger da todos los módulos a cada municipio nuevo y la migración a los que existen;
+  - `platform_set_tenant_modules` (operador con segundo factor): claves conocidas, sin repetir, con lo que cada una necesita; bloquea el municipio y audita `platform.modules_changed` con el antes y el después (no si nada cambió);
+  - `provision_tenant(…, p_modules)` empieza con el paquete elegido, comprobado antes de crear nada;
+  - `resolve_tenant_by_host`, `my_memberships` y `platform_list_tenants` suman `modules`; `worker_api.monthly_report_data` también;
+  - triggers que rechazan con `PT403` crear un evento sin la agenda, un tour o un panorama sin los tours, un modelo 3D sin ese módulo, un circuito sin el pasaporte, y conocimiento o un documento sin el asistente.
+- `@rikuy/core`:
+  - `domain/tenancy/modules`: catálogo con nombres y descripciones, paquetes, `hasModule` (un conjunto desconocido es «todo»), `checkModuleSet`, `withModule` y `passageVisibleWith`;
+  - `changeTenantModules` y el paquete en `provisionTenant`;
+  - el Copilot (`copilotForModules`), las recomendaciones, «Estadísticas» y el informe mensual no usan lo de un módulo apagado; sin Copilot, el informe va sin recomendaciones («El municipio no tiene el Copilot»);
+  - los tours omiten los puntos de modelo 3D sin ese módulo; el sitemap omite agenda y mapa; la demo carga solo lo que su paquete tiene.
+- `@rikuy/db`: los módulos en el registro de hosts, las membresías, la lista del operador y el informe; una clave desconocida se ignora (`moduleKeysOf`) y sin la columna (la app sale antes que la migración) el municipio tiene todo. `pnpm platform:provision` acepta `"modules"`.
+- Portal:
+  - con un módulo apagado, sus enlaces desaparecen de la cabecera, el inicio («Muy pronto» incluido), el sitemap, las fichas (mapa pequeño, «Ver en el mapa del municipio», tour) y el asistente (secciones, «Ver la ruta en el mapa», dictado y «Escuchar»);
+  - sus páginas responden 404: `/agenda` y los eventos, `/mapa`, `/recorrido`, `/pasaporte`, `/sello`, `/sellar`, `/premio` y `/asistente`; la página del tour de un lugar lleva a su ficha (307);
+  - el asistente no lee pasajes de tours sin los tours ni de eventos sin la agenda; `/canje` sigue funcionando para comprobantes ya emitidos.
+- Panel:
+  - **`/plataforma/modulos/{municipio}`** (columna «Módulos» en la lista de municipios): un interruptor por módulo, lo que necesita cada uno (apagar los tours apaga los modelos 3D) y una confirmación al apagar; al guardar se invalida la caché del portal de ese municipio;
+  - **«Módulos con los que empieza»** en el alta;
+  - la página del municipio muestra solo las tarjetas de sus módulos y cuáles tiene; las páginas y acciones de un módulo apagado responden 404 o «sin permiso»; sin Copilot, los editores no ofrecen «Proponer con el Copilot»; sin modelos 3D, el editor del tour no ofrece puntos de modelo.
+- Tests:
+  - 1.002 unitarios (core 689, db 204, web 45, worker 50, config 14);
+  - 1.728 pgTAP (40 nuevos, `048_tenant_modules`: todos empiezan con todo; nadie lee las tablas; propietario, operador sin segundo factor y visitante no cambian nada; clave desconocida, repetida, sin lo que necesita o vacía, y municipio desconocido rechazados sin cambiar nada; el paquete «solo información» con tours, auditado una vez; el portal, el panel y el operador leen el conjunto; lo creado antes se conserva; circuitos, conocimiento, modelos 3D, documentos, eventos, tours y panoramas rechazados con `PT403` y aceptados con el módulo; el otro municipio no cambia; encender de nuevo; el alta con un paquete y uno inválido rechazado antes de crear nada);
+  - **e2e en un navegador real** (`modules.e2e.test.ts`, nuevo paso del grupo «Lighthouse · visitas»), 4 casos: el operador apaga agenda, mapa, tours y pasaporte de Demo Sur (los modelos 3D se apagan con los tours) tras confirmar y queda auditado; el portal de Demo Sur no los enlaza, sus páginas dan 404, el tour lleva a la ficha y el sitemap los omite, mientras Demo Norte sigue igual; su propietaria no ve esas tarjetas, sus páginas dan 404 y la base rechaza un evento nuevo (`PT403`) sin haber borrado nada; encendidos otra vez, todo vuelve; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - portales 161, contratos RC-09/10/11/12 216, asistente 6, Copilot 2, recomendaciones 2, informe mensual 2, estadísticas 2, pasaporte 3, sellos 3, premio 2, métricas del pasaporte 2, tours 10, medios 3, segundo factor 3 y visitas 2 en verde;
+  - `plpgsql_check` sin hallazgos.
+
+**Desviaciones:**
+
+- Las lecturas anónimas de lo publicado siguen existiendo en la base: el portal no las pide ni las enlaza. Ocultar un módulo es una regla del producto, no un secreto.
+- Las acciones del panel que editan un evento (no lo crean) no comprueban la agenda: su página ya no existe y la base rechaza crear uno nuevo.
+- El tour de un lugar sin los tours lleva a su ficha (307) en vez de 404, como un tour borrado (ADR-049).
+
 ## Cómo verificarlo
 
-- Tras el merge, en el celular, sella un lugar de «Corazón de Ucureña» (su QR en el panel sirve). Sellar otra vez el mismo lugar el mismo día no suma.
-- En el panel de Ucureña → «Estadísticas»: la sección «Pasaporte turístico» muestra los sellos, las visitas comprobadas en el lugar, el circuito completado y el premio canjeado de hoy, cada lugar con las vistas de su ficha, y «Pasaporte turístico por día (CSV)» al final.
-- En «Informe mensual» → «Noviembre de 2026 (en curso)», la misma sección; con «Generar recomendaciones» en «Estadísticas», una puede apoyarse en el pasaporte.
-- Los sellos de antes de este merge no aparecen: se cuentan desde ahora.
+- Tras el merge, en `/plataforma` (con tu segundo factor): la lista de municipios tiene la columna «Módulos» con «Todos» en cada uno.
+- Abre los módulos de una demo (por ejemplo, Demo Norte), apaga «Tours 360°» y «Pasaporte turístico» y guarda (pide confirmación). En su portal ya no aparecen «Tours 360°» ni «Pasaporte» en la cabecera, `/recorrido` y `/pasaporte` dan 404 y la página de un tour lleva a la ficha de su lugar. En su panel ya no están esas tarjetas.
+- Enciéndelos otra vez: todo vuelve como estaba.
+- En `/plataforma/nuevo` aparece «Módulos con los que empieza»: «Completo» o «Solo información».
+- Ucureña no cambia: tiene todos los módulos.
 
 ## Siguiente paso
 
-**C3 — rediseño de la interfaz** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): sistema de diseño white-label (colores, logo y tipografía siguen siendo datos de cada municipio) y las pantallas clave del portal y del panel, dentro del presupuesto de rendimiento y los contratos de accesibilidad. Antes de empezar, confirmar con el usuario los pasos de C3, qué pantallas primero y con qué herramienta se explora el diseño (Google Stitch u otra).
+**C3 · Paso 2 — sistema de diseño con temas** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): fuentes, colores y componentes white-label sobre la dirección de Stitch («Tierra Viva Editorial»), con dos temas para empezar y «Tema del portal» con vista previa en el panel. Antes de empezar, confirmar con el usuario el segundo tema («Inmersivo» oscuro o «Minimalista» claro), qué fuentes ofrecer y si la marca de Ucureña adopta ya la paleta de Stitch.
 
 ## Decisiones pendientes del usuario
 

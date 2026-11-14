@@ -1,4 +1,6 @@
 import {
+  hasModule,
+  type ModuleKey,
   formatDateRange,
   formatShortDate,
   loadRecommendations,
@@ -76,6 +78,7 @@ interface StatisticsPageProps {
 /** C1 · Paso 2 (ADR-052): what the municipality's portal is used for, for any member. */
 export default async function StatisticsPage({ params, searchParams }: StatisticsPageProps) {
   const membership = await requireOrganization((await params).slug);
+  const has = (key: ModuleKey) => hasModule(membership.modules, key);
   const period = parseStatisticsPeriod((await searchParams).periodo);
   const session = await adminSession();
   const [{ summary, passport, firstDay }, saved, calendar] = await Promise.all([
@@ -147,14 +150,19 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
       <section aria-labelledby="resumen" className="metrics-section">
         <h2 id="resumen">Resumen</h2>
         <ul className="stats-tiles">
-          {(Object.keys(TOTAL_LABELS) as StatisticsTotal[]).map((key) => (
-            <li key={key} className="stats-tile">
-              <span className="stats-tile-label">{TOTAL_LABELS[key].label}</span>
-              <span className="stats-tile-value">{formatCount(totals[key].value)}</span>
-              <Change measure={totals[key]} />
-              <span className="field-hint">{TOTAL_LABELS[key].hint}</span>
-            </li>
-          ))}
+          {(Object.keys(TOTAL_LABELS) as StatisticsTotal[])
+            // Without the agenda or the tours (ADR-060), their actions are not offered.
+            .filter(
+              (key) => (key !== "calendar" || has("agenda")) && (key !== "scenes" || has("tours")),
+            )
+            .map((key) => (
+              <li key={key} className="stats-tile">
+                <span className="stats-tile-label">{TOTAL_LABELS[key].label}</span>
+                <span className="stats-tile-value">{formatCount(totals[key].value)}</span>
+                <Change measure={totals[key]} />
+                <span className="field-hint">{TOTAL_LABELS[key].hint}</span>
+              </li>
+            ))}
         </ul>
       </section>
 
@@ -241,41 +249,43 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
         ) : null}
       </section>
 
-      <section aria-labelledby="tours" className="metrics-section">
-        <h2 id="tours">Tours 360°</h2>
-        {summary.tours.length === 0 ? (
-          <p className="field-hint">Ningún tour se abrió en este período.</p>
-        ) : (
-          <ul className="stats-tours">
-            {summary.tours.map((tour) => (
-              <li key={tour.contentId} className="stats-tour">
-                <h3>
-                  <Link href={editorOf(tour.kind, tour.contentId)}>{tour.title}</Link>
-                </h3>
-                <p className="field-hint">
-                  {formatCount(tour.views)} {tour.views === 1 ? "vista" : "vistas"} del tour ·{" "}
-                  {formatCount(tour.visitors)} visitantes · {formatCount(tour.sceneViews)}{" "}
-                  {tour.sceneViews === 1 ? "escena vista" : "escenas vistas"}
-                  {tour.qr > 0 ? ` · ${formatCount(tour.qr)} por QR` : ""}
-                </p>
-                {tour.scenes.length > 0 ? (
-                  <details className="stats-details">
-                    <summary>Escenas ({tour.scenes.length})</summary>
-                    <ol className="metrics-list">
-                      {tour.scenes.map((scene) => (
-                        <li key={scene.sceneId}>
-                          {scene.title ?? "Escena de un tour borrado"}: {formatCount(scene.views)}{" "}
-                          {scene.views === 1 ? "vez" : "veces"}
-                        </li>
-                      ))}
-                    </ol>
-                  </details>
-                ) : null}
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
+      {has("tours") ? (
+        <section aria-labelledby="tours" className="metrics-section">
+          <h2 id="tours">Tours 360°</h2>
+          {summary.tours.length === 0 ? (
+            <p className="field-hint">Ningún tour se abrió en este período.</p>
+          ) : (
+            <ul className="stats-tours">
+              {summary.tours.map((tour) => (
+                <li key={tour.contentId} className="stats-tour">
+                  <h3>
+                    <Link href={editorOf(tour.kind, tour.contentId)}>{tour.title}</Link>
+                  </h3>
+                  <p className="field-hint">
+                    {formatCount(tour.views)} {tour.views === 1 ? "vista" : "vistas"} del tour ·{" "}
+                    {formatCount(tour.visitors)} visitantes · {formatCount(tour.sceneViews)}{" "}
+                    {tour.sceneViews === 1 ? "escena vista" : "escenas vistas"}
+                    {tour.qr > 0 ? ` · ${formatCount(tour.qr)} por QR` : ""}
+                  </p>
+                  {tour.scenes.length > 0 ? (
+                    <details className="stats-details">
+                      <summary>Escenas ({tour.scenes.length})</summary>
+                      <ol className="metrics-list">
+                        {tour.scenes.map((scene) => (
+                          <li key={scene.sceneId}>
+                            {scene.title ?? "Escena de un tour borrado"}: {formatCount(scene.views)}{" "}
+                            {scene.views === 1 ? "vez" : "veces"}
+                          </li>
+                        ))}
+                      </ol>
+                    </details>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
 
       {passport?.active ? (
         <PassportSection
@@ -405,42 +415,44 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
         </ul>
       </section>
 
-      <section aria-labelledby="recomendaciones" className="metrics-section">
-        <h2 id="recomendaciones">Recomendaciones del Copilot</h2>
-        <p className="field-hint">
-          Con las visitas de los últimos 30 días, el pasaporte turístico, las preguntas que el
-          asistente no supo responder, la revisión del contenido y la agenda. Cada recomendación
-          muestra las cifras en las que se basa. Nada se publica ni cambia solo: los enlaces llevan
-          a donde lo hace una persona del equipo.
-        </p>
-        {saved ? (
-          <>
-            <p className="recommendations-meta">
-              Generadas el {generatedAt(saved.createdAt, calendar.timezone)} · visitas{" "}
-              {formatDateRange(saved)}
-            </p>
-            {recommendationsAge(saved) >= RECOMMENDATIONS_FRESH_DAYS ? (
-              <p className="notice" role="status">
-                Estas recomendaciones tienen más de {RECOMMENDATIONS_FRESH_DAYS} días: genera unas
-                nuevas para ver las cifras de ahora.
+      {has("copilot") ? (
+        <section aria-labelledby="recomendaciones" className="metrics-section">
+          <h2 id="recomendaciones">Recomendaciones del Copilot</h2>
+          <p className="field-hint">
+            Con las visitas de los últimos 30 días, el pasaporte turístico, las preguntas que el
+            asistente no supo responder, la revisión del contenido y la agenda. Cada recomendación
+            muestra las cifras en las que se basa. Nada se publica ni cambia solo: los enlaces
+            llevan a donde lo hace una persona del equipo.
+          </p>
+          {saved ? (
+            <>
+              <p className="recommendations-meta">
+                Generadas el {generatedAt(saved.createdAt, calendar.timezone)} · visitas{" "}
+                {formatDateRange(saved)}
               </p>
-            ) : null}
-            <RecommendationList
-              membership={membership}
-              items={saved.items}
-              facts={saved.facts}
-              names={names}
-            />
-          </>
-        ) : (
-          <p className="field-hint">Todavía no hay recomendaciones para este municipio.</p>
-        )}
-        <RecommendationsForm
-          org={membership.slug}
-          enabled={aiGatewayStatus().configured}
-          hasSaved={saved !== null}
-        />
-      </section>
+              {recommendationsAge(saved) >= RECOMMENDATIONS_FRESH_DAYS ? (
+                <p className="notice" role="status">
+                  Estas recomendaciones tienen más de {RECOMMENDATIONS_FRESH_DAYS} días: genera unas
+                  nuevas para ver las cifras de ahora.
+                </p>
+              ) : null}
+              <RecommendationList
+                membership={membership}
+                items={saved.items}
+                facts={saved.facts}
+                names={names}
+              />
+            </>
+          ) : (
+            <p className="field-hint">Todavía no hay recomendaciones para este municipio.</p>
+          )}
+          <RecommendationsForm
+            org={membership.slug}
+            enabled={aiGatewayStatus().configured}
+            hasSaved={saved !== null}
+          />
+        </section>
+      ) : null}
 
       <p className="field-hint">
         Para la alcaldía: el <Link href={`/o/${membership.slug}/informe`}>informe mensual</Link>,

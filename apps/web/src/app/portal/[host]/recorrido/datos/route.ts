@@ -1,6 +1,6 @@
 import { portalTour } from "@/server/portal-content";
 import { tourData } from "@/server/portal-tours";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
 
 /**
@@ -16,7 +16,7 @@ interface TourDataContext {
 }
 
 async function handle(request: Request, { params }: TourDataContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "tours");
   if (view === null) return new Response("Not found", { status: 404 });
   const search = new URL(request.url).searchParams;
   const kind = search.get("tipo");

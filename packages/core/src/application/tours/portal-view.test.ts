@@ -148,6 +148,12 @@ describe("the public tour viewer's model", () => {
     ]);
   });
 
+  it("leaves out the 3D models of a municipality without that module (ADR-060)", () => {
+    const without = tourViewerModel(tour, ["tours"]);
+    expect(without.scenes[1]?.points).toEqual([]);
+    expect(without.scenes[0]?.points.map((point) => point.kind)).toEqual(["info", "scene", "tour"]);
+  });
+
   it("starts at the scene a link asks for, else at the entry", () => {
     expect(startingScene(model, C).title).toBe("Taller");
     expect(startingScene(model, null).title).toBe("Sala");

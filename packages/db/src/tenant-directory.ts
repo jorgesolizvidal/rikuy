@@ -6,6 +6,8 @@ import {
 } from "@rikuy/core";
 import { z } from "zod";
 
+import { moduleKeysOf } from "./module-keys";
+
 /**
  * Domain-registry adapter backed by `public.resolve_tenant_by_host` (migration P1).
  *
@@ -25,6 +27,8 @@ const rowSchema = z.object({
   active_config_id: z.uuid().nullable(),
   // Optional while the app may be deployed before the migration that adds it (ADR-034).
   is_demo: z.boolean().optional(),
+  // Same for the modules (ADR-060): without them the portal has everything.
+  modules: z.array(z.string()).nullable().optional(),
 });
 
 export function mapTenantRow(row: unknown): PortalTenant {
@@ -39,6 +43,7 @@ export function mapTenantRow(row: unknown): PortalTenant {
     isCanonical: r.is_canonical,
     activeConfigId: r.active_config_id,
     ...(r.is_demo ? { demo: true } : {}),
+    ...(r.modules ? { modules: moduleKeysOf(r.modules) ?? [] } : {}),
   };
 }
 

@@ -14,7 +14,7 @@ import Link from "next/link";
 
 import { formatCount } from "@/components/statistics/format";
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
 import "../estadisticas/statistics.css";
@@ -107,7 +107,7 @@ interface QuestionsPageProps {
 
 /** C1 · Paso 3 (ADR-053): what visitors ask and nothing published answers, for any member. */
 export default async function QuestionsPage({ params, searchParams }: QuestionsPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "assistant");
   const period = parseUnansweredPeriod((await searchParams).periodo);
   const session = await adminSession();
   const data = await loadUnansweredQuestions(membership, session.questions, period);

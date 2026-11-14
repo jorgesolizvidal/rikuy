@@ -117,9 +117,12 @@ Ningún dato del municipio entra al código ni a variables de entorno: todo se h
    - «Nombre del municipio»;
    - «Identificador» (se sugiere a partir del nombre);
    - «Dirección del portal», exactamente la del paso 1;
-   - «Correo del propietario»: tu correo, para ser el propietario del municipio (debe poder recibir el código: con el correo incluido de Supabase, solo los miembros del equipo).
+   - «Correo del propietario»: tu correo, para ser el propietario del municipio (debe poder recibir el código: con el correo incluido de Supabase, solo los miembros del equipo);
+   - «Módulos con los que empieza»: «Completo» (todo) o «Solo información» (destinos, agenda y mapa), según lo contratado ([ADR-060](adr/ADR-060-tenant-modules.md)).
 
    La zona horaria es la de Bolivia (`America/La_Paz`).
+
+   Los módulos se cambian después en `/plataforma` → columna «Módulos» del municipio: un interruptor por módulo. Apagar uno lo oculta del portal y del panel desde la siguiente visita; no se borra nada y vuelve como estaba al encenderlo.
 
 3. **Aceptar:** en el inicio del panel aparece la invitación; «Aceptar». Al abrir el municipio, el panel pide la verificación en dos pasos (ver la sección siguiente).
 4. **Marca:** en el municipio → «Marca del portal»: nombre, lema, colores, logo, contacto, redes y descripción para buscadores; «Publicar».

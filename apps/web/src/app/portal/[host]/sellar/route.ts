@@ -2,7 +2,7 @@ import { collectStamp } from "@rikuy/core";
 
 import { publishedStampReader } from "@/server/platform";
 import { fromSamePortal } from "@/server/portal-request";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 interface StampContext {
   readonly params: Promise<{ host: string }>;
@@ -19,7 +19,7 @@ const NO_STORE = { "cache-control": "no-store" };
  * stored: the database adds the stamp to the place's daily totals (ADR-059).
  */
 export async function POST(request: Request, { params }: StampContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "passport");
   if (view === null) {
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
   }

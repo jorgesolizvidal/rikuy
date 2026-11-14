@@ -109,6 +109,7 @@ export async function provisionTenantAction(
       hostname: formData.get("hostname"),
       ownerEmail: formData.get("ownerEmail"),
       demo: formData.get("demo"),
+      modulePackage: formData.get("modulePackage") ?? "complete",
     };
     const result = await provisionTenant(input, {
       platform,

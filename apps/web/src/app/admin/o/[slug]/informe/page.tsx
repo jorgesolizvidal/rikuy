@@ -1,4 +1,6 @@
 import {
+  hasModule,
+  type ModuleKey,
   COPILOT_ISSUE_LABELS,
   formatDateRange,
   formatMonth,
@@ -66,6 +68,8 @@ interface ReportPageProps {
  */
 export default async function MonthlyReportPage({ params, searchParams }: ReportPageProps) {
   const membership = await requireOrganization((await params).slug);
+  // Sections of a module the municipality does not have (ADR-060) only show what was kept.
+  const has = (key: ModuleKey) => hasModule(membership.modules, key);
   const session = await adminSession();
   const view = await loadMonthlyReport(
     membership,
@@ -227,37 +231,40 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
         />
       ) : null}
 
-      <section aria-labelledby="preguntas" className="metrics-section">
-        <h2 id="preguntas">Preguntas sin respuesta</h2>
-        {questions.total === 0 ? (
-          <p className="field-hint">El asistente respondió todas las preguntas del mes.</p>
-        ) : (
-          <>
-            <p>
-              El asistente no supo responder{" "}
-              <strong>
-                {formatCount(questions.total)} {questions.total === 1 ? "pregunta" : "preguntas"}
-              </strong>{" "}
-              de {formatCount(questions.people)} {questions.people === 1 ? "persona" : "personas"} (
-              {formatCount(questions.groups.length)}{" "}
-              {questions.groups.length === 1 ? "distinta" : "distintas"}). Las más frecuentes:
-            </p>
-            <ol className="metrics-list report-questions">
-              {questions.groups.slice(0, 10).map((group) => (
-                <li key={group.key}>
-                  «{group.text}» · {formatCount(group.times)} {group.times === 1 ? "vez" : "veces"}
-                  <Link
-                    href={`/o/${membership.slug}/conocimiento?pregunta=${encodeURIComponent(group.text)}`}
-                    className="report-screen-only report-inline-link"
-                  >
-                    Probar en «Conocimiento del asistente»
-                  </Link>
-                </li>
-              ))}
-            </ol>
-          </>
-        )}
-      </section>
+      {has("assistant") || questions.total > 0 ? (
+        <section aria-labelledby="preguntas" className="metrics-section">
+          <h2 id="preguntas">Preguntas sin respuesta</h2>
+          {questions.total === 0 ? (
+            <p className="field-hint">El asistente respondió todas las preguntas del mes.</p>
+          ) : (
+            <>
+              <p>
+                El asistente no supo responder{" "}
+                <strong>
+                  {formatCount(questions.total)} {questions.total === 1 ? "pregunta" : "preguntas"}
+                </strong>{" "}
+                de {formatCount(questions.people)} {questions.people === 1 ? "persona" : "personas"}{" "}
+                ({formatCount(questions.groups.length)}{" "}
+                {questions.groups.length === 1 ? "distinta" : "distintas"}). Las más frecuentes:
+              </p>
+              <ol className="metrics-list report-questions">
+                {questions.groups.slice(0, 10).map((group) => (
+                  <li key={group.key}>
+                    «{group.text}» · {formatCount(group.times)}{" "}
+                    {group.times === 1 ? "vez" : "veces"}
+                    <Link
+                      href={`/o/${membership.slug}/conocimiento?pregunta=${encodeURIComponent(group.text)}`}
+                      className="report-screen-only report-inline-link"
+                    >
+                      Probar en «Conocimiento del asistente»
+                    </Link>
+                  </li>
+                ))}
+              </ol>
+            </>
+          )}
+        </section>
+      ) : null}
 
       <section aria-labelledby="contenido-estado" className="metrics-section">
         <h2 id="contenido-estado">Estado del contenido</h2>
@@ -313,38 +320,40 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
         )}
       </section>
 
-      <section aria-labelledby="recomendaciones" className="metrics-section">
-        <h2 id="recomendaciones">Recomendaciones del Copilot</h2>
-        {saved && saved.items && saved.facts ? (
-          <>
-            <p className="recommendations-meta">
-              Generadas el {dateTime(saved.generatedAt, timezone)} con las cifras{" "}
-              {formatDateRange(saved)}. Cada una muestra las cifras en las que se basa; nada se
-              publica solo.
+      {has("copilot") || saved?.items ? (
+        <section aria-labelledby="recomendaciones" className="metrics-section">
+          <h2 id="recomendaciones">Recomendaciones del Copilot</h2>
+          {saved && saved.items && saved.facts ? (
+            <>
+              <p className="recommendations-meta">
+                Generadas el {dateTime(saved.generatedAt, timezone)} con las cifras{" "}
+                {formatDateRange(saved)}. Cada una muestra las cifras en las que se basa; nada se
+                publica solo.
+              </p>
+              <RecommendationList
+                membership={membership}
+                items={saved.items}
+                facts={saved.facts}
+                names={names}
+              />
+            </>
+          ) : saved?.forgotten ? (
+            <p className="field-hint">
+              Las recomendaciones de este mes ya no se guardan: se borran a los 90 días, como las
+              preguntas de los visitantes.
             </p>
-            <RecommendationList
-              membership={membership}
-              items={saved.items}
-              facts={saved.facts}
-              names={names}
-            />
-          </>
-        ) : saved?.forgotten ? (
-          <p className="field-hint">
-            Las recomendaciones de este mes ya no se guardan: se borran a los 90 días, como las
-            preguntas de los visitantes.
-          </p>
-        ) : saved ? (
-          <p className="field-hint">{monthlyNoteLabel(saved.note)}</p>
-        ) : view.current ? (
-          <p className="field-hint">
-            Las recomendaciones del mes se generan solas el día 1 del mes siguiente, con el mes
-            completo.
-          </p>
-        ) : (
-          <p className="field-hint">Este mes no tiene recomendaciones guardadas.</p>
-        )}
-      </section>
+          ) : saved ? (
+            <p className="field-hint">{monthlyNoteLabel(saved.note)}</p>
+          ) : view.current ? (
+            <p className="field-hint">
+              Las recomendaciones del mes se generan solas el día 1 del mes siguiente, con el mes
+              completo.
+            </p>
+          ) : (
+            <p className="field-hint">Este mes no tiene recomendaciones guardadas.</p>
+          )}
+        </section>
+      ) : null}
 
       <section aria-labelledby="correo" className="metrics-section report-screen-only">
         <h2 id="correo">Por correo</h2>

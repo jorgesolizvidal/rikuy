@@ -4,7 +4,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../../sign-out-button";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
@@ -26,7 +26,7 @@ interface EditorPageProps {
 
 export default async function KnowledgeEditorPage({ params }: EditorPageProps) {
   const { slug, id } = await params;
-  const membership = await requireOrganization(slug);
+  const membership = await requireModule(slug, "assistant");
   if (!UUID.test(id)) notFound();
   const editor = await loadKnowledgeEditor(membership, id, (await adminSession()).knowledge);
   if (editor === null) notFound();

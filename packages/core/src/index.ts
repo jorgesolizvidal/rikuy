@@ -9,6 +9,7 @@
  * (enforced by ESLint). Modules are added phase by phase; see docs/roadmap.md.
  */
 export * from "./domain/tenancy/host";
+export * from "./domain/tenancy/modules";
 export * from "./contracts/tenant";
 export * from "./application/tenancy/resolve-portal-tenant";
 export * from "./application/tenancy/cached-tenant-directory";
@@ -112,6 +113,7 @@ export * from "./application/assistant/unanswered";
 export * from "./contracts/copilot";
 export * from "./application/copilot/copilot";
 export * from "./application/copilot/ports";
+export * from "./application/copilot/modules";
 export * from "./application/copilot/recommendations";
 export * from "./domain/copilot/diff";
 export * from "./domain/copilot/issues";

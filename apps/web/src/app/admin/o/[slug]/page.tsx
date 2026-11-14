@@ -1,4 +1,13 @@
-import { canEditContent, canManageBranding, canManageMembers, ROLE_LABELS } from "@rikuy/core";
+import {
+  canEditContent,
+  canManageBranding,
+  canManageMembers,
+  hasModule,
+  MODULE_KEYS,
+  MODULE_NAMES,
+  ROLE_LABELS,
+  type ModuleKey,
+} from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -16,6 +25,8 @@ export async function generateMetadata({ params }: OrganizationPageProps): Promi
 
 export default async function OrganizationPage({ params }: OrganizationPageProps) {
   const membership = await requireOrganization((await params).slug);
+  const has = (key: ModuleKey) => hasModule(membership.modules, key);
+  const modules = membership.modules ?? MODULE_KEYS;
 
   return (
     <main id="contenido" tabIndex={-1} className="shell">
@@ -37,68 +48,80 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
           </Link>
         </li>
-        <li>
-          <Link href={`/o/${membership.slug}/agenda`} className="org-card">
-            <span>
-              <span className="org-name">Agenda</span>
-              <span className="org-detail">Eventos con fecha, lugar y fotos</span>
-            </span>
-            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/tours`} className="org-card">
-            <span>
-              <span className="org-name">Tours 360°</span>
-              <span className="org-detail">Recorridos virtuales de los destinos y eventos</span>
-            </span>
-            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/panoramas`} className="org-card">
-            <span>
-              <span className="org-name">Panoramas 360°</span>
-              <span className="org-detail">Fotos 360° para los recorridos virtuales</span>
-            </span>
-            <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/modelos`} className="org-card">
-            <span>
-              <span className="org-name">Modelos 3D</span>
-              <span className="org-detail">
-                Objetos en 3D para los recorridos, optimizados para celulares
+        {has("agenda") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/agenda`} className="org-card">
+              <span>
+                <span className="org-name">Agenda</span>
+                <span className="org-detail">Eventos con fecha, lugar y fotos</span>
               </span>
-            </span>
-            <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/conocimiento`} className="org-card">
-            <span>
-              <span className="org-name">Conocimiento del asistente</span>
-              <span className="org-detail">
-                Textos y documentos que lee el asistente, y prueba de lo que encuentra
+              <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+            </Link>
+          </li>
+        ) : null}
+        {has("tours") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/tours`} className="org-card">
+              <span>
+                <span className="org-name">Tours 360°</span>
+                <span className="org-detail">Recorridos virtuales de los destinos y eventos</span>
               </span>
-            </span>
-            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/copilot`} className="org-card">
-            <span>
-              <span className="org-name">Copilot</span>
-              <span className="org-detail">
-                Revisa lo que le falta al contenido y propone textos que tú decides guardar
+              <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+            </Link>
+          </li>
+        ) : null}
+        {has("tours") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/panoramas`} className="org-card">
+              <span>
+                <span className="org-name">Panoramas 360°</span>
+                <span className="org-detail">Fotos 360° para los recorridos virtuales</span>
               </span>
-            </span>
-            <span className="org-role">
-              {canEditContent(membership.role) ? "Usar" : "Preguntar"}
-            </span>
-          </Link>
-        </li>
+              <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
+            </Link>
+          </li>
+        ) : null}
+        {has("models") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/modelos`} className="org-card">
+              <span>
+                <span className="org-name">Modelos 3D</span>
+                <span className="org-detail">
+                  Objetos en 3D para los recorridos, optimizados para celulares
+                </span>
+              </span>
+              <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
+            </Link>
+          </li>
+        ) : null}
+        {has("assistant") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/conocimiento`} className="org-card">
+              <span>
+                <span className="org-name">Conocimiento del asistente</span>
+                <span className="org-detail">
+                  Textos y documentos que lee el asistente, y prueba de lo que encuentra
+                </span>
+              </span>
+              <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
+            </Link>
+          </li>
+        ) : null}
+        {has("copilot") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/copilot`} className="org-card">
+              <span>
+                <span className="org-name">Copilot</span>
+                <span className="org-detail">
+                  Revisa lo que le falta al contenido y propone textos que tú decides guardar
+                </span>
+              </span>
+              <span className="org-role">
+                {canEditContent(membership.role) ? "Usar" : "Preguntar"}
+              </span>
+            </Link>
+          </li>
+        ) : null}
         <li>
           <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
             <span>
@@ -121,17 +144,19 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             <span className="org-role">Ver</span>
           </Link>
         </li>
-        <li>
-          <Link href={`/o/${membership.slug}/pasaporte`} className="org-card">
-            <span>
-              <span className="org-name">Pasaporte turístico</span>
-              <span className="org-detail">
-                Circuitos de destinos con un premio para quien los completa
+        {has("passport") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/pasaporte`} className="org-card">
+              <span>
+                <span className="org-name">Pasaporte turístico</span>
+                <span className="org-detail">
+                  Circuitos de destinos con un premio para quien los completa
+                </span>
               </span>
-            </span>
-            <span className="org-role">Ver</span>
-          </Link>
-        </li>
+              <span className="org-role">Ver</span>
+            </Link>
+          </li>
+        ) : null}
         <li>
           <Link href={`/o/${membership.slug}/informe`} className="org-card">
             <span>
@@ -143,17 +168,19 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             <span className="org-role">Ver</span>
           </Link>
         </li>
-        <li>
-          <Link href={`/o/${membership.slug}/preguntas`} className="org-card">
-            <span>
-              <span className="org-name">Lo que preguntan los visitantes</span>
-              <span className="org-detail">
-                Las preguntas que el asistente no pudo responder con lo publicado
+        {has("assistant") ? (
+          <li>
+            <Link href={`/o/${membership.slug}/preguntas`} className="org-card">
+              <span>
+                <span className="org-name">Lo que preguntan los visitantes</span>
+                <span className="org-detail">
+                  Las preguntas que el asistente no pudo responder con lo publicado
+                </span>
               </span>
-            </span>
-            <span className="org-role">Ver</span>
-          </Link>
-        </li>
+              <span className="org-role">Ver</span>
+            </Link>
+          </li>
+        ) : null}
         <li>
           <Link href={`/o/${membership.slug}/uso`} className="org-card">
             <span>
@@ -190,6 +217,11 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
           </li>
         ) : null}
       </ul>
+      <p className="field-hint org-modules">
+        Módulos de este municipio:{" "}
+        {modules.length > 0 ? modules.map((key) => MODULE_NAMES[key]).join(", ") : "ninguno"}. Los
+        activa el operador de la plataforma.
+      </p>
       {membership.demo ? (
         <p className="notice">
           Es una demo comercial: su portal no aparece en buscadores y avisa a los visitantes que es

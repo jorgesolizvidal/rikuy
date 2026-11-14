@@ -34,12 +34,14 @@ import {
   type SnapshotItem,
 } from "../../domain/copilot/prompts";
 import { formatEventSchedule } from "../../domain/events/schedule";
+import { passageVisibleWith } from "../../domain/tenancy/modules";
 import type { AiCall, AiSessionInput, AiSessionResult } from "../ai/gateway";
 import { reservationFor } from "../ai/gateway";
 import type { ContentRecord, ContentRepository } from "../content/ports";
 import type { KnowledgeRepository } from "../knowledge/ports";
 import type { TourRepository } from "../tours/tours";
 import type { UsageMeter } from "../usage/usage";
+import { copilotForModules } from "./modules";
 import type { CopilotRepository } from "./ports";
 
 /**
@@ -108,8 +110,9 @@ export async function loadCopilot(
   membership: OrganizationMembership,
   copilot: CopilotRepository,
 ): Promise<CopilotOverview> {
+  const view = copilotForModules(copilot, membership.modules);
   const [review, proposals] = await Promise.all([
-    copilot.review(membership.tenantId),
+    view.review(membership.tenantId),
     canPropose(membership) ? copilot.listProposals(membership.tenantId) : Promise.resolve(null),
   ]);
   return { review, proposals };
@@ -318,11 +321,18 @@ export async function askCopilotTraced(
   const history = parseTurns(input.history);
   const now = (deps.now ?? (() => new Date()))();
 
+  const copilot = copilotForModules(deps.copilot, membership.modules);
   const [data, review, usage, passages] = await Promise.all([
-    deps.copilot.snapshot(membership.tenantId),
-    deps.copilot.review(membership.tenantId),
+    copilot.snapshot(membership.tenantId),
+    copilot.review(membership.tenantId),
     deps.usage(),
-    deps.knowledge.search(membership.tenantId, question.slice(0, 300), COPILOT_LIMITS.passages),
+    deps.knowledge
+      .search(membership.tenantId, question.slice(0, 300), COPILOT_LIMITS.passages * 2)
+      .then((found) =>
+        found
+          .filter((passage) => passageVisibleWith(membership.modules, passage))
+          .slice(0, COPILOT_LIMITS.passages),
+      ),
   ]);
   const { items, byLabel, omitted } = snapshotItems(data.items, review);
   const snapshot: CopilotSnapshot = {

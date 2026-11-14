@@ -1,6 +1,6 @@
 "use server";
 
-import { generateRecommendations, openOrganization } from "@rikuy/core";
+import { generateRecommendations, openOrganization, withModule } from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
 import { recommendationsDeps } from "@/server/copilot";
@@ -29,7 +29,9 @@ export async function generateRecommendationsAction(
     const slug = formData.get("org");
     const session = await adminSession();
     const membership =
-      typeof slug === "string" ? await openOrganization(actor, slug, session.memberships) : null;
+      typeof slug === "string"
+        ? withModule(await openOrganization(actor, slug, session.memberships), "copilot")
+        : null;
     if (membership === null) return { status: "forbidden" };
     const outcome = await generateRecommendations(
       membership,

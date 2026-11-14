@@ -1,4 +1,5 @@
 import type { MembershipRole } from "../../contracts/organization";
+import type { ModuleKey } from "../../domain/tenancy/modules";
 
 export type TenantStatus = "provisioning" | "active" | "suspended";
 export type MembershipStatus = "invited" | "active" | "revoked";
@@ -17,6 +18,8 @@ export interface PlatformTenantSummary {
   readonly createdAt: string;
   /** A commercial demo (ADR-034). */
   readonly demo: boolean;
+  /** The modules it has (ADR-060); absent when read before that migration (all of them). */
+  readonly modules?: readonly ModuleKey[];
 }
 
 export interface ProvisionRequest {
@@ -28,6 +31,8 @@ export interface ProvisionRequest {
   readonly timezone: string;
   /** A commercial demo: never indexed, offers sample content (ADR-034). */
   readonly demo: boolean;
+  /** The modules it starts with (ADR-060), already checked. */
+  readonly modules: readonly ModuleKey[];
 }
 
 export type ProvisionOutcome =
@@ -53,7 +58,15 @@ export interface PlatformRepository {
   setStatus(tenantId: string, status: "active" | "suspended"): Promise<TenantStatusChangeOutcome>;
   /** Removes the TOTP factors of an owner or admin, audited (ADR-043). */
   resetSecondFactor(email: string): Promise<SecondFactorResetOutcome>;
+  /** Replaces the modules of a municipality, audited (ADR-060). */
+  setModules(tenantId: string, modules: readonly ModuleKey[]): Promise<ModulesChangeOutcome>;
 }
+
+export type ModulesChangeOutcome =
+  | { readonly status: "updated"; readonly modules: readonly ModuleKey[] }
+  | { readonly status: "invalid" }
+  | { readonly status: "not_found" }
+  | { readonly status: "forbidden" };
 
 export type SecondFactorResetOutcome =
   | { readonly status: "reset"; readonly removed: number }

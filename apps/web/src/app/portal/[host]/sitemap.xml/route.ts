@@ -7,7 +7,7 @@ import {
   portalPassport,
   portalTourIndex,
 } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalView } from "@/server/portal-view";
 
 /** Resolved per request: these small responses carry their own Cache-Control. */
 export const dynamic = "force-dynamic";
@@ -26,7 +26,10 @@ export async function GET(_request: Request, { params }: SitemapContext) {
     portalTourIndex(view),
     portalPassport(view),
   ]);
-  const xml = buildSitemap(portalOrigin(view), destinations, events, tours, circuits);
+  const xml = buildSitemap(portalOrigin(view), destinations, events, tours, circuits, {
+    agenda: portalHas(view, "agenda"),
+    map: portalHas(view, "map"),
+  });
   return new Response(xml, {
     headers: {
       "content-type": "application/xml; charset=utf-8",

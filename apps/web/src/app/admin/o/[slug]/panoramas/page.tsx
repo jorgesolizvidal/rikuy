@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { AutoRefresh } from "./auto-refresh";
@@ -19,7 +19,7 @@ interface PanoramasPageProps {
 }
 
 export default async function PanoramasPage({ params }: PanoramasPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "tours");
   const session = await adminSession();
   const { cards, assets, canUpload, canDelete } = await loadPanoramas(membership, {
     panoramas: session.panoramas,

@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { publishedStampReader } from "@/server/platform";
 import { portalPassport, responsiveImage } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 import "../../passport.css";
 import { PassportHowItWorks } from "../../passport-how";
@@ -29,7 +29,7 @@ export const metadata: Metadata = {
 
 export default async function StampPage({ params }: StampPageProps) {
   const { host, code } = await params;
-  const view = await portalView(host);
+  const view = await portalViewWith(host, "passport");
   if (view === null) notFound();
   const tenantId = view.context.tenant.tenantId;
   const place = isStampCode(code) ? await publishedStampReader().place(tenantId, code) : null;

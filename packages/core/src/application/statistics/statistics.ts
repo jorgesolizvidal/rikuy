@@ -6,6 +6,7 @@ import {
   type PassportStatisticsData,
   type PassportSummary,
 } from "../../domain/passport/statistics";
+import { hasModule } from "../../domain/tenancy/modules";
 import {
   originsCsv,
   statisticsRange,
@@ -71,11 +72,13 @@ export async function loadStatistics(
   // Nothing to compare with when the previous period was not counted entirely.
   const comparable = firstDay !== null && range.previous.from >= firstDay;
   const days = { from: range.from, to: range.to };
+  // Without the passport (ADR-060), no section: its numbers are kept, not shown.
+  const withPassport = hasModule(membership.modules, "passport");
   const [current, previous, passport, passportBefore] = await Promise.all([
     repository.statistics(membership.tenantId, days, false),
     comparable ? repository.statistics(membership.tenantId, range.previous, false) : null,
-    repository.passport(membership.tenantId, days, false),
-    repository.passport(membership.tenantId, range.previous, false),
+    withPassport ? repository.passport(membership.tenantId, days, false) : null,
+    withPassport ? repository.passport(membership.tenantId, range.previous, false) : null,
   ]);
   const summary = summarizeStatistics(range, current, previous, firstDay);
   return {
@@ -117,7 +120,9 @@ export async function downloadStatistics(
   const days = { from: range.from, to: range.to };
   const filename = `${membership.slug}-${kind}-${range.from}-a-${range.to}.csv`;
   if (kind === "pasaporte") {
-    const data = await repository.passport(membership.tenantId, days, true);
+    const data = hasModule(membership.modules, "passport")
+      ? await repository.passport(membership.tenantId, days, true)
+      : null;
     return {
       filename,
       body: passportCsv(data ?? { ...days, since: null, places: [], circuits: [] }),
