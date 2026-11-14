@@ -12,7 +12,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../../../sign-out-button";
 import { ProposalReview, type FieldDiff } from "./proposal-review";
@@ -36,7 +36,7 @@ interface ProposalPageProps {
 
 export default async function ProposalPage({ params }: ProposalPageProps) {
   const { slug, id } = await params;
-  const membership = await requireOrganization(slug);
+  const membership = await requireModule(slug, "copilot");
   const session = await adminSession();
   const proposal = await loadProposal(membership, id, session.copilot);
   if (!proposal) notFound();

@@ -2,6 +2,7 @@ import type { AiRefusal } from "../../contracts/ai";
 import type { CopilotReviewRow, CopilotSnapshotRow } from "../../contracts/copilot";
 import type { OrganizationMembership } from "../../contracts/organization";
 import { COPILOT_PATHS } from "../../domain/copilot/paths";
+import { hasModule, type ModuleKey } from "../../domain/tenancy/modules";
 import {
   parseRecommendations,
   recommendationFacts,
@@ -21,6 +22,7 @@ import type {
 } from "../assistant/unanswered";
 import { loadStatistics, type StatisticsRepository } from "../statistics/statistics";
 import { canPropose, COPILOT_NOTICES, type CopilotAiRunner } from "./copilot";
+import { copilotForModules, reviewForModules, snapshotForModules } from "./modules";
 import type { CopilotRepository } from "./ports";
 
 /**
@@ -141,6 +143,8 @@ export interface RecommendationRun {
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
   readonly snapshot: readonly CopilotSnapshotRow[];
+  /** The municipality's modules (ADR-060): nothing of a module that is off. */
+  readonly modules?: readonly ModuleKey[];
   readonly ai: CopilotAiRunner;
 }
 
@@ -160,13 +164,17 @@ export type RecommendationRunOutcome =
 export async function runRecommendations(
   run: RecommendationRun,
 ): Promise<RecommendationRunOutcome> {
+  const modules = run.modules;
+  const questions = hasModule(modules, "assistant")
+    ? run.questions
+    : { ...run.questions, total: 0, people: 0, groups: [] };
   const facts = recommendationFacts({
     statistics: run.statistics,
-    passport: run.passport ?? null,
+    passport: hasModule(modules, "passport") ? (run.passport ?? null) : null,
     ...(run.period ? { period: run.period } : {}),
-    questions: recommendationQuestions(run.questions),
-    review: run.review,
-    snapshot: run.snapshot,
+    questions: recommendationQuestions(questions),
+    review: reviewForModules(run.review, modules),
+    snapshot: snapshotForModules(run.snapshot, modules),
   });
   const messages = recommendationMessages({
     site: run.site,
@@ -201,11 +209,12 @@ export async function generateRecommendations(
   deps: GenerateRecommendationsDeps,
 ): Promise<GenerateRecommendationsOutcome> {
   const now = (deps.now ?? (() => new Date()))();
+  const copilot = copilotForModules(deps.copilot, membership.modules);
   const [stats, questions, review, snapshot] = await Promise.all([
     loadStatistics(membership, deps.statistics, "30-dias", now),
     deps.questions.unansweredQuestions(membership.tenantId, 30),
-    deps.copilot.review(membership.tenantId),
-    deps.copilot.snapshot(membership.tenantId),
+    copilot.review(membership.tenantId),
+    copilot.snapshot(membership.tenantId),
   ]);
   const run = await runRecommendations({
     tenantId: membership.tenantId,
@@ -218,6 +227,7 @@ export async function generateRecommendations(
     questions,
     review,
     snapshot: snapshot.items,
+    ...(membership.modules ? { modules: membership.modules } : {}),
     ai: deps.ai,
   });
   if (run.status === "refused") {

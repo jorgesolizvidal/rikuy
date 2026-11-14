@@ -10,7 +10,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../../../../sign-out-button";
@@ -26,7 +26,7 @@ interface CircuitPageProps {
 
 export default async function CircuitAdminPage({ params }: CircuitPageProps) {
   const { slug, id } = await params;
-  const membership = await requireOrganization(slug);
+  const membership = await requireModule(slug, "passport");
   const session = await adminSession();
   const [view, hostname, pins] = await Promise.all([
     loadPassport(membership, { passport: session.passport, content: session.content }),

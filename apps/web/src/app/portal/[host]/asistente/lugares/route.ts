@@ -1,5 +1,5 @@
 import { portalPlanPlaces } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
 
 interface PlacesContext {
@@ -12,7 +12,7 @@ interface PlacesContext {
  * only rounded distances go with the question. Public data of THIS portal (from the host).
  */
 async function handle(_request: Request, { params }: PlacesContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "assistant");
   if (view === null) return Response.json({ error: "not_found" }, { status: 404 });
   const { destinations, events } = await portalPlanPlaces(view);
   const places = [

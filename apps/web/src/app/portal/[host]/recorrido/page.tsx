@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { portalTour, portalTourIndex } from "@/server/portal-content";
 import { tourData } from "@/server/portal-tours";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 import { TourArticle } from "../tour-page";
 
@@ -18,7 +18,7 @@ interface GeneralTourPageProps {
 }
 
 async function load(params: GeneralTourPageProps["params"]) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "tours");
   if (view === null) return null;
   const index = await portalTourIndex(view);
   const start = index.find((entry) => entry.start) ?? index[0];

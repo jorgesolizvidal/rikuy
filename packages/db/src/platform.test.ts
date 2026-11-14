@@ -1,3 +1,4 @@
+import { MODULE_KEYS } from "@rikuy/core";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -60,6 +61,7 @@ describe("platform repository", () => {
       defaultLocale: "es",
       timezone: "America/La_Paz",
       demo: false,
+      modules: [...MODULE_KEYS],
     };
     expect(await createPlatformRepository(ok.client).provision(request)).toEqual({
       status: "provisioned",
@@ -72,6 +74,14 @@ describe("platform repository", () => {
     const demo = session(() => json([{ tenant_id: TENANT, domain_id: TENANT }]));
     await createPlatformRepository(demo.client).provision({ ...request, demo: true });
     expect(demo.calls[0]?.body).toMatchObject({ p_demo: true });
+    // Everything is the default: the modules go only for another package (ADR-060).
+    expect(ok.calls[0]?.body).not.toHaveProperty("p_modules");
+    const information = session(() => json([{ tenant_id: TENANT, domain_id: TENANT }]));
+    await createPlatformRepository(information.client).provision({
+      ...request,
+      modules: ["agenda", "map"],
+    });
+    expect(information.calls[0]?.body).toMatchObject({ p_modules: ["agenda", "map"] });
 
     for (const [code, status, hint, outcome] of [
       ["PT409", 409, "slug", "slug_taken"],
@@ -85,6 +95,41 @@ describe("platform repository", () => {
         status: outcome,
       });
     }
+  });
+
+  it("changes the modules and reads them with the municipalities (ADR-060)", async () => {
+    const ok = session(() => json(["agenda", "map", "restaurantes"]));
+    expect(await createPlatformRepository(ok.client).setModules(TENANT, ["map", "agenda"])).toEqual(
+      { status: "updated", modules: ["agenda", "map"] },
+    );
+    expect(ok.calls[0]?.url.pathname).toBe("/rest/v1/rpc/platform_set_tenant_modules");
+    expect(ok.calls[0]?.body).toEqual({ p_tenant_id: TENANT, p_modules: ["map", "agenda"] });
+    for (const [code, status, outcome] of [
+      ["42501", 403, "forbidden"],
+      ["PT404", 404, "not_found"],
+      ["23514", 400, "invalid"],
+    ] as const) {
+      const failing = session(() => pgError(code, status, null));
+      expect(await createPlatformRepository(failing.client).setModules(TENANT, [])).toEqual({
+        status: outcome,
+      });
+    }
+
+    const row = {
+      tenant_id: TENANT,
+      slug: "demo-norte",
+      display_name: "Municipio Demo Norte",
+      status: "active",
+      canonical_host: "demo-norte.localhost",
+      owner_email: null,
+      owner_status: null,
+      created_at: "2026-11-13T00:00:00Z",
+      is_demo: false,
+    };
+    const listed = session(() => json([{ ...row, modules: ["tours", "voice"] }, row]));
+    const [withModules, before] = await createPlatformRepository(listed.client).listTenants();
+    expect(withModules?.modules).toEqual(["tours", "voice"]);
+    expect(before).not.toHaveProperty("modules");
   });
 
   it("maps status changes", async () => {

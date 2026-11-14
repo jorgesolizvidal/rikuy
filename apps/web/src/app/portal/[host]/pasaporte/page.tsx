@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { portalPassport } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 import "../passport.css";
 import { PassportHowItWorks } from "../passport-how";
@@ -14,7 +14,7 @@ interface PassportPageProps {
 }
 
 export async function generateMetadata({ params }: PassportPageProps): Promise<Metadata> {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "passport");
   if (view === null) return {};
   const { siteName } = view.resolved.presentation.identity;
   const description = `Circuitos de lugares para recorrer en ${siteName} y el premio por completarlos.`;
@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: PassportPageProps): Promise<M
 
 /** The tourist passport (C2, ADR-056): the municipality's published circuits. */
 export default async function PassportPage({ params }: PassportPageProps) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "passport");
   if (view === null) notFound();
   const circuits = await portalPassport(view);
 

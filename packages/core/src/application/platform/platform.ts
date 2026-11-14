@@ -1,9 +1,16 @@
 import { normalizeEmail, normalizeOneTimeCode } from "../../domain/identity/email";
 import { classifyHost, type PlatformHosts } from "../../domain/tenancy/host";
+import {
+  checkModuleSet,
+  MODULE_PACKAGES,
+  type ModuleKey,
+  type ModulePackage,
+} from "../../domain/tenancy/modules";
 import { isValidSlug } from "../../domain/tenancy/slug";
 import type {
   IdentityAdmin,
   MfaGateway,
+  ModulesChangeOutcome,
   PlatformRepository,
   PlatformTenantSummary,
   ProvisionOutcome,
@@ -87,7 +94,7 @@ export function suggestPortalHostname(slug: string, hosts: PlatformHosts): strin
   return `${slug}.${hosts.rootDomain}`;
 }
 
-export type ProvisionField = "displayName" | "slug" | "hostname" | "ownerEmail";
+export type ProvisionField = "displayName" | "slug" | "hostname" | "ownerEmail" | "modules";
 
 export type ProvisionTenantResult =
   | ProvisionOutcome
@@ -113,6 +120,8 @@ export async function provisionTenant(
     readonly ownerEmail: unknown;
     /** "on" (a checkbox) or true: a commercial demo. */
     readonly demo?: unknown;
+    /** The package it starts with (ADR-060): "complete" (default) or "information". */
+    readonly modulePackage?: unknown;
   },
   deps: ProvisionTenantDeps,
 ): Promise<ProvisionTenantResult> {
@@ -135,7 +144,14 @@ export async function provisionTenant(
   const ownerEmail = normalizeEmail(input.ownerEmail);
   if (ownerEmail === null) fields.push("ownerEmail");
 
-  if (fields.length > 0 || hostname === null || ownerEmail === null) {
+  const modulePackage = input.modulePackage ?? "complete";
+  const modules =
+    modulePackage === "complete" || modulePackage === "information"
+      ? MODULE_PACKAGES[modulePackage as ModulePackage]
+      : null;
+  if (modules === null) fields.push("modules");
+
+  if (fields.length > 0 || hostname === null || ownerEmail === null || modules === null) {
     return { status: "invalid_input", fields };
   }
 
@@ -148,7 +164,32 @@ export async function provisionTenant(
     defaultLocale: "es",
     timezone: "America/La_Paz",
     demo: input.demo === true || input.demo === "on",
+    modules,
   });
+}
+
+export type ChangeModulesResult =
+  | ModulesChangeOutcome
+  | { readonly status: "requires"; readonly module: ModuleKey; readonly needs: ModuleKey };
+
+/**
+ * The operator (with the second factor) turns modules of a municipality on or off
+ * (ADR-060). Nothing is deleted: content of a module turned off is kept and comes back when
+ * it is turned on again. A module that needs another one cannot stay on without it.
+ */
+export async function changeTenantModules(
+  platform: PlatformRepository,
+  tenantId: unknown,
+  modules: unknown,
+): Promise<ChangeModulesResult> {
+  if ((await platform.operatorAccess()) !== "ok") return { status: "forbidden" };
+  if (typeof tenantId !== "string" || tenantId === "" || !Array.isArray(modules)) {
+    return { status: "invalid" };
+  }
+  const checked = checkModuleSet(modules);
+  if (checked.status === "invalid") return { status: "invalid" };
+  if (checked.status === "requires") return checked;
+  return platform.setModules(tenantId, checked.modules);
 }
 
 export async function changeTenantStatus(

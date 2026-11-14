@@ -26,7 +26,7 @@ import {
 } from "./platform";
 import type { NearbyTargetDto } from "@/app/portal/[host]/visitor-location";
 
-import { portalView, type PortalView } from "./portal-view";
+import { portalHas, portalView, type PortalView } from "./portal-view";
 
 /** What an <img> needs to load the right derivative and reserve its space. */
 export interface ResponsiveImage {
@@ -74,12 +74,14 @@ export const portalOpeningHours = cache(async (view: PortalView) =>
 );
 
 /** What a plan of the assistant may include: destinations with hours and upcoming events. */
-export const portalPlanPlaces = cache(async (view: PortalView) =>
-  loadAssistantPlaces(view.context.tenant.tenantId, {
+export const portalPlanPlaces = cache(async (view: PortalView) => {
+  const places = await loadAssistantPlaces(view.context.tenant.tenantId, {
     destinations: publishedContentReader(),
     events: publishedEventReader(),
-  }),
-);
+  });
+  // Without the agenda, no plan includes events (ADR-060).
+  return portalHas(view, "agenda") ? places : { ...places, events: [] };
+});
 
 /** Absolute public origin of this portal (its canonical host). */
 export function portalOrigin(view: PortalView): string {
@@ -103,14 +105,19 @@ export const portalNearbyTargets = cache(async (view: PortalView): Promise<Nearb
   ),
 );
 
-/** Upcoming and ongoing events of the portal's tenant, soonest first. */
+/**
+ * Upcoming and ongoing events of the portal's tenant, soonest first. None without the agenda
+ * (ADR-060): every page that lists events reads them here.
+ */
 export const portalEvents = cache(async (view: PortalView) =>
-  publishedEventReader().list(view.context.tenant.tenantId),
+  portalHas(view, "agenda") ? publishedEventReader().list(view.context.tenant.tenantId) : [],
 );
 
-/** One published event (also after it ended), or null. */
+/** One published event (also after it ended), or null; null without the agenda. */
 export const portalEvent = cache(async (view: PortalView, slug: string) =>
-  publishedEventReader().find(view.context.tenant.tenantId, slug),
+  portalHas(view, "agenda")
+    ? publishedEventReader().find(view.context.tenant.tenantId, slug)
+    : null,
 );
 
 /** What the browser map and its list need for one place (no internal ids). */
@@ -161,15 +168,19 @@ export const portalIsEmpty = cache(async (view: PortalView) =>
  * header link and the passport pages share it. Without it a page still works.
  */
 export const portalPassport = cache(async (view: PortalView) =>
-  publishedPassportReader()
-    .circuits(view.context.tenant.tenantId)
-    .catch(() => []),
+  portalHas(view, "passport")
+    ? publishedPassportReader()
+        .circuits(view.context.tenant.tenantId)
+        .catch(() => [])
+    : [],
 );
 
 /** The published tour of a destination or event (also of an ended event), or null. */
 export const portalTour = cache(
   async (view: PortalView, kind: "destination" | "event", slug: string) =>
-    publishedTourReader().find(view.context.tenant.tenantId, kind, slug),
+    portalHas(view, "tours") && (kind === "destination" || portalHas(view, "agenda"))
+      ? publishedTourReader().find(view.context.tenant.tenantId, kind, slug)
+      : null,
 );
 
 /**
@@ -178,9 +189,15 @@ export const portalTour = cache(
  * manifest. Without it a page still works: no general tour link, that is all.
  */
 export const portalTourIndex = cache(async (view: PortalView) =>
-  publishedTourReader()
-    .index(view.context.tenant.tenantId)
-    .catch(() => []),
+  portalHas(view, "tours")
+    ? publishedTourReader()
+        .index(view.context.tenant.tenantId)
+        .then((index) =>
+          // Without the agenda, no tour of an event either (ADR-060).
+          portalHas(view, "agenda") ? index : index.filter((entry) => entry.kind !== "event"),
+        )
+        .catch(() => [])
+    : [],
 );
 
 /**
@@ -241,6 +258,10 @@ export async function tourMovedOrNotFound(
   const view = await portalView(host);
   if (!view) notFound();
   const decoded = decodeURIComponent(slug);
+  // Without the tours (ADR-060), a link to one leads to the place's own page.
+  if (!portalHas(view, "tours")) {
+    redirect(kind === "event" ? PORTAL_PATHS.event(decoded) : PORTAL_PATHS.destination(decoded));
+  }
   const current = await portalMovedSlug(view, kind, decoded);
   if (current) permanentRedirect(tourPath(kind, current));
   const moved = await publishedTourRedirectReader().find(

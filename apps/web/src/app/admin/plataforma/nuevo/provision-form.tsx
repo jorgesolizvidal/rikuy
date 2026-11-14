@@ -1,6 +1,12 @@
 "use client";
 
-import { suggestSlug, type ProvisionField } from "@rikuy/core";
+import {
+  MODULE_NAMES,
+  MODULE_PACKAGE_NAMES,
+  MODULE_PACKAGES,
+  suggestSlug,
+  type ProvisionField,
+} from "@rikuy/core";
 import Link from "next/link";
 import {
   useActionState,
@@ -20,6 +26,7 @@ const FIELD_ERRORS: Readonly<Record<ProvisionField, string>> = {
   hostname:
     "Escribe solo el dominio, sin http:// ni puerto, y distinto al del panel y al de la plataforma.",
   ownerEmail: "Escribe un correo válido.",
+  modules: "Elige con qué módulos empieza.",
 };
 
 const STATUS_MESSAGES: Partial<Record<ProvisionState["status"], string>> = {
@@ -171,6 +178,30 @@ export function ProvisionForm({
           {...invalidProps("ownerEmail", errorFor("ownerEmail"))}
         />
       </Field>
+
+      <fieldset className="field">
+        <legend>Módulos con los que empieza</legend>
+        <p className="field-hint" id="modules-hint">
+          Destinos, marca, miembros y estadísticas están siempre. Después puedes encender o apagar
+          cada módulo desde la lista de municipios.
+        </p>
+        {(["complete", "information"] as const).map((name) => (
+          <label key={name} className="checkbox">
+            <input
+              type="radio"
+              name="modulePackage"
+              value={name}
+              defaultChecked={name === "complete"}
+              aria-describedby="modules-hint"
+            />
+            <span>
+              <strong>{MODULE_PACKAGE_NAMES[name]}</strong>:{" "}
+              {MODULE_PACKAGES[name].map((key) => MODULE_NAMES[key]).join(", ")}.
+            </span>
+          </label>
+        ))}
+        {errorFor("modules") ? <p className="field-error">{errorFor("modules")}</p> : null}
+      </fieldset>
 
       <div className="field">
         <label className="checkbox">

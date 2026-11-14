@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { portalEvents } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 import { AgendaList } from "../agenda-list";
 import { EventCard } from "../event-card";
@@ -14,7 +14,7 @@ interface AgendaPageProps {
 }
 
 export async function generateMetadata({ params }: AgendaPageProps): Promise<Metadata> {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "agenda");
   if (view === null) return {};
   const { siteName } = view.resolved.presentation.identity;
   const description = `Ferias, fiestas y actividades en ${siteName}: fecha, lugar y cómo llegar.`;
@@ -27,7 +27,7 @@ export async function generateMetadata({ params }: AgendaPageProps): Promise<Met
 }
 
 export default async function AgendaPage({ params }: AgendaPageProps) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "agenda");
   if (view === null) notFound();
   const events = await portalEvents(view);
   const months = groupByMonth(events);

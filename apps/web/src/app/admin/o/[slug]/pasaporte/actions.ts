@@ -4,6 +4,7 @@ import {
   createCircuit,
   deleteCircuit,
   openOrganization,
+  withModule,
   publishCircuit,
   renewStampCode,
   setRedeemPin,
@@ -37,7 +38,10 @@ async function run<T extends { readonly status: string }>(
     if (actor === null) return { status: "signed_out" };
     const membership =
       typeof slug === "string"
-        ? await openOrganization(actor, slug, (await adminSession()).memberships)
+        ? withModule(
+            await openOrganization(actor, slug, (await adminSession()).memberships),
+            "passport",
+          )
         : null;
     if (membership === null) return { status: "forbidden" };
     return await body(membership);

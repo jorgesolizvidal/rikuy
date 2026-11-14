@@ -395,6 +395,27 @@ describe("produceMonthlyReport", () => {
     expect(outcome).toMatchObject({ recommendations: 0, note: "tenant_quota" });
   });
 
+  it("without the Copilot module it never asks the AI and says why (ADR-060)", async () => {
+    const { store, calls } = fakeStore(source(), { ...DATA, modules: ["agenda", "map"] });
+    const { mailer, sent } = fakeMailer();
+    const { ai, inputs } = simulatedAi();
+    const outcome = await produceMonthlyReport(LEASE, {
+      store,
+      ai,
+      mailer,
+      adminOrigin: "https://panel.example.test",
+      sent: 0,
+      saveProgress: async () => undefined,
+      now: NOW,
+    });
+    expect(inputs).toEqual([]);
+    expect(calls.saved).toEqual([
+      { to: "2026-10-31", aiRequestId: null, facts: null, items: null, note: "copilot_off" },
+    ]);
+    expect(sent[0]?.text).toContain("no tiene el Copilot");
+    expect(outcome).toMatchObject({ recommendations: 0, note: "copilot_off" });
+  });
+
   it("without SMTP it keeps the report and mails nothing", async () => {
     const { store, calls } = fakeStore(source());
     const outcome = await produceMonthlyReport(LEASE, {

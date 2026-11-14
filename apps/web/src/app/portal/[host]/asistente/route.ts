@@ -3,7 +3,7 @@ import { after } from "next/server";
 import { recordUnansweredQuestion } from "@/server/ai-gateway";
 import { askPortalAssistant } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
 
 interface AssistantContext {
@@ -22,7 +22,7 @@ const NO_STORE = { "cache-control": "no-store" };
  * portal (Origin), and the answer is never cached.
  */
 async function handle(request: Request, { params }: AssistantContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "assistant");
   if (view === null)
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
 

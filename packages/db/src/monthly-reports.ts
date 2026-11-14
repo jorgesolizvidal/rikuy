@@ -15,6 +15,7 @@ import { factsSchema, recommendationItemsSchema } from "./copilot-recommendation
 import { parseReviewRows, snapshotSchema } from "./copilot";
 import { isMissingFunction } from "./missing-function";
 import type { SessionClient } from "./session-client";
+import { moduleKeysOf } from "./module-keys";
 import { passportStatisticsSchema, statisticsSchema } from "./statistics";
 import { unansweredSchema } from "./unanswered-questions";
 
@@ -171,6 +172,8 @@ const dataSchema = z.object({
   // Absent before migration 20261122000000 (the worker may run a few minutes earlier).
   passport: passportStatisticsSchema.nullable().optional(),
   passportPrevious: passportStatisticsSchema.nullable().optional(),
+  // Absent before migration 20261123000000 (ADR-060): everything.
+  modules: z.array(z.string()).optional(),
 });
 
 /** worker_api's monthly report functions over the workload's connection. */
@@ -207,12 +210,13 @@ export function createPostgresMonthlyReportStore(
             ${previous?.from ?? null}::date, ${previous?.to ?? null}::date
           ) as data
         `;
-        const parsed = dataSchema.parse(row?.data);
+        const { modules, ...parsed } = dataSchema.parse(row?.data);
         return {
           ...parsed,
           review: parseReviewRows(parsed.review),
           passport: parsed.passport ?? null,
           passportPrevious: parsed.passportPrevious ?? null,
+          ...(modules ? { modules: moduleKeysOf(modules) ?? [] } : {}),
         };
       }),
 

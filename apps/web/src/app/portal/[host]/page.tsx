@@ -8,7 +8,7 @@ import {
   portalPassport,
   portalTourIndex,
 } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalView } from "@/server/portal-view";
 
 import { Contour } from "./contour";
 import { DestinationCard } from "./destination-card";
@@ -56,12 +56,13 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
     portalTourIndex(view),
     portalPassport(view),
   ]);
-  // Only what this portal does not have yet (a new municipality shows all of it).
+  // Only what this portal does not have yet (a new municipality shows all of it), and only
+  // what its municipality has (ADR-060).
   const upcoming = [
     ...(destinations.length > 0 ? [] : [PLACES_SOON]),
-    ...(events.length > 0 ? [] : [AGENDA_SOON]),
-    ...(tours.length > 0 ? [] : [TOURS_SOON]),
-    ...(aiGatewayStatus().configured ? [] : [ASSISTANT_SOON]),
+    ...(events.length > 0 || !portalHas(view, "agenda") ? [] : [AGENDA_SOON]),
+    ...(tours.length > 0 || !portalHas(view, "tours") ? [] : [TOURS_SOON]),
+    ...(aiGatewayStatus().configured || !portalHas(view, "assistant") ? [] : [ASSISTANT_SOON]),
   ];
 
   return (

@@ -20,7 +20,7 @@ import {
   portalHasTour,
   responsiveImage,
 } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalViewWith } from "@/server/portal-view";
 
 import { MiniMap } from "../../mini-map";
 import { PortalImage } from "../../portal-image";
@@ -33,7 +33,7 @@ interface EventPageProps {
 
 async function load(params: EventPageProps["params"]) {
   const { host, slug } = await params;
-  const view = await portalView(host);
+  const view = await portalViewWith(host, "agenda");
   if (view === null) return null;
   const event = await portalEvent(view, decodeURIComponent(slug));
   return event ? { view, event } : null;
@@ -84,6 +84,7 @@ export default async function EventPage({ params }: EventPageProps) {
   const loaded = await load(params);
   if (loaded === null) return movedOrNotFound(params, "event", PORTAL_PATHS.event);
   const { view, event } = loaded;
+  const withMap = portalHas(view, "map");
   const [targets, tour] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "event", event.slug, event.ended),
@@ -205,27 +206,33 @@ export default async function EventPage({ params }: EventPageProps) {
       {event.location ? (
         <section aria-labelledby="ubicacion" className="portal-location">
           <h2 id="ubicacion">Ubicación</h2>
-          <MiniMap
-            point={{
-              key: "here",
-              kind: "event",
-              title: event.title,
-              href: "",
-              detail: "",
-              lat: event.location.lat,
-              lng: event.location.lng,
-            }}
-          />
+          {withMap ? (
+            <MiniMap
+              point={{
+                key: "here",
+                kind: "event",
+                title: event.title,
+                href: "",
+                detail: "",
+                lat: event.location.lat,
+                lng: event.location.lng,
+              }}
+            />
+          ) : null}
           <div className="portal-location-visitor">
             <DistanceText point={event.location} />
             <LocationButton label="Ver a qué distancia estoy" />
           </div>
           <p>
             {formatCoordinates(event.location)} ·{" "}
-            <a href={`${PORTAL_PATHS.map}?lat=${event.location.lat}&lng=${event.location.lng}`}>
-              Ver en el mapa del municipio
-            </a>{" "}
-            ·{" "}
+            {withMap ? (
+              <>
+                <a href={`${PORTAL_PATHS.map}?lat=${event.location.lat}&lng=${event.location.lng}`}>
+                  Ver en el mapa del municipio
+                </a>{" "}
+                ·{" "}
+              </>
+            ) : null}
             <a href={openStreetMapUrl(event.location)} target="_blank" rel="noopener noreferrer">
               OpenStreetMap
             </a>

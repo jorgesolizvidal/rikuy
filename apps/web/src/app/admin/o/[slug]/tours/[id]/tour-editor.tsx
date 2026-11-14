@@ -45,7 +45,8 @@ export interface TourEditorProps {
   readonly entrySceneId: string | null;
   readonly scenes: readonly EditorScene[];
   readonly options: readonly EditorOption[];
-  readonly models: readonly EditorModelOption[];
+  /** Null: the municipality does not have 3D models (ADR-060), no model points are offered. */
+  readonly models: readonly EditorModelOption[] | null;
   readonly targets: readonly EditorTargetOption[];
   readonly canEdit: boolean;
   readonly canPublish: boolean;

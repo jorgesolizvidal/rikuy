@@ -181,7 +181,11 @@ export function buildSitemap(
     readonly publishedAt: string;
   }[] = [],
   circuits: readonly { readonly slug: string; readonly publishedAt: string }[] = [],
+  /** Sections the portal has (ADR-060); all of them by default. */
+  sections: { readonly agenda?: boolean; readonly map?: boolean } = {},
 ): string {
+  const withAgenda = sections.agenda ?? true;
+  const withMap = sections.map ?? true;
   const entry = (path: string, lastModified?: string) =>
     `<url><loc>${escapeXml(`${origin}${path}`)}</loc>${
       lastModified ? `<lastmod>${new Date(lastModified).toISOString()}</lastmod>` : ""
@@ -197,8 +201,8 @@ export function buildSitemap(
     entry("/", latest([...destinations, ...events])),
     entry(PORTAL_PATHS.destinations, latest(destinations)),
     ...destinations.map((d) => entry(PORTAL_PATHS.destination(d.slug), d.updatedAt)),
-    entry(PORTAL_PATHS.agenda, latest(events)),
-    entry(PORTAL_PATHS.map, latest([...destinations, ...events])),
+    ...(withAgenda ? [entry(PORTAL_PATHS.agenda, latest(events))] : []),
+    ...(withMap ? [entry(PORTAL_PATHS.map, latest([...destinations, ...events]))] : []),
     ...events.map((e) => entry(PORTAL_PATHS.event(e.slug), e.updatedAt)),
     ...(tours.length > 0
       ? [

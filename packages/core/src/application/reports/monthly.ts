@@ -1,6 +1,7 @@
 import type { CopilotReviewRow, CopilotSnapshotData } from "../../contracts/copilot";
 import type { OrganizationMembership } from "../../contracts/organization";
 import { localClock } from "../../domain/plan/clock";
+import { hasModule, type ModuleKey } from "../../domain/tenancy/modules";
 import { COPILOT_ISSUE_LABELS } from "../../domain/copilot/issues";
 import type { Recommendation, RecommendationFact } from "../../domain/copilot/recommendations";
 import {
@@ -27,6 +28,7 @@ import {
 } from "../../domain/visits/statistics";
 import type { UnansweredQuestionsData } from "../assistant/unanswered";
 import { canPropose, type CopilotAiRunner } from "../copilot/copilot";
+import { copilotForModules, reviewForModules } from "../copilot/modules";
 import type { CopilotRepository } from "../copilot/ports";
 import { runRecommendations } from "../copilot/recommendations";
 import type { JobLease } from "../jobs/ports";
@@ -115,6 +117,7 @@ export const MONTHLY_NOTE_LABELS: Readonly<Record<string, string>> = {
   provider_unavailable: "El servicio de IA no respondió: el informe va sin recomendaciones.",
   provider_error: "El Copilot no pudo responder: el informe va sin recomendaciones.",
   tenant_unavailable: "El municipio no estaba en línea: el informe va sin recomendaciones.",
+  copilot_off: "El municipio no tiene el Copilot: el informe va sin recomendaciones.",
   visitor_limit: "El Copilot no pudo responder: el informe va sin recomendaciones.",
   nothing: NOTHING_NOTE,
 };
@@ -172,17 +175,19 @@ export async function loadMonthlyReport(
   const days = { from: range.from, to: range.to };
   const comparable = calendar.firstDay !== null && range.previous.from >= calendar.firstDay;
   const tenant = membership.tenantId;
+  const copilot = copilotForModules(deps.copilot, membership.modules);
+  const withPassport = hasModule(membership.modules, "passport");
   const [current, previous, questions, activity, review, snapshot, status, passport, before] =
     await Promise.all([
       deps.statistics.statistics(tenant, days, false),
       comparable ? deps.statistics.statistics(tenant, range.previous, false) : null,
       deps.reports.questions(tenant, days),
       deps.reports.activity(tenant, days),
-      deps.copilot.review(tenant),
-      deps.copilot.snapshot(tenant),
+      copilot.review(tenant),
+      copilot.snapshot(tenant),
       deps.reports.status(tenant, month),
-      deps.statistics.passport(tenant, days, false),
-      deps.statistics.passport(tenant, range.previous, false),
+      withPassport ? deps.statistics.passport(tenant, days, false) : null,
+      withPassport ? deps.statistics.passport(tenant, range.previous, false) : null,
     ]);
   const summary = summarizeStatistics(range, current, previous, calendar.firstDay);
   return {
@@ -250,6 +255,8 @@ export interface MonthlyReportData {
   /** The tourist passport of the month and of the one compared (null: not counted yet). */
   readonly passport: PassportStatisticsData | null;
   readonly passportPrevious: PassportStatisticsData | null;
+  /** The municipality's modules (ADR-060); absent: read before that migration (all). */
+  readonly modules?: readonly ModuleKey[];
 }
 
 /** worker_api, always under the job's lease and for the job's own municipality. */
@@ -336,13 +343,28 @@ export async function produceMonthlyReport(
   const data = await deps.store.data(lease, days, comparable ? range.previous : null);
   if (data === "lease_lost") throw lost();
   const summary = summarizeStatistics(range, data.current, data.previous, source.firstDay);
-  const passport = data.passport
-    ? summarizePassport(range, data.passport, data.passportPrevious, viewsOf(summary))
-    : null;
+  const modules = data.modules;
+  const passport =
+    data.passport && hasModule(modules, "passport")
+      ? summarizePassport(range, data.passport, data.passportPrevious, viewsOf(summary))
+      : null;
+  const review = reviewForModules(data.review, modules);
 
   let items: readonly Recommendation[] | null = source.items;
   let note: string | null = source.note;
-  if (!source.generated) {
+  if (!source.generated && !hasModule(modules, "copilot")) {
+    // The municipality does not have the Copilot: the report goes without recommendations.
+    const saved = await deps.store.save(lease, {
+      to: range.to,
+      aiRequestId: null,
+      facts: null,
+      items: null,
+      note: "copilot_off",
+    });
+    if (saved === "lease_lost") throw lost();
+    items = null;
+    note = "copilot_off";
+  } else if (!source.generated) {
     const run = await runRecommendations({
       tenantId: source.tenantId,
       site: source.name,
@@ -355,6 +377,7 @@ export async function produceMonthlyReport(
       questions: data.questions,
       review: data.review,
       snapshot: data.snapshot.items,
+      ...(modules ? { modules } : {}),
       ai: deps.ai,
     });
     const saved =
@@ -401,7 +424,7 @@ export async function produceMonthlyReport(
           summary,
           passport,
           questions: data.questions,
-          review: data.review,
+          review,
           activity: data.activity,
           items,
           note,

@@ -2,7 +2,7 @@ import { parseBoundingBox } from "@rikuy/core";
 
 import { publishedMapReader } from "@/server/platform";
 import { toMapPoint } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
 
 interface PlacesContext {
@@ -14,7 +14,7 @@ interface PlacesContext {
  * The tenant comes from the host, never from the query; areas larger than 20° are refused.
  */
 async function handle(request: Request, { params }: PlacesContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "map");
   if (view === null) return Response.json({ error: "not_found" }, { status: 404 });
   const area = parseBoundingBox(new URL(request.url).searchParams.get("area"));
   if (area === null) return Response.json({ error: "invalid_area" }, { status: 400 });

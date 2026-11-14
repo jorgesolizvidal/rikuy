@@ -4,6 +4,7 @@ import type {
   TourViewerPanorama,
   TourViewerPoint,
 } from "../../domain/tours/viewer";
+import { hasModule, type ModuleKey } from "../../domain/tenancy/modules";
 import { tourPath } from "../content/portal";
 
 interface PointBase {
@@ -87,8 +88,18 @@ function pointOf(
   }
 }
 
-/** The scenes in their published order, the entry first only if the municipality put it there. */
-export function tourViewerModel(tour: PublishedTour): TourViewerModel {
+/**
+ * The scenes in their published order, the entry first only if the municipality put it there.
+ * With the municipality's modules (ADR-060): no 3D models without that module, and no jump to
+ * the tour of an event without the agenda.
+ */
+export function tourViewerModel(
+  tour: PublishedTour,
+  modules?: readonly ModuleKey[],
+): TourViewerModel {
+  const usable = (point: TourViewerPoint) =>
+    !(point.kind === "model" && !hasModule(modules, "models")) &&
+    !(point.kind === "tour" && point.target.kind === "event" && !hasModule(modules, "agenda"));
   const { manifest } = tour;
   const titles = new Map(manifest.scenes.map((scene) => [scene.sceneId, scene.title]));
   return {
@@ -105,7 +116,7 @@ export function tourViewerModel(tour: PublishedTour): TourViewerModel {
       panorama: panoramaOf(scene),
       points: scene.hotspots.flatMap((hotspot) => {
         const point = pointOf(hotspot, titles, tour);
-        return point ? [point] : [];
+        return point && usable(point) ? [point] : [];
       }),
     })),
   };

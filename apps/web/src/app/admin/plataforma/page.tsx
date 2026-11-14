@@ -1,4 +1,4 @@
-import { listPlatformTenants, loadOperations, type TenantStatus } from "@rikuy/core";
+import { listPlatformTenants, loadOperations, MODULE_KEYS, type TenantStatus } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -112,6 +112,7 @@ export default async function PlatformPage() {
               <th scope="col">Municipio</th>
               <th scope="col">Estado</th>
               <th scope="col">Propietario</th>
+              <th scope="col">Módulos</th>
               <th scope="col">
                 <span className="visually-hidden">Acciones</span>
               </th>
@@ -145,6 +146,14 @@ export default async function PlatformPage() {
                   {tenant.ownerStatus === "invited" ? (
                     <span className="org-detail">Invitación sin aceptar</span>
                   ) : null}
+                </td>
+                <td>
+                  <Link href={`/plataforma/modulos/${tenant.slug}`}>
+                    {tenant.modules === undefined || tenant.modules.length === MODULE_KEYS.length
+                      ? "Todos"
+                      : `${tenant.modules.length} de ${MODULE_KEYS.length}`}
+                    <span className="visually-hidden">: cambiar los de {tenant.displayName}</span>
+                  </Link>
                 </td>
                 <td className="cell-actions">
                   {tenant.status === "active" ? (

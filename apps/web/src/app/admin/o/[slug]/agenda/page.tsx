@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { NewDestinationForm } from "../destinos/new-destination-form";
@@ -63,7 +63,7 @@ function EventTable({
 }
 
 export default async function AgendaPage({ params }: AgendaPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "agenda");
   const agenda = await loadAgenda(membership, (await adminSession()).content);
   const canEdit = canEditContent(membership.role);
   const empty = agenda.upcoming.length + agenda.undated.length + agenda.past.length === 0;

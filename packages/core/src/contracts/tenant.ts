@@ -1,5 +1,7 @@
 import { z } from "zod";
 
+import { MODULE_KEYS } from "../domain/tenancy/modules";
+
 /**
  * Public projection of a tenant resolved from a portal host.
  * Contains only what any visitor of that portal may know.
@@ -15,6 +17,8 @@ export const portalTenantSchema = z.object({
   activeConfigId: z.uuid().nullable(),
   /** A commercial demo (ADR-034): never indexed and says so. Absent means a real portal. */
   demo: z.boolean().optional(),
+  /** The modules it has (ADR-060). Absent: an older registry, which means all of them. */
+  modules: z.array(z.enum(MODULE_KEYS)).optional(),
 });
 
 export type PortalTenant = z.infer<typeof portalTenantSchema>;

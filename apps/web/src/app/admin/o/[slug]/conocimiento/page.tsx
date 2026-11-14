@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { KnowledgeSearchForm, NewKnowledgeForm } from "./knowledge-forms";
@@ -38,7 +38,7 @@ interface KnowledgePageProps {
 }
 
 export default async function KnowledgePage({ params, searchParams }: KnowledgePageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "assistant");
   const asked = (await searchParams).pregunta;
   const question = typeof asked === "string" ? asked.slice(0, 300) : undefined;
   const session = await adminSession();

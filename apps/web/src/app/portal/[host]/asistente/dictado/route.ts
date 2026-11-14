@@ -2,7 +2,7 @@ import { DICTATION_LIMITS, DICTATION_MESSAGES } from "@rikuy/core";
 
 import { transcribePortalDictation } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
 
 interface DictationContext {
@@ -22,7 +22,7 @@ const NO_STORE = { "cache-control": "no-store" };
  * Neither the audio nor the text is kept.
  */
 async function handle(request: Request, { params }: DictationContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "voice");
   if (view === null)
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
   if (!fromSamePortal(request))

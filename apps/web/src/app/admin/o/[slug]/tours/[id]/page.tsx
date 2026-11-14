@@ -1,4 +1,4 @@
-import { loadTourEditor, loadTourRemoval, richTextToMarkup } from "@rikuy/core";
+import { hasModule, loadTourEditor, loadTourRemoval, richTextToMarkup } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -6,7 +6,7 @@ import { notFound } from "next/navigation";
 import { adminSession } from "@/server/admin-session";
 import { platformSettings } from "@/server/platform";
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 import { tourCandidates } from "@/server/tour-candidates";
 
 import { SignOutButton } from "../../../../sign-out-button";
@@ -29,7 +29,7 @@ function size(width: number | null, height: number | null): string | null {
 
 export default async function TourPage({ params }: TourPageProps) {
   const { slug, id } = await params;
-  const membership = await requireOrganization(slug);
+  const membership = await requireModule(slug, "tours");
   const session = await adminSession();
   const [editor, removal] = await Promise.all([
     loadTourEditor(membership, id, {
@@ -90,7 +90,7 @@ export default async function TourPage({ params }: TourPageProps) {
       <TourEditor
         org={membership.slug}
         tourId={record.tourId}
-        copilot={aiGatewayStatus().configured}
+        copilot={aiGatewayStatus().configured && hasModule(membership.modules, "copilot")}
         contentTitle={record.content.title}
         editCount={editor.editCount}
         entrySceneId={revision.entrySceneId}
@@ -129,14 +129,18 @@ export default async function TourPage({ params }: TourPageProps) {
           size: size(option.width, option.height),
           uploaded: DAY.format(new Date(option.createdAt)),
         }))}
-        models={editor.models.map((model) => ({
-          versionId: model.versionId,
-          posterUrl: model.posterUrl,
-          hasPoster: model.hasPoster,
-          label: `Modelo subido el ${DAY.format(new Date(model.createdAt))}${
-            model.triangles ? ` · ${model.triangles.toLocaleString("es-BO")} triángulos` : ""
-          }`,
-        }))}
+        models={
+          hasModule(membership.modules, "models")
+            ? editor.models.map((model) => ({
+                versionId: model.versionId,
+                posterUrl: model.posterUrl,
+                hasPoster: model.hasPoster,
+                label: `Modelo subido el ${DAY.format(new Date(model.createdAt))}${
+                  model.triangles ? ` · ${model.triangles.toLocaleString("es-BO")} triángulos` : ""
+                }`,
+              }))
+            : null
+        }
         targets={editor.targets}
         canEdit={editor.canEdit}
         canPublish={editor.canPublish}

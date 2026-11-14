@@ -185,6 +185,8 @@ export interface AssistantPanelProps {
   readonly named: boolean;
   readonly greeting: string;
   readonly siteName: string;
+  /** The municipality has the assistant's voice (ADR-060). */
+  readonly voice: boolean;
   readonly open: boolean;
   readonly onClose: () => void;
   readonly request?: AssistantRequestFromPage | null;
@@ -195,6 +197,7 @@ export default function AssistantPanel({
   named,
   greeting,
   siteName,
+  voice,
   open,
   onClose,
   request = null,
@@ -213,8 +216,8 @@ export default function AssistantPanel({
   /** A plan that asked for the location: asked again once the phone knows where it is. */
   const waiting = useRef<{ text: string; intent: PlanIntent } | null>(null);
   // Voice (ADR-041): what the browser can do, decided once it runs.
-  const canDictate = useSyncExternalStore(noSubscription, dictationSupported, () => false);
-  const canSpeak = useSyncExternalStore(noSubscription, speechSupported, () => false);
+  const canDictate = useSyncExternalStore(noSubscription, dictationSupported, () => false) && voice;
+  const canSpeak = useSyncExternalStore(noSubscription, speechSupported, () => false) && voice;
   const [voiceMessage, setVoiceMessage] = useState<string | null>(null);
   const [speaking, setSpeaking] = useState<string | null>(null);
   /** The question in the field came (at least partly) from dictation: read its answer. */

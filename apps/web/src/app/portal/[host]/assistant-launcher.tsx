@@ -21,6 +21,8 @@ export interface AssistantLauncherProps {
   readonly named: boolean;
   readonly greeting: string;
   readonly siteName: string;
+  /** The municipality has the assistant's voice (ADR-060): dictation and «Escuchar». */
+  readonly voice: boolean;
 }
 
 export function AssistantLauncher(props: AssistantLauncherProps) {

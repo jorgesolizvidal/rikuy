@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../../../sign-out-button";
@@ -26,7 +26,7 @@ interface PassportPageProps {
 
 /** C2 · Paso 1 (ADR-056): the circuits of the tourist passport. Any member sees them. */
 export default async function PassportAdminPage({ params }: PassportPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "passport");
   const session = await adminSession();
   const [{ circuits, canEdit }, codes, hostname] = await Promise.all([
     loadPassport(membership, { passport: session.passport, content: session.content }),

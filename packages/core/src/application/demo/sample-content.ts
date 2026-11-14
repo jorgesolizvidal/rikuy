@@ -15,6 +15,7 @@ import {
   type SampleScene,
 } from "../../domain/demo/sample-template";
 import { parseCoordinates } from "../../domain/geo/coordinates";
+import { hasModule } from "../../domain/tenancy/modules";
 import { createDestination, publishDestination } from "../content/destinations";
 import { createEvent, publishEvent } from "../content/events";
 import { createKnowledge, publishKnowledge } from "../knowledge/knowledge";
@@ -206,15 +207,18 @@ export async function loadSampleContent(
       );
       if (published.status !== "published") throw new SampleStop({ status: "failed" });
       destinations += 1;
-      if (item.slug === SAMPLE_TOUR_DESTINATION) {
+      if (item.slug === SAMPLE_TOUR_DESTINATION && hasModule(membership.modules, "tours")) {
         panoramas = await uploadPanoramas(membership, deps);
       }
     }
 
-    const events = await deps.content.listEvents(membership.tenantId);
+    // Only what the demo has (ADR-060): no events without the agenda, no guide without the
+    // assistant, no panoramas without the tours.
+    const withAgenda = hasModule(membership.modules, "agenda");
+    const events = withAgenda ? await deps.content.listEvents(membership.tenantId) : [];
     const eventSlugs = new Set(events.map((entry) => entry.slug));
     let createdEvents = 0;
-    for (const item of SAMPLE_EVENTS) {
+    for (const item of withAgenda ? SAMPLE_EVENTS : []) {
       if (eventSlugs.has(item.slug)) continue;
       const venueId = ids.get(item.venue) ?? null;
       const location = places.get(item.venue) ?? center;
@@ -250,7 +254,9 @@ export async function loadSampleContent(
       createdEvents += 1;
     }
 
-    const knowledge = await loadSampleKnowledge(membership, name, deps.knowledge);
+    const knowledge = hasModule(membership.modules, "assistant")
+      ? await loadSampleKnowledge(membership, name, deps.knowledge)
+      : 0;
     return { status: "loaded", destinations, events: createdEvents, panoramas, knowledge };
   } catch (error) {
     if (error instanceof SampleStop) return error.result;
@@ -321,7 +327,12 @@ export async function loadSampleContentStatus(
     deps.panoramas.list(membership.tenantId),
   ]);
   const slugs = new Set([...destinations, ...events, ...knowledge].map((entry) => entry.slug));
-  const all = [...SAMPLE_DESTINATIONS, ...SAMPLE_EVENTS, SAMPLE_KNOWLEDGE].map((item) => item.slug);
+  // What the demo has (ADR-060): the parts of a module that is off are not missing.
+  const all = [
+    ...SAMPLE_DESTINATIONS,
+    ...(hasModule(membership.modules, "agenda") ? SAMPLE_EVENTS : []),
+    ...(hasModule(membership.modules, "assistant") ? [SAMPLE_KNOWLEDGE] : []),
+  ].map((item) => item.slug);
   const present = all.filter((slug) => slugs.has(slug)).length;
   const hasPlace = slugs.has(SAMPLE_TOUR_DESTINATION);
   const built = tours.some(
@@ -331,15 +342,16 @@ export async function loadSampleContentStatus(
   const processing = panoramas.filter(
     (panorama) => panorama.status === "processing" || panorama.status === "uploading",
   ).length;
-  const tour = !hasPlace
-    ? "none"
-    : built
-      ? "built"
-      : ready >= SAMPLE_PANORAMAS.length
-        ? "ready"
-        : processing > 0
-          ? "processing"
-          : "missing";
+  const tour =
+    !hasPlace || !hasModule(membership.modules, "tours")
+      ? "none"
+      : built
+        ? "built"
+        : ready >= SAMPLE_PANORAMAS.length
+          ? "ready"
+          : processing > 0
+            ? "processing"
+            : "missing";
   return { loaded: present === all.length, partial: present > 0 && present < all.length, tour };
 }
 
@@ -372,6 +384,7 @@ export async function buildSampleTour(
 ): Promise<SampleTourResult> {
   const allowed = mayLoad(membership);
   if (allowed !== "ok") return { status: allowed };
+  if (!hasModule(membership.modules, "tours")) return { status: "forbidden" };
   try {
     const destinations = await deps.content.listDestinations(membership.tenantId);
     const place = destinations.find((entry) => entry.slug === SAMPLE_TOUR_DESTINATION);

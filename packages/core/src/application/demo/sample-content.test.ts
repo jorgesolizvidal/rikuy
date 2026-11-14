@@ -143,4 +143,21 @@ describe("sample content use cases", () => {
       partial: true,
     });
   });
+
+  it("a demo with «Solo información» is complete with its destinations alone (ADR-060)", async () => {
+    const d = deps();
+    const information = { ...demoOwner, modules: ["agenda" as const, "map" as const] };
+    d.content.listDestinations.mockResolvedValue(
+      SAMPLE_DESTINATIONS.map((item) => ({ slug: item.slug })) as never,
+    );
+    d.content.listEvents.mockResolvedValue(
+      SAMPLE_EVENTS.map((item) => ({ slug: item.slug })) as never,
+    );
+    expect(await loadSampleContentStatus({ ...information }, d)).toEqual({
+      loaded: true,
+      partial: false,
+      tour: "none",
+    });
+    expect(await buildSampleTour(information, d as never)).toEqual({ status: "forbidden" });
+  });
 });

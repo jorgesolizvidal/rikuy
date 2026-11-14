@@ -15,7 +15,7 @@ import type { CSSProperties, ReactNode } from "react";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { platformSettings } from "@/server/platform";
 import { portalIsEmpty, portalPassport, portalTourIndex } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalView } from "@/server/portal-view";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
@@ -108,8 +108,12 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
   const demo = view.context.tenant.demo === true;
-  // The assistant's button only where the platform has AI; without it nothing is shown.
-  const persona = aiGatewayStatus().configured ? assistantPersona(presentation) : null;
+  // The assistant's button only where the platform has AI and the municipality has the
+  // assistant (ADR-060); without them nothing is shown.
+  const persona =
+    aiGatewayStatus().configured && portalHas(view, "assistant")
+      ? assistantPersona(presentation)
+      : null;
 
   return (
     <div
@@ -155,8 +159,8 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         <InstallButton siteName={identity.siteName} />
         <nav aria-label="Principal" className="portal-nav">
           <a href={PORTAL_PATHS.destinations}>Destinos</a>
-          <a href={PORTAL_PATHS.agenda}>Agenda</a>
-          <a href={PORTAL_PATHS.map}>Mapa</a>
+          {portalHas(view, "agenda") ? <a href={PORTAL_PATHS.agenda}>Agenda</a> : null}
+          {portalHas(view, "map") ? <a href={PORTAL_PATHS.map}>Mapa</a> : null}
           {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
           {circuits.length > 0 ? <a href={PORTAL_PATHS.passport}>Pasaporte</a> : null}
         </nav>
@@ -206,6 +210,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           named={persona.named}
           greeting={persona.greeting}
           siteName={identity.siteName}
+          voice={portalHas(view, "voice")}
         />
       ) : null}
       {/* Anonymous visit counts (ADR-051): daily totals, no cookies. */}

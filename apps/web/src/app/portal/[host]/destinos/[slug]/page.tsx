@@ -21,7 +21,7 @@ import {
   portalHasTour,
   responsiveImage,
 } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalView } from "@/server/portal-view";
 
 import { MiniMap } from "../../mini-map";
 import { OpenNow } from "../../open-now";
@@ -92,6 +92,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     portalOpeningHours(view).catch(() => new Map()),
   ]);
   const hours = allHours.get(destination.slug) ?? null;
+  const withMap = portalHas(view, "map");
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
   const url = `${portalOrigin(view)}${PORTAL_PATHS.destination(destination.slug)}`;
@@ -202,29 +203,35 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       {destination.location ? (
         <section aria-labelledby="ubicacion" className="portal-location">
           <h2 id="ubicacion">Ubicación</h2>
-          <MiniMap
-            point={{
-              key: "here",
-              kind: "destination",
-              title: destination.title,
-              href: "",
-              detail: "",
-              lat: destination.location.lat,
-              lng: destination.location.lng,
-            }}
-          />
+          {withMap ? (
+            <MiniMap
+              point={{
+                key: "here",
+                kind: "destination",
+                title: destination.title,
+                href: "",
+                detail: "",
+                lat: destination.location.lat,
+                lng: destination.location.lng,
+              }}
+            />
+          ) : null}
           <div className="portal-location-visitor">
             <DistanceText point={destination.location} />
             <LocationButton label="Ver a qué distancia estoy" />
           </div>
           <p>
             {formatCoordinates(destination.location)} ·{" "}
-            <a
-              href={`${PORTAL_PATHS.map}?lat=${destination.location.lat}&lng=${destination.location.lng}`}
-            >
-              Ver en el mapa del municipio
-            </a>{" "}
-            ·{" "}
+            {withMap ? (
+              <>
+                <a
+                  href={`${PORTAL_PATHS.map}?lat=${destination.location.lat}&lng=${destination.location.lng}`}
+                >
+                  Ver en el mapa del municipio
+                </a>{" "}
+                ·{" "}
+              </>
+            ) : null}
             <a
               href={openStreetMapUrl(destination.location)}
               target="_blank"

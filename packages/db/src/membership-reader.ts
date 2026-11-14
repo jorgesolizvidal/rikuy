@@ -2,6 +2,7 @@ import type { MembershipReader, OrganizationMembership } from "@rikuy/core";
 import { z } from "zod";
 
 import { isMissingFunction } from "./missing-function";
+import { moduleKeysOf } from "./module-keys";
 import type { SessionClient } from "./session-client";
 
 const roleSchema = z.enum(["owner", "admin", "editor", "analyst"]);
@@ -15,6 +16,8 @@ const rpcRowSchema = z.object({
   is_demo: z.boolean(),
   role: roleSchema,
   needs_second_factor: z.boolean(),
+  // Optional while the app may be deployed before the migration that adds it (ADR-060).
+  modules: z.array(z.string()).optional(),
 });
 
 const legacyRowSchema = z.object({
@@ -36,6 +39,7 @@ interface Row {
   readonly demo: boolean;
   readonly role: z.infer<typeof roleSchema>;
   readonly needsSecondFactor: boolean;
+  readonly modules?: unknown;
 }
 
 function toMembership(row: Row): OrganizationMembership[] {
@@ -49,6 +53,7 @@ function toMembership(row: Row): OrganizationMembership[] {
       tenantStatus: row.status,
       ...(row.demo ? { demo: true } : {}),
       ...(row.needsSecondFactor ? { needsSecondFactor: true } : {}),
+      ...(row.modules !== undefined ? { modules: moduleKeysOf(row.modules) ?? [] } : {}),
     },
   ];
 }
@@ -76,6 +81,7 @@ export function createMembershipReader(client: SessionClient): MembershipReader 
               demo: row.is_demo,
               role: row.role,
               needsSecondFactor: row.needs_second_factor,
+              modules: row.modules,
             }),
           );
       }

@@ -2,6 +2,7 @@
 
 import {
   openOrganization,
+  withModule,
   requestModelUpload,
   saveModelPoster,
   submitModel,
@@ -23,7 +24,10 @@ async function membershipFor(
   if (actor === null) return { status: "signed_out" };
   const membership =
     typeof slug === "string"
-      ? await openOrganization(actor, slug, (await adminSession()).memberships)
+      ? withModule(
+          await openOrganization(actor, slug, (await adminSession()).memberships),
+          "models",
+        )
       : null;
   return membership === null ? { status: "forbidden" } : { membership };
 }

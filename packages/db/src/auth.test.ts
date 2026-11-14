@@ -170,6 +170,7 @@ describe("membership reader", () => {
             is_demo: true,
             role: "editor",
             needs_second_factor: false,
+            modules: ["agenda", "map", "restaurantes"],
           },
           {
             tenant_id: "5eed1000-0000-4000-8000-000000000003",
@@ -200,6 +201,7 @@ describe("membership reader", () => {
         role: "editor",
         tenantStatus: "provisioning",
         demo: true,
+        modules: ["agenda", "map"],
       },
     ]);
     expect(h.requests.some((r) => r.url.pathname === "/rest/v1/memberships")).toBe(false);

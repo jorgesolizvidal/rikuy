@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 import { tourCandidates } from "@/server/tour-candidates";
 
@@ -27,7 +27,7 @@ interface ToursPageProps {
 }
 
 export default async function ToursPage({ params }: ToursPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "tours");
   const session = await adminSession();
   const [{ tours, candidates, canEdit }, general, hostname] = await Promise.all([
     loadTours(membership, {

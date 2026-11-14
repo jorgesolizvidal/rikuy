@@ -3,6 +3,9 @@ import "server-only";
 import {
   askAssistant,
   dictationPrompt,
+  passageVisibleWith,
+  PORTAL_PATHS,
+  type AssistantLink,
   type DictationResult,
   type AssistantPage,
   type AssistantPageItem,
@@ -19,7 +22,7 @@ import {
   portalPlanPlaces,
   portalTourIndex,
 } from "./portal-content";
-import type { PortalView } from "./portal-view";
+import { portalHas, type PortalView } from "./portal-view";
 
 /**
  * The visitor's assistant for one portal (ADR-038). The municipality is the one the host
@@ -55,14 +58,49 @@ export async function askPortalAssistant(
     presentation: view.resolved.presentation,
     hasTours: tours.length > 0,
   };
-  return askAssistant(tenant, body, visitor, {
+  const modules = view.context.tenant.modules;
+  const result = await askAssistant(tenant, body, visitor, {
     session: (input, work) => runAiWork(input, work),
-    search: searchAiKnowledge,
+    // Nothing of a module the municipality does not have (ADR-060): a few more are asked
+    // for, so leaving some out still leaves enough.
+    search: async (tenantId, query, limit) =>
+      (await searchAiKnowledge(tenantId, query, limit * 2))
+        .filter((passage) => passageVisibleWith(modules, passage))
+        .slice(0, limit),
     page: (_tenantId, page) => pageItem(view, page),
     places: () => portalPlanPlaces(view),
     tourContext: aiTourContext,
     now: () => new Date(),
   });
+  return withPortalSections(view, result);
+}
+
+/** No link to a section the portal does not have (the agenda or the map, ADR-060). */
+function withPortalSections(view: PortalView, result: AssistantResult): AssistantResult {
+  const hidden = new Set<string>([
+    ...(portalHas(view, "agenda") ? [] : [PORTAL_PATHS.agenda]),
+    ...(portalHas(view, "map") ? [] : [PORTAL_PATHS.map]),
+  ]);
+  if (hidden.size === 0) return result;
+  const links = (list: readonly AssistantLink[]) => list.filter((link) => !hidden.has(link.href));
+  const { reply } = result;
+  if (reply.status === "notice") {
+    return {
+      ...result,
+      reply: { ...reply, notice: { ...reply.notice, links: links(reply.notice.links) } },
+    };
+  }
+  if (reply.status !== "answered") return result;
+  return {
+    ...result,
+    reply: {
+      ...reply,
+      links: links(reply.links),
+      ...(reply.plan
+        ? { plan: { ...reply.plan, mapHref: portalHas(view, "map") ? reply.plan.mapHref : null } }
+        : {}),
+    },
+  };
 }
 
 /**

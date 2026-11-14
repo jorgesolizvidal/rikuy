@@ -2,7 +2,7 @@ import { requestVoucher } from "@rikuy/core";
 
 import { publishedRewardReader } from "@/server/platform";
 import { fromSamePortal } from "@/server/portal-request";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 interface PrizeContext {
   readonly params: Promise<{ host: string }>;
@@ -18,7 +18,7 @@ const NO_STORE = { "cache-control": "no-store" };
  * passport. Only from a page of this same portal.
  */
 export async function POST(request: Request, { params }: PrizeContext) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "passport");
   if (view === null) {
     return Response.json({ status: "not_found" }, { status: 404, headers: NO_STORE });
   }

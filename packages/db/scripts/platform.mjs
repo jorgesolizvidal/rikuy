@@ -60,6 +60,8 @@ async function provision(file) {
     p_default_locale: spec.defaultLocale ?? "es",
     p_timezone: spec.timezone ?? "America/La_Paz",
     ...(spec.demo === true ? { p_demo: true } : {}),
+    // ADR-060: `"modules": ["agenda", "map"]` starts with those; without it, with all of them.
+    ...(Array.isArray(spec.modules) ? { p_modules: spec.modules } : {}),
   });
   if (error) {
     const reason = error.hint ? ` (${error.hint})` : "";

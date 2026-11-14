@@ -52,6 +52,16 @@ describe("createSupabaseTenantDirectory", () => {
     });
   });
 
+  it("reads the modules the portal has, leaving out keys it does not know (ADR-060)", async () => {
+    const fetch = fakeFetch(() =>
+      Response.json([{ ...row, modules: ["agenda", "restaurantes", "passport"] }]),
+    );
+    const tenant = await createSupabaseTenantDirectory({ ...base, fetch }).findByHost(
+      "demo-norte.localhost",
+    );
+    expect(tenant?.modules).toEqual(["agenda", "passport"]);
+  });
+
   it("returns null for an unknown host", async () => {
     const fetch = fakeFetch(() => Response.json([]));
     await expect(

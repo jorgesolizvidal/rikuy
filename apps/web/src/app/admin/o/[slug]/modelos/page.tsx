@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { AutoRefresh } from "../panoramas/auto-refresh";
@@ -35,7 +35,7 @@ interface ModelsPageProps {
 }
 
 export default async function ModelsPage({ params }: ModelsPageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "models");
   const session = await adminSession();
   const { cards, assets, canUpload, canDelete } = await loadModels(membership, {
     models: session.models,

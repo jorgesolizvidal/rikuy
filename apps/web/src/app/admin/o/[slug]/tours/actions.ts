@@ -9,6 +9,7 @@ import {
   discardTourDraft,
   moveTour,
   openOrganization,
+  withModule,
   publishTour,
   removeTourHotspot,
   restoreTourRevision,
@@ -48,7 +49,7 @@ async function membershipFor(
   if (actor === null) return "signed_out";
   const membership =
     typeof slug === "string"
-      ? await openOrganization(actor, slug, (await adminSession()).memberships)
+      ? withModule(await openOrganization(actor, slug, (await adminSession()).memberships), "tours")
       : null;
   return membership ?? "forbidden";
 }

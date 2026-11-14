@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { portalPassport } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalViewWith } from "@/server/portal-view";
 
 import { DestinationCard } from "../../destination-card";
 import "../../passport.css";
@@ -17,7 +17,7 @@ interface CircuitPageProps {
 
 async function circuitOf(params: CircuitPageProps["params"]) {
   const { host, slug } = await params;
-  const view = await portalView(host);
+  const view = await portalViewWith(host, "passport");
   if (view === null) return null;
   const decoded = decodeURIComponent(slug);
   const circuit = (await portalPassport(view)).find((item) => item.slug === decoded) ?? null;
@@ -74,7 +74,7 @@ export default async function CircuitPage({ params }: CircuitPageProps) {
         reward={circuit.reward}
         stopIds={circuit.stops.map((stop) => stop.id)}
       />
-      {located.length >= 2 ? (
+      {located.length >= 2 && portalHas(view, "map") ? (
         <p className="passport-map-link">
           <a href={mapRoutePath(located.map((stop) => `destination:${stop.slug}`))}>
             Ver el recorrido en el mapa

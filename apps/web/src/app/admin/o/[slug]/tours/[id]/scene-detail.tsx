@@ -76,7 +76,8 @@ export function SceneDetail({
   readonly org: string;
   readonly scene: EditorScene;
   readonly scenes: readonly SceneOption[];
-  readonly models: readonly EditorModelOption[];
+  /** Null: no 3D models in this municipality (ADR-060). */
+  readonly models: readonly EditorModelOption[] | null;
   readonly targets: readonly EditorTargetOption[];
   readonly canEdit: boolean;
   /** «Proponer con el Copilot» for this scene (ADR-042), when the person can edit. */
@@ -396,7 +397,7 @@ export function SceneDetail({
           <div className="hotspot-add">
             <p className="field-hint">Agregar un punto:</p>
             <div className="row-actions">
-              {KINDS.map((kind) => (
+              {KINDS.filter((kind) => kind !== "model" || models !== null).map((kind) => (
                 <button
                   key={kind}
                   type="button"
@@ -429,7 +430,7 @@ export function SceneDetail({
             kind={draft.kind}
             initial={null}
             scenes={otherScenes}
-            models={models}
+            models={models ?? []}
             targets={targets}
             pending={pending}
             onCancel={() => setDraft(null)}
@@ -450,7 +451,7 @@ export function SceneDetail({
             kind={editingHotspot.kind}
             initial={editingHotspot}
             scenes={otherScenes}
-            models={models}
+            models={models ?? []}
             targets={targets}
             pending={pending}
             onCancel={() => setEditing(null)}

@@ -13,7 +13,7 @@ import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 
 import { SignOutButton } from "../../../../sign-out-button";
 import { ProposeForm } from "./propose-form";
@@ -26,7 +26,7 @@ interface ProposePageProps {
 }
 
 export default async function ProposePage({ params, searchParams }: ProposePageProps) {
-  const membership = await requireOrganization((await params).slug);
+  const membership = await requireModule((await params).slug, "copilot");
   const query = await searchParams;
   const target = proposalTargetFromQuery(query);
   if (!target || !canPropose(membership)) notFound();

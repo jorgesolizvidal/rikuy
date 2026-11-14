@@ -1,24 +1,27 @@
 import { createClient, type AuthError, type PostgrestError } from "@supabase/supabase-js";
-import type {
-  IdentityAdmin,
-  InvitationRepository,
-  MemberChangeOutcome,
-  MemberRepository,
-  MfaGateway,
-  OperatorAccess,
-  PendingInvitation,
-  PlatformRepository,
-  PlatformTenantSummary,
-  ProvisionOutcome,
-  SecondFactorResetOutcome,
-  TenantMember,
-  TenantStatusChangeOutcome,
-  TotpEnrollment,
-  TotpVerifyOutcome,
+import {
+  MODULE_KEYS,
+  type IdentityAdmin,
+  type InvitationRepository,
+  type MemberChangeOutcome,
+  type MemberRepository,
+  type MfaGateway,
+  type ModulesChangeOutcome,
+  type OperatorAccess,
+  type PendingInvitation,
+  type PlatformRepository,
+  type PlatformTenantSummary,
+  type ProvisionOutcome,
+  type SecondFactorResetOutcome,
+  type TenantMember,
+  type TenantStatusChangeOutcome,
+  type TotpEnrollment,
+  type TotpVerifyOutcome,
 } from "@rikuy/core";
 import { z } from "zod";
 
 import { isMissingFunction } from "./missing-function";
+import { moduleKeysOf } from "./module-keys";
 import type { SessionClient } from "./session-client";
 
 /**
@@ -54,6 +57,8 @@ const tenantRowSchema = z.object({
   owner_status: membershipStatusSchema.nullable(),
   created_at: z.string(),
   is_demo: z.boolean().optional(),
+  // Optional while the app may be deployed before the migration that adds it (ADR-060).
+  modules: z.array(z.string()).optional(),
 });
 
 export function createPlatformRepository(client: SessionClient): PlatformRepository {
@@ -80,6 +85,7 @@ export function createPlatformRepository(client: SessionClient): PlatformReposit
           ownerStatus: row.owner_status,
           createdAt: row.created_at,
           demo: row.is_demo === true,
+          ...(row.modules ? { modules: moduleKeysOf(row.modules) ?? [] } : {}),
         }));
     },
 
@@ -93,6 +99,8 @@ export function createPlatformRepository(client: SessionClient): PlatformReposit
         p_timezone: request.timezone,
         // Only when asked, so a provisioning still works against a database without it.
         ...(request.demo ? { p_demo: true } : {}),
+        // Without modules it starts with everything; only another package is sent (ADR-060).
+        ...(request.modules.length !== MODULE_KEYS.length ? { p_modules: request.modules } : {}),
       });
       if (error) {
         const { code, hint } = rpcError(error);
@@ -134,6 +142,19 @@ export function createPlatformRepository(client: SessionClient): PlatformReposit
       if (code === "PT404") return { status: "not_found" };
       if (code === "PT409") return { status: "self" };
       throw unexpected("Resetting a second factor", error);
+    },
+
+    async setModules(tenantId, modules): Promise<ModulesChangeOutcome> {
+      const { data, error } = await client.rpc("platform_set_tenant_modules", {
+        p_tenant_id: tenantId,
+        p_modules: [...modules],
+      });
+      if (!error) return { status: "updated", modules: moduleKeysOf(data) ?? [] };
+      const { code } = rpcError(error);
+      if (code === "42501") return { status: "forbidden" };
+      if (code === "PT404") return { status: "not_found" };
+      if (code === "23514" || code === "22P02") return { status: "invalid" };
+      throw unexpected("Changing the modules", error);
     },
   };
 }

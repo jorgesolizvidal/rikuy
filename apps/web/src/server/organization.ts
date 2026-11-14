@@ -1,6 +1,11 @@
 import "server-only";
 
-import { organizationAccess, type OrganizationMembership } from "@rikuy/core";
+import {
+  hasModule,
+  organizationAccess,
+  type ModuleKey,
+  type OrganizationMembership,
+} from "@rikuy/core";
 import { notFound, redirect } from "next/navigation";
 import { cache } from "react";
 
@@ -22,3 +27,13 @@ export const requireOrganization = cache(async (slug: string): Promise<Organizat
   }
   return access.membership;
 });
+
+/**
+ * Same, for a page of a module (ADR-060): 404 when the municipality does not have it, as if
+ * the page did not exist. Its content is kept and comes back when the module is turned on.
+ */
+export async function requireModule(slug: string, key: ModuleKey): Promise<OrganizationMembership> {
+  const membership = await requireOrganization(slug);
+  if (!hasModule(membership.modules, key)) notFound();
+  return membership;
+}

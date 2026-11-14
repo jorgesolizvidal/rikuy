@@ -12,7 +12,7 @@ import { notFound } from "next/navigation";
 
 import { publishedMapReader } from "@/server/platform";
 import { portalMapExtent, toMapPoint } from "@/server/portal-content";
-import { portalView } from "@/server/portal-view";
+import { portalViewWith } from "@/server/portal-view";
 
 import { MapExplorer } from "../map-explorer";
 import { MapRoute } from "../map-route";
@@ -29,7 +29,7 @@ interface MapPageProps {
 export async function generateMetadata({
   params,
 }: Omit<MapPageProps, "searchParams">): Promise<Metadata> {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "map");
   if (view === null) return {};
   const { siteName } = view.resolved.presentation.identity;
   const description = `Mapa de ${siteName}: destinos y eventos próximos, con la lista de lugares.`;
@@ -76,7 +76,7 @@ function capped(box: BoundingBox): BoundingBox {
 }
 
 export default async function MapPage({ params, searchParams }: MapPageProps) {
-  const view = await portalView((await params).host);
+  const view = await portalViewWith((await params).host, "map");
   if (view === null) notFound();
   const [extent, query] = await Promise.all([portalMapExtent(view), searchParams]);
   const center = requestedCenter(query);

@@ -1,11 +1,12 @@
 import {
   contentImagePath,
   eventImages,
+  hasModule,
+  type ImageReference,
   listDestinations,
   loadEventEditor,
   richTextToMarkup,
   ROLE_LABELS,
-  type ImageReference,
 } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
@@ -13,7 +14,7 @@ import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { requireOrganization } from "@/server/organization";
+import { requireModule } from "@/server/organization";
 import { platformSettings, publishedContentReader } from "@/server/platform";
 
 import { SignOutButton } from "../../../../sign-out-button";
@@ -42,7 +43,7 @@ interface EditorPageProps {
 
 export default async function EventEditorPage({ params }: EditorPageProps) {
   const { slug, id } = await params;
-  const membership = await requireOrganization(slug);
+  const membership = await requireModule(slug, "agenda");
   if (!UUID.test(id)) notFound();
   const session = await adminSession();
   const editor = await loadEventEditor(membership, id, session.content);
@@ -134,7 +135,9 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
           timezoneNote="Escribe la fecha y la hora del municipio."
         />
         <aside className="history">
-          {editor.canEdit && aiGatewayStatus().configured ? (
+          {editor.canEdit &&
+          aiGatewayStatus().configured &&
+          hasModule(membership.modules, "copilot") ? (
             <CopilotProposeLink
               org={membership.slug}
               target={{ type: "content", contentId: record.contentId }}

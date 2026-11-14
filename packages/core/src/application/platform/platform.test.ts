@@ -12,6 +12,7 @@ import {
   revokeMember,
 } from "./members";
 import {
+  changeTenantModules,
   changeTenantStatus,
   listPlatformTenants,
   operatorGate,
@@ -38,7 +39,9 @@ function platform(access: OperatorAccess, overrides: Partial<PlatformRepository>
     operatorAccess: async () => access,
     listTenants: async () => [],
     async provision(request) {
-      calls.push(`provision:${request.slug}:${request.hostname}:${request.ownerUserId}`);
+      calls.push(
+        `provision:${request.slug}:${request.hostname}:${request.ownerUserId}:${request.modules.join(",")}`,
+      );
       return { status: "provisioned", tenantId: TENANT };
     },
     async setStatus(tenantId, status) {
@@ -48,6 +51,10 @@ function platform(access: OperatorAccess, overrides: Partial<PlatformRepository>
     async resetSecondFactor(email) {
       calls.push(`reset:${email}`);
       return { status: "reset", removed: 1 };
+    },
+    async setModules(tenantId, modules) {
+      calls.push(`modules:${tenantId}:${modules.join(",")}`);
+      return { status: "updated", modules };
     },
     ...overrides,
   };
@@ -159,8 +166,23 @@ describe("provisioning", () => {
     });
     expect(id.emails).toEqual(["duena@demo-este.example.test"]);
     expect(p.calls).toEqual([
-      "provision:demo-este:demo-este.localhost:user-for-duena@demo-este.example.test",
+      "provision:demo-este:demo-este.localhost:user-for-duena@demo-este.example.test:agenda,map,tours,models,passport,assistant,voice,copilot",
     ]);
+  });
+
+  it("starts with the package the operator chose (ADR-060)", async () => {
+    const p = platform("ok");
+    await provisionTenant(
+      { ...valid, modulePackage: "information" },
+      { platform: p.repo, identity: identity().admin, hosts: HOSTS },
+    );
+    expect(p.calls[0]).toMatch(/:agenda,map$/u);
+    expect(
+      await provisionTenant(
+        { ...valid, modulePackage: "todo" },
+        { platform: p.repo, identity: identity().admin, hosts: HOSTS },
+      ),
+    ).toEqual({ status: "invalid_input", fields: ["modules"] });
   });
 
   it.each(["none", "needs_mfa"] as const)(
@@ -194,6 +216,32 @@ describe("provisioning", () => {
       ),
     ).toEqual({ status: "invalid_input", fields });
     expect(id.emails).toEqual([]);
+  });
+
+  it("changes the modules only for an operator with the second factor (ADR-060)", async () => {
+    expect(await changeTenantModules(platform("needs_mfa").repo, TENANT, ["map"])).toEqual({
+      status: "forbidden",
+    });
+    const p = platform("ok");
+    expect(await changeTenantModules(p.repo, TENANT, ["passport", "map"])).toEqual({
+      status: "updated",
+      modules: ["map", "passport"],
+    });
+    expect(await changeTenantModules(p.repo, TENANT, ["models"])).toEqual({
+      status: "requires",
+      module: "models",
+      needs: "tours",
+    });
+    expect(await changeTenantModules(p.repo, TENANT, ["map", "map"])).toEqual({
+      status: "invalid",
+    });
+    expect(await changeTenantModules(p.repo, TENANT, ["cine"])).toEqual({ status: "invalid" });
+    expect(await changeTenantModules(p.repo, TENANT, "map")).toEqual({ status: "invalid" });
+    expect(await changeTenantModules(p.repo, TENANT, [])).toEqual({
+      status: "updated",
+      modules: [],
+    });
+    expect(p.calls).toEqual([`modules:${TENANT}:map,passport`, `modules:${TENANT}:`]);
   });
 
   it("only allows activation or suspension", async () => {
