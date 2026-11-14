@@ -1,7 +1,17 @@
 import { describe, expect, it } from "vitest";
 
 import { contrastRatio, isHexColor, mostReadable, relativeLuminance } from "./color";
-import { CONTRAST_MINIMUMS, deriveTheme, themeContrast, themeCssVariables } from "./theme";
+import {
+  CONTRAST_MINIMUMS,
+  deriveTheme,
+  isThemeStyle,
+  styleAllowsMode,
+  THEME_DEFINITIONS,
+  THEME_STYLES,
+  themeContrast,
+  themeCssVariables,
+  themeStyleOf,
+} from "./theme";
 
 describe("WCAG contrast", () => {
   it("matches reference values", () => {
@@ -30,11 +40,49 @@ describe("WCAG contrast", () => {
 describe("themes", () => {
   it("derives the palette from mode + two colors", () => {
     const light = deriveTheme({ mode: "light", brand: "#1f6f4a", accent: "#a06f12" });
-    expect(light.background).toBe("#f7f8f6");
+    expect(light.style).toBe("editorial");
+    expect(light.background).toBe("#fbf9f4");
     expect(light.onBrand).toBe("#ffffff");
     const dark = deriveTheme({ mode: "dark", brand: "#f0a868", accent: "#7fb7d9" });
     expect(dark.background).toBe("#101312");
     expect(dark.onBrand).toBe("#101312");
+  });
+
+  it("derives each style from its own base (ADR-061)", () => {
+    const immersive = deriveTheme({
+      style: "immersive",
+      mode: "dark",
+      brand: "#f0a868",
+      accent: "#7fb7d9",
+    });
+    expect(immersive.style).toBe("immersive");
+    expect(immersive.background).toBe("#0c110e");
+    // A light immersive theme does not exist: it is read as dark, never an unreadable mix.
+    const forced = deriveTheme({
+      style: "immersive",
+      mode: "light",
+      brand: "#f0a868",
+      accent: "#7fb7d9",
+    });
+    expect(forced.mode).toBe("dark");
+    expect(forced.background).toBe("#0c110e");
+    expect(themeStyleOf({})).toBe("editorial");
+    expect(THEME_STYLES.every(isThemeStyle)).toBe(true);
+    expect(isThemeStyle("Editorial")).toBe(false);
+    expect(styleAllowsMode("immersive", "light")).toBe(false);
+    expect(styleAllowsMode("editorial", "light")).toBe(true);
+    for (const style of THEME_STYLES) expect(THEME_DEFINITIONS[style].name).not.toBe("");
+  });
+
+  it("keeps the platform's neutrals readable in every style", () => {
+    for (const style of THEME_STYLES) {
+      for (const mode of THEME_DEFINITIONS[style].modes) {
+        const palette = deriveTheme({ style, mode, brand: "#000000", accent: "#000000" });
+        expect(contrastRatio(palette.text, palette.background)).toBeGreaterThanOrEqual(7);
+        expect(contrastRatio(palette.muted, palette.background)).toBeGreaterThanOrEqual(4.5);
+        expect(contrastRatio(palette.muted, palette.surface)).toBeGreaterThanOrEqual(4.5);
+      }
+    }
   });
 
   it("reports every AA check", () => {

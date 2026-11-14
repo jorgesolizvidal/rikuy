@@ -38,6 +38,35 @@ describe("branding form mapping", () => {
       expect(valuesFromPresentation(result.value).social.instagram).toContain("instagram");
   });
 
+  it("carries the theme's style (ADR-061)", () => {
+    const immersive = presentationInputFromForm(
+      form({ ...filled, style: "immersive", mode: "dark", brand: "#f0a868", accent: "#7fb7d9" }),
+    );
+    expect(immersive.theme).toMatchObject({ style: "immersive", mode: "dark" });
+    const result = validatePresentation(immersive);
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(valuesFromPresentation(result.value).style).toBe("immersive");
+
+    // A page opened before the themes sends no style: editorial, as before.
+    const older = presentationInputFromForm(form(filled));
+    expect(older.theme).not.toHaveProperty("style");
+    const kept = validatePresentation(older);
+    expect(kept.ok && valuesFromPresentation(kept.value).style).toBe("editorial");
+
+    // Immersive on a light background, or an unknown style, is pointed at its field.
+    const light = validatePresentation(
+      presentationInputFromForm(form({ ...filled, style: "immersive" })),
+    );
+    expect(light.ok).toBe(false);
+    if (!light.ok) expect(fieldErrors(light.issues, []).mode).toContain("Inmersivo");
+    const unknown = validatePresentation(
+      presentationInputFromForm(form({ ...filled, style: "neon" })),
+    );
+    expect(unknown.ok).toBe(false);
+    if (!unknown.ok)
+      expect(fieldErrors(unknown.issues, []).style).toBe("Elige uno de los dos temas.");
+  });
+
   it("carries the logo reference only when both hidden fields are present", () => {
     const asset = "5eed4000-0000-4000-8000-000000000001";
     const withLogo = presentationInputFromForm(

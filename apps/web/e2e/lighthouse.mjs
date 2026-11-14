@@ -242,6 +242,14 @@ function measure(lhr, page) {
     lcpPhases: (lhr.audits["lcp-breakdown-insight"]?.details?.items?.[0]?.items ?? [])
       .map((item) => `${item.subpart}=${Math.round(item.duration)}`)
       .join(" "),
+    // What moved (C3 · Paso 2): the elements behind the CLS, so a failing run says where to look.
+    shifts: (lhr.audits["layout-shifts"]?.details?.items ?? [])
+      .slice(0, 3)
+      .map(
+        (item) =>
+          `${item.node?.selector ?? item.node?.nodeLabel ?? "?"} (${Number(item.score ?? 0).toFixed(3)})`,
+      )
+      .join(", "),
   };
 }
 
@@ -370,6 +378,8 @@ const problems = [];
         chosen.scores.seo
       }${chosen.intendedNoindex ? " (noindex: portal vacío)" : ""} LCP ${chosen.lcpMs} ms TBT ${chosen.tbtMs} ms CLS ${chosen.cls} JS ${chosen.scriptKb} KB`,
     );
+    const moved = runs.filter((r) => r.cls > 0 && r.shifts).map((r) => r.shifts);
+    if (moved.length > 0) console.log(`  moved: ${moved[0]}`);
   }
 }
 
@@ -400,7 +410,7 @@ annotate(
   rows
     .map(
       ({ page, chosen, runs, lcps }) =>
-        `${page.label} perf ${chosen.scores.performance} [${runs.join(", ")}] LCP ${chosen.lcpMs} [${lcps.join(", ")}] TTFB ${chosen.ttfbMs} TBT ${chosen.tbtMs} · ${chosen.lcpPhases}`,
+        `${page.label} perf ${chosen.scores.performance} [${runs.join(", ")}] LCP ${chosen.lcpMs} [${lcps.join(", ")}] TTFB ${chosen.ttfbMs} TBT ${chosen.tbtMs} · ${chosen.lcpPhases}${chosen.cls > 0 && chosen.shifts ? ` · CLS ${chosen.cls}: ${chosen.shifts}` : ""}`,
     )
     .join("\n"),
   "notice",

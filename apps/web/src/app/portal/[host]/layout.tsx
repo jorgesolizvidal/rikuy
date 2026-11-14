@@ -8,9 +8,11 @@ import {
   themeCssVariables,
 } from "@rikuy/core";
 import type { Metadata, Viewport } from "next";
-import localFont from "next/font/local";
 import { notFound } from "next/navigation";
 import type { CSSProperties, ReactNode } from "react";
+import { preload } from "react-dom";
+
+import { THEME_FONTS, themeFontFaces } from "@/lib/theme-fonts";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { platformSettings } from "@/server/platform";
@@ -23,19 +25,6 @@ import { AssistantLauncher } from "./assistant-launcher";
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
 import { VisitTracker } from "./visit-tracker";
-
-/**
- * The portal's display face (titles), self-hosted and preloaded with the page: as a plain
- * stylesheet font it was found only after the CSS, one more round trip before the first
- * paint of every page. Latin covers Spanish; other characters use the fallback face.
- */
-const display = localFont({
-  src: "../../../../node_modules/@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2",
-  weight: "200 800",
-  display: "swap",
-  variable: "--font-portal-display",
-  fallback: ["system-ui", "sans-serif"],
-});
 
 /**
  * Portal pages are cached per host and rebuilt at most every 2 minutes (ADR-024): enough
@@ -114,16 +103,24 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
     aiGatewayStatus().configured && portalHas(view, "assistant")
       ? assistantPersona(presentation)
       : null;
+  // The theme's font only (ADR-061), preloaded with the page: found only after the CSS, it
+  // would be one more round trip before the titles settle. The other theme's never loads.
+  const font = THEME_FONTS[palette.style];
+  preload(font.href, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
 
   return (
     <div
-      className={`portal ${display.variable}`}
+      className="portal"
+      data-theme={palette.style}
       data-mode={palette.mode}
       data-assistant={persona ? "" : undefined}
       lang={view.context.tenant.defaultLocale}
       // Validated #rrggbb values only (see themeCssVariables).
       style={themeCssVariables(palette) as CSSProperties}
     >
+      <style href={`rikuy-font-${palette.style}`} precedence="default">
+        {themeFontFaces(palette.style)}
+      </style>
       <a className="portal-skip" href="#contenido">
         Saltar al contenido
       </a>

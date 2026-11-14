@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node scripts/vendor-maplibre.mjs && node scripts/vendor-three.mjs && next dev",
-    "build": "node scripts/vendor-maplibre.mjs && node scripts/vendor-three.mjs && next build",
+    "dev": "node scripts/vendor-maplibre.mjs && node scripts/vendor-three.mjs && node scripts/vendor-fonts.mjs && next dev",
+    "build": "node scripts/vendor-maplibre.mjs && node scripts/vendor-three.mjs && node scripts/vendor-fonts.mjs && next build",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "next typegen && tsc -p tsconfig.json",
@@ -29,10 +29,12 @@
     "test:e2e-rewards": "vitest run --config vitest.e2e.config.ts e2e/rewards.e2e.test.ts",
     "test:e2e-passport-metrics": "vitest run --config vitest.e2e.config.ts e2e/passport-metrics.e2e.test.ts",
     "test:e2e-modules": "vitest run --config vitest.e2e.config.ts e2e/modules.e2e.test.ts",
+    "test:e2e-themes": "vitest run --config vitest.e2e.config.ts e2e/themes.e2e.test.ts",
     "test:e2e-unanswered": "vitest run --config vitest.e2e.config.ts e2e/unanswered.e2e.test.ts"
   },
   "dependencies": {
     "@fontsource-variable/bricolage-grotesque": "5.3.0",
+    "@fontsource-variable/plus-jakarta-sans": "5.3.0",
     "@photo-sphere-viewer/core": "5.15.1",
     "@photo-sphere-viewer/equirectangular-tiles-adapter": "5.15.1",
     "@photo-sphere-viewer/markers-plugin": "5.15.1",
