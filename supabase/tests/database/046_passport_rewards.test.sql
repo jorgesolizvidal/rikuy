@@ -176,8 +176,10 @@ select is((select count(*)::int from public.audit_events where action = 'passpor
 
 -- A circuit without a key cannot be redeemed; an expired voucher neither, and the phone gets a new one.
 set local role anon;
+-- The voucher's code is the only 8-character value in scratch (the rest are edition numbers;
+-- ordering by text picked one of them when the random code started with a low digit).
 insert into scratch select public.portal_request_voucher(:'ta', 'otra', :'p1', (select stamps from phone where passport = :'p1'))->>'code';
-select is(public.portal_redeem_voucher(:'ta', (select v from scratch order by v desc limit 1), '2468', false)->>'status',
+select is(public.portal_redeem_voucher(:'ta', (select v from scratch where length(v) = 8), '2468', false)->>'status',
   'no_pin', 'a circuit without the shop''s key cannot be redeemed');
 reset role;
 update public.passport_circuits set redeem_pin_hash = extensions.crypt('9999', extensions.gen_salt('bf', 8)),
