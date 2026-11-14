@@ -263,7 +263,7 @@ describe("web manifest", () => {
       name: "Municipio Demo Norte",
       short_name: "Demo Norte",
       theme_color: "#1f6f4a",
-      background_color: "#f7f8f6",
+      background_color: "#fbf9f4",
       start_url: "/",
       display: "standalone",
     });

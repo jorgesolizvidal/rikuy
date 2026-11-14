@@ -1,9 +1,8 @@
-import "@fontsource-variable/bricolage-grotesque";
-
-import { loadBrandingEditor, logoPreviewUrl, ROLE_LABELS } from "@rikuy/core";
+import { loadBrandingEditor, logoPreviewUrl, ROLE_LABELS, THEME_STYLES } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { themeFontFaces } from "@/lib/theme-fonts";
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
@@ -36,6 +35,10 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
+      {/* The preview's fonts (ADR-061): each downloads only when its theme is shown. */}
+      <style href="rikuy-theme-fonts-preview" precedence="default">
+        {THEME_STYLES.map(themeFontFaces).join("")}
+      </style>
       <header className="admin-header">
         <Link href={`/o/${membership.slug}`} className="eyebrow">
           ← {membership.displayName}

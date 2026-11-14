@@ -2,7 +2,13 @@ import { z } from "zod";
 
 import { HEX_COLOR_PATTERN } from "../domain/branding/color";
 import { NEARBY_RADIUS } from "../domain/geo/proximity";
-import { themeContrast, type ContrastCheck } from "../domain/branding/theme";
+import {
+  styleAllowsMode,
+  THEME_STYLES,
+  themeContrast,
+  themeStyleOf,
+  type ContrastCheck,
+} from "../domain/branding/theme";
 
 /**
  * White-label presentation of a tenant portal (stored in `tenant_config_versions.branding`).
@@ -61,11 +67,21 @@ export const tenantPresentationSchema = z.strictObject({
     shortName: line(1, PRESENTATION_LIMITS.shortName),
     tagline: line(0, PRESENTATION_LIMITS.tagline),
   }),
-  theme: z.strictObject({
-    mode: z.enum(["light", "dark"]),
-    brand: hexColorSchema,
-    accent: hexColorSchema,
-  }),
+  /**
+   * The style (ADR-061) brings fonts and components; absent means «editorial». The
+   * «immersive» style exists only on a dark background.
+   */
+  theme: z
+    .strictObject({
+      style: z.enum(THEME_STYLES).optional(),
+      mode: z.enum(["light", "dark"]),
+      brand: hexColorSchema,
+      accent: hexColorSchema,
+    })
+    .refine((theme) => styleAllowsMode(themeStyleOf(theme), theme.mode), {
+      path: ["mode"],
+      message: "mode_not_allowed",
+    }),
   contact: z.strictObject({
     email: z.email().max(PRESENTATION_LIMITS.email).optional(),
     phone: z
@@ -183,7 +199,7 @@ export function defaultPresentation(tenant: { readonly displayName: string }): T
       shortName: deriveShortName(tenant.displayName),
       tagline: "",
     },
-    theme: { mode: "light", brand: "#24557a", accent: "#8a6d1f" },
+    theme: { style: "editorial", mode: "light", brand: "#24557a", accent: "#8a6d1f" },
     contact: {},
     social: [],
     seo: { description: "" },

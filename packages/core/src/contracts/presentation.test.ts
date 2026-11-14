@@ -89,6 +89,40 @@ describe("presentation contract", () => {
     ).toEqual([{ path: "theme.accent", code: "contrast.accentOnBackground" }]);
   });
 
+  it("accepts the two styles, immersive only on a dark background (ADR-061)", () => {
+    const theme = (value: object) => issues({ ...samplePresentation(), theme: value });
+    expect(
+      theme({ style: "editorial", mode: "light", brand: "#14532d", accent: "#b45309" }),
+    ).toEqual([]);
+    expect(
+      theme({ style: "editorial", mode: "dark", brand: "#f0a868", accent: "#7fb7d9" }),
+    ).toEqual([]);
+    expect(
+      theme({ style: "immersive", mode: "dark", brand: "#f0a868", accent: "#7fb7d9" }),
+    ).toEqual([]);
+    expect(
+      theme({ style: "immersive", mode: "light", brand: "#14532d", accent: "#b45309" }),
+    ).toEqual([{ path: "theme.mode", code: "invalid" }]);
+    expect(
+      theme({ style: "brutalist", mode: "dark", brand: "#f0a868", accent: "#7fb7d9" }).map(
+        (i) => i.path,
+      ),
+    ).toEqual(["theme.style"]);
+    // Older presentations, without a style, stay valid and read as editorial.
+    const stored = parseStoredPresentation(samplePresentation());
+    expect(stored?.theme.style).toBeUndefined();
+  });
+
+  it("checks contrast against the style's own background", () => {
+    // A mid green: readable on the editorial ivory, not on the immersive night.
+    expect(
+      issues({
+        ...samplePresentation(),
+        theme: { style: "immersive", mode: "dark", brand: "#14532d", accent: "#7fb7d9" },
+      }),
+    ).toEqual([{ path: "theme.brand", code: "contrast.brandOnBackground" }]);
+  });
+
   it("parses stored values without re-checking contrast and returns null for garbage", () => {
     expect(parseStoredPresentation(samplePresentation())?.identity.shortName).toBe("Demo Norte");
     expect(parseStoredPresentation({})).toBeNull();

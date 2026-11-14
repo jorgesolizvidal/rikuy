@@ -4,6 +4,7 @@ import {
   deriveTheme,
   isHexColor,
   monogram,
+  THEME_DEFINITIONS,
   themeContrast,
   themeCssVariables,
   type ContrastCheck,
@@ -20,7 +21,10 @@ const CHECK_LABELS: Readonly<Record<ContrastCheck, string>> = {
 
 const ratio = new Intl.NumberFormat("es-BO", { maximumFractionDigits: 1 });
 
-/** Live preview of the portal header and hero with WCAG contrast checks. */
+/**
+ * Live preview of the portal with its theme (ADR-061): header, title, a destination card and
+ * a button, with WCAG contrast checks. The theme fonts come with the page (page.tsx).
+ */
 export function BrandingPreview({
   values,
   logoUrl,
@@ -31,7 +35,7 @@ export function BrandingPreview({
   const brand = values.brand.trim().toLowerCase();
   const accent = values.accent.trim().toLowerCase();
   const colorsValid = isHexColor(brand) && isHexColor(accent);
-  const choice = { mode: values.mode, brand, accent };
+  const choice = { style: values.style, mode: values.mode, brand, accent };
   const palette = colorsValid ? deriveTheme(choice) : null;
   const checks = colorsValid ? themeContrast(choice) : [];
   const shortName = values.shortName.trim() || "?";
@@ -40,8 +44,16 @@ export function BrandingPreview({
     <aside className="branding-preview" aria-labelledby="preview-title">
       <h2 id="preview-title">Vista previa</h2>
       {palette ? (
+        <p className="preview-theme" aria-live="polite">
+          Tema {THEME_DEFINITIONS[palette.style].name}, fondo{" "}
+          {palette.mode === "dark" ? "oscuro" : "claro"}
+        </p>
+      ) : null}
+      {palette ? (
         <div
           className="preview-portal"
+          data-theme={palette.style}
+          data-mode={palette.mode}
           style={themeCssVariables(palette) as CSSProperties}
           // Purely visual copy of what the form says; screen readers get the form itself.
           aria-hidden="true"
@@ -56,13 +68,24 @@ export function BrandingPreview({
             )}
             <span>{values.siteName || "Nombre del portal"}</span>
           </div>
-          <p className="preview-title">{values.siteName || "Nombre del portal"}</p>
-          {values.tagline ? <p className="preview-tagline">{values.tagline}</p> : null}
-          <p className="preview-body">
-            Texto de ejemplo con un <span className="preview-link">enlace</span>.
+          <div className="preview-hero">
+            <p className="preview-title">{values.siteName || "Nombre del portal"}</p>
+            {values.tagline ? <p className="preview-tagline">{values.tagline}</p> : null}
+          </div>
+          <p className="preview-section">
+            <span className="preview-rule" />
+            Lugares para visitar
           </p>
-          <span className="preview-button">Botón</span>
-          <span className="preview-rule" />
+          <div className="preview-card">
+            <span className="preview-card-media" />
+            <span className="preview-card-text">
+              <span className="preview-card-title">Lugar de ejemplo</span>
+              <span className="preview-card-summary">
+                Texto de ejemplo con un <span className="preview-link">enlace</span>.
+              </span>
+            </span>
+          </div>
+          <span className="preview-button">Cómo llegar</span>
         </div>
       ) : (
         <p className="notice">Escribe los colores en formato #rrggbb para ver la vista previa.</p>

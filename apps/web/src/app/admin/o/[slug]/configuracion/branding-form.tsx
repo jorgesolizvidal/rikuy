@@ -5,7 +5,11 @@ import {
   NEARBY_RADIUS,
   PRESENTATION_LIMITS,
   SOCIAL_NETWORKS,
+  styleAllowsMode,
+  THEME_DEFINITIONS,
+  THEME_STYLES,
   type SocialNetwork,
+  type ThemeStyle,
 } from "@rikuy/core";
 import {
   useActionState,
@@ -70,6 +74,13 @@ export function BrandingForm({
 
   const set = <K extends keyof BrandingValues>(key: K, value: BrandingValues[K]) =>
     setValues((current) => ({ ...current, [key]: value }));
+  // A theme that has only a dark background takes it at once (ADR-061).
+  const setStyle = (style: ThemeStyle) =>
+    setValues((current) => ({
+      ...current,
+      style,
+      mode: styleAllowsMode(style, current.mode) ? current.mode : "dark",
+    }));
   const setSocial = (network: SocialNetwork, url: string) =>
     setValues((current) => ({ ...current, social: { ...current.social, [network]: url } }));
   const setLogo = (logo: LogoSelection | null) => {
@@ -141,8 +152,58 @@ export function BrandingForm({
         </fieldset>
 
         <fieldset disabled={!canEdit || pending}>
+          <legend>Tema del portal</legend>
+          <p className="field-hint" id="style-hint">
+            El tema decide las letras, la forma de las tarjetas y de los botones. Los colores y el
+            logo siguen siendo los del municipio.
+          </p>
+          <div
+            className="field"
+            role="radiogroup"
+            aria-labelledby="style-label"
+            aria-describedby={errors.style ? "style-error" : "style-hint"}
+            aria-invalid={errors.style ? true : undefined}
+            tabIndex={errors.style ? -1 : undefined}
+          >
+            <span id="style-label" className="visually-hidden">
+              Tema
+            </span>
+            <div className="theme-choices">
+              {THEME_STYLES.map((style) => (
+                <label key={style} className="theme-choice">
+                  <input
+                    type="radio"
+                    name="style"
+                    value={style}
+                    checked={values.style === style}
+                    onChange={() => setStyle(style)}
+                    aria-describedby={`style-${style}-text`}
+                  />
+                  <span className="theme-choice-name">{THEME_DEFINITIONS[style].name}</span>
+                  <span className="theme-choice-text" id={`style-${style}-text`}>
+                    {THEME_DEFINITIONS[style].description}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {errors.style ? (
+              <span className="field-error" id="style-error">
+                {errors.style}
+              </span>
+            ) : null}
+          </div>
+        </fieldset>
+
+        <fieldset disabled={!canEdit || pending}>
           <legend>Colores</legend>
-          <div className="field" role="radiogroup" aria-labelledby="mode-label">
+          <div
+            className="field"
+            role="radiogroup"
+            aria-labelledby="mode-label"
+            aria-describedby={errors.mode ? "mode-error" : undefined}
+            aria-invalid={errors.mode ? true : undefined}
+            tabIndex={errors.mode ? -1 : undefined}
+          >
             <span id="mode-label">Fondo</span>
             <div className="choice-row">
               {(
@@ -150,19 +211,34 @@ export function BrandingForm({
                   ["light", "Claro"],
                   ["dark", "Oscuro"],
                 ] as const
-              ).map(([mode, label]) => (
-                <label key={mode} className="choice">
-                  <input
-                    type="radio"
-                    name="mode"
-                    value={mode}
-                    checked={values.mode === mode}
-                    onChange={() => set("mode", mode)}
-                  />
-                  {label}
-                </label>
-              ))}
+              ).map(([mode, label]) => {
+                const allowed = styleAllowsMode(values.style, mode);
+                return (
+                  <label key={mode} className="choice">
+                    <input
+                      type="radio"
+                      name="mode"
+                      value={mode}
+                      checked={values.mode === mode}
+                      disabled={!allowed}
+                      onChange={() => set("mode", mode)}
+                    />
+                    {label}
+                    {allowed ? null : (
+                      <span className="choice-note">
+                        {" "}
+                        (el tema {THEME_DEFINITIONS[values.style].name} es oscuro)
+                      </span>
+                    )}
+                  </label>
+                );
+              })}
             </div>
+            {errors.mode ? (
+              <span className="field-error" id="mode-error">
+                {errors.mode}
+              </span>
+            ) : null}
           </div>
           <ColorField
             field="brand"

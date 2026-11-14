@@ -76,13 +76,14 @@ values
   ('5eed2000-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 'demo-norte.localhost', 'platform', 'active', now()),
   ('5eed2000-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000002', 'demo-sur.localhost', 'platform', 'active', now());
 
--- Published (sealed) white-label presentation: two clearly different brands on one build.
+-- Published (sealed) white-label presentation: two clearly different brands on one build,
+-- one per theme (ADR-061): Demo Norte «editorial», Demo Sur «immersive».
 insert into public.tenant_config_versions (id, tenant_id, version, state, sealed_at, created_by, branding)
 values
   ('5eed3000-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 1, 'sealed', now(),
    '5eed0000-0000-4000-8000-000000000001',
    '{"identity": {"siteName": "Municipio Demo Norte", "shortName": "Demo Norte", "tagline": "Valles, ferias y caminos de herradura"},
-     "theme": {"mode": "light", "brand": "#1f6f4a", "accent": "#a06f12"},
+     "theme": {"style": "editorial", "mode": "light", "brand": "#1f6f4a", "accent": "#a06f12"},
      "contact": {"email": "turismo@demo-norte.example.test", "phone": "+591 4 000 0001", "address": "Plaza principal s/n"},
      "social": [{"network": "facebook", "url": "https://facebook.example.test/demo-norte"},
                 {"network": "instagram", "url": "https://instagram.example.test/demo-norte"}],
@@ -90,7 +91,7 @@ values
   ('5eed3000-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000002', 1, 'sealed', now(),
    '5eed0000-0000-4000-8000-000000000002',
    '{"identity": {"siteName": "Municipio Demo Sur", "shortName": "Demo Sur", "tagline": "Lagunas, miradores y noches estrelladas"},
-     "theme": {"mode": "dark", "brand": "#f0a868", "accent": "#7fb7d9"},
+     "theme": {"style": "immersive", "mode": "dark", "brand": "#f0a868", "accent": "#7fb7d9"},
      "contact": {"email": "hola@demo-sur.example.test"},
      "social": [{"network": "youtube", "url": "https://youtube.example.test/@demo-sur"}],
      "seo": {"description": "Lagunas, miradores y cielos nocturnos de un municipio de demostración."}}');

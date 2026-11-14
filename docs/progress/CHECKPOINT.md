@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 1 — módulos de cada municipio ✅
-- **Rama:** `feat/c3-step1-tenant-modules` → PR hacia `main`
+- **Último paso completado:** C3 · Paso 2 — temas del portal ✅
+- **Rama:** `feat/c3-step2-design-themes` → PR hacia `main`
 
 ## Historial
 
@@ -2362,17 +2362,51 @@ Sin cambios en la base. Tests: core 600 (+3: el hecho de pocas visitas, las regl
 - Las acciones del panel que editan un evento (no lo crean) no comprueban la agenda: su página ya no existe y la base rechaza crear uno nuevo.
 - El tour de un lugar sin los tours lleva a su ficha (307) en vez de 404, como un tour borrado (ADR-049).
 
+**Verificación en producción (2026-11-14):** tras el merge (PR #81), el usuario hizo las cinco pruebas: la columna «Módulos», apagar tours y pasaporte en una demo (sin enlaces, 404 y la página del tour llevando a la ficha), encenderlos otra vez, el paquete al dar de alta y Ucureña con todos los módulos.
+
+### C3 · Paso 2 — temas del portal ✅
+
+- Decisiones del usuario ([ADR-061](../adr/ADR-061-portal-themes.md)), 2026-11-14:
+  - **el segundo tema es «Inmersivo»**: fondo oscuro, títulos grandes y fotos a sangre;
+  - **cada tema trae sus fuentes**: el municipio no elige letras;
+  - **Ucureña adopta «Editorial»** con la paleta de Stitch; el usuario la cambia en el panel después del merge.
+- Base de datos (`20261124000000_c3_design_themes.sql`, solo expand): `private.is_valid_presentation` acepta `theme.style` opcional, `editorial` o `immersive`, e `immersive` solo con fondo oscuro. Las marcas guardadas sin él siguen siendo válidas.
+- `@rikuy/core`:
+  - `THEME_STYLES`, `THEME_DEFINITIONS` (nombre, descripción y fondos de cada tema), `themeStyleOf`, `styleAllowsMode`;
+  - `deriveTheme` usa la paleta base del tema: Editorial claro en marfil (`#fbf9f4`), Editorial oscuro como siempre, Inmersivo `#0c110e`. El contraste AA se mide contra ese fondo;
+  - el contrato acepta `style` y rechaza «Inmersivo» con fondo claro; la marca neutra por defecto es «Editorial».
+- Web:
+  - **fuentes por tema**, autoalojadas: `scripts/vendor-fonts.mjs` copia Plus Jakarta Sans (Editorial, 27 KB) y Bricolage Grotesque (Inmersivo, 41 KB) a `public/vendor/fonts/<paquete>/<versión>/`. Cada portal precarga solo la de su tema y declara su `@font-face` con la página (`src/lib/theme-fonts.ts`), con una cara de respaldo ajustada a sus medidas (los valores de `next/font`, comprobados en un test). Sale `next/font/local` del portal;
+  - `portal.css`: _tokens_ por tema en `.portal[data-theme]` (fuentes, radios, sombra, peso de los títulos, líneas) y las reglas propias de cada uno:
+    - Editorial: cabecera blanca, títulos en 800, barra de acento sobre cada sección, tarjetas blancas con sombra y la foto arriba, botones redondeados y el pie del color del municipio;
+    - Inmersivo: navegación en mayúsculas, portada con resplandor del color del municipio y un título más grande, secciones separadas por líneas, tarjetas con la foto a sangre y el texto blanco sobre un velo negro, agenda como línea de tiempo y botones cuadrados;
+  - panel, «Marca del portal»: **«Tema del portal»** con los dos temas descritos; con «Inmersivo», «Claro» queda deshabilitado con su motivo. La **vista previa** muestra cabecera, portada, una tarjeta y un botón con el tema, las fuentes y los colores. Un formulario abierto antes del despliegue (sin el campo) sigue guardando «Editorial».
+- Seed: Demo Norte «Editorial» y Demo Sur «Inmersivo», así el CI mide los dos temas.
+- CI: nuevo paso **«Portal themes in a real browser»** (grupo «Lighthouse · visitas»).
+- Tests:
+  - unitarios: core 693 (+4: temas en el contrato, contraste contra el fondo del tema, paletas legibles en cada tema), web 49 (+4: el formulario con el tema y las fuentes, que apuntan a un archivo instalado y conservan las medidas de `next/font`);
+  - 1.746 pgTAP (18 nuevos, `049_design_themes`): sin tema, Editorial claro y oscuro, Inmersivo oscuro; Inmersivo claro, un tema desconocido, en mayúsculas, nulo, que no es texto, una clave de fuente y un color con CSS rechazados; el propietario guarda y publica un tema; la RPC rechaza Inmersivo claro; un editor y el propietario de otro municipio no lo cambian;
+  - **e2e en un navegador real** (`themes.e2e.test.ts`, 4 casos): Demo Norte y Demo Sur con el mismo contenido y distinto tema (fuente de los títulos y del texto, la tarjeta con el título debajo o encima de la foto, el pie, la forma de los botones); cada portal descarga y precarga solo su fuente; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px en inicio, destinos, agenda y ficha de los dos; el propietario de Demo Sur pasa a «Editorial» claro con la vista previa avisando del contraste, publica, el portal cambia en la siguiente visita y vuelve a «Inmersivo»; la base solo acepta los dos temas;
+  - portales (161) y contratos RC-09/10/11/12 (216) en verde;
+  - Lighthouse local de las páginas del seed (móvil, CPU ×4): Editorial 97–99 (LCP 1,4–2,2 s), Inmersivo 95–99 (LCP 1,9–2,5 s), CLS 0 y JS 147–150 KB en todas.
+- Lo que encontraron las pruebas, ya corregido: el nombre del sitio en Inmersivo, en dos líneas, era 1 px más alto que su fila a 360 px, y el botón «Instalar» movía la página (contrato RC-09).
+
+**Desviaciones:**
+
+- `/mapa` no se pudo medir aquí: sin acceso a OpenFreeMap, el mapa reintenta y la medición varía entre 43 y 69. Lo mide el CI, que sí llega al servicio.
+- La portada con foto llega con el inicio por secciones (Paso 3), como variante; las páginas con estilos propios (tour, asistente, pasaporte, mapa) heredan colores y fuentes del tema, pero su forma se rehace en los Pasos 4 a 6.
+- La vista previa del panel es una copia pequeña; el portal publicado es la referencia.
+
 ## Cómo verificarlo
 
-- Tras el merge, en `/plataforma` (con tu segundo factor): la lista de municipios tiene la columna «Módulos» con «Todos» en cada uno.
-- Abre los módulos de una demo (por ejemplo, Demo Norte), apaga «Tours 360°» y «Pasaporte turístico» y guarda (pide confirmación). En su portal ya no aparecen «Tours 360°» ni «Pasaporte» en la cabecera, `/recorrido` y `/pasaporte` dan 404 y la página de un tour lleva a la ficha de su lugar. En su panel ya no están esas tarjetas.
-- Enciéndelos otra vez: todo vuelve como estaba.
-- En `/plataforma/nuevo` aparece «Módulos con los que empieza»: «Completo» o «Solo información».
-- Ucureña no cambia: tiene todos los módulos.
+- Tras el merge, abre Demo Norte y Demo Sur: el mismo tipo de contenido se ve como dos sitios distintos (Demo Sur de las demos de producción sigue en «Editorial» hasta que le cambies el tema).
+- En «Marca del portal» de Ucureña aparece **«Tema del portal»** con «Editorial» marcado. Para la paleta de Stitch, deja «Editorial» y «Claro», pon **Color principal `#14532d`** (8,7:1 sobre el fondo) y **Color de acento `#b45309`** (4,8:1) y publica: el portal cambia en la siguiente visita.
+- En una demo, elige «Inmersivo»: «Claro» queda deshabilitado y la vista previa pasa a oscuro con la foto de fondo en la tarjeta. Publica y mira el portal en el celular y en la PC.
+- En el celular, el botón «Instalar» y las fuentes no mueven la página.
 
 ## Siguiente paso
 
-**C3 · Paso 2 — sistema de diseño con temas** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): fuentes, colores y componentes white-label sobre la dirección de Stitch («Tierra Viva Editorial»), con dos temas para empezar y «Tema del portal» con vista previa en el panel. Antes de empezar, confirmar con el usuario el segundo tema («Inmersivo» oscuro o «Minimalista» claro), qué fuentes ofrecer y si la marca de Ucureña adopta ya la paleta de Stitch.
+**C3 · Paso 3 — inicio por secciones, destinos y agenda** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): qué secciones tiene el inicio, en qué orden y en qué variante (por ejemplo, portada con foto), como dato del municipio; destinos y agenda con el diseño nuevo; barra inferior en el celular según los módulos. Antes de empezar, confirmar con el usuario las secciones y variantes, y qué lleva la barra inferior.
 
 ## Decisiones pendientes del usuario
 

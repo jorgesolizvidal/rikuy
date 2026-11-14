@@ -1,5 +1,6 @@
 import {
   ASSISTANT_TONES,
+  isThemeStyle,
   NEARBY_RADIUS,
   PRESENTATION_LIMITS,
   type AssistantTone,
@@ -7,6 +8,8 @@ import {
   type PresentationIssue,
   type SocialNetwork,
   type TenantPresentation,
+  themeStyleOf,
+  type ThemeStyle,
 } from "@rikuy/core";
 
 /**
@@ -17,6 +20,8 @@ export interface BrandingValues {
   siteName: string;
   shortName: string;
   tagline: string;
+  /** The portal's theme (ADR-061): fonts and components. */
+  style: ThemeStyle;
   mode: "light" | "dark";
   brand: string;
   accent: string;
@@ -51,6 +56,7 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     siteName: presentation.identity.siteName,
     shortName: presentation.identity.shortName,
     tagline: presentation.identity.tagline,
+    style: themeStyleOf(presentation.theme),
     mode: presentation.theme.mode,
     brand: presentation.theme.brand,
     accent: presentation.theme.accent,
@@ -89,6 +95,7 @@ export function presentationInputFromForm(formData: FormData) {
       tagline: text(formData, "tagline"),
     },
     theme: {
+      ...styleFromForm(formData),
       mode: text(formData, "mode"),
       brand: text(formData, "brand"),
       accent: text(formData, "accent"),
@@ -103,6 +110,14 @@ export function presentationInputFromForm(formData: FormData) {
     ...visitorsFromForm(formData),
     ...assistantFromForm(formData),
   };
+}
+
+function styleFromForm(formData: FormData) {
+  // A form without the field (a page opened before ADR-061) keeps meaning «editorial»; an
+  // unknown value fails validation (never a silent default).
+  if (!formData.has("style")) return {};
+  const style = text(formData, "style");
+  return { style: isThemeStyle(style) ? style : "" };
 }
 
 function assistantFromForm(formData: FormData) {
@@ -139,6 +154,7 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   "identity.siteName": "siteName",
   "identity.shortName": "shortName",
   "identity.tagline": "tagline",
+  "theme.style": "style",
   "theme.mode": "mode",
   "theme.brand": "brand",
   "theme.accent": "accent",
@@ -161,7 +177,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   siteName: "Escribe el nombre del portal en una línea, hasta 60 caracteres.",
   shortName: "Escribe un nombre corto de hasta 12 caracteres.",
   tagline: "El lema admite una línea de hasta 140 caracteres.",
-  mode: "Elige fondo claro u oscuro.",
+  style: "Elige uno de los dos temas.",
+  mode: "Elige fondo claro u oscuro. El tema Inmersivo solo tiene fondo oscuro.",
   brand: "Usa un color en formato #rrggbb.",
   accent: "Usa un color en formato #rrggbb.",
   email: "Escribe un correo válido, por ejemplo turismo@municipio.gob.bo.",

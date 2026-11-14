@@ -1,14 +1,61 @@
 /* Public portal. Every color comes from the tenant palette (CSS variables set on .portal),
-   so this stylesheet is shared by all municipalities without a single tenant literal. */
+   so this stylesheet is shared by all municipalities without a single tenant literal.
+
+   Themes (ADR-061): `data-theme` on .portal picks the platform's fonts and component shapes
+   («editorial» or «immersive»); the tokens below are what components read. The theme's
+   @font-face rules come with the page (src/lib/theme-fonts.ts). */
 
 .portal {
-  --font-display: var(--font-portal-display), var(--font-sans);
+  --font-display: var(--font-sans);
+  --font-body: var(--font-sans);
   --gutter: clamp(1rem, 5vw, 3.5rem);
+  /* Shapes */
+  --radius-card: 0.75rem;
+  --radius-media: 0.75rem;
+  --radius-control: 999px;
+  --shadow-card: none;
+  /* Type */
+  --title-weight: 740;
+  --title-tracking: -0.03em;
+  --heading-weight: 650;
+  /* Neutral lines and tints derived from the palette (no new tenant colors). */
+  --line: color-mix(in srgb, var(--fg) 14%, transparent);
+  --tint: color-mix(in srgb, var(--fg) 5%, var(--bg));
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
   background: var(--bg);
   color: var(--fg);
+  font-family: var(--font-body);
+}
+
+/* Editorial: a travel magazine. Plus Jakarta Sans everywhere, white cards with soft shadows,
+   rounded photos and pill buttons. */
+.portal[data-theme="editorial"] {
+  --font-display: "Rikuy Editorial", "Rikuy Editorial Fallback", var(--font-sans);
+  --font-body: var(--font-display);
+  --radius-card: 1.25rem;
+  --radius-media: 1rem;
+  --shadow-card:
+    0 1px 2px color-mix(in srgb, var(--fg) 6%, transparent),
+    0 0.75rem 1.75rem -1rem color-mix(in srgb, var(--fg) 28%, transparent);
+  --title-weight: 800;
+  --title-tracking: -0.025em;
+  --heading-weight: 750;
+}
+
+/* Immersive: night and full-bleed photos. A condensed display face for titles, the system
+   font for reading, square shapes and text over the photos. */
+.portal[data-theme="immersive"] {
+  --font-display: "Rikuy Inmersivo", "Rikuy Inmersivo Fallback", var(--font-sans);
+  --font-body: var(--font-sans);
+  --radius-card: 0.375rem;
+  --radius-media: 0.375rem;
+  --radius-control: 0.375rem;
+  --title-weight: 780;
+  --title-tracking: -0.04em;
+  --heading-weight: 700;
+  --line: color-mix(in srgb, var(--fg) 18%, transparent);
 }
 
 .portal[data-mode="light"] {
@@ -127,9 +174,9 @@
   max-width: 11ch;
   font-family: var(--font-display);
   font-size: clamp(3rem, 10.5vw, 7.25rem);
-  font-weight: 760;
+  font-weight: var(--title-weight);
   line-height: 0.92;
-  letter-spacing: -0.035em;
+  letter-spacing: var(--title-tracking);
   text-wrap: balance;
 }
 
@@ -161,7 +208,7 @@
   margin: 0 0 1.5rem;
   font-family: var(--font-display);
   font-size: clamp(1.4rem, 3vw, 1.875rem);
-  font-weight: 650;
+  font-weight: var(--heading-weight);
   letter-spacing: -0.015em;
 }
 
@@ -292,7 +339,7 @@
   min-height: 2.75rem;
   padding: 0.5rem 1.125rem;
   border: 2px solid var(--brand);
-  border-radius: 999px;
+  border-radius: var(--radius-control);
   background: transparent;
   color: var(--brand);
   font: inherit;
@@ -375,9 +422,9 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(2.25rem, 7vw, 4rem);
-  font-weight: 740;
+  font-weight: var(--title-weight);
   line-height: 1;
-  letter-spacing: -0.03em;
+  letter-spacing: var(--title-tracking);
   text-wrap: balance;
   overflow-wrap: anywhere;
 }
@@ -420,7 +467,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(1.4rem, 3vw, 1.875rem);
-  font-weight: 650;
+  font-weight: var(--heading-weight);
   letter-spacing: -0.015em;
 }
 
@@ -446,7 +493,7 @@
 
 .portal-card-media {
   aspect-ratio: 4 / 3;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-media);
   overflow: hidden;
   background:
     linear-gradient(135deg, color-mix(in srgb, var(--accent) 35%, transparent), transparent),
@@ -490,7 +537,7 @@
   max-height: 70vh;
   object-fit: cover;
   margin-top: 2rem;
-  border-radius: 1rem;
+  border-radius: var(--radius-media);
 }
 
 .portal-actions {
@@ -552,7 +599,7 @@
 
 .portal-gallery-link {
   display: block;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-media);
   overflow: hidden;
   aspect-ratio: 4 / 3;
   background: var(--surface);
@@ -635,8 +682,9 @@
   gap: 1rem;
   align-items: flex-start;
   padding: 1rem;
-  border-radius: 0.75rem;
+  border-radius: var(--radius-card);
   background: var(--surface);
+  box-shadow: var(--shadow-card);
   color: var(--fg);
   text-decoration: none;
 }
@@ -652,7 +700,7 @@
   place-items: center;
   width: 3.5rem;
   padding: 0.5rem 0;
-  border-radius: 0.5rem;
+  border-radius: calc(var(--radius-card) * 0.6);
   background: var(--brand);
   color: var(--on-brand);
   line-height: 1;
@@ -822,7 +870,7 @@
 .portal-map-frame,
 .portal-mini-map {
   position: relative;
-  border-radius: 1rem;
+  border-radius: var(--radius-media);
   overflow: hidden;
   background: var(--surface);
 }
@@ -1276,4 +1324,272 @@
 /* Room at the end of the page, so the button never covers the last lines of the footer. */
 .portal[data-assistant] .portal-footer {
   padding-bottom: 5.5rem;
+}
+
+/* ══ Themes (ADR-061) ══════════════════════════════════════════════════════
+   What makes the two themes look like different sites with the same content. Only shapes,
+   type and layout: every color still comes from the palette (and a fixed black scrim over
+   photos, for white text on any image). */
+
+/* ── Editorial ─────────────────────────────────────────────────────────── */
+
+.portal[data-theme="editorial"] .portal-header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.portal[data-theme="editorial"] .portal-mark {
+  border-radius: 0.75rem;
+}
+
+.portal[data-theme="editorial"] .portal-nav > a {
+  color: var(--muted);
+}
+
+.portal[data-theme="editorial"] .portal-nav > a:hover {
+  color: var(--brand);
+}
+
+.portal[data-theme="editorial"] .portal-hero h1 {
+  font-size: clamp(2.75rem, 9vw, 6.25rem);
+  line-height: 0.98;
+}
+
+.portal[data-theme="editorial"] .portal-tagline {
+  font-weight: 650;
+}
+
+/* A short accent bar above each section title, like a magazine's kicker. */
+.portal[data-theme="editorial"] .portal-section-head h2::before,
+.portal[data-theme="editorial"] .portal-upcoming > h2::before {
+  content: "";
+  display: block;
+  width: 2.5rem;
+  height: 0.25rem;
+  margin-bottom: 0.75rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+.portal[data-theme="editorial"] .portal-card a {
+  height: 100%;
+  box-sizing: border-box;
+  padding-bottom: 1.25rem;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.portal[data-mode="dark"][data-theme="editorial"] .portal-card a,
+.portal[data-mode="dark"][data-theme="editorial"] .portal-event a {
+  border: 1px solid var(--line);
+}
+
+.portal[data-theme="editorial"] .portal-card a > :not(.portal-card-media) {
+  margin-inline: 1.25rem;
+}
+
+.portal[data-theme="editorial"] .portal-card-media {
+  border-radius: 0;
+}
+
+.portal[data-theme="editorial"] .portal-card-title {
+  margin-top: 1.125rem;
+  font-weight: 750;
+}
+
+.portal[data-theme="editorial"] .portal-upcoming li {
+  padding: 1.25rem;
+  border-top: 0;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.portal[data-theme="editorial"] .portal-upcoming li::before {
+  content: "";
+  display: block;
+  width: 1.75rem;
+  height: 0.25rem;
+  margin-bottom: 0.875rem;
+  border-radius: 999px;
+  background: var(--accent);
+}
+
+/* The footer is the brand: its text uses the color made for it (4.5:1, checked on save). */
+.portal[data-theme="editorial"] .portal-footer {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.portal[data-theme="editorial"] .portal-footer a,
+.portal[data-theme="editorial"] .portal-footer .portal-credit {
+  color: var(--on-brand);
+}
+
+.portal[data-theme="editorial"] .portal-footer :focus-visible {
+  outline-color: var(--on-brand);
+}
+
+/* ── Immersive ─────────────────────────────────────────────────────────── */
+
+.portal[data-theme="immersive"] .portal-header {
+  border-bottom: 1px solid var(--line);
+}
+
+.portal[data-theme="immersive"] .portal-mark {
+  border-radius: 0.25rem;
+}
+
+/* Two lines must still fit the name's row (2.75rem), or «Instalar» would move the page. */
+.portal[data-theme="immersive"] .portal-brand-name {
+  font-family: var(--font-display);
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.portal[data-theme="immersive"] .portal-nav > a {
+  font-size: 0.875rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.portal[data-theme="immersive"] .portal-button {
+  letter-spacing: 0.02em;
+}
+
+/* The hero glows with the brand color behind a larger title. */
+.portal[data-theme="immersive"] .portal-hero {
+  padding-block: clamp(4rem, 16vh, 10rem) clamp(3.5rem, 12vh, 7rem);
+  background:
+    radial-gradient(
+      ellipse 70% 80% at 85% 20%,
+      color-mix(in srgb, var(--brand) 30%, transparent),
+      transparent 70%
+    ),
+    radial-gradient(
+      ellipse 50% 60% at 10% 100%,
+      color-mix(in srgb, var(--accent) 18%, transparent),
+      transparent 70%
+    ),
+    var(--bg);
+}
+
+.portal[data-theme="immersive"] .portal-contour {
+  stroke: var(--brand);
+  opacity: 0.4;
+}
+
+.portal[data-theme="immersive"] .portal-hero h1 {
+  max-width: 12ch;
+  font-size: clamp(3.25rem, 13vw, 9rem);
+  line-height: 0.86;
+}
+
+.portal[data-theme="immersive"] .portal-tagline {
+  font-size: clamp(1.25rem, 3.2vw, 2rem);
+  font-weight: 600;
+}
+
+.portal[data-theme="immersive"] .portal-section-head {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.portal[data-theme="immersive"] .portal-section-head h2,
+.portal[data-theme="immersive"] .portal-upcoming > h2 {
+  font-size: clamp(1.75rem, 4.5vw, 3rem);
+  line-height: 1;
+}
+
+/* Cards: the photo fills the card and the text sits on a black scrim at its foot, white on
+   any photo. */
+.portal[data-theme="immersive"] .portal-card a {
+  --fg: #ffffff;
+  --muted: #e2e6e3;
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  box-sizing: border-box;
+  height: 100%;
+  min-height: clamp(20rem, 62vw, 26rem);
+  padding: 1.25rem;
+  overflow: hidden;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.portal[data-theme="immersive"] .portal-card a::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    rgb(6 8 7 / 94%) 0%,
+    rgb(6 8 7 / 78%) 38%,
+    rgb(6 8 7 / 0%) 78%
+  );
+}
+
+.portal[data-theme="immersive"] .portal-card-media {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+
+.portal[data-theme="immersive"] .portal-card-title {
+  margin-top: 0;
+  font-family: var(--font-display);
+  font-size: 1.625rem;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+}
+
+.portal[data-theme="immersive"] .portal-card-text {
+  margin-top: 0.375rem;
+  -webkit-line-clamp: 2;
+}
+
+/* Events: a timeline of lines instead of boxes; the date is an outlined block. */
+.portal[data-theme="immersive"] .portal-events {
+  gap: 0;
+}
+
+.portal[data-theme="immersive"] .portal-event a {
+  padding: 1.25rem 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  background: transparent;
+}
+
+.portal[data-theme="immersive"] .portal-event-date {
+  width: 4rem;
+  padding: 0.625rem 0;
+  border: 2px solid var(--brand);
+  background: transparent;
+  color: var(--brand);
+}
+
+.portal[data-theme="immersive"] .portal-event-day {
+  font-size: 1.875rem;
+}
+
+.portal[data-theme="immersive"] .portal-event-title {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.portal[data-theme="immersive"] .portal-footer {
+  border-top: 1px solid var(--line);
 }

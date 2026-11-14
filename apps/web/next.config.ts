@@ -12,6 +12,13 @@ const versionOf = (packageJson: string) =>
 const maplibreVersion = versionOf(require.resolve("maplibre-gl/package.json"));
 // three does not export its package.json: found from its main entry (build/three.cjs).
 const threeVersion = versionOf(join(dirname(require.resolve("three")), "..", "package.json"));
+// The portal themes' fonts (ADR-061), copied by scripts/vendor-fonts.mjs.
+const jakartaVersion = versionOf(
+  require.resolve("@fontsource-variable/plus-jakarta-sans/package.json"),
+);
+const bricolageVersion = versionOf(
+  require.resolve("@fontsource-variable/bricolage-grotesque/package.json"),
+);
 
 /**
  * Baseline security headers. A full Content-Security-Policy is introduced with the portal
@@ -46,8 +53,13 @@ const nextConfig: NextConfig = {
     "meshoptimizer",
     "pdfjs-dist",
   ],
-  // Map worker and KTX2 transcoder are served from public/vendor/<package>/<version>/.
-  env: { NEXT_PUBLIC_MAPLIBRE_VERSION: maplibreVersion, NEXT_PUBLIC_THREE_VERSION: threeVersion },
+  // Map worker, KTX2 transcoder and theme fonts are served from public/vendor/<package>/<version>/.
+  env: {
+    NEXT_PUBLIC_MAPLIBRE_VERSION: maplibreVersion,
+    NEXT_PUBLIC_THREE_VERSION: threeVersion,
+    NEXT_PUBLIC_JAKARTA_VERSION: jakartaVersion,
+    NEXT_PUBLIC_BRICOLAGE_VERSION: bricolageVersion,
+  },
   async headers() {
     return [
       { source: "/:path*", headers: [...securityHeaders, ...versionHeaders] },

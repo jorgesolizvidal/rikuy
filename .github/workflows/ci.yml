@@ -463,13 +463,23 @@ jobs:
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-passport-metrics 2>&1 | tee ../../passport-metrics.log
       # C3 · Paso 1 (ADR-060): the operator turns modules of Demo Sur off and on again; its
       # portal and its panel stop offering them (404), the database refuses new content of a
-      # module that is off, nothing is deleted. Last of this group: it leaves every module on.
+      # module that is off, nothing is deleted. It leaves every module on.
       - name: Tenant modules in a real browser
         if: matrix.suite == 'lighthouse' && (success() || failure())
         working-directory: apps/web
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-modules 2>&1 | tee ../../modules.log
+      # C3 · Paso 2 (ADR-061): the same build serves Demo Norte «editorial» and Demo Sur
+      # «immersive» with different fonts (each portal downloads only its own), cards, footer and
+      # buttons; the owner changes the theme with a preview and the portal follows. It leaves
+      # Demo Sur as the seed has it.
+      - name: Portal themes in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-themes 2>&1 | tee ../../themes.log
       # RC-01/07/08 (P4): the reference tours (a museum and a four-scene carnival) walked in a
       # real browser — entry, information and gallery, every scene forward and back, arrows,
       # the 3D model loaded only on demand, another tour, out; fast taps and late answers never
@@ -529,7 +539,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do
