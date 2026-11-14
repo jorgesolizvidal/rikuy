@@ -28,7 +28,7 @@ const DB_URL =
 const SUR_ID = "5eed1000-0000-4000-8000-000000000002";
 const OWNER_SUR = "owner@demo-sur.example.test";
 const JAKARTA = /\/vendor\/fonts\/plus-jakarta-sans\/[\d.]+\/[a-z-]+\.woff2$/u;
-const BRICOLAGE = /\/vendor\/fonts\/bricolage-grotesque\/[\d.]+\/[a-z-]+\.woff2$/u;
+const BRICOLAGE = /\/vendor\/fonts\/bricolage-grotesque\/[\d.]+\/[a-z0-9-]+\.woff2$/u;
 
 const db = postgres(DB_URL, { max: 1, prepare: false, onnotice: () => undefined });
 let browser: Browser;

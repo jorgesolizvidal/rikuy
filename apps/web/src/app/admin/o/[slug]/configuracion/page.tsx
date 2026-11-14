@@ -27,7 +27,10 @@ const DATE = new Intl.DateTimeFormat("es-BO", {
 export default async function BrandingPage({ params }: BrandingPageProps) {
   const membership = await requireOrganization((await params).slug);
   const session = await adminSession();
-  const editor = await loadBrandingEditor(membership, session.config);
+  const [editor, destinations] = await Promise.all([
+    loadBrandingEditor(membership, session.config),
+    session.content.listDestinations(membership.tenantId).catch(() => []),
+  ]);
   const logoPreview = await logoPreviewUrl(membership.tenantId, editor.initial, session.media);
   const portalUrl = editor.portalHostname
     ? platformSettings().portalOrigin(editor.portalHostname)
@@ -76,6 +79,12 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
         revision={editor.draft?.revision ?? null}
         canEdit={editor.canEdit}
         logoPreviewUrl={logoPreview}
+        destinations={destinations.map((destination) => ({
+          id: destination.contentId,
+          title: destination.title,
+          published: destination.status !== "draft",
+        }))}
+        modules={membership.modules ?? null}
       />
     </main>
   );

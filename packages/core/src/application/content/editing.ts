@@ -165,9 +165,11 @@ export type SaveContentResult =
 
 const MEDIA_ISSUE: DestinationIssue = { path: "images", code: "media" };
 
-function storageIssues(reason: "shape" | "media" | "venue"): DestinationIssue[] {
+function storageIssues(reason: "shape" | "media" | "venue" | "category"): DestinationIssue[] {
   if (reason === "media") return [MEDIA_ISSUE];
   if (reason === "venue") return [{ path: "venueId", code: "invalid" }];
+  // The category was archived meanwhile, or is not of this municipality (ADR-062).
+  if (reason === "category") return [{ path: "categoryId", code: "invalid" }];
   return [{ path: "", code: "invalid" }];
 }
 

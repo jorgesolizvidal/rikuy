@@ -8,6 +8,7 @@ import {
   styleAllowsMode,
   THEME_DEFINITIONS,
   THEME_STYLES,
+  type ModuleKey,
   type SocialNetwork,
   type ThemeStyle,
 } from "@rikuy/core";
@@ -27,6 +28,7 @@ import { SOCIAL_LABELS } from "@/lib/social-labels";
 import { brandingAction, type BrandingFormState } from "./actions";
 import type { BrandingField, BrandingValues } from "./branding-fields";
 import { BrandingPreview } from "./branding-preview";
+import { HomeFields, type CoverOption } from "./home-fields";
 import { LogoField, type LogoSelection } from "./logo-field";
 
 interface BrandingFormProps {
@@ -36,6 +38,9 @@ interface BrandingFormProps {
   readonly canEdit: boolean;
   /** Signed preview of the logo the editor starts with (draft or published), if any. */
   readonly logoPreviewUrl: string | null;
+  /** Destinations the home's cover can show (ADR-062). */
+  readonly destinations: readonly CoverOption[];
+  readonly modules: readonly ModuleKey[] | null;
 }
 
 const STATUS_MESSAGES: Readonly<Record<Exclude<BrandingFormState["status"], "idle">, string>> = {
@@ -55,6 +60,8 @@ export function BrandingForm({
   revision,
   canEdit,
   logoPreviewUrl,
+  destinations,
+  modules,
 }: BrandingFormProps) {
   const [values, setValues] = useState(initial);
   const [logoPreview, setLogoPreview] = useState(logoPreviewUrl);
@@ -193,6 +200,15 @@ export function BrandingForm({
             ) : null}
           </div>
         </fieldset>
+
+        <HomeFields
+          value={values.home}
+          onChange={(home) => set("home", home)}
+          destinations={destinations}
+          modules={modules}
+          errors={errors}
+          disabled={!canEdit || pending}
+        />
 
         <fieldset disabled={!canEdit || pending}>
           <legend>Colores</legend>

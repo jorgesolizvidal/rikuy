@@ -82,6 +82,10 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
           Ferias, fiestas y actividades de {membership.displayName}. Un evento publicado aparece en
           el portal hasta que termina; después sale de la agenda solo.
         </p>
+        <p>
+          <Link href={`/o/${membership.slug}/categorias`}>Categorías</Link> para filtrar la lista en
+          el portal.
+        </p>
       </div>
 
       {canEdit ? (

@@ -91,11 +91,17 @@ export async function saveBrandingDraft(
 }
 
 /**
- * The shape was valid, so a database refusal is about references the database checks: today
- * only the logo (missing, not ready, or from another tenant).
+ * The shape was valid, so a database refusal is about references the database checks: the
+ * logo (missing, not ready, or from another tenant) and the home's cover destination
+ * (ADR-062: not a destination of this tenant).
  */
 function databaseIssues(presentation: TenantPresentation): readonly PresentationIssue[] {
-  return presentation.logo ? [{ path: "logo", code: "invalid" }] : [];
+  return [
+    ...(presentation.logo ? [{ path: "logo", code: "invalid" as const }] : []),
+    ...(presentation.home?.hero.destinationId
+      ? [{ path: "home.hero.destinationId", code: "invalid" as const }]
+      : []),
+  ];
 }
 
 export type PublishBrandingResult =

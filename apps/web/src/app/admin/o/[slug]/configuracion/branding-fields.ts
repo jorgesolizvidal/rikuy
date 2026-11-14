@@ -1,5 +1,12 @@
 import {
   ASSISTANT_TONES,
+  HERO_VARIANTS,
+  HOME_SECTION_KEYS,
+  HOME_SECTIONS,
+  homeOf,
+  isHomeVariant,
+  type HeroVariant,
+  type HomeSectionKey,
   isThemeStyle,
   NEARBY_RADIUS,
   PRESENTATION_LIMITS,
@@ -39,12 +46,62 @@ export interface BrandingValues {
   /** Logo reference (hidden fields `logo.assetId` / `logo.version`); empty: no logo. */
   logoAssetId: string;
   logoVersion: string;
+  /** The portal's home (ADR-062). */
+  home: HomeValues;
+}
+
+/** One line per section of the catalog, in the home's order; hidden ones keep their place. */
+export interface HomeSectionValues {
+  readonly key: HomeSectionKey;
+  readonly shown: boolean;
+  readonly variant: string;
+}
+
+export interface HomeValues {
+  readonly heroVariant: HeroVariant;
+  /** The cover's destination id; empty: the first destination that has a photo. */
+  readonly heroDestination: string;
+  /** Two figures written by the municipality; both fields empty: no figure. */
+  readonly figures: readonly [HomeFigureValues, HomeFigureValues];
+  readonly sections: readonly HomeSectionValues[];
+}
+
+export interface HomeFigureValues {
+  readonly value: string;
+  readonly label: string;
 }
 
 export type BrandingField =
-  | Exclude<keyof BrandingValues, "social" | "logoAssetId" | "logoVersion">
+  | Exclude<keyof BrandingValues, "social" | "logoAssetId" | "logoVersion" | "home">
   | `social.${SocialNetwork}`
-  | "logo";
+  | "logo"
+  | "homeHero"
+  | "homeFigure1"
+  | "homeSections";
+
+/** The form's home: the brand's own, or the platform's default, every section listed. */
+export function homeValues(presentation: TenantPresentation): HomeValues {
+  const home = homeOf(presentation);
+  const listed = home.sections.map((section) => ({
+    key: section.key,
+    shown: true,
+    variant: section.variant,
+  }));
+  // The sections it leaves out, after the rest, hidden, in their default variant.
+  const missing = HOME_SECTIONS.filter(
+    (section) => !home.sections.some((item) => item.key === section.key),
+  ).map((section) => ({ key: section.key, shown: false, variant: section.variants[0]?.key ?? "" }));
+  const figure = (index: number): HomeFigureValues => ({
+    value: home.figures[index]?.value ?? "",
+    label: home.figures[index]?.label ?? "",
+  });
+  return {
+    heroVariant: home.hero.variant,
+    heroDestination: home.hero.destinationId ?? "",
+    figures: [figure(0), figure(1)],
+    sections: [...listed, ...missing],
+  };
+}
 
 export function valuesFromPresentation(presentation: TenantPresentation): BrandingValues {
   const social = Object.fromEntries(SOCIAL_NETWORKS.map((network) => [network, ""])) as Record<
@@ -71,6 +128,7 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     social,
     logoAssetId: presentation.logo?.assetId ?? "",
     logoVersion: presentation.logo ? String(presentation.logo.version) : "",
+    home: homeValues(presentation),
   };
 }
 
@@ -109,6 +167,44 @@ export function presentationInputFromForm(formData: FormData) {
     ...logoFromForm(formData),
     ...visitorsFromForm(formData),
     ...assistantFromForm(formData),
+    ...homeFromForm(formData),
+  };
+}
+
+/**
+ * The home from its fields (ADR-062). A form without them (a page opened before this step)
+ * leaves the brand's home out: the portal then shows the platform's default.
+ */
+function homeFromForm(formData: FormData) {
+  if (!formData.has("home.hero.variant")) return {};
+  const variant = text(formData, "home.hero.variant");
+  const destination = text(formData, "home.hero.destination");
+  const figures = [1, 2].flatMap((n) => {
+    const value = text(formData, `home.figure.${String(n)}.value`);
+    const label = text(formData, `home.figure.${String(n)}.label`);
+    // Both empty: no figure. Only one: kept, so validation says what is missing.
+    return value === "" && label === "" ? [] : [{ value, label }];
+  });
+  const order = formData
+    .getAll("home.order")
+    .filter((key): key is HomeSectionKey =>
+      (HOME_SECTION_KEYS as readonly unknown[]).includes(key),
+    );
+  const sections = order
+    .filter((key) => formData.get(`home.show.${key}`) === "on")
+    .map((key) => {
+      const chosen = text(formData, `home.variant.${key}`);
+      return { key, variant: isHomeVariant(key, chosen) ? chosen : "" };
+    });
+  return {
+    home: {
+      hero: {
+        variant: (HERO_VARIANTS as readonly string[]).includes(variant) ? variant : "",
+        destinationId: destination === "" ? null : destination,
+      },
+      figures,
+      sections,
+    },
   };
 }
 
@@ -171,6 +267,19 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   logo: "logo",
   "logo.assetId": "logo",
   "logo.version": "logo",
+  home: "homeHero",
+  "home.hero": "homeHero",
+  "home.hero.variant": "homeHero",
+  "home.hero.destinationId": "homeHero",
+  "home.figures": "homeFigure1",
+  "home.figures.0": "homeFigure1",
+  "home.figures.0.value": "homeFigure1",
+  "home.figures.0.label": "homeFigure1",
+  // Empty rows are left out, so the index is not the row on screen: one message for both.
+  "home.figures.1": "homeFigure1",
+  "home.figures.1.value": "homeFigure1",
+  "home.figures.1.label": "homeFigure1",
+  "home.sections": "homeSections",
 };
 
 const MESSAGES: Readonly<Record<string, string>> = {
@@ -191,6 +300,10 @@ const MESSAGES: Readonly<Record<string, string>> = {
   assistantTone: "Elige «Cercano» o «Formal».",
   social: "Pega el enlace completo de la página, empezando por https://.",
   logo: "Este logo ya no se puede usar. Sube otro o quítalo para publicar sin logo.",
+  homeHero: "Elige la portada: con foto o solo texto.",
+  homeFigure1:
+    "En cada cifra escribe el número o dato (hasta 12 caracteres, como «1953») y qué es (hasta 60), o deja los dos vacíos.",
+  homeSections: "Elige una variante para cada sección que se muestra.",
 };
 
 const CONTRAST_MESSAGES: Readonly<Record<string, string>> = {
@@ -210,6 +323,7 @@ export function fieldErrors(
   const errors: Partial<Record<BrandingField, string>> = {};
   for (const issue of issues) {
     let field: BrandingField | undefined = PATH_TO_FIELD[issue.path];
+    if (field === undefined && issue.path.startsWith("home.sections")) field = "homeSections";
     const social = /^social\.(\d+)/.exec(issue.path);
     if (social) {
       const network = submittedSocial[Number(social[1])]?.network;

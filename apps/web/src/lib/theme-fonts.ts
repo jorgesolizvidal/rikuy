@@ -28,6 +28,8 @@ export interface ThemeFont {
   };
   /** Whether body text also uses it (otherwise only titles; body keeps the system font). */
   readonly body: boolean;
+  /** `font-weight` of the face: a range for a variable file, one value for a static one. */
+  readonly weight: string;
 }
 
 /** Latin subset of the fontsource files (Spanish and English). */
@@ -47,16 +49,20 @@ export const THEME_FONTS: Readonly<Record<ThemeStyle, ThemeFont>> = {
     ),
     fallback: { ascent: "98.16%", descent: "20.99%", lineGap: "0.00%", sizeAdjust: "105.75%" },
     body: true,
+    weight: "200 800",
   },
+  // One static weight (700): titles only, 22 KB instead of the 41 KB variable file, which kept
+  // the home's title (its LCP) over budget in the CI (ADR-062).
   immersive: {
     family: "Rikuy Inmersivo",
     href: vendor(
       "bricolage-grotesque",
       process.env.NEXT_PUBLIC_BRICOLAGE_VERSION,
-      "bricolage-grotesque-latin-wght-normal.woff2",
+      "bricolage-grotesque-latin-700-normal.woff2",
     ),
-    fallback: { ascent: "82.39%", descent: "23.92%", lineGap: "0.00%", sizeAdjust: "112.88%" },
+    fallback: { ascent: "83.56%", descent: "24.26%", lineGap: "0.00%", sizeAdjust: "111.30%" },
     body: false,
+    weight: "700",
   },
 };
 
@@ -68,7 +74,7 @@ export function themeFontFaces(style: ThemeStyle): string {
   const font = THEME_FONTS[style];
   const { ascent, descent, lineGap, sizeAdjust } = font.fallback;
   const face = (family: string, display: "swap" | "optional") =>
-    `@font-face{font-family:"${family}";src:url("${font.href}") format("woff2");font-weight:200 800;font-style:normal;font-display:${display};unicode-range:${LATIN}}`;
+    `@font-face{font-family:"${family}";src:url("${font.href}") format("woff2");font-weight:${font.weight};font-style:normal;font-display:${display};unicode-range:${LATIN}}`;
   return [
     face(font.family, "swap"),
     ...(font.body ? [face(textFamily(font), "optional")] : []),

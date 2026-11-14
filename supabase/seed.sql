@@ -77,7 +77,8 @@ values
   ('5eed2000-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000002', 'demo-sur.localhost', 'platform', 'active', now());
 
 -- Published (sealed) white-label presentation: two clearly different brands on one build,
--- one per theme (ADR-061): Demo Norte «editorial», Demo Sur «immersive».
+-- one per theme (ADR-061): Demo Norte «editorial», Demo Sur «immersive». Demo Norte keeps
+-- the platform's default home; Demo Sur arranges its own (ADR-062).
 insert into public.tenant_config_versions (id, tenant_id, version, state, sealed_at, created_by, branding)
 values
   ('5eed3000-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 1, 'sealed', now(),
@@ -94,7 +95,14 @@ values
      "theme": {"style": "immersive", "mode": "dark", "brand": "#f0a868", "accent": "#7fb7d9"},
      "contact": {"email": "hola@demo-sur.example.test"},
      "social": [{"network": "youtube", "url": "https://youtube.example.test/@demo-sur"}],
-     "seo": {"description": "Lagunas, miradores y cielos nocturnos de un municipio de demostración."}}');
+     "seo": {"description": "Lagunas, miradores y cielos nocturnos de un municipio de demostración."},
+     "home": {"hero": {"variant": "text", "destinationId": null},
+              "figures": [{"value": "4.100 m", "label": "Altura de la laguna sobre el mar"}],
+              "sections": [{"key": "figures", "variant": "band"},
+                           {"key": "events", "variant": "cards"},
+                           {"key": "destinations", "variant": "featured"},
+                           {"key": "tours", "variant": "banner"},
+                           {"key": "assistant", "variant": "banner"}]}}');
 
 update public.tenants t
 set canonical_domain_id = d.id,
@@ -119,14 +127,26 @@ values
   ('5eed4100-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000001', 'destination', 'plaza-principal',
    '5eed0000-0000-4000-8000-000000000001');
 
+-- Categories of each municipality (C3 · Paso 3, ADR-062): what the portal filters by.
+insert into public.content_categories (id, tenant_id, kind, name, position, created_by)
+values
+  ('5eed4700-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 'destination', 'Miradores', 1,
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4700-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000001', 'destination', 'Plazas y centro', 2,
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4700-0000-4000-8000-000000000003', '5eed1000-0000-4000-8000-000000000001', 'event', 'Ferias', 1,
+   '5eed0000-0000-4000-8000-000000000001'),
+  ('5eed4700-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000002', 'destination', 'Naturaleza', 1,
+   '5eed0000-0000-4000-8000-000000000002');
+
 insert into public.content_revisions
   (id, tenant_id, content_id, revision_no, state, title, summary, body, latitude, longitude, created_by, sealed_at, sealed_by,
-   opening_hours)
+   opening_hours, category_id)
 values
   ('5eed4200-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001',
    1, 'sealed', 'Mirador del Valle', 'Vista panorámica del valle al atardecer.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Un mirador de demostración."}]}]',
-   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '2 days', '5eed0000-0000-4000-8000-000000000001', null),
+   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '2 days', '5eed0000-0000-4000-8000-000000000001', null, '5eed4700-0000-4000-8000-000000000001'),
   ('5eed4200-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001',
    2, 'sealed', 'Mirador del Valle', 'El mejor punto para ver el valle al atardecer, a 15 minutos de la plaza.',
    '[{"type": "heading", "level": 2, "children": [{"type": "text", "text": "Cómo llegar"}]},
@@ -135,17 +155,19 @@ values
                                         {"type": "text", "text": "."}]},
      {"type": "list", "ordered": false, "items": [[{"type": "text", "text": "Mejor hora: atardecer"}],
                                                   [{"type": "text", "text": "Entrada libre"}]]}]',
-   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000001', '{"mode": "always", "note": "Al aire libre"}'),
+   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000001', '{"mode": "always", "note": "Al aire libre"}', '5eed4700-0000-4000-8000-000000000001'),
   ('5eed4200-0000-4000-8000-000000000003', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000002',
-   1, 'draft', 'Feria de los domingos', '', '[]', null, null, '5eed0000-0000-4000-8000-000000000003', null, null, null),
+   1, 'draft', 'Feria de los domingos', '', '[]', null, null, '5eed0000-0000-4000-8000-000000000003', null, null, null, null),
   ('5eed4200-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000002', '5eed4100-0000-4000-8000-000000000003',
    1, 'sealed', 'Laguna Espejo', 'Una laguna de altura que refleja el cielo nocturno.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Laguna de demostración para el municipio Sur."}]}]',
-   -21.5302, -64.7298, '5eed0000-0000-4000-8000-000000000002', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000002', null),
+   -21.5302, -64.7298, '5eed0000-0000-4000-8000-000000000002', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000002', null,
+   '5eed4700-0000-4000-8000-000000000004'),
   ('5eed4200-0000-4000-8000-000000000005', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000004',
    1, 'sealed', 'Plaza principal', 'El punto de partida: iglesia, mercado y la salida al mirador.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Plaza de demostración del municipio Norte."}]}]',
-   -17.3953, -66.1556, '5eed0000-0000-4000-8000-000000000001', now() - interval '3 days', '5eed0000-0000-4000-8000-000000000001', null);
+   -17.3953, -66.1556, '5eed0000-0000-4000-8000-000000000001', now() - interval '3 days', '5eed0000-0000-4000-8000-000000000001', null,
+   '5eed4700-0000-4000-8000-000000000002');
 
 update public.content_items i
 set published_revision_id = v.published, published_at = v.published_at, draft_revision_id = v.draft
@@ -191,13 +213,14 @@ with today as (
 )
 insert into public.content_revisions
   (id, tenant_id, content_id, revision_no, state, title, summary, body, latitude, longitude,
-   starts_local, ends_local, all_day, venue_content_id, created_by, sealed_at, sealed_by)
+   starts_local, ends_local, all_day, venue_content_id, created_by, sealed_at, sealed_by, category_id)
 select v.id::uuid, v.tenant_id::uuid, v.content_id::uuid, 1, v.state::public.config_state, v.title, v.summary,
        v.body::jsonb, v.latitude, v.longitude,
        today.day + v.starts_offset::interval, today.day + v.ends_offset::interval, v.all_day,
        v.venue::uuid, v.created_by::uuid,
        case when v.state = 'sealed' then now() - interval '1 day' end,
-       case when v.state = 'sealed' then v.created_by::uuid end
+       case when v.state = 'sealed' then v.created_by::uuid end,
+       case when v.content_id = '5eed4100-0000-4000-8000-000000000011' then '5eed4700-0000-4000-8000-000000000003'::uuid end
 from (values
   ('5eed4200-0000-4000-8000-000000000011', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000011',
    'sealed', 'Feria del choclo', 'Productores del valle, comida y música en el mirador.',

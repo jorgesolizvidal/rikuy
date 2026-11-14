@@ -95,7 +95,7 @@ export type CreateContentOutcome =
 
 export type SaveContentOutcome =
   | { readonly status: "saved"; readonly revisionNo: number; readonly editCount: number }
-  | { readonly status: "invalid"; readonly reason: "shape" | "media" | "venue" }
+  | { readonly status: "invalid"; readonly reason: "shape" | "media" | "venue" | "category" }
   | { readonly status: "conflict" | "forbidden" | "not_found" };
 
 export type PublishContentOutcome =

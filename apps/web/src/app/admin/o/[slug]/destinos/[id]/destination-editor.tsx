@@ -42,6 +42,14 @@ export interface EditorValues {
   /** Events only. */
   readonly schedule?: ScheduleValues;
   readonly venueId?: string | null;
+  /** The municipality's category (ADR-062). */
+  readonly categoryId?: string | null;
+}
+
+/** A category the editor offers (of this kind, in the municipality's order). */
+export interface CategoryOption {
+  readonly id: string;
+  readonly name: string;
 }
 
 interface DestinationEditorProps {
@@ -57,6 +65,9 @@ interface DestinationEditorProps {
   /** Events: destinations that can be the venue, and the time zone note. */
   readonly venues?: readonly VenueOption[];
   readonly timezoneNote?: string;
+  /** The municipality's categories of this kind, and where they are managed. */
+  readonly categories?: readonly CategoryOption[];
+  readonly categoriesHref?: string;
 }
 
 const NOUN = { destination: "este destino", event: "este evento" } as const;
@@ -90,6 +101,7 @@ const FIELD_MESSAGES = {
   scheduleOrder: "El final no puede ser antes del inicio.",
   schedule: "Revisa la fecha y la hora (un evento dura como máximo un año).",
   venue: "Ese destino ya no está disponible. Elige otro o ninguno.",
+  category: "Esa categoría ya no existe. Elige otra o ninguna.",
   hours:
     "Revisa el horario: cada día abre antes de cerrar, el segundo horario empieza después de que cierra el primero, y al menos un día está abierto.",
 } as const;
@@ -105,6 +117,7 @@ function fieldErrors(issues: readonly DestinationIssue[] = []) {
       | "coverAlt"
       | "schedule"
       | "venue"
+      | "category"
       | "hours",
       string
     >
@@ -129,6 +142,7 @@ function fieldErrors(issues: readonly DestinationIssue[] = []) {
             ? FIELD_MESSAGES.scheduleOrder
             : FIELD_MESSAGES.schedule;
     else if (head === "venueId") errors.venue = FIELD_MESSAGES.venue;
+    else if (head === "categoryId") errors.category = FIELD_MESSAGES.category;
     else if (head === "hours") errors.hours = FIELD_MESSAGES.hours;
     else if (head === "cover") errors.coverAlt = FIELD_MESSAGES.alt;
     else if (head === "gallery" && third === "alt") galleryAlts.add(Number(second));
@@ -155,6 +169,8 @@ export function DestinationEditor({
   mapCenter,
   venues = [],
   timezoneNote = "",
+  categories,
+  categoriesHref,
 }: DestinationEditorProps) {
   const router = useRouter();
   const id = useId();
@@ -232,6 +248,7 @@ export function DestinationEditor({
           }
         : {}),
       ...(kind === "destination" && values.hours ? { hours: fromHoursValues(values.hours) } : {}),
+      categoryId: values.categoryId ?? null,
     };
     startTransition(() => dispatch({ payload, snapshot: JSON.stringify(values) }));
   }
@@ -287,6 +304,40 @@ export function DestinationEditor({
             </span>
           ) : null}
         </div>
+        {categories ? (
+          <div className="field">
+            <label htmlFor={`${id}-category`}>Categoría</label>
+            <select
+              id={`${id}-category`}
+              value={values.categoryId ?? ""}
+              aria-invalid={errors.category ? true : undefined}
+              aria-describedby={`${id}-category-hint${errors.category ? ` ${id}-category-error` : ""}`}
+              onChange={(event) => set("categoryId", event.target.value || null)}
+            >
+              <option value="">Sin categoría</option>
+              {categories.map((category) => (
+                <option key={category.id} value={category.id}>
+                  {category.name}
+                </option>
+              ))}
+            </select>
+            <span id={`${id}-category-hint`} className="field-hint">
+              {categories.length === 0
+                ? "Todavía no hay categorías. "
+                : "Los visitantes filtran la lista por categoría. "}
+              {categoriesHref ? (
+                <a href={categoriesHref}>
+                  {categories.length === 0 ? "Crear las categorías" : "Ver las categorías"}
+                </a>
+              ) : null}
+            </span>
+            {errors.category ? (
+              <span id={`${id}-category-error`} className="field-error">
+                {errors.category}
+              </span>
+            ) : null}
+          </div>
+        ) : null}
         <div className="field">
           <label htmlFor={`${id}-body`}>Descripción</label>
           <details className="format-help" id={`${id}-body-hint`}>

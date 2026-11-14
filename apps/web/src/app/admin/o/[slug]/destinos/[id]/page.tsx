@@ -3,6 +3,7 @@ import {
   documentImages,
   hasModule,
   type ImageReference,
+  loadCategories,
   loadDestinationEditor,
   richTextToMarkup,
   ROLE_LABELS,
@@ -76,6 +77,11 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
     ...image,
     previewUrl: previews.get(previewPath(image)) ?? null,
   });
+  // The municipality's categories of this kind (ADR-062). One archived meanwhile is not
+  // offered: the draft keeps it until it is saved without it.
+  const categories = (await loadCategories(membership, { categories: session.categories }))[
+    "destination"
+  ].map((category) => ({ id: category.id, name: category.name }));
   const initial: EditorValues = {
     title: document.title,
     summary: document.summary,
@@ -84,6 +90,9 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
     cover: document.cover ? withPreview(document.cover) : null,
     gallery: document.gallery.map(withPreview),
     hours: toHoursValues(document.hours),
+    categoryId: categories.some((category) => category.id === document.categoryId)
+      ? (document.categoryId ?? null)
+      : null,
   };
   const published = record.history.find(
     (entry) => entry.revisionId === record.published?.revisionId,
@@ -122,6 +131,8 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
           org={membership.slug}
           contentId={record.contentId}
           initial={initial}
+          categories={categories}
+          categoriesHref={`/o/${membership.slug}/categorias`}
           editCount={editor.editCount}
           canEdit={editor.canEdit}
           canPublish={editor.canPublish}

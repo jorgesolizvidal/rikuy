@@ -1,6 +1,14 @@
 import { z } from "zod";
 
 import { HEX_COLOR_PATTERN } from "../domain/branding/color";
+import {
+  DEFAULT_HOME,
+  HERO_VARIANTS,
+  HOME_LIMITS,
+  HOME_SECTION_KEYS,
+  isHomeVariant,
+  type HomeLayout,
+} from "../domain/branding/home";
 import { NEARBY_RADIUS } from "../domain/geo/proximity";
 import {
   styleAllowsMode,
@@ -60,6 +68,41 @@ const httpsUrlSchema = z
       return false;
     }
   });
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/u;
+
+/** The portal's home (ADR-062): fixed keys and variants; text in single lines. */
+export const homeLayoutSchema = z.strictObject({
+  hero: z.strictObject({
+    variant: z.enum(HERO_VARIANTS),
+    /** Photo of this destination; null: the first destination that has a photo. */
+    destinationId: z.string().regex(UUID).nullable(),
+  }),
+  figures: z
+    .array(
+      z.strictObject({
+        value: line(1, HOME_LIMITS.figureValue),
+        label: line(1, HOME_LIMITS.figureLabel),
+      }),
+    )
+    .max(HOME_LIMITS.figures),
+  sections: z
+    .array(
+      z
+        .strictObject({ key: z.enum(HOME_SECTION_KEYS), variant: z.string() })
+        .refine((section) => isHomeVariant(section.key, section.variant), {
+          path: ["variant"],
+          message: "unknown_variant",
+        }),
+    )
+    .max(HOME_LIMITS.sections)
+    .refine(
+      (sections) => new Set(sections.map((section) => section.key)).size === sections.length,
+      {
+        message: "duplicate_section",
+      },
+    ),
+});
 
 export const tenantPresentationSchema = z.strictObject({
   identity: z.strictObject({
@@ -122,6 +165,8 @@ export const tenantPresentationSchema = z.strictObject({
       tone: z.enum(ASSISTANT_TONES),
     })
     .optional(),
+  /** Optional home of the portal (ADR-062); absent: the platform's default. */
+  home: homeLayoutSchema.optional(),
 });
 
 export type TenantPresentation = z.infer<typeof tenantPresentationSchema>;
@@ -175,6 +220,11 @@ export function parseStoredPresentation(value: unknown): TenantPresentation | nu
 /** The municipality's «Estás cerca de…» radius in meters (default 150 m). */
 export function nearbyRadiusOf(presentation: TenantPresentation): number {
   return presentation.visitors?.nearbyRadius ?? NEARBY_RADIUS.default;
+}
+
+/** The municipality's home, or the platform's default. */
+export function homeOf(presentation: TenantPresentation): HomeLayout {
+  return presentation.home ?? DEFAULT_HOME;
 }
 
 /** Up to 12 characters taken from the end of the name ("Municipio Demo Norte" → "Demo Norte"). */

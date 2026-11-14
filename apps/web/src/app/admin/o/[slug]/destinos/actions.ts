@@ -123,6 +123,8 @@ export interface DestinationPayload {
     readonly end: string;
   } | null;
   readonly venueId?: string | null;
+  /** The municipality's category (ADR-062); absent: the editor did not offer one. */
+  readonly categoryId?: string | null;
 }
 
 export interface SaveDestinationState {
@@ -168,6 +170,8 @@ export async function saveDestinationAction(
       location: payload.location,
       cover: payload.cover,
       gallery: payload.gallery,
+      // Without a category the key is left out (the document is the same as before).
+      ...(payload.categoryId ? { categoryId: payload.categoryId } : {}),
     };
     // Without hours the key is left out: the document is the same as before this step.
     const destination = payload.hours ? { ...base, hours: payload.hours } : base;

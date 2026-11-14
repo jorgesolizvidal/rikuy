@@ -33,9 +33,22 @@ function contourPaths(seed: string): string[] {
         1,
       );
       const r = radius * wobble;
-      return `${(center.x + Math.cos(angle) * r * 1.35).toFixed(1)},${(center.y + Math.sin(angle) * r).toFixed(1)}`;
+      return [
+        Math.round(center.x + Math.cos(angle) * r * 1.35),
+        Math.round(center.y + Math.sin(angle) * r),
+      ] as const;
     });
-    return `M${points.join("L")}Z`;
+    // Whole units of a 720-wide box, each point relative to the one before (rounded first,
+    // so nothing drifts): the same lines in less than half the bytes. The page carries them
+    // twice (HTML and React's data), on the way to the cover's title, its LCP (ADR-062).
+    const [first = [0, 0], ...rest] = points;
+    let previous = first;
+    const steps = rest.map((point) => {
+      const step = `${String(point[0] - previous[0])},${String(point[1] - previous[1])}`;
+      previous = point;
+      return step;
+    });
+    return `M${String(first[0])},${String(first[1])}l${steps.join(" ")}z`;
   });
 }
 

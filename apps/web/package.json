@@ -30,11 +30,12 @@
     "test:e2e-passport-metrics": "vitest run --config vitest.e2e.config.ts e2e/passport-metrics.e2e.test.ts",
     "test:e2e-modules": "vitest run --config vitest.e2e.config.ts e2e/modules.e2e.test.ts",
     "test:e2e-themes": "vitest run --config vitest.e2e.config.ts e2e/themes.e2e.test.ts",
+    "test:e2e-home": "vitest run --config vitest.e2e.config.ts e2e/home.e2e.test.ts",
     "test:e2e-unanswered": "vitest run --config vitest.e2e.config.ts e2e/unanswered.e2e.test.ts"
   },
   "dependencies": {
-    "@fontsource-variable/bricolage-grotesque": "5.3.0",
     "@fontsource-variable/plus-jakarta-sans": "5.3.0",
+    "@fontsource/bricolage-grotesque": "5.3.0",
     "@photo-sphere-viewer/core": "5.15.1",
     "@photo-sphere-viewer/equirectangular-tiles-adapter": "5.15.1",
     "@photo-sphere-viewer/markers-plugin": "5.15.1",

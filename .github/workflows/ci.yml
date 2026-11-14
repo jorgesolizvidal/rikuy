@@ -480,6 +480,16 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-themes 2>&1 | tee ../../themes.log
+      # C3 · Paso 3 (ADR-062): Demo Sur's own home vs. Demo Norte's default, the
+      # municipality's categories filtering destinations and agenda in the browser, the phone's
+      # bottom bar by modules, and the owner arranging categories and home in the panel (put
+      # back as the seed had it).
+      - name: Home and categories in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-home 2>&1 | tee ../../home.log
       # RC-01/07/08 (P4): the reference tours (a museum and a four-scene carnival) walked in a
       # real browser — entry, information and gallery, every scene forward and back, arrows,
       # the 3D model loaded only on demand, another tour, out; fast taps and late answers never
@@ -539,7 +549,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

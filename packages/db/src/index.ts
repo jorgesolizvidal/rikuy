@@ -79,3 +79,4 @@ export { createKnowledgeRepository, mapPassageRow } from "./knowledge";
 export { createCopilotRepository } from "./copilot";
 export { createMetricsRepository } from "./metrics";
 export { createEvalRepository } from "./evaluations";
+export { createCategoryRepository, createSupabasePublishedContentIndexReader } from "./categories";

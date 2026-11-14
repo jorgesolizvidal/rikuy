@@ -6,8 +6,13 @@ import { THEME_STYLES } from "@rikuy/core";
 import { beforeAll, describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
+/** The package each font folder comes from (scripts/vendor-fonts.mjs). */
+const PACKAGES: Readonly<Record<string, string>> = {
+  "plus-jakarta-sans": "@fontsource-variable/plus-jakarta-sans",
+  "bricolage-grotesque": "@fontsource/bricolage-grotesque",
+};
 const packageDir = (name: string) =>
-  dirname(require.resolve(`@fontsource-variable/${name}/package.json`));
+  dirname(require.resolve(`${PACKAGES[name] ?? name}/package.json`));
 const versionOf = (name: string) =>
   (JSON.parse(readFileSync(join(packageDir(name), "package.json"), "utf8")) as { version: string })
     .version;
@@ -23,7 +28,7 @@ beforeAll(async () => {
 
 /** The file each theme points at, inside its installed package. */
 function sourceOf(href: string): string {
-  const match = /^\/vendor\/fonts\/([a-z-]+)\/(\d+\.\d+\.\d+)\/([a-z-]+\.woff2)$/.exec(href);
+  const match = /^\/vendor\/fonts\/([a-z-]+)\/(\d+\.\d+\.\d+)\/([a-z0-9-]+\.woff2)$/.exec(href);
   if (!match) throw new Error(`unexpected font address ${href}`);
   const [, name = "", version, file = ""] = match;
   expect(version).toBe(versionOf(name));
@@ -75,6 +80,12 @@ describe("theme fonts (ADR-061)", () => {
     );
     expect(css).not.toContain("Rikuy Inmersivo");
     expect(fonts.themeFontFaces("immersive")).toContain(fonts.THEME_FONTS.immersive.href);
+  });
+
+  it("a variable file declares its range; immersive, its one static weight", () => {
+    expect(fonts.themeFontFaces("editorial")).toContain("font-weight:200 800;");
+    expect(fonts.themeFontFaces("immersive")).toContain("font-weight:700;");
+    expect(fonts.THEME_FONTS.immersive.href).toMatch(/-700-normal\.woff2$/u);
   });
 
   it("titles swap; reading text never reflows after the first paint", () => {

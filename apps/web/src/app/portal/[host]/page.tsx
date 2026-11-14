@@ -1,33 +1,47 @@
-import { PORTAL_PATHS } from "@rikuy/core";
+import "./listing.css";
+
+import {
+  assistantPersona,
+  categoryBySlug,
+  homeFigures,
+  homeOf,
+  visibleHomeSections,
+  type HomeSectionKey,
+  type PublishedDestinationSummary,
+} from "@rikuy/core";
 import { notFound } from "next/navigation";
+import type { ReactNode } from "react";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import {
+  portalBadges,
   portalDestinations,
   portalEvents,
+  portalIndex,
   portalPassport,
   portalTourIndex,
 } from "@/server/portal-content";
+import { tourMenu } from "@/server/portal-tours";
 import { portalHas, portalView } from "@/server/portal-view";
 
-import { Contour } from "./contour";
-import { DestinationCard } from "./destination-card";
-import { EventCard } from "./event-card";
+import {
+  AssistantBanner,
+  DestinationsSection,
+  EventsSection,
+  FiguresBand,
+  HomeHero,
+  PassportBanner,
+  ToursBanner,
+} from "./home-sections";
 
 interface PortalPageProps {
   readonly params: Promise<{ host: string }>;
 }
 
-/** Destinations shown on the home page; the rest are one click away. */
-const HOME_DESTINATIONS = 6;
-
 const PLACES_SOON = {
   title: "Lugares para visitar",
   text: "Fichas de cada destino con fotos, ubicación y cómo llegar.",
 } as const;
-
-/** Next events shown on the home page. */
-const HOME_EVENTS = 3;
 
 const AGENDA_SOON = {
   title: "Agenda",
@@ -45,100 +59,121 @@ const ASSISTANT_SOON = {
   text: "Pregunta qué hacer y recibe respuestas basadas en la información del municipio.",
 } as const;
 
+/** The cover: the destination the municipality chose, or the first one with a photo. */
+function coverDestination(
+  destinations: readonly PublishedDestinationSummary[],
+  chosenSlug: string | null,
+): PublishedDestinationSummary | null {
+  const chosen = chosenSlug ? destinations.find((item) => item.slug === chosenSlug) : undefined;
+  if (chosen?.cover) return chosen;
+  return destinations.find((item) => item.cover !== null) ?? null;
+}
+
 export default async function PortalHomePage({ params }: PortalPageProps) {
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
-  const { identity, seo } = view.resolved.presentation;
-  const [destinations, events, tours, circuits] = await Promise.all([
+  const { presentation } = view.resolved;
+  const { identity, seo } = presentation;
+  const home = homeOf(presentation);
+  const tenantId = view.context.tenant.tenantId;
+  const [destinations, events, tours, circuits, index, badges] = await Promise.all([
     portalDestinations(view),
     portalEvents(view),
     portalTourIndex(view),
     portalPassport(view),
+    portalIndex(view),
+    portalBadges(view),
   ]);
+  const has = (module: Parameters<typeof portalHas>[1]) => portalHas(view, module);
+  const persona =
+    aiGatewayStatus().configured && has("assistant") ? assistantPersona(presentation) : null;
+
+  // The cover (ADR-062): with a photo only when a destination has one.
+  const chosenSlug =
+    home.hero.destinationId === null
+      ? null
+      : (index.find(
+          (entry) => entry.kind === "destination" && entry.contentId === home.hero.destinationId,
+        )?.slug ?? null);
+  const cover = home.hero.variant === "photo" ? coverDestination(destinations, chosenSlug) : null;
+
+  const destinationCategories = categoryBySlug(index, "destination");
+  const eventCategories = categoryBySlug(index, "event");
+  const startTour = tourMenu(tours.filter((entry) => entry.start).slice(0, 1))[0] ?? null;
+
+  const sections: Readonly<Record<HomeSectionKey, () => ReactNode>> = {
+    figures: () => (
+      <FiguresBand
+        figures={homeFigures(
+          home.figures,
+          {
+            destinations: destinations.length,
+            tours: tours.length,
+            events: events.length,
+            circuits: circuits.length,
+          },
+          has,
+        )}
+      />
+    ),
+    destinations: () => (
+      <DestinationsSection
+        tenantId={tenantId}
+        destinations={destinations}
+        variant={home.sections.find((section) => section.key === "destinations")?.variant ?? "grid"}
+        heroSlug={cover?.slug ?? null}
+        badgesOf={(slug) => ({
+          category: destinationCategories.get(slug)?.name ?? null,
+          tour: badges.tours.has(`destination:${slug}`),
+          stamp: badges.stamps.has(`destination:${slug}`),
+        })}
+      />
+    ),
+    events: () => (
+      <EventsSection
+        tenantId={tenantId}
+        events={events}
+        variant={home.sections.find((section) => section.key === "events")?.variant ?? "list"}
+        badgesOf={(slug) => ({
+          category: eventCategories.get(slug)?.name ?? null,
+          tour: badges.tours.has(`event:${slug}`),
+        })}
+      />
+    ),
+    tours: () => <ToursBanner tours={tours.length} photo={startTour ? startTour.preview : null} />,
+    passport: () => <PassportBanner circuits={circuits.length} />,
+    assistant: () =>
+      persona ? <AssistantBanner name={persona.name} named={persona.named} /> : null,
+  };
+
   // Only what this portal does not have yet (a new municipality shows all of it), and only
   // what its municipality has (ADR-060).
   const upcoming = [
     ...(destinations.length > 0 ? [] : [PLACES_SOON]),
-    ...(events.length > 0 || !portalHas(view, "agenda") ? [] : [AGENDA_SOON]),
-    ...(tours.length > 0 || !portalHas(view, "tours") ? [] : [TOURS_SOON]),
-    ...(aiGatewayStatus().configured || !portalHas(view, "assistant") ? [] : [ASSISTANT_SOON]),
+    ...(events.length > 0 || !has("agenda") ? [] : [AGENDA_SOON]),
+    ...(tours.length > 0 || !has("tours") ? [] : [TOURS_SOON]),
+    ...(aiGatewayStatus().configured || !has("assistant") ? [] : [ASSISTANT_SOON]),
   ];
 
   return (
     <>
-      <section className="portal-hero" aria-labelledby="portal-title">
-        <Contour seed={view.context.tenant.tenantId} />
-        <div className="portal-hero-text">
-          <h1 id="portal-title">{identity.siteName}</h1>
-          {identity.tagline ? <p className="portal-tagline">{identity.tagline}</p> : null}
-          {seo.description ? <p className="portal-intro">{seo.description}</p> : null}
+      <HomeHero
+        tenantId={tenantId}
+        siteName={identity.siteName}
+        tagline={identity.tagline}
+        description={seo.description}
+        destination={cover}
+        destinationHasTour={cover ? badges.tours.has(`destination:${cover.slug}`) : false}
+        tours={tours.length}
+        agenda={has("agenda") && events.length > 0}
+      />
+
+      {visibleHomeSections(home, has).map((section) => (
+        <div key={section.key} className="home-section" data-section={section.key}>
+          {sections[section.key]()}
         </div>
-      </section>
-
-      {destinations.length > 0 ? (
-        <section className="portal-section" aria-labelledby="destinos">
-          <div className="portal-section-head">
-            <h2 id="destinos">Lugares para visitar</h2>
-            {destinations.length > HOME_DESTINATIONS ? (
-              <a href={PORTAL_PATHS.destinations}>Ver los {destinations.length} destinos</a>
-            ) : (
-              <a href={PORTAL_PATHS.destinations}>Ver todos</a>
-            )}
-          </div>
-          <ul className="portal-cards">
-            {destinations.slice(0, HOME_DESTINATIONS).map((destination, index) => (
-              <DestinationCard
-                key={destination.slug}
-                tenantId={view.context.tenant.tenantId}
-                destination={destination}
-                // On a phone the first photo is in view: it is what the page waits for (LCP).
-                priority={index === 0}
-              />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {events.length > 0 ? (
-        <section className="portal-section" aria-labelledby="eventos">
-          <div className="portal-section-head">
-            <h2 id="eventos">Próximos eventos</h2>
-            <a href={PORTAL_PATHS.agenda}>Ver la agenda</a>
-          </div>
-          <ul className="portal-events">
-            {events.slice(0, HOME_EVENTS).map((event) => (
-              <EventCard key={event.slug} event={event} />
-            ))}
-          </ul>
-        </section>
-      ) : null}
-
-      {tours.length > 0 ? (
-        <section className="portal-section" aria-labelledby="recorridos">
-          <div className="portal-section-head">
-            <h2 id="recorridos">Recorridos 360°</h2>
-            <a href={PORTAL_PATHS.generalTour}>
-              {tours.length === 1 ? "Abrir el recorrido" : `Recorrer los ${tours.length} lugares`}
-            </a>
-          </div>
-          <p className="portal-section-text">{TOURS_SOON.text}</p>
-        </section>
-      ) : null}
-
-      {circuits.length > 0 ? (
-        <section className="portal-section" aria-labelledby="pasaporte">
-          <div className="portal-section-head">
-            <h2 id="pasaporte">Pasaporte turístico</h2>
-            <a href={PORTAL_PATHS.passport}>
-              {circuits.length === 1 ? "Ver el circuito" : `Ver los ${circuits.length} circuitos`}
-            </a>
-          </div>
-          <p className="portal-section-text">
-            Recorre los lugares de un circuito y llévate el premio del municipio.
-          </p>
-        </section>
-      ) : null}
+      ))}
 
       {upcoming.length > 0 ? (
         <section className="portal-upcoming" aria-labelledby="pronto">

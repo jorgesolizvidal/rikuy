@@ -7,17 +7,26 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const require = createRequire(import.meta.url);
+// [package, folder, file]. Immersive uses one static weight (700, its titles): 22 KB instead
+// of the 41 KB variable file, which kept its home's title (the LCP) over budget (ADR-062).
 const FONTS = [
-  ["plus-jakarta-sans", "plus-jakarta-sans-latin-wght-normal.woff2"],
-  ["bricolage-grotesque", "bricolage-grotesque-latin-wght-normal.woff2"],
+  [
+    "@fontsource-variable/plus-jakarta-sans",
+    "plus-jakarta-sans",
+    "plus-jakarta-sans-latin-wght-normal.woff2",
+  ],
+  [
+    "@fontsource/bricolage-grotesque",
+    "bricolage-grotesque",
+    "bricolage-grotesque-latin-700-normal.woff2",
+  ],
 ];
 
-for (const [name, file] of FONTS) {
-  const pkgPath = require.resolve(`@fontsource-variable/${name}/package.json`);
+for (const [pkg, name, file] of FONTS) {
+  const pkgPath = require.resolve(`${pkg}/package.json`);
   const { version } = JSON.parse(readFileSync(pkgPath, "utf8"));
   const source = join(dirname(pkgPath), "files", file);
-  if (!existsSync(source))
-    throw new Error(`@fontsource-variable/${name} ${version}: ${file} not found`);
+  if (!existsSync(source)) throw new Error(`${pkg} ${version}: ${file} not found`);
   const target = join(
     dirname(fileURLToPath(import.meta.url)),
     "..",

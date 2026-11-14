@@ -635,3 +635,14 @@
 .portal-assistant-launcher {
   display: none;
 }
+
+/* The tour uses the whole screen: no bottom bar (ADR-062), and the footer needs no room for
+   it. */
+.portal-bottom-bar {
+  display: none;
+}
+
+.portal .portal-footer,
+.portal[data-assistant] .portal-footer {
+  padding-bottom: clamp(2rem, 6vh, 3.5rem);
+}

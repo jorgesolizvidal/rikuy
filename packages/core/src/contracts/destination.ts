@@ -90,6 +90,8 @@ export const destinationDocumentSchema = z.strictObject({
   gallery: z.array(imageReferenceSchema).max(DESTINATION_LIMITS.gallery),
   /** Optional: without it (or null) the place has no published hours. */
   hours: openingHoursSchema.nullable().optional(),
+  /** Optional category of the municipality (ADR-062); without it (or null), none. */
+  categoryId: z.string().regex(UUID).nullable().optional(),
 });
 export type DestinationDocument = z.infer<typeof destinationDocumentSchema>;
 

@@ -3,6 +3,7 @@ import "server-only";
 import type { Actor } from "@rikuy/core";
 import {
   createAiUsageRepository,
+  createCategoryRepository,
   createContentRepository,
   createCopilotRepository,
   createEvalRepository,
@@ -82,6 +83,7 @@ export const adminSession = cache(async () => {
     mfa: createMfaGateway(client),
     media: createMediaRepository(client),
     content: createContentRepository(client),
+    categories: createCategoryRepository(client),
     copilot: createCopilotRepository(client),
     knowledge: createKnowledgeRepository(client),
     panoramas: createPanoramaRepository(client),

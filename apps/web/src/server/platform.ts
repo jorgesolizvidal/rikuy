@@ -12,6 +12,7 @@ import {
   type PublishedPresentationReader,
   type PublishedRedirectReader,
   type PublishedPassportReader,
+  type PublishedContentIndexReader,
   type PublishedRewardReader,
   type PublishedStampReader,
   type PublishedTourReader,
@@ -25,6 +26,7 @@ import {
   createSupabasePublishedMapReader,
   createSupabasePublishedRedirectReader,
   createSupabasePublishedPassportReader,
+  createSupabasePublishedContentIndexReader,
   createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
   createSupabasePublishedTourReader,
@@ -166,6 +168,19 @@ export function publishedPassportReader(): PublishedPassportReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedPassport;
+}
+
+let publishedIndex: PublishedContentIndexReader | undefined;
+
+/** The portal's index: ids, addresses and categories of what is published (ADR-062). */
+export function publishedIndexReader(): PublishedContentIndexReader {
+  if (publishedIndex) return publishedIndex;
+  const { env } = platformSettings();
+  publishedIndex = createSupabasePublishedContentIndexReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedIndex;
 }
 
 let publishedStamps: PublishedStampReader | undefined;

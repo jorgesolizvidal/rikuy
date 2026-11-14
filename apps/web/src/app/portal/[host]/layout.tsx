@@ -3,6 +3,8 @@ import "./portal.css";
 import {
   PORTAL_PATHS,
   assistantPersona,
+  bottomBar,
+  type BottomBarKey,
   monogram,
   portalIconPath,
   themeCssVariables,
@@ -22,6 +24,7 @@ import { portalHas, portalView } from "@/server/portal-view";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 
 import { AssistantLauncher } from "./assistant-launcher";
+import { BottomBar } from "./bottom-bar";
 import { InstallButton } from "./install-button";
 import { SocialLinks } from "./social-links";
 import { VisitTracker } from "./visit-tracker";
@@ -33,6 +36,16 @@ import { VisitTracker } from "./visit-tracker";
  * (/mapa) stay dynamic.
  */
 export const revalidate = 120;
+
+/** Where each entry of the phone's bottom bar goes (ADR-062). */
+const BAR_HREF: Readonly<Record<BottomBarKey, string>> = {
+  home: "/",
+  destinations: PORTAL_PATHS.destinations,
+  agenda: PORTAL_PATHS.agenda,
+  passport: PORTAL_PATHS.passport,
+  map: PORTAL_PATHS.map,
+  tours: PORTAL_PATHS.generalTour,
+};
 
 /** No host is known at build time: each portal page is rendered on its first visit, then cached. */
 export function generateStaticParams(): { host: string }[] {
@@ -106,6 +119,16 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   // The theme's font only (ADR-061), preloaded with the page: found only after the CSS, it
   // would be one more round trip before the titles settle. The other theme's never loads.
   const font = THEME_FONTS[palette.style];
+  // The phone's bottom bar: what the municipality has (modules, and something published for
+  // the tours and the passport), the same links as the header.
+  const bar = bottomBar({
+    agenda: portalHas(view, "agenda"),
+    map: portalHas(view, "map"),
+    tours: tours.length > 0,
+    passport: circuits.length > 0,
+  });
+  const withHref = (items: typeof bar.items) =>
+    items.map((item) => ({ ...item, href: BAR_HREF[item.key] }));
   preload(font.href, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
 
   return (
@@ -201,6 +224,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           Funciona con Rikuy.
         </p>
       </footer>
+      <BottomBar items={withHref(bar.items)} more={withHref(bar.more)} />
       {persona ? (
         <AssistantLauncher
           name={persona.name}
