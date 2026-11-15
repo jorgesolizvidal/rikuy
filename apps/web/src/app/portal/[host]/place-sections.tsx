@@ -1,6 +1,5 @@
 import {
   describeProximity,
-  formatCoordinates,
   openStreetMapUrl,
   PORTAL_PATHS,
   type GeoPoint,
@@ -44,18 +43,15 @@ export function PlaceLocation({
           }}
         />
       ) : null}
-      <p>
-        {formatCoordinates(location)} ·{" "}
+      {/* The coordinates stay in the links (C3 · Paso 8): raw numbers help no visitor. */}
+      <p className="portal-location-links">
         {withMap ? (
-          <>
-            <a href={`${PORTAL_PATHS.map}?lat=${location.lat}&lng=${location.lng}`}>
-              Ver en el mapa del municipio
-            </a>{" "}
-            ·{" "}
-          </>
+          <a href={`${PORTAL_PATHS.map}?lat=${location.lat}&lng=${location.lng}`}>
+            Ver en el mapa del municipio
+          </a>
         ) : null}
         <a href={openStreetMapUrl(location)} target="_blank" rel="noopener noreferrer">
-          OpenStreetMap
+          Abrir en OpenStreetMap<span className="visually-hidden"> (se abre en otra pestaña)</span>
         </a>
       </p>
     </section>

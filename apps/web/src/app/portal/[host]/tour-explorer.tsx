@@ -529,32 +529,39 @@ export function TourExplorer({
               <span className="tour-bar-label">Escenas</span>
             </button>
           ) : null}
-          <button
-            type="button"
-            className="tour-bar-button"
-            disabled={!previous}
-            onClick={() => previous && goTo(previous.id)}
-          >
-            <span aria-hidden="true">‹</span>
-            <span className="tour-bar-label">Anterior</span>
-            {previous ? <span className="visually-hidden">: {previous.title}</span> : null}
-          </button>
+          {scenes.length > 1 ? (
+            <button
+              type="button"
+              className="tour-bar-button"
+              disabled={!previous}
+              onClick={() => previous && goTo(previous.id)}
+            >
+              <span aria-hidden="true">‹</span>
+              <span className="tour-bar-label">Anterior</span>
+              {previous ? <span className="visually-hidden">: {previous.title}</span> : null}
+            </button>
+          ) : null}
           <p className="tour-bar-title" aria-live="polite">
             <strong>{scene.title}</strong>
-            <span>
-              {loadingTour ? "Abriendo el tour…" : `Escena ${position} de ${scenes.length}`}
-            </span>
+            {/* With one scene there is nothing to count or step through (C3 · Paso 8). */}
+            {loadingTour || scenes.length > 1 ? (
+              <span>
+                {loadingTour ? "Abriendo el tour…" : `Escena ${position} de ${scenes.length}`}
+              </span>
+            ) : null}
           </p>
-          <button
-            type="button"
-            className="tour-bar-button"
-            disabled={!next}
-            onClick={() => next && goTo(next.id)}
-          >
-            <span className="tour-bar-label">Siguiente</span>
-            <span aria-hidden="true">›</span>
-            {next ? <span className="visually-hidden">: {next.title}</span> : null}
-          </button>
+          {scenes.length > 1 ? (
+            <button
+              type="button"
+              className="tour-bar-button"
+              disabled={!next}
+              onClick={() => next && goTo(next.id)}
+            >
+              <span className="tour-bar-label">Siguiente</span>
+              <span aria-hidden="true">›</span>
+              {next ? <span className="visually-hidden">: {next.title}</span> : null}
+            </button>
+          ) : null}
           {assistant ? (
             <button
               type="button"
@@ -691,7 +698,10 @@ export function TourExplorer({
                       chooseTour(item);
                     }}
                   >
-                    {item.title}
+                    <span className="tour-other-title">{item.title}</span>
+                    <span className="tour-other-scenes">
+                      {item.scenes === 1 ? "1 escena" : `${String(item.scenes)} escenas`}
+                    </span>
                   </a>
                 </li>
               ))}

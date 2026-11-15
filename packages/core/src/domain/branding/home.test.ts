@@ -30,11 +30,14 @@ const without =
     !off.includes(module);
 
 describe("home layout (ADR-062)", () => {
-  it("the default has every section once, in the catalog's order and first variant", () => {
+  it("the default has the catalog's sections in order, without figures and the assistant", () => {
     expect(DEFAULT_HOME.hero).toEqual({ variant: "photo", destinationId: null });
-    expect(DEFAULT_HOME.sections.map((section) => section.key)).toEqual(
-      HOME_SECTIONS.map((section) => section.key),
-    );
+    expect(DEFAULT_HOME.sections.map((section) => section.key)).toEqual([
+      "destinations",
+      "events",
+      "tours",
+      "passport",
+    ]);
     for (const section of DEFAULT_HOME.sections) {
       expect(isHomeVariant(section.key, section.variant)).toBe(true);
     }
@@ -54,8 +57,15 @@ describe("home layout (ADR-062)", () => {
     const keys = visibleHomeSections(DEFAULT_HOME, without("agenda", "passport")).map(
       (section) => section.key,
     );
-    expect(keys).toEqual(["figures", "destinations", "tours", "assistant"]);
-    expect(visibleHomeSections(DEFAULT_HOME, all)).toHaveLength(HOME_SECTIONS.length);
+    expect(keys).toEqual(["destinations", "tours"]);
+    expect(visibleHomeSections(DEFAULT_HOME, all)).toHaveLength(4);
+    const everything = {
+      ...DEFAULT_HOME,
+      sections: HOME_SECTIONS.map((section) => ({ key: section.key, variant: "" })),
+    };
+    expect(visibleHomeSections(everything, without("assistant")).map((s) => s.key)).not.toContain(
+      "assistant",
+    );
   });
 
   it("the contract accepts a full home and the database's shapes only", () => {
@@ -111,23 +121,24 @@ describe("figures band", () => {
 });
 
 describe("bottom bar on the phone", () => {
-  it("with everything: four places and «Más» with the rest", () => {
+  it("with everything: the five sections, the map inside «Destinos», nothing in «Más»", () => {
     const bar = bottomBar({ agenda: true, map: true, tours: true, passport: true });
     expect(bar.items.map((item) => item.label)).toEqual([
       "Inicio",
       "Destinos",
+      "360°",
       "Agenda",
       "Pasaporte",
     ]);
-    expect(bar.more.map((item) => item.label)).toEqual(["Mapa", "Tours 360°"]);
+    expect(bar.more).toEqual([]);
   });
 
-  it("only what the municipality has, in a fixed order, without «Más» when it fits", () => {
+  it("only what the municipality has, in a fixed order; the map when there is room", () => {
     expect(
       bottomBar({ agenda: true, map: true, tours: true, passport: false }).items.map(
         (item) => item.key,
       ),
-    ).toEqual(["home", "destinations", "agenda", "map", "tours"]);
+    ).toEqual(["home", "destinations", "tours", "agenda", "map"]);
     expect(bottomBar({ agenda: false, map: false, tours: false, passport: false })).toEqual({
       items: [
         { key: "home", label: "Inicio" },

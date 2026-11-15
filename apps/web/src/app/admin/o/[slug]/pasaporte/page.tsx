@@ -9,6 +9,7 @@ import { platformSettings } from "@/server/platform";
 import { NewCircuitForm } from "./new-circuit-form";
 import { StampCodes } from "./stamp-codes";
 import "./passport.css";
+import { NewItem, wantsNew } from "@/components/panel/new-item";
 
 export const metadata: Metadata = { title: "Pasaporte turístico" };
 
@@ -21,10 +22,11 @@ const DATE = new Intl.DateTimeFormat("es-BO", {
 
 interface PassportPageProps {
   readonly params: Promise<{ slug: string }>;
+  readonly searchParams: Promise<{ nuevo?: string | string[] }>;
 }
 
 /** C2 · Paso 1 (ADR-056): the circuits of the tourist passport. Any member sees them. */
-export default async function PassportAdminPage({ params }: PassportPageProps) {
+export default async function PassportAdminPage({ params, searchParams }: PassportPageProps) {
   const membership = await requireModule((await params).slug, "passport");
   const session = await adminSession();
   const [{ circuits, canEdit }, codes, hostname] = await Promise.all([
@@ -45,10 +47,12 @@ export default async function PassportAdminPage({ params }: PassportPageProps) {
       </div>
 
       {canEdit ? (
-        <section aria-labelledby="nuevo-circuito" className="members-invite">
-          <h2 id="nuevo-circuito">Nuevo circuito</h2>
+        <NewItem
+          label="Nuevo circuito"
+          open={circuits.length === 0 || wantsNew(await searchParams)}
+        >
           <NewCircuitForm org={membership.slug} />
-        </section>
+        </NewItem>
       ) : (
         <p className="notice" role="status">
           Tu rol puede ver los circuitos, pero no crearlos ni cambiarlos.

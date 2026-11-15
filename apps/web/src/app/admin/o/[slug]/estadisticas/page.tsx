@@ -153,7 +153,6 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
                 <span className="stats-tile-label">{TOTAL_LABELS[key].label}</span>
                 <span className="stats-tile-value">{formatCount(totals[key].value)}</span>
                 <Change measure={totals[key]} />
-                <span className="field-hint">{TOTAL_LABELS[key].hint}</span>
               </li>
             ))}
         </ul>
@@ -454,6 +453,19 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
 
       <section aria-labelledby="como-se-cuenta" className="metrics-section">
         <h2 id="como-se-cuenta">Cómo se cuenta</h2>
+        {/* What each figure of the summary counts (C3 · Paso 8: here, not in every tile). */}
+        <dl className="stats-legend">
+          {(Object.keys(TOTAL_LABELS) as StatisticsTotal[])
+            .filter(
+              (key) => (key !== "calendar" || has("agenda")) && (key !== "scenes" || has("tours")),
+            )
+            .map((key) => (
+              <div key={key}>
+                <dt>{TOTAL_LABELS[key].label}</dt>
+                <dd>{TOTAL_LABELS[key].hint}</dd>
+              </div>
+            ))}
+        </dl>
         <ul className="metrics-list">
           <li>
             Los números son un <strong>mínimo</strong>: no cuentan a quien bloquea JavaScript, a los

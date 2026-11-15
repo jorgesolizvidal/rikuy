@@ -64,6 +64,38 @@ export function formatEventSchedule(schedule: EventSchedule, locale = "es"): str
   );
 }
 
+/**
+ * The line next to a card's date block (C3 · Paso 8): what the block does not say.
+ * "Lunes · 19:00–22:00", "Domingo · todo el día", "30 nov – 2 dic",
+ * "19 feb, 14:30 – 20 feb, 18:00".
+ */
+export function formatEventShort(schedule: EventSchedule, locale = "es"): string {
+  const { start, end } = bounds(schedule);
+  const sameDay = schedule.start.slice(0, 10) === schedule.end.slice(0, 10);
+  const weekday = () =>
+    capitalize(new Intl.DateTimeFormat(locale, { timeZone: "UTC", weekday: "long" }).format(start));
+  if (sameDay) {
+    if (schedule.allDay) return `${weekday()} · todo el día`;
+    const time = new Intl.DateTimeFormat(locale, {
+      timeZone: "UTC",
+      hour: "2-digit",
+      minute: "2-digit",
+      hourCycle: "h23",
+    });
+    const hours =
+      start.getTime() === end.getTime() ? time.format(start) : time.formatRange(start, end);
+    return `${weekday()} · ${plainSpaces(hours)}`;
+  }
+  const format = new Intl.DateTimeFormat(locale, {
+    timeZone: "UTC",
+    day: "numeric",
+    month: "short",
+    ...(schedule.allDay ? {} : { hour: "2-digit" as const, minute: "2-digit" as const }),
+    hourCycle: "h23",
+  });
+  return plainSpaces(format.formatRange(start, end)).replace(/\./gu, "");
+}
+
 /** Badge for cards: { day: "2", month: "nov" } of the first day. */
 export function eventDateBadge(
   schedule: EventSchedule,

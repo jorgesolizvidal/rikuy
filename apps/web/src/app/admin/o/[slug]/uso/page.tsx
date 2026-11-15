@@ -1,4 +1,4 @@
-import { loadAiUsage, loadUsage, loadVoiceUsage } from "@rikuy/core";
+import { loadAiUsage, loadUsage, loadVoiceUsage, MODULE_KEYS, MODULE_NAMES } from "@rikuy/core";
 import type { Metadata } from "next";
 
 import { UsageBar } from "@/components/usage/usage-bar";
@@ -103,6 +103,16 @@ export default async function UsagePage({ params }: UsagePageProps) {
           </li>
         ) : null}
       </ul>
+      <section aria-labelledby="modulos" className="usage-modules">
+        <h2 id="modulos">Módulos del plan</h2>
+        <p>
+          {(membership.modules ?? MODULE_KEYS).length > 0
+            ? (membership.modules ?? MODULE_KEYS).map((key) => MODULE_NAMES[key]).join(", ")
+            : "Ninguno"}
+          .
+        </p>
+        <p className="field-hint">Los activa el operador de la plataforma.</p>
+      </section>
       <p className="field-hint">
         Lo «reservado» es una estimación de lo que están subiendo o procesando ahora; se ajusta a lo
         real cuando termina.

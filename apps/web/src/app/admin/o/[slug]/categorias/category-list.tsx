@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useId, useState, useTransition } from "react";
 
 import { saveCategoriesAction, type SaveCategoriesState } from "./actions";
+import { PanelIcon } from "@/components/panel/panel-icon";
 
 interface Row {
   /** Local key; `id` is the saved category's, absent for a new one. */
@@ -126,30 +127,36 @@ export function CategoryList({
             </span>
             <span className="category-actions">
               <button
+                title="Subir"
                 type="button"
                 className="button button-quiet"
                 disabled={index === 0}
                 aria-label={`Subir «${row.name || "sin nombre"}»`}
                 onClick={() => move(index, -1)}
               >
-                Subir
+                <PanelIcon name="up" />
+                <span className="visually-hidden">Subir</span>
               </button>
               <button
+                title="Bajar"
                 type="button"
                 className="button button-quiet"
                 disabled={index === rows.length - 1}
                 aria-label={`Bajar «${row.name || "sin nombre"}»`}
                 onClick={() => move(index, 1)}
               >
-                Bajar
+                <PanelIcon name="down" />
+                <span className="visually-hidden">Bajar</span>
               </button>
               <button
+                title="Quitar"
                 type="button"
                 className="button button-quiet"
                 aria-label={`Quitar «${row.name || "sin nombre"}»`}
                 onClick={() => update(rows.filter((_, at) => at !== index))}
               >
-                Quitar
+                <PanelIcon name="remove" />
+                <span className="visually-hidden">Quitar</span>
               </button>
             </span>
           </li>

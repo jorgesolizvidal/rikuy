@@ -6,6 +6,7 @@ import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
 import { NewDestinationForm } from "../destinos/new-destination-form";
+import { NewItem, wantsNew } from "@/components/panel/new-item";
 
 export const metadata: Metadata = { title: "Agenda" };
 
@@ -17,6 +18,7 @@ const STATUS = {
 
 interface AgendaPageProps {
   readonly params: Promise<{ slug: string }>;
+  readonly searchParams: Promise<{ nuevo?: string | string[] }>;
 }
 
 function EventTable({
@@ -44,7 +46,6 @@ function EventTable({
             <tr key={event.contentId}>
               <td>
                 <Link href={`/o/${org}/agenda/${event.contentId}`}>{event.title}</Link>
-                <span className="cell-detail">/{event.slug}</span>
               </td>
               <td data-label="Cuándo">
                 {event.schedule ? formatEventSchedule(event.schedule) : "Sin fecha"}
@@ -63,7 +64,7 @@ function EventTable({
   );
 }
 
-export default async function AgendaPage({ params }: AgendaPageProps) {
+export default async function AgendaPage({ params, searchParams }: AgendaPageProps) {
   const membership = await requireModule((await params).slug, "agenda");
   const agenda = await loadAgenda(membership, (await adminSession()).content);
   const canEdit = canEditContent(membership.role);
@@ -84,10 +85,9 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
       </div>
 
       {canEdit ? (
-        <section aria-labelledby="nuevo-evento" className="members-invite">
-          <h2 id="nuevo-evento">Nuevo evento</h2>
+        <NewItem label="Nuevo evento" open={empty || wantsNew(await searchParams)}>
           <NewDestinationForm org={membership.slug} kind="event" />
-        </section>
+        </NewItem>
       ) : (
         <p className="notice" role="status">
           Tu rol puede ver la agenda, pero no crear ni cambiar eventos.

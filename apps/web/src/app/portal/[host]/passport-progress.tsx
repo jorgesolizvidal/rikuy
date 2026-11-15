@@ -171,6 +171,7 @@ export function CircuitSeals({
             title={stop.title}
             state={stamp ? "stamped" : "missing"}
             size={44}
+            rim={false}
           />
         );
       })}

@@ -180,13 +180,22 @@
   margin: 0;
 }
 
+/* One way to get there, then the rest side by side (C3 · Paso 8: four stacked buttons read
+   as four equal choices). */
 .portal-visit .portal-actions {
-  display: grid;
+  display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
 }
 
 .portal-visit .portal-actions .portal-button {
-  width: 100%;
+  flex: 1 1 8rem;
+  justify-content: center;
+}
+
+.portal-visit .portal-actions .portal-button-primary,
+.portal-visit .portal-actions .portal-status {
+  flex-basis: 100%;
 }
 
 .portal-visit-venue,
@@ -540,4 +549,11 @@
 .portal-lightbox-figure figcaption {
   font-size: 0.9375rem;
   color: rgb(255 255 255 / 86%);
+}
+
+/* «Ver en el mapa del municipio» · «Abrir en OpenStreetMap» */
+.portal-location-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1.5rem;
 }

@@ -127,8 +127,14 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
     tours: tours.length > 0,
     passport: circuits.length > 0,
   });
+  const mapInBar = [...bar.items, ...bar.more].some((item) => item.key === "map");
   const withHref = (items: typeof bar.items) =>
-    items.map((item) => ({ ...item, href: BAR_HREF[item.key] }));
+    items.map((item) => ({
+      ...item,
+      href: BAR_HREF[item.key],
+      // Without its own place, the map belongs to «Destinos» (its list links to it).
+      ...(item.key === "destinations" && !mapInBar ? { also: [PORTAL_PATHS.map] } : {}),
+    }));
   preload(font.href, { as: "font", type: "font/woff2", crossOrigin: "anonymous" });
 
   return (
@@ -189,6 +195,10 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
       <main id="contenido">{children}</main>
 
       <footer className="portal-footer">
+        <section aria-labelledby="pie-portal" className="portal-footer-brand">
+          <h2 id="pie-portal">{identity.siteName}</h2>
+          {identity.tagline ? <p>{identity.tagline}</p> : null}
+        </section>
         {hasContact ? (
           <section aria-labelledby="contacto">
             <h2 id="contacto">Contacto</h2>

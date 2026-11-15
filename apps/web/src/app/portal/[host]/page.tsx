@@ -164,9 +164,7 @@ export default async function PortalHomePage({ params }: PortalPageProps) {
         tagline={identity.tagline}
         description={seo.description}
         destination={cover}
-        destinationHasTour={cover ? badges.tours.has(`destination:${cover.slug}`) : false}
         tours={tours.length}
-        agenda={has("agenda") && events.length > 0}
       />
 
       {visibleHomeSections(home, has).map((section) => (

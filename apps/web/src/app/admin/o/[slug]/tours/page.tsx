@@ -11,6 +11,7 @@ import { PortalShare } from "../destinos/[id]/portal-share";
 import { GeneralTourForm } from "./general-tour-form";
 import { KIND, scenesLabel, TOUR_STATUS } from "./labels";
 import { NewTourForm } from "./new-tour-form";
+import { NewItem, wantsNew } from "@/components/panel/new-item";
 
 export const metadata: Metadata = { title: "Tours 360°" };
 
@@ -23,9 +24,10 @@ const DATE = new Intl.DateTimeFormat("es-BO", {
 
 interface ToursPageProps {
   readonly params: Promise<{ slug: string }>;
+  readonly searchParams: Promise<{ nuevo?: string | string[] }>;
 }
 
-export default async function ToursPage({ params }: ToursPageProps) {
+export default async function ToursPage({ params, searchParams }: ToursPageProps) {
   const membership = await requireModule((await params).slug, "tours");
   const session = await adminSession();
   const [{ tours, candidates, canEdit }, general, hostname] = await Promise.all([
@@ -51,8 +53,7 @@ export default async function ToursPage({ params }: ToursPageProps) {
       </div>
 
       {canEdit ? (
-        <section aria-labelledby="nuevo-tour" className="members-invite">
-          <h2 id="nuevo-tour">Nuevo tour</h2>
+        <NewItem label="Nuevo tour" open={tours.length === 0 || wantsNew(await searchParams)}>
           {candidates.length === 0 ? (
             <p className="field-hint">
               Todos los destinos y eventos próximos ya tienen su tour. Para uno nuevo, crea antes el
@@ -61,7 +62,7 @@ export default async function ToursPage({ params }: ToursPageProps) {
           ) : (
             <NewTourForm org={membership.slug} candidates={candidates} />
           )}
-        </section>
+        </NewItem>
       ) : (
         <p className="notice" role="status">
           Tu rol puede ver los tours, pero no crearlos ni cambiarlos.

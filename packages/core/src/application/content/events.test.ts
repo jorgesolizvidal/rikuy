@@ -12,6 +12,7 @@ import {
   eventDateBadge,
   formatEventMonth,
   formatEventSchedule,
+  formatEventShort,
   groupByMonth,
 } from "../../domain/events/schedule";
 import { loadAgenda, publishEvent, saveEventDraft } from "./events";
@@ -91,6 +92,16 @@ describe("event schedule", () => {
     expect(formatEventSchedule({ allDay: true, start: "2026-11-30", end: "2026-12-02" })).toBe(
       "30 de noviembre – 2 de diciembre de 2026",
     );
+    expect(formatEventShort(TIMED)).toBe("Lunes · 19:00–22:00");
+    expect(formatEventShort({ allDay: true, start: "2026-11-08", end: "2026-11-08" })).toBe(
+      "Domingo · todo el día",
+    );
+    expect(formatEventShort({ allDay: true, start: "2026-11-30", end: "2026-12-02" })).toBe(
+      "30 nov – 2 dic",
+    );
+    expect(
+      formatEventShort({ allDay: false, start: "2027-02-19T14:30", end: "2027-02-20T18:00" }),
+    ).toBe("19 feb, 14:30 – 20 feb, 18:00");
     expect(eventDateBadge(TIMED)).toEqual({ day: "2", month: "nov" });
     expect(formatEventMonth("2026-11")).toBe("Noviembre de 2026");
     expect(dayAfter("2026-12-31")).toBe("20270101");

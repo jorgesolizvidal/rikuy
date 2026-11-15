@@ -20,17 +20,23 @@ export interface CardBadges {
   readonly stamp?: boolean;
 }
 
-/** «Recorrido 360°» and «Sello» on the photo; the category above the title. */
+/**
+ * «Recorrido 360°» and «Sello del pasaporte»: on a detail page's cover (`placement="photo"`)
+ * or, in a list, as a quiet line below the card's text (C3 · Paso 8: pills on every photo
+ * covered the photos and repeated themselves down the list).
+ */
 export function CardFlags({
   tour = false,
   stamp = false,
+  placement = "photo",
 }: {
   readonly tour?: boolean | undefined;
   readonly stamp?: boolean | undefined;
+  readonly placement?: "photo" | "text";
 }) {
   if (!tour && !stamp) return null;
   return (
-    <span className="portal-card-flags">
+    <span className="portal-card-flags" data-placement={placement}>
       {tour ? (
         <span className="portal-flag">
           <svg aria-hidden="true" viewBox="0 0 24 24" width="14" height="14" focusable="false">
@@ -93,11 +99,11 @@ export function DestinationCard({
               priority={priority}
             />
           ) : null}
-          <CardFlags tour={badges.tour} stamp={badges.stamp} />
         </div>
         {badges.category ? <span className="portal-card-kicker">{badges.category}</span> : null}
         <Heading className="portal-card-title">{destination.title}</Heading>
         {destination.summary ? <p className="portal-card-text">{destination.summary}</p> : null}
+        <CardFlags tour={badges.tour} stamp={badges.stamp} placement="text" />
         {destination.location ? <DistanceText point={destination.location} compact /> : null}
         {extra}
       </a>

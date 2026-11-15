@@ -9,15 +9,12 @@ import {
   portalDestinations,
   portalIndex,
   portalNearbyTargets,
-  portalPassport,
 } from "@/server/portal-content";
 import { portalHas, portalView } from "@/server/portal-view";
 
 import { DestinationCard } from "../destination-card";
-import { PassportBanner } from "../home-sections";
 import { FilteredProximityList } from "../list-filter";
 import { searchText } from "../list-search";
-import { ListingFacts } from "../listing-facts";
 import { LocationButton, NearbyNotice, ProximityNote } from "../visitor-location";
 
 interface DestinationsPageProps {
@@ -40,19 +37,15 @@ export async function generateMetadata({ params }: DestinationsPageProps): Promi
 export default async function DestinationsPage({ params }: DestinationsPageProps) {
   const view = await portalView((await params).host);
   if (view === null) notFound();
-  const [destinations, targets, index, badges, circuits] = await Promise.all([
+  const [destinations, targets, index, badges] = await Promise.all([
     portalDestinations(view),
     portalNearbyTargets(view),
     portalIndex(view),
     portalBadges(view),
-    portalPassport(view),
   ]);
-  const { siteName } = view.resolved.presentation.identity;
   const categories = categoriesInUse(index, "destination");
   const categoryOf = categoryBySlug(index, "destination");
   const slugOfCategory = new Map(categories.map((category) => [category.id, category.slug]));
-  const withTour = destinations.filter((item) => badges.tours.has(`destination:${item.slug}`));
-  const withStamp = destinations.filter((item) => badges.stamps.has(`destination:${item.slug}`));
 
   return (
     <div className="portal-page">
@@ -65,18 +58,12 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
         </ol>
       </nav>
       <header className="portal-listing-head">
-        <div>
-          <p className="portal-kicker">{siteName}</p>
-          <h1 className="portal-page-title">Destinos</h1>
-          <p className="portal-lead">Lugares para visitar: fotos, ubicación y cómo llegar.</p>
-        </div>
-        <ListingFacts
-          facts={[
-            { value: destinations.length, label: destinations.length === 1 ? "lugar" : "lugares" },
-            { value: withTour.length, label: "con recorrido 360°" },
-            { value: withStamp.length, label: "con sello del pasaporte" },
-          ]}
-        />
+        <h1 className="portal-page-title">Destinos</h1>
+        <p className="portal-lead">
+          {destinations.length > 0
+            ? `${String(destinations.length)} ${destinations.length === 1 ? "lugar" : "lugares"} para visitar: fotos, ubicación y cómo llegar.`
+            : "Lugares para visitar: fotos, ubicación y cómo llegar."}
+        </p>
       </header>
       {destinations.length === 0 ? (
         <p className="portal-empty">Pronto publicaremos aquí los lugares para visitar.</p>
@@ -120,7 +107,6 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
           <NearbyNotice targets={targets} radius={nearbyRadiusOf(view.resolved.presentation)} />
         </>
       )}
-      {circuits.length > 0 ? <PassportBanner circuits={circuits.length} headingLevel={2} /> : null}
     </div>
   );
 }

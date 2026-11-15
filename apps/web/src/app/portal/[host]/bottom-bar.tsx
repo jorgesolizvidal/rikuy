@@ -24,6 +24,8 @@ const ICONS: Readonly<Record<BottomBarKey | "more", string>> = {
 
 export interface BottomBarLink extends BottomBarItem {
   readonly href: string;
+  /** Other sections it stands for (the map, inside «Destinos»). */
+  readonly also?: readonly string[];
 }
 
 function Icon({ name }: { readonly name: BottomBarKey | "more" }) {
@@ -41,9 +43,11 @@ function Icon({ name }: { readonly name: BottomBarKey | "more" }) {
   );
 }
 
-function isCurrent(pathname: string | null, href: string): boolean {
+function isCurrent(pathname: string | null, item: BottomBarLink): boolean {
   if (pathname === null) return false;
-  return href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`);
+  return [item.href, ...(item.also ?? [])].some((href) =>
+    href === "/" ? pathname === "/" : pathname === href || pathname.startsWith(`${href}/`),
+  );
 }
 
 export function BottomBar({
@@ -64,7 +68,7 @@ export function BottomBar({
   const menuId = useId();
   const button = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLUListElement>(null);
-  const moreCurrent = more.some((item) => isCurrent(pathname, item.href));
+  const moreCurrent = more.some((item) => isCurrent(pathname, item));
 
   useEffect(() => {
     if (!open) return;
@@ -92,7 +96,7 @@ export function BottomBar({
       <ul>
         {items.map((item) => (
           <li key={item.key}>
-            <a href={item.href} aria-current={isCurrent(pathname, item.href) ? "page" : undefined}>
+            <a href={item.href} aria-current={isCurrent(pathname, item) ? "page" : undefined}>
               <Icon name={item.key} />
               <span>{item.label}</span>
             </a>
@@ -114,10 +118,7 @@ export function BottomBar({
             <ul id={menuId} ref={menu} hidden={!open}>
               {more.map((item) => (
                 <li key={item.key}>
-                  <a
-                    href={item.href}
-                    aria-current={isCurrent(pathname, item.href) ? "page" : undefined}
-                  >
+                  <a href={item.href} aria-current={isCurrent(pathname, item) ? "page" : undefined}>
                     <Icon name={item.key} />
                     <span>{item.label}</span>
                   </a>

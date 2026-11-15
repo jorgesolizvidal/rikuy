@@ -9,6 +9,11 @@
   --font-display: var(--font-sans);
   --font-body: var(--font-sans);
   --gutter: clamp(1rem, 5vw, 3.5rem);
+  /* One page width for the header, every section and the footer (C3 · Paso 8): content is
+     at most --page wide and centered; on narrow screens it keeps the gutter. Percentages
+     resolve where --edge is used, against the full-width block that pads itself with it. */
+  --page: 72rem;
+  --edge: max(var(--gutter), calc((100% - var(--page)) / 2));
   /* Shapes */
   --radius-card: 0.75rem;
   --radius-media: 0.75rem;
@@ -106,7 +111,7 @@
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .portal-header {
-  padding: 1.25rem var(--gutter);
+  padding: 1.25rem var(--edge);
 }
 
 .portal .portal-brand {
@@ -138,7 +143,7 @@
   position: relative;
   isolation: isolate;
   overflow: hidden;
-  padding: clamp(3rem, 12vh, 8rem) var(--gutter) clamp(3rem, 10vh, 6rem);
+  padding: clamp(3rem, 12vh, 8rem) var(--edge) clamp(3rem, 10vh, 6rem);
 }
 
 .portal-contour {
@@ -201,7 +206,7 @@
 /* ── Upcoming sections ─────────────────────────────────────────────────── */
 
 .portal-upcoming {
-  padding: clamp(2.5rem, 8vh, 4.5rem) var(--gutter);
+  padding: clamp(2.5rem, 8vh, 4.5rem) var(--edge);
 }
 
 .portal-upcoming h2,
@@ -244,7 +249,7 @@
 
 .portal-footer {
   margin-top: auto;
-  padding: clamp(2rem, 6vh, 3.5rem) var(--gutter);
+  padding: clamp(2rem, 6vh, 3.5rem) var(--edge);
   background: var(--surface);
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 16rem), 1fr));
@@ -255,6 +260,19 @@
 .portal-footer h2 {
   font-size: 1.125rem;
   margin-bottom: 0.75rem;
+}
+
+.portal-footer-brand h2 {
+  font-family: var(--font-display);
+  font-size: 1.375rem;
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-tracking);
+}
+
+.portal-footer-brand p {
+  margin: 0;
+  max-width: 32ch;
+  opacity: 0.85;
 }
 
 .portal-footer address {
@@ -397,7 +415,8 @@
 
 .portal-page {
   width: 100%;
-  max-width: 72rem;
+  /* The content is exactly --page wide, like the header and the footer. */
+  max-width: calc(var(--page) + 2 * var(--gutter));
   margin: 0 auto;
   padding: clamp(1rem, 4vh, 2.5rem) var(--gutter) clamp(2.5rem, 8vh, 4.5rem);
   box-sizing: border-box;
@@ -445,7 +464,7 @@
 /* ── Destination cards ──────────────────────────────────────────────────── */
 
 .portal-section {
-  padding: clamp(2.5rem, 8vh, 4.5rem) var(--gutter) 0;
+  padding: clamp(2.5rem, 8vh, 4.5rem) var(--edge) 0;
 }
 
 .portal-section-head {
@@ -484,6 +503,13 @@
 
 .portal-section .portal-cards {
   margin-top: 0;
+}
+
+/* Four places fill one row of four instead of three and an orphan (C3 · Paso 8). */
+@media (min-width: 64rem) {
+  .portal-cards:not([data-variant="featured"]):has(> li:nth-child(4):last-child) {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 
 .portal-card a {
@@ -1301,6 +1327,26 @@
   line-height: 1.2;
 }
 
+/* In a list: a quiet line below the card's text, no pills (C3 · Paso 8). */
+.portal-card-flags[data-placement="text"] {
+  position: static;
+  gap: 0.25rem 0.875rem;
+  margin-top: 0.5rem;
+}
+
+.portal-card-flags[data-placement="text"] .portal-flag {
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.portal-card-flags[data-placement="text"] svg {
+  color: var(--brand);
+}
+
 /* ── Phone's bottom bar (ADR-062) ───────────────────────────────────────── */
 
 .portal-bottom-bar {
@@ -1466,18 +1512,6 @@
 
 .portal[data-theme="editorial"] .portal-tagline {
   font-weight: 650;
-}
-
-/* A short accent bar above each section title, like a magazine's kicker. */
-.portal[data-theme="editorial"] .portal-section-head h2::before,
-.portal[data-theme="editorial"] .portal-upcoming > h2::before {
-  content: "";
-  display: block;
-  width: 2.5rem;
-  height: 0.25rem;
-  margin-bottom: 0.75rem;
-  border-radius: 999px;
-  background: var(--accent);
 }
 
 .portal[data-theme="editorial"] .portal-card a {
@@ -1705,5 +1739,5 @@
 
 /* The map page is wider than the text pages: the map is its content (C3 · Paso 4). */
 .portal-page.portal-map-page {
-  max-width: 88rem;
+  max-width: calc(88rem + 2 * var(--gutter));
 }

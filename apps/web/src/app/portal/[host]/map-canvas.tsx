@@ -240,7 +240,8 @@ export default function MapCanvas({
               center: [center?.lng ?? 0, center?.lat ?? 0] as [number, number],
               zoom: center?.zoom ?? 2,
             }),
-        fitBoundsOptions: { padding: 32, maxZoom: 15 },
+        // A circuit's stops may be a few hundred meters apart: closer for the route.
+        fitBoundsOptions: { padding: 32, maxZoom: route ? 17 : 15 },
         interactive,
         cooperativeGestures: interactive,
         attributionControl: { compact: true },

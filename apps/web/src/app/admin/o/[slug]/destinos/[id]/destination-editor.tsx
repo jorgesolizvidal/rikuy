@@ -391,6 +391,25 @@ export function DestinationEditor({
         </section>
       </fieldset>
 
+      {/* The photos right after the text (C3 · Paso 8): what a visitor sees first. */}
+      <CoverField
+        org={org}
+        value={values.cover}
+        disabled={locked}
+        altInvalid={Boolean(errors.coverAlt)}
+        onChange={(cover) => set("cover", cover)}
+      />
+      <GalleryField
+        org={org}
+        value={values.gallery}
+        disabled={locked}
+        invalidAlts={galleryAlts}
+        onChange={(gallery) => set("gallery", gallery)}
+      />
+      {errors.images || errors.coverAlt || galleryAlts.size > 0 ? (
+        <p className="field-error">{errors.images ?? FIELD_MESSAGES.alt}</p>
+      ) : null}
+
       {kind === "event" && values.schedule ? (
         <ScheduleField
           value={values.schedule}
@@ -448,24 +467,6 @@ export function DestinationEditor({
         error={errors.location}
         onChange={(point) => set("location", point)}
       />
-
-      <CoverField
-        org={org}
-        value={values.cover}
-        disabled={locked}
-        altInvalid={Boolean(errors.coverAlt)}
-        onChange={(cover) => set("cover", cover)}
-      />
-      <GalleryField
-        org={org}
-        value={values.gallery}
-        disabled={locked}
-        invalidAlts={galleryAlts}
-        onChange={(gallery) => set("gallery", gallery)}
-      />
-      {errors.images || errors.coverAlt || galleryAlts.size > 0 ? (
-        <p className="field-error">{errors.images ?? FIELD_MESSAGES.alt}</p>
-      ) : null}
 
       {canEdit ? (
         <div className="form-actions branding-actions sticky-actions">

@@ -2,7 +2,13 @@
    of the portal does not pay for it before its first paint. Colors come from the tenant's
    palette (CSS variables on .portal), never from a tenant literal. */
 .portal-tour-header {
-  margin-bottom: 1.25rem;
+  margin-bottom: 0.875rem;
+}
+
+/* The viewer is the page: a shorter title keeps it and its bar above the fold
+   (C3 · Paso 8). */
+.portal-tour-header .portal-page-title {
+  font-size: clamp(1.625rem, 4vw, 2.5rem);
 }
 
 .portal-tour-eyebrow {
@@ -30,7 +36,8 @@
 
 .tour-viewport {
   position: relative;
-  height: clamp(18rem, 62vh, 40rem);
+  /* What the window has left under the header, the title and the tour's bar. */
+  height: clamp(18rem, calc(100svh - 17rem), 46rem);
   background-size: cover;
   background-position: center;
 }
@@ -685,20 +692,44 @@
   grid-column: 1 / -1;
 }
 
+/* Each tour as a card with its number of scenes (C3 · Paso 8). No previews: the other tours
+   download nothing until the visitor opens one (P4 · Paso 5). */
 .tour-guide-others ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem 1.25rem;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+  gap: 0.75rem;
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
 .tour-guide-others a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 2.75rem;
-  font-weight: 600;
+  display: grid;
+  gap: 0.25rem;
+  height: 100%;
+  box-sizing: border-box;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  color: var(--fg);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.tour-guide-others a:hover {
+  border-color: var(--brand);
+}
+
+.tour-guide-others a:hover .tour-other-title {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.tour-other-scenes {
+  color: var(--muted);
+  font-size: 0.875rem;
+  font-weight: 500;
 }
 
 /* The guide (ADR-040): «¿Qué estoy viendo?» in the bar, «Preguntar sobre esto» in a point. */
@@ -732,4 +763,14 @@
 .portal .portal-footer,
 .portal[data-assistant] .portal-footer {
   padding-bottom: clamp(2rem, 6vh, 3.5rem);
+}
+
+/* The viewer's zoom (C3 · Paso 8): a small pill in the corner, not a second bar. */
+.tour-stage .psv-navbar {
+  left: auto;
+  right: 0.75rem;
+  bottom: 0.75rem;
+  width: auto;
+  border-radius: 999px;
+  background: rgb(6 8 7 / 62%);
 }

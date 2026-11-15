@@ -17,6 +17,7 @@ import {
 } from "../actions";
 import type { EditorModelOption, EditorTargetOption } from "./hotspot-form";
 import { SceneDetail, type EditorScene } from "./scene-detail";
+import { PanelIcon } from "@/components/panel/panel-icon";
 
 export type { EditorScene } from "./scene-detail";
 
@@ -217,6 +218,7 @@ export function TourEditor(props: TourEditorProps) {
                     {props.canEdit ? (
                       <div className="row-actions">
                         <button
+                          title="Subir"
                           type="button"
                           className="button button-quiet"
                           disabled={pending || index === 0}
@@ -233,9 +235,11 @@ export function TourEditor(props: TourEditorProps) {
                             )
                           }
                         >
-                          Subir
+                          <PanelIcon name="up" />
+                          <span className="visually-hidden">Subir</span>
                         </button>
                         <button
+                          title="Bajar"
                           type="button"
                           className="button button-quiet"
                           disabled={pending || index === sceneCount - 1}
@@ -252,7 +256,8 @@ export function TourEditor(props: TourEditorProps) {
                             )
                           }
                         >
-                          Bajar
+                          <PanelIcon name="down" />
+                          <span className="visually-hidden">Bajar</span>
                         </button>
                         {isEntry ? null : (
                           <button
@@ -311,13 +316,15 @@ export function TourEditor(props: TourEditorProps) {
                           </>
                         ) : (
                           <button
+                            title="Quitar"
                             type="button"
                             className="button button-quiet"
                             disabled={pending}
                             aria-label={`Quitar «${entry.title}» del tour`}
                             onClick={() => setRemoving(entry.sceneId)}
                           >
-                            Quitar
+                            <PanelIcon name="remove" />
+                            <span className="visually-hidden">Quitar</span>
                           </button>
                         )}
                       </div>

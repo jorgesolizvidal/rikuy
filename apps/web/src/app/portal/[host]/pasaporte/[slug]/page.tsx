@@ -109,12 +109,18 @@ export default async function CircuitPage({ params }: CircuitPageProps) {
           <h2 id="recorrido">El recorrido</h2>
           <RouteMap
             stops={route}
-            area={padBoundingBox({
-              west: Math.min(...route.map((stop) => stop.lng)),
-              south: Math.min(...route.map((stop) => stop.lat)),
-              east: Math.max(...route.map((stop) => stop.lng)),
-              north: Math.max(...route.map((stop) => stop.lat)),
-            })}
+            // Fitted to the stops (C3 · Paso 8): a walk of a few hundred meters fills the
+            // map instead of sitting in the middle of 2 km.
+            area={padBoundingBox(
+              {
+                west: Math.min(...route.map((stop) => stop.lng)),
+                south: Math.min(...route.map((stop) => stop.lat)),
+                east: Math.max(...route.map((stop) => stop.lng)),
+                north: Math.max(...route.map((stop) => stop.lat)),
+              },
+              0.003,
+              0.3,
+            )}
           />
           <p>
             <a href={mapRoutePath(located.map((stop) => `destination:${stop.slug}`))}>

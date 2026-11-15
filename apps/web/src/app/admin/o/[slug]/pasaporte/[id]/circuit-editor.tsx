@@ -14,6 +14,7 @@ import {
   type CircuitWriteState,
   type DeleteCircuitState,
 } from "../actions";
+import { PanelIcon } from "@/components/panel/panel-icon";
 
 const MESSAGES: Partial<
   Record<CircuitWriteState["status"] | DeleteCircuitState["status"], string>
@@ -210,22 +211,27 @@ export function CircuitEditor({
                   {canChange ? (
                     <span className="circuit-stop-actions">
                       <button
+                        title="Subir"
                         type="button"
                         className="button button-quiet"
                         disabled={index === 0 || pending}
                         onClick={() => move(index, -1)}
                       >
-                        Subir<span className="visually-hidden"> «{title}»</span>
+                        <PanelIcon name="up" />
+                        <span className="visually-hidden">Subir «{title}»</span>
                       </button>
                       <button
+                        title="Bajar"
                         type="button"
                         className="button button-quiet"
                         disabled={index === stops.length - 1 || pending}
                         onClick={() => move(index, 1)}
                       >
-                        Bajar<span className="visually-hidden"> «{title}»</span>
+                        <PanelIcon name="down" />
+                        <span className="visually-hidden">Bajar «{title}»</span>
                       </button>
                       <button
+                        title="Quitar"
                         type="button"
                         className="button button-quiet"
                         disabled={pending}
@@ -233,7 +239,8 @@ export function CircuitEditor({
                           setStops((current) => current.filter((stop) => stop !== contentId))
                         }
                       >
-                        Quitar<span className="visually-hidden"> «{title}»</span>
+                        <PanelIcon name="remove" />
+                        <span className="visually-hidden">Quitar «{title}»</span>
                       </button>
                     </span>
                   ) : null}

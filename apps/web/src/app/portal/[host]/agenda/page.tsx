@@ -10,14 +10,12 @@ import {
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { portalBadges, portalEvents, portalIndex, portalPassport } from "@/server/portal-content";
+import { portalBadges, portalEvents, portalIndex } from "@/server/portal-content";
 import { portalViewWith } from "@/server/portal-view";
 
 import { AgendaList } from "../agenda-list";
 import { EventCard } from "../event-card";
-import { PassportBanner } from "../home-sections";
 import { searchText } from "../list-search";
-import { ListingFacts } from "../listing-facts";
 import { LocationButton } from "../visitor-location";
 
 interface AgendaPageProps {
@@ -40,11 +38,10 @@ export async function generateMetadata({ params }: AgendaPageProps): Promise<Met
 export default async function AgendaPage({ params }: AgendaPageProps) {
   const view = await portalViewWith((await params).host, "agenda");
   if (view === null) notFound();
-  const [events, index, badges, circuits] = await Promise.all([
+  const [events, index, badges] = await Promise.all([
     portalEvents(view),
     portalIndex(view),
     portalBadges(view),
-    portalPassport(view),
   ]);
   const months = groupByMonth(events);
   const listed = new Set(events.map((event) => event.slug));
@@ -65,22 +62,10 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
         </ol>
       </nav>
       <header className="portal-listing-head">
-        <div>
-          <p className="portal-kicker">{view.resolved.presentation.identity.siteName}</p>
-          <h1 className="portal-page-title">Agenda</h1>
-          <p className="portal-lead">
-            Ferias, fiestas y actividades. Las fechas y horas son las del municipio.
-          </p>
-        </div>
-        <ListingFacts
-          facts={[
-            {
-              value: events.length,
-              label: events.length === 1 ? "evento próximo" : "eventos próximos",
-            },
-            { value: months.length, label: months.length === 1 ? "mes" : "meses" },
-          ]}
-        />
+        <h1 className="portal-page-title">Agenda</h1>
+        <p className="portal-lead">
+          Ferias, fiestas y actividades. Las fechas y horas son las del municipio.
+        </p>
       </header>
       {months.length === 0 ? (
         <p className="portal-empty">No hay eventos próximos por ahora. Vuelve pronto.</p>
@@ -118,7 +103,6 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
           />
         </>
       )}
-      {circuits.length > 0 ? <PassportBanner circuits={circuits.length} headingLevel={2} /> : null}
     </div>
   );
 }

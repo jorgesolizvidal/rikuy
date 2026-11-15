@@ -6,6 +6,7 @@ import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 
 import { NewDestinationForm } from "./new-destination-form";
+import { NewItem, wantsNew } from "@/components/panel/new-item";
 
 export const metadata: Metadata = { title: "Destinos" };
 
@@ -24,9 +25,10 @@ const DATE = new Intl.DateTimeFormat("es-BO", {
 
 interface DestinationsPageProps {
   readonly params: Promise<{ slug: string }>;
+  readonly searchParams: Promise<{ nuevo?: string | string[] }>;
 }
 
-export default async function DestinationsPage({ params }: DestinationsPageProps) {
+export default async function DestinationsPage({ params, searchParams }: DestinationsPageProps) {
   const membership = await requireOrganization((await params).slug);
   const destinations = await listDestinations(membership, (await adminSession()).content);
   const canEdit = canEditContent(membership.role);
@@ -46,10 +48,12 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
       </div>
 
       {canEdit ? (
-        <section aria-labelledby="nuevo-destino" className="members-invite">
-          <h2 id="nuevo-destino">Nuevo destino</h2>
+        <NewItem
+          label="Nuevo destino"
+          open={destinations.length === 0 || wantsNew(await searchParams)}
+        >
           <NewDestinationForm org={membership.slug} />
-        </section>
+        </NewItem>
       ) : (
         <p className="notice" role="status">
           Tu rol puede ver los destinos, pero no crearlos ni cambiarlos.
@@ -76,7 +80,6 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
                     <Link href={`/o/${membership.slug}/destinos/${destination.contentId}`}>
                       {destination.title}
                     </Link>
-                    <span className="cell-detail">/{destination.slug}</span>
                   </td>
                   <td data-label="Estado">
                     <span className="status-pill" data-status={destination.status}>
