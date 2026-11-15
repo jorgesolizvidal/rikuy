@@ -9,10 +9,8 @@ import {
   detectPlanIntent,
   type AnswerBlock,
   type AssistantLink,
-  type AssistantPlan,
   type AssistantReply,
   type PlanIntent,
-  type PublicCitation,
 } from "@rikuy/core/assistant-client";
 import { distanceMeters, type PositionFix } from "@rikuy/core/geo";
 import {
@@ -23,11 +21,14 @@ import {
   useState,
   useSyncExternalStore,
   type FormEvent,
+  type ReactNode,
 } from "react";
 
 import { tourAssistantContext, type TourAssistantContext } from "@/lib/assistant-context";
 import { useVisitorLocation } from "@/lib/use-visitor-location";
 
+import type { AssistantPlaceCard } from "./assistant-cards";
+import { AnswerSources, PlanCard } from "./assistant-place";
 import {
   dictationSupported,
   speak,
@@ -35,7 +36,6 @@ import {
   stopSpeaking,
   useDictation,
 } from "./assistant-voice";
-import { LocationButton } from "./visitor-location";
 
 /**
  * The assistant's conversation (ADR-038), loaded only when the visitor opens it. A modal
@@ -51,7 +51,10 @@ const ENDPOINT = "/asistente";
 const PLACES_ENDPOINT = "/asistente/lugares";
 const WIDE = "(min-width: 48rem)";
 
-type Shown = Exclude<AssistantReply, { status: "invalid" }>;
+/** An answer and the cards of the places it names (ADR-065), as the portal sent them. */
+type Shown = Exclude<AssistantReply, { status: "invalid" }> & {
+  readonly places?: readonly AssistantPlaceCard[];
+};
 
 type Message =
   | { readonly id: string; readonly role: "user"; readonly text: string }
@@ -64,10 +67,14 @@ interface Saved {
 }
 
 /** Plans (ADR-039): the engine decides the stops, the model explains them. */
-const PLANS: readonly { readonly intent: PlanIntent; readonly label: string }[] = [
-  { intent: "nearby", label: "¿Qué hay cerca?" },
-  { intent: "today", label: "Plan para hoy" },
-  { intent: "route", label: "Ruta sugerida" },
+const PLANS: readonly {
+  readonly intent: PlanIntent;
+  readonly label: string;
+  readonly icon: Icon;
+}[] = [
+  { intent: "nearby", label: "¿Qué hay cerca?", icon: "pin" },
+  { intent: "today", label: "Plan para hoy", icon: "calendar" },
+  { intent: "route", label: "Ruta sugerida", icon: "route" },
 ];
 
 interface PlacePoint {
@@ -102,10 +109,93 @@ async function distancesFrom(fix: PositionFix): Promise<Record<string, number>> 
   );
 }
 
-const SUGGESTIONS: Readonly<Record<string, readonly string[]>> = {
-  item: ["¿Qué puedo hacer aquí?", "¿Cómo llego?", "¿Qué más hay cerca?"],
-  any: ["¿Qué lugares puedo visitar?", "¿Qué eventos hay próximamente?", "¿Qué se puede comer?"],
+const SUGGESTIONS: Readonly<
+  Record<string, readonly { readonly text: string; readonly icon: Icon }[]>
+> = {
+  item: [
+    { text: "¿Qué puedo hacer aquí?", icon: "spark" },
+    { text: "¿Cómo llego?", icon: "route" },
+    { text: "¿Qué más hay cerca?", icon: "pin" },
+  ],
+  any: [
+    { text: "¿Qué lugares puedo visitar?", icon: "pin" },
+    { text: "¿Qué eventos hay próximamente?", icon: "calendar" },
+    { text: "¿Qué se puede comer?", icon: "food" },
+  ],
 };
+
+type Icon = "pin" | "calendar" | "route" | "spark" | "food";
+
+const ICON_PATHS: Readonly<Record<Icon, string>> = {
+  pin: "M12 21s-6.5-6.6-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.4 12 21 12 21Zm0-8.7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+  calendar:
+    "M7 3v3m10-3v3M4 9h16M5 5h14a1 1 0 0 1 1 1v13a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V6a1 1 0 0 1 1-1Z",
+  route:
+    "M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm12-10a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM8 17h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7",
+  spark: "M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5m7 7L18 18M6 18l2.5-2.5m7-7L18 6",
+  food: "M7 3v8m-2-8v5a2 2 0 0 0 4 0V3m-2 8v10m10-18c-2 0-3 2.5-3 6s1 4 3 4v8",
+};
+
+/** A chip's small icon (decorative: the chip's text names it). */
+function ChipIcon({ icon }: { readonly icon: Icon }) {
+  return (
+    <svg
+      className="assistant-chip-icon"
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      aria-hidden="true"
+      focusable="false"
+    >
+      <path
+        d={ICON_PATHS[icon]}
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+/** The assistant's face: the municipality's logo, or its initials (decorative). */
+function Avatar({ logo, mark }: { readonly logo: string | null; readonly mark: string }) {
+  return (
+    <span className="assistant-avatar" aria-hidden="true">
+      {logo ? (
+        // The portal's own versioned logo (≤512 px WebP), already in the browser's cache.
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={logo} alt="" decoding="async" />
+      ) : (
+        mark
+      )}
+    </span>
+  );
+}
+
+function NewIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      <path
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        d="M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"
+      />
+    </svg>
+  );
+}
+
+function SendIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
+      <path fill="currentColor" d="M3.4 20.4 21 12 3.4 3.6 3.3 10l12.6 2-12.6 2 .1 6.4Z" />
+    </svg>
+  );
+}
 
 function load(): Saved {
   const fresh = { startedAt: Date.now(), messages: [] };
@@ -185,6 +275,9 @@ export interface AssistantPanelProps {
   readonly named: boolean;
   readonly greeting: string;
   readonly siteName: string;
+  /** The municipality's logo (ADR-065: the assistant's face), or its initials without one. */
+  readonly logo: string | null;
+  readonly mark: string;
   /** The municipality has the assistant's voice (ADR-060). */
   readonly voice: boolean;
   readonly open: boolean;
@@ -197,11 +290,14 @@ export default function AssistantPanel({
   named,
   greeting,
   siteName,
+  logo,
+  mark,
   voice,
   open,
   onClose,
   request = null,
 }: AssistantPanelProps) {
+  const avatar = <Avatar logo={logo} mark={mark} />;
   const ids = useId();
   const dialog = useRef<HTMLDialogElement>(null);
   const input = useRef<HTMLTextAreaElement>(null);
@@ -307,7 +403,7 @@ export default function AssistantPanel({
             ...(distances && Object.keys(distances).length > 0 ? { distances } : {}),
           }),
         });
-        const reply = (await response.json()) as AssistantReply;
+        const reply = (await response.json()) as Shown | { readonly status: "invalid" };
         if (!response.ok || reply.status === "invalid") throw new Error(String(response.status));
         const id = nextId();
         setMessages((current) => [...current, { id, role: "assistant", reply }]);
@@ -391,14 +487,24 @@ export default function AssistantPanel({
       }}
     >
       <header className="assistant-header">
-        <div>
+        {avatar}
+        <div className="assistant-heading">
           <h2 id={`${ids}-title`}>{name}</h2>
-          <p className="assistant-subtitle">{named ? `Asistente de ${siteName}` : siteName}</p>
+          <p className="assistant-subtitle">
+            {named ? `Asistente de ${siteName}` : siteName}
+            <span className="assistant-status">Responde con lo publicado</span>
+          </p>
         </div>
         <div className="assistant-header-actions">
           {messages.length > 0 ? (
-            <button type="button" className="assistant-quiet" onClick={restart}>
-              Nueva conversación
+            <button
+              type="button"
+              className="assistant-quiet"
+              title="Nueva conversación"
+              onClick={restart}
+            >
+              <NewIcon />
+              <span className="visually-hidden">Nueva conversación</span>
             </button>
           ) : null}
           <button type="button" className="assistant-close" onClick={onClose}>
@@ -418,19 +524,24 @@ export default function AssistantPanel({
         tabIndex={0}
         aria-label="Conversación"
       >
-        <div className="assistant-message assistant-from-assistant">
+        <div className="assistant-message assistant-from-assistant assistant-welcome">
+          {avatar}
           <p>{greeting}</p>
         </div>
         {messages.length === 0 ? (
-          <div className="assistant-suggestions" aria-label="Preguntas sugeridas" role="group">
+          <div className="assistant-suggestions" aria-labelledby={`${ids}-faq`} role="group">
+            <p id={`${ids}-faq`} className="assistant-section-title">
+              Preguntas frecuentes
+            </p>
             {suggestions.map((suggestion) => (
               <button
-                key={suggestion}
+                key={suggestion.text}
                 type="button"
                 className="assistant-chip"
-                onClick={() => void ask(suggestion)}
+                onClick={() => void ask(suggestion.text)}
               >
-                {suggestion}
+                <ChipIcon icon={suggestion.icon} />
+                {suggestion.text}
               </button>
             ))}
           </div>
@@ -439,6 +550,7 @@ export default function AssistantPanel({
           <MessageView
             key={message.id}
             message={message}
+            avatar={avatar}
             name={name}
             speaking={speaking === message.id}
             onRead={
@@ -469,6 +581,7 @@ export default function AssistantPanel({
             disabled={busy}
             onClick={() => void ask(plan.label, plan.intent)}
           >
+            <ChipIcon icon={plan.icon} />
             {plan.label}
           </button>
         ))}
@@ -517,7 +630,8 @@ export default function AssistantPanel({
           className="assistant-send"
           disabled={busy || recording || transcribing || question.trim().length < 2}
         >
-          Enviar
+          <SendIcon />
+          <span className="visually-hidden">Enviar</span>
         </button>
       </form>
       <p id={`${ids}-voice`} className="assistant-voice" role="status">
@@ -599,32 +713,6 @@ function Contact({
   );
 }
 
-function Sources({
-  sources,
-  lang,
-}: {
-  readonly sources: readonly PublicCitation[];
-  readonly lang: "es" | "en";
-}) {
-  if (sources.length === 0) return null;
-  return (
-    <div className="assistant-sources">
-      <p className="assistant-sources-title">{lang === "en" ? "Sources" : "Fuentes"}</p>
-      <ul>
-        {sources.map((source) => {
-          const text = `${source.title}${source.page ? ` · ${source.page}` : ""}${source.ended ? (lang === "en" ? " · ended" : " · ya terminó") : ""}`;
-          return (
-            <li key={`${source.href ?? ""}${source.title}${source.page ?? ""}`}>
-              <span className="assistant-source-kind">{source.label}</span>{" "}
-              {source.href ? <a href={source.href}>{text}</a> : <span>{text}</span>}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
 function MicIcon() {
   return (
     <svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true" focusable="false">
@@ -655,11 +743,13 @@ function ReadButton({
 
 function MessageView({
   message,
+  avatar,
   name,
   speaking,
   onRead,
 }: {
   readonly message: Message;
+  readonly avatar: ReactNode;
   readonly name: string;
   readonly speaking: boolean;
   readonly onRead: (() => void) | null;
@@ -676,104 +766,57 @@ function MessageView({
   }
   if (message.role === "error") {
     return (
-      <div className="assistant-message assistant-from-assistant assistant-problem">
-        <p>{message.text}</p>
+      <div className="assistant-row">
+        {avatar}
+        <div className="assistant-message assistant-from-assistant assistant-problem">
+          <p>{message.text}</p>
+        </div>
       </div>
     );
   }
   const { reply } = message;
   if (reply.status === "notice") {
     return (
-      <div
-        className="assistant-message assistant-from-assistant assistant-problem"
-        lang={reply.lang}
-      >
-        <p>
-          <span className="visually-hidden">{reply.notice.speaker}: </span>
-          {reply.notice.message}
-        </p>
+      <div className="assistant-row">
+        {avatar}
+        <div
+          className="assistant-message assistant-from-assistant assistant-problem"
+          lang={reply.lang}
+        >
+          <p>
+            <span className="visually-hidden">{reply.notice.speaker}: </span>
+            {reply.notice.message}
+          </p>
+          <Links
+            links={reply.notice.links}
+            label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
+          />
+          <Contact contact={reply.notice.contact} lang={reply.lang} />
+          {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="assistant-row">
+      {avatar}
+      <div className="assistant-message assistant-from-assistant" lang={reply.lang}>
+        <span className="visually-hidden">{name}: </span>
+        <Blocks blocks={reply.blocks} />
+        {reply.abstained ? (
+          <p className="assistant-abstained">
+            {reply.lang === "en" ? "No published source." : "Sin fuentes publicadas."}
+          </p>
+        ) : null}
+        {reply.plan ? <PlanCard plan={reply.plan} cards={reply.places} lang={reply.lang} /> : null}
+        <AnswerSources sources={reply.sources} cards={reply.places} lang={reply.lang} />
         <Links
-          links={reply.notice.links}
+          links={reply.links}
           label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
         />
-        <Contact contact={reply.notice.contact} lang={reply.lang} />
+        <Contact contact={reply.contact} lang={reply.lang} />
         {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
       </div>
-    );
-  }
-  return (
-    <div className="assistant-message assistant-from-assistant" lang={reply.lang}>
-      <span className="visually-hidden">{name}: </span>
-      <Blocks blocks={reply.blocks} />
-      {reply.abstained ? (
-        <p className="assistant-abstained">
-          {reply.lang === "en" ? "No published source." : "Sin fuentes publicadas."}
-        </p>
-      ) : null}
-      {reply.plan ? <PlanView plan={reply.plan} lang={reply.lang} /> : null}
-      <Sources sources={reply.sources} lang={reply.lang} />
-      <Links
-        links={reply.links}
-        label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
-      />
-      <Contact contact={reply.contact} lang={reply.lang} />
-      {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
     </div>
-  );
-}
-
-function PlanView({ plan, lang }: { readonly plan: AssistantPlan; readonly lang: "es" | "en" }) {
-  const en = lang === "en";
-  if (plan.needsLocation) {
-    return (
-      <div className="assistant-plan">
-        <LocationButton label={en ? "Use my location" : "Usar mi ubicación"} />
-      </div>
-    );
-  }
-  if (plan.stops.length === 0) return null;
-  return (
-    <section className="assistant-plan" aria-label={plan.title}>
-      <p className="assistant-plan-title">
-        {plan.title}
-        {plan.start ? <span className="assistant-plan-start"> · {plan.start}</span> : null}
-      </p>
-      <ol className="assistant-plan-stops">
-        {plan.stops.map((stop) => (
-          <li key={stop.href} className="assistant-plan-stop">
-            <span className="assistant-plan-number" aria-hidden="true">
-              {stop.position}
-            </span>
-            <span className="assistant-plan-body">
-              <a href={stop.href}>{stop.title}</a>
-              <span className="assistant-plan-kind">
-                {stop.kind === "event" ? (en ? "Event" : "Evento") : en ? "Place" : "Destino"}
-              </span>
-              {stop.time ? <span className="assistant-plan-time">{stop.time}</span> : null}
-              {stop.distance ? (
-                <span className="assistant-plan-distance">{stop.distance}</span>
-              ) : null}
-              {stop.note ? <span className="assistant-plan-note">{stop.note}</span> : null}
-            </span>
-          </li>
-        ))}
-      </ol>
-      <p className="assistant-plan-hint">
-        {en
-          ? "Straight-line distances and estimated walking times."
-          : "Distancias en línea recta y tiempos a pie estimados."}
-      </p>
-      {plan.mapHref ? (
-        <a className="assistant-plan-map" href={plan.mapHref}>
-          {plan.intent === "nearby"
-            ? en
-              ? "See them on the map"
-              : "Verlos en el mapa"
-            : en
-              ? "See the route on the map"
-              : "Ver la ruta en el mapa"}
-        </a>
-      ) : null}
-    </section>
   );
 }

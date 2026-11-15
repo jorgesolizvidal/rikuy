@@ -84,6 +84,19 @@ export interface AssistantPlanStop {
   readonly note: string | null;
 }
 
+/**
+ * A plan for today or a route at a glance (C3 · Paso 6, ADR-065): its stops, the walk between
+ * them in a straight line and the estimated walking time. None for «qué hay cerca» (each
+ * distance is from the visitor, not a route) or with a single stop.
+ */
+export interface AssistantPlanSummary {
+  readonly stops: number;
+  /** «1,2 km»: every leg of the plan, in a straight line; null when no leg is known. */
+  readonly distance: string | null;
+  /** «25 min»: the estimated walking time of those legs. */
+  readonly walk: string | null;
+}
+
 export interface AssistantPlan {
   readonly intent: PlanIntent;
   readonly title: string;
@@ -94,6 +107,7 @@ export interface AssistantPlan {
   readonly mapHref: string | null;
   /** «Qué hay cerca» without the visitor's location: the panel offers to share it. */
   readonly needsLocation: boolean;
+  readonly summary?: AssistantPlanSummary;
 }
 
 export interface PlanAnswer {
@@ -274,6 +288,17 @@ function stopView(
   } satisfies AssistantPlanStop;
 }
 
+function planSummary(stops: readonly PlanStop[]): AssistantPlanSummary {
+  const legs = stops.filter((stop) => stop.legMeters !== null);
+  const meters = legs.reduce((total, stop) => total + (stop.legMeters ?? 0), 0);
+  const minutes = legs.reduce((total, stop) => total + (stop.walkMinutes ?? 0), 0);
+  return {
+    stops: stops.length,
+    distance: legs.length > 0 ? formatDistance(meters) : null,
+    walk: legs.length > 0 && minutes >= 1 ? formatMinutes(minutes) : null,
+  };
+}
+
 /** One line per stop for the model, in Spanish (it is data, like the passages). */
 function modelLine(stop: AssistantPlanStop, view: PlanStop): string {
   const parts: string[] = [stop.title, stop.kind === "event" ? "evento" : "destino"];
@@ -350,6 +375,7 @@ export async function answerPlan(
     stops,
     mapHref: stops.length > 0 ? mapRoutePath(plan.stops.map((stop) => stop.key)) : null,
     needsLocation: plan.outcome === "needs_origin",
+    ...(intent !== "nearby" && plan.stops.length > 1 ? { summary: planSummary(plan.stops) } : {}),
   };
 
   const fixedReply = (text: string, withLinks: boolean): PlanAnswer => ({

@@ -3,9 +3,11 @@ import "server-only";
 import {
   askAssistant,
   dictationPrompt,
+  formatEventSchedule,
   passageVisibleWith,
   PORTAL_PATHS,
   type AssistantLink,
+  type AssistantReply,
   type DictationResult,
   type AssistantPage,
   type AssistantPageItem,
@@ -14,13 +16,20 @@ import {
 } from "@rikuy/core";
 
 import { aiTourContext, runAiWork, searchAiKnowledge, transcribeAudio } from "./ai-gateway";
+import type { AssistantPlaceCard } from "@/app/portal/[host]/assistant-cards";
+
 import {
+  categoriesByKey,
+  portalBadges,
   portalDestination,
   portalDestinations,
   portalEvent,
   portalEvents,
+  portalIndex,
+  portalPassport,
   portalPlanPlaces,
   portalTourIndex,
+  responsiveImage,
 } from "./portal-content";
 import { portalHas, type PortalView } from "./portal-view";
 
@@ -101,6 +110,90 @@ function withPortalSections(view: PortalView, result: AssistantResult): Assistan
         : {}),
     },
   };
+}
+
+/** A place's page in an answer: `/destinos/{slug}` or `/agenda/{slug}`, nothing deeper. */
+function placeOf(href: string): { kind: "destination" | "event"; slug: string } | null {
+  const match = /^\/(destinos|agenda)\/([a-z0-9-]+)$/u.exec(href);
+  if (!match?.[2]) return null;
+  return { kind: match[1] === "destinos" ? "destination" : "event", slug: match[2] };
+}
+
+/**
+ * The cards of the places an answer names (C3 · Paso 6, ADR-065): its cited destinations and
+ * events and its plan's stops, from what this portal publishes — never from the model. A place
+ * that is not published (an event that ended, a page of another kind) has no card: the answer
+ * shows its plain link. A failure leaves the cards out; the answer is unchanged.
+ */
+export async function assistantPlaceCards(
+  view: PortalView,
+  reply: AssistantReply,
+): Promise<AssistantPlaceCard[]> {
+  if (reply.status !== "answered") return [];
+  const wanted = new Map<string, { kind: "destination" | "event"; slug: string }>();
+  for (const href of [
+    ...reply.sources.map((source) => source.href),
+    ...(reply.plan?.stops.map((stop) => stop.href) ?? []),
+  ]) {
+    const place = href ? placeOf(href) : null;
+    if (href && place) wanted.set(href, place);
+  }
+  if (wanted.size === 0) return [];
+  try {
+    const tenantId = view.context.tenant.tenantId;
+    const [destinations, events, index, badges, circuits] = await Promise.all([
+      portalDestinations(view),
+      portalHas(view, "agenda") ? portalEvents(view) : Promise.resolve([]),
+      portalIndex(view),
+      portalBadges(view),
+      portalPassport(view),
+    ]);
+    const categories = categoriesByKey(index);
+    const stampIds = new Map(
+      circuits.flatMap((circuit) =>
+        circuit.stops.flatMap((stop) => (stop.id ? [[stop.slug, stop.id] as const] : [])),
+      ),
+    );
+    const image = (cover: Parameters<typeof responsiveImage>[1] | null) => {
+      if (!cover) return null;
+      const { src, srcSet, width, height } = responsiveImage(tenantId, cover);
+      return { src, srcSet, width, height };
+    };
+    const cards: AssistantPlaceCard[] = [];
+    for (const [href, place] of wanted) {
+      const key = `${place.kind}:${place.slug}`;
+      if (place.kind === "destination") {
+        const destination = destinations.find((item) => item.slug === place.slug);
+        if (!destination) continue;
+        cards.push({
+          href,
+          kind: "destination",
+          title: destination.title,
+          category: categories.get(key) ?? null,
+          date: null,
+          image: image(destination.cover),
+          tour: badges.tours.has(key),
+          stampPlaceId: stampIds.get(place.slug) ?? null,
+        });
+      } else {
+        const event = events.find((item) => item.slug === place.slug);
+        if (!event) continue;
+        cards.push({
+          href,
+          kind: "event",
+          title: event.title,
+          category: categories.get(key) ?? null,
+          date: formatEventSchedule(event.schedule),
+          image: image(event.cover),
+          tour: badges.tours.has(key),
+          stampPlaceId: null,
+        });
+      }
+    }
+    return cards;
+  } catch {
+    return [];
+  }
 }
 
 /**
