@@ -288,7 +288,7 @@ async function assertNoLeak(page, requests, position) {
   });
   await check("granted · the next page resumes without asking again", async () => {
     await page.goto(`${NORTE}/destinos/mirador-del-valle`);
-    const line = page.locator(".portal-location-visitor .portal-distance");
+    const line = page.locator(".portal-visit-distance .portal-distance");
     await line.waitFor({ timeout: 5000 });
     assert.match(
       await line.innerText(),

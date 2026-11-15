@@ -1,13 +1,5 @@
 /* The assistant's route on the map (ADR-039), only with `?ruta=`. */
 
-@media (min-width: 60rem) {
-  .portal-map-layout.portal-map-route {
-    grid-template-areas:
-      "visitor visitor"
-      "map list";
-  }
-}
-
 .portal-route-stops {
   list-style: none;
   margin: 0;

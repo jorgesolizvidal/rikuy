@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 3 — inicio por secciones, destinos y agenda ✅
-- **Rama:** `feat/c3-step3-home-sections` → PR hacia `main`
+- **Último paso completado:** C3 · Paso 4 — fichas de destino y evento, y mapa ✅
+- **Rama:** `feat/c3-step4-detail-pages` → PR hacia `main`
 
 ## Historial
 
@@ -2454,16 +2454,49 @@ Lo que encontró el CI del push, ya corregido:
 - La vista previa de «Marca del portal» no dibuja el inicio: el portal publicado es la referencia.
 - Stitch muestra duración de la visita y «Cómo llegar» en las listas: no existen como datos todavía y no se inventan.
 
+### C3 · Paso 4 — fichas de destino y evento, y mapa ✅
+
+- Decisiones del usuario ([ADR-063](../adr/ADR-063-detail-pages-map.md)), 2026-11-14:
+  - **portada y columna lateral**: la foto grande con el título encima y, al lado, la tarjeta «Para tu visita» (en el celular, justo después del resumen);
+  - la ficha suma **«Cerca de aquí»**, **«Eventos en este lugar»**, el **sello del pasaporte** y **fotos ampliadas**;
+  - en un evento, **el bloque de fecha y su estado**;
+  - **el mapa grande, con la lista al costado y filtro por categoría**.
+- Sin cambios en la base de datos: todo sale de lecturas que ya existían.
+- `@rikuy/core`:
+  - `nearestPlaces` (hasta 3 lugares a menos de 15 km, en línea recta desde el lugar de la ficha);
+  - `eventCountdown` y `describeCountdown` («Hoy a las 19:00», «Mañana», «En 5 días», «En curso», «Ya terminó»), con el reloj del municipio; en `@rikuy/core/geo`, para el navegador.
+- Portal:
+  - **ficha de destino y de evento**: portada a sangre con la categoría, el título y las etiquetas reales («Recorrido 360°», «Sello del pasaporte»), y en un evento el bloque de día y mes; sin foto, lo mismo en texto;
+  - **«Para tu visita»**: horario y «Abierto ahora», «Ver a qué distancia estoy», «Cómo llegar», el tour 360°, «Compartir» y, en una parada, «Sello del pasaporte» con sus circuitos; en un evento, «Cuándo» con su estado, la fecha y el lugar, y «Añadir al calendario». Un evento terminado conserva solo su tour;
+  - **«Eventos en este lugar»** en la ficha del destino;
+  - **«Cerca de aquí»**: calculado en el servidor desde el lugar (la página sigue en caché), sin repetir los eventos del lugar ni el lugar del evento, nunca un borrador ni otro municipio;
+  - **fotos ampliadas** en un diálogo nativo («Foto 1 de 3», «Anterior», «Siguiente», flechas, Escape y el foco de vuelta); sin JavaScript, cada foto sigue siendo un enlace a su archivo;
+  - **mapa**: en la PC, capas, categorías, ubicación y la lista a la izquierda (se desplaza en su columna) y el mapa a la derecha, siempre visible; en el celular, el mapa arriba y la lista debajo. Las categorías filtran el mapa y la lista; cada fila tiene la miniatura del lugar. La ruta del asistente usa la misma disposición; la página del mapa es más ancha (88 rem).
+  - Estilos de las fichas en `detail.css` (solo las fichas; absorbe `hours.css` y el mapa pequeño), fuera de la hoja común.
+- Tests:
+  - unitarios: core 715 (+6: lugares cercanos y el estado del evento, con la zona horaria del municipio);
+  - **e2e en un navegador real** (`detail.e2e.test.ts`, nuevo paso del grupo «Lighthouse · visitas», 4 casos): la ficha del mirador con su portada, «Para tu visita», «Ruta del valle», la feria en «Eventos en este lugar» y la plaza en «Cerca de aquí» (sin el borrador ni Demo Sur); la feria con el reloj del navegador fijado: «En 3 días» y «En curso»; el evento terminado sin estado ni calendario; el propietario sube dos fotos a la plaza y en el portal se abren grandes, se recorren con flechas y «Siguiente» y el foco vuelve; el mapa con la lista al costado (PC) y debajo (celular), filtrado por «Miradores»; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - portales 161, ubicación RC-06 35 (la distancia ahora está en la tarjeta), contratos RC-09/10/11/12 216, temas 4, inicio 4, módulos 4 y tours 10 en verde.
+- Lighthouse en el CI (móvil, CPU ×4, seed): fichas 98 (LCP 2,24–2,40 s), inicio, destinos y agenda 98–100, CLS 0 y JS 150–151 KB en todas; `/mapa` 68–70 (LCP 2,1 s, umbral 60).
+- Verificado en local, en el navegador (390 y 1280 px): la ficha del mirador con tres fotos, la feria, el mapa con categorías.
+
+**Desviaciones:**
+
+- La tarjeta «Para tu visita» no queda fija al desplazarse: con horario y circuitos puede ser más alta que la pantalla.
+- «Cerca de aquí» es en línea recta (la página lo dice) y solo cuenta destinos y eventos próximos.
+- El filtro de categorías del mapa no queda en la dirección (la página del mapa ya es dinámica y tiene sus propios parámetros).
+- Las fichas quedan con LCP 2,24–2,40 s en el CI (límite 2,5 s): el margen de antes, a cuidar en los próximos pasos.
+
 ## Cómo verificarlo
 
-- Tras el merge, en «Marca del portal» de Ucureña aparece **«Inicio del portal»**: elige la portada «Con foto» y el destino (por ejemplo, la plaza), agrega una cifra propia (por ejemplo «1953 · Firma del Decreto de Reforma Agraria»), ordena las secciones y publica. El inicio cambia en la siguiente visita.
-- En **«Categorías»** (página del municipio) crea las de destinos y eventos; en cada destino y evento elige su categoría y publica. En el portal, `/destinos` y `/agenda` muestran los filtros, y las tarjetas su categoría.
-- En el celular, las secciones están en la barra inferior; en la PC, en el encabezado.
-- Los destinos con tour dicen «Recorrido 360°» y las paradas de un circuito «Sello del pasaporte».
+- Tras el merge, abre en el celular y en la PC una ficha de Ucureña (por ejemplo, la iglesia): la foto grande con el título encima, la tarjeta «Para tu visita» (horario si lo tiene, «Cómo llegar», el tour 360° y el sello de «Corazón de Ucureña»), «Cerca de aquí» con los otros lugares y sus distancias.
+- Toca una foto de la galería: se abre grande, con «Siguiente» y «Anterior»; Escape o «Cerrar» vuelven a la ficha.
+- La ficha del carnaval o de la feria: el bloque de fecha y «En N días», «Mañana», «Hoy» o «En curso».
+- `/mapa`: en la PC la lista a la izquierda y el mapa a la derecha; en el celular el mapa arriba. Con las categorías publicadas, toca una y el mapa y la lista muestran solo esos lugares.
 
 ## Siguiente paso
 
-**C3 · Paso 4 — fichas de destino y evento, y mapa** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): las fichas con el diseño de Stitch (sin datos inventados) y el mapa. Antes de empezar, confirmar con el usuario qué lleva cada ficha y cómo se ve el mapa.
+**C3 · Paso 5 — tour, recorrido general, pasaporte, sello y canje** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): esas páginas con el sistema de diseño (sin los elementos que Stitch inventó en el pasaporte: folio, rango, paradas en orden, «Sellar en 360°»). Antes de empezar, confirmar con el usuario qué cambia en cada una.
 
 ## Decisiones pendientes del usuario
 

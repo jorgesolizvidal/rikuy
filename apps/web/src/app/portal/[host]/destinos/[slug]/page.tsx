@@ -3,9 +3,7 @@ import {
   PORTAL_PATHS,
   destinationJsonLd,
   directionsUrl,
-  formatCoordinates,
   openingHoursLines,
-  openStreetMapUrl,
   serializeJsonLd,
   tourPath,
 } from "@rikuy/core";
@@ -19,15 +17,18 @@ import {
   portalOpeningHours,
   portalOrigin,
   portalHasTour,
+  portalPlaceExtras,
   responsiveImage,
 } from "@/server/portal-content";
 import { portalHas, portalView } from "@/server/portal-view";
 
-import { MiniMap } from "../../mini-map";
+import "../../detail.css";
+import { DetailHero } from "../../detail-hero";
 import { OpenNow } from "../../open-now";
-import { PortalImage } from "../../portal-image";
+import { PhotoGallery } from "../../photo-gallery";
+import { EventsHere, NearbyPlaces, PlaceLocation, VisitorDistance } from "../../place-sections";
 import { ShareButton } from "../../share-button";
-import { DistanceText, LocationButton, NearbyNotice } from "../../visitor-location";
+import { NearbyNotice } from "../../visitor-location";
 
 interface DestinationPageProps {
   readonly params: Promise<{ host: string; slug: string }>;
@@ -78,18 +79,20 @@ export function generateStaticParams(): { slug: string }[] {
   return [];
 }
 
-const COVER_SIZES = "(min-width: 72rem) 72rem, 100vw";
-const GALLERY_SIZES = "(min-width: 72rem) 23rem, (min-width: 40rem) 45vw, 100vw";
-
 export default async function DestinationPage({ params }: DestinationPageProps) {
   const loaded = await load(params);
   if (loaded === null) return movedOrNotFound(params, "destination", PORTAL_PATHS.destination);
   const { view, destination } = loaded;
-  const [targets, tour, allHours] = await Promise.all([
+  const [targets, tour, allHours, extras] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "destination", destination.slug),
-    // Without the hours the page still shows: they are one more section.
+    // Without the hours the page still shows: they are one more part of the visit card.
     portalOpeningHours(view).catch(() => new Map()),
+    portalPlaceExtras(view, {
+      kind: "destination",
+      slug: destination.slug,
+      location: destination.location,
+    }),
   ]);
   const hours = allHours.get(destination.slug) ?? null;
   const withMap = portalHas(view, "map");
@@ -110,7 +113,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   );
 
   return (
-    <article className="portal-page portal-destination">
+    <article className="portal-page portal-detail">
       <script
         type="application/ld+json"
         // JSON built by us from validated data; `<` is escaped so it cannot end the tag.
@@ -128,124 +131,107 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
         </ol>
       </nav>
 
-      <header className="portal-destination-header">
-        <h1 className="portal-page-title">{destination.title}</h1>
-        {destination.summary ? <p className="portal-lead">{destination.summary}</p> : null}
-      </header>
+      <DetailHero
+        title={destination.title}
+        category={extras.category}
+        cover={cover}
+        tour={tour}
+        stamp={extras.circuits.length > 0}
+      />
 
-      {cover ? (
-        <PortalImage className="portal-cover" image={cover} sizes={COVER_SIZES} priority />
-      ) : null}
-
-      <div className="portal-actions">
-        {tour ? (
-          <a
-            className="portal-button portal-tour-link"
-            href={tourPath("destination", destination.slug)}
-          >
-            Ver el tour 360°
-          </a>
+      <div className="portal-detail-grid">
+        {destination.summary ? (
+          <p className="portal-lead portal-detail-lead">{destination.summary}</p>
         ) : null}
-        {destination.location ? (
-          <a
-            className="portal-button portal-button-primary"
-            data-visit="directions"
-            href={directionsUrl(destination.location)}
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Cómo llegar<span className="visually-hidden"> (abre la app de mapas)</span>
-          </a>
-        ) : null}
-        <ShareButton title={destination.title} url={url} />
-      </div>
 
-      {destination.body.length > 0 ? (
-        <div className="portal-prose">
-          <RichTextView blocks={destination.body} />
-        </div>
-      ) : null}
+        <aside className="portal-visit" aria-labelledby="para-tu-visita">
+          <h2 id="para-tu-visita">Para tu visita</h2>
+          {hours ? (
+            <section aria-labelledby="horario" className="portal-hours">
+              <h3 id="horario">Horario</h3>
+              <OpenNow hours={hours} timezone={view.context.tenant.timezone} />
+              <dl className="portal-hours-week">
+                {openingHoursLines(hours).map((line) => (
+                  <div key={line.days}>
+                    <dt>{line.days}</dt>
+                    <dd>{line.times}</dd>
+                  </div>
+                ))}
+              </dl>
+              {hours.note ? <p className="portal-hours-note">{hours.note}</p> : null}
+            </section>
+          ) : null}
+          {destination.location ? <VisitorDistance location={destination.location} /> : null}
+          <div className="portal-actions">
+            {destination.location ? (
+              <a
+                className="portal-button portal-button-primary"
+                data-visit="directions"
+                href={directionsUrl(destination.location)}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Cómo llegar<span className="visually-hidden"> (abre la app de mapas)</span>
+              </a>
+            ) : null}
+            {tour ? (
+              <a
+                className="portal-button portal-tour-link"
+                href={tourPath("destination", destination.slug)}
+              >
+                Ver el tour 360°
+              </a>
+            ) : null}
+            <ShareButton title={destination.title} url={url} />
+          </div>
+          {extras.circuits.length > 0 ? (
+            <section aria-labelledby="sello" className="portal-visit-stamp">
+              <h3 id="sello">Sello del pasaporte</h3>
+              <p>
+                Este lugar es parada de{" "}
+                {extras.circuits.map((circuit, index) => (
+                  <span key={circuit.slug}>
+                    {index > 0 ? (index === extras.circuits.length - 1 ? " y " : ", ") : null}
+                    <a href={PORTAL_PATHS.passportCircuit(circuit.slug)}>{circuit.name}</a>
+                  </span>
+                ))}
+                . Sella tu pasaporte con el código QR que está en el lugar.
+              </p>
+            </section>
+          ) : null}
+        </aside>
 
-      {destination.gallery.length > 0 ? (
-        <section aria-labelledby="galeria" className="portal-gallery">
-          <h2 id="galeria">Fotos</h2>
-          <ul>
-            {destination.gallery.map((image, index) => {
-              const photo = responsiveImage(tenantId, image);
-              return (
-                <li key={`${image.assetId}-${index}`}>
-                  <a href={photo.largest.url} className="portal-gallery-link">
-                    <PortalImage image={photo} sizes={GALLERY_SIZES} />
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      ) : null}
+        <div className="portal-detail-main">
+          {destination.body.length > 0 ? (
+            <div className="portal-prose">
+              <RichTextView blocks={destination.body} />
+            </div>
+          ) : null}
 
-      {hours ? (
-        <section aria-labelledby="horario" className="portal-hours">
-          <h2 id="horario">Horario</h2>
-          <OpenNow hours={hours} timezone={view.context.tenant.timezone} />
-          <dl className="portal-hours-week">
-            {openingHoursLines(hours).map((line) => (
-              <div key={line.days}>
-                <dt>{line.days}</dt>
-                <dd>{line.times}</dd>
-              </div>
-            ))}
-          </dl>
-          {hours.note ? <p className="portal-hours-note">{hours.note}</p> : null}
-        </section>
-      ) : null}
-
-      {destination.location ? (
-        <section aria-labelledby="ubicacion" className="portal-location">
-          <h2 id="ubicacion">Ubicación</h2>
-          {withMap ? (
-            <MiniMap
-              point={{
-                key: "here",
-                kind: "destination",
-                title: destination.title,
-                href: "",
-                detail: "",
-                lat: destination.location.lat,
-                lng: destination.location.lng,
-              }}
+          {destination.gallery.length > 0 ? (
+            <PhotoGallery
+              photos={destination.gallery.map((image) => responsiveImage(tenantId, image))}
             />
           ) : null}
-          <div className="portal-location-visitor">
-            <DistanceText point={destination.location} />
-            <LocationButton label="Ver a qué distancia estoy" />
-          </div>
-          <p>
-            {formatCoordinates(destination.location)} ·{" "}
-            {withMap ? (
-              <>
-                <a
-                  href={`${PORTAL_PATHS.map}?lat=${destination.location.lat}&lng=${destination.location.lng}`}
-                >
-                  Ver en el mapa del municipio
-                </a>{" "}
-                ·{" "}
-              </>
-            ) : null}
-            <a
-              href={openStreetMapUrl(destination.location)}
-              target="_blank"
-              rel="noopener noreferrer"
-            >
-              OpenStreetMap
-            </a>
-          </p>
-        </section>
-      ) : null}
 
-      <footer className="portal-destination-meta">
-        <p>Actualizado el {updated}.</p>
-      </footer>
+          <EventsHere events={extras.eventsHere} />
+
+          {destination.location ? (
+            <PlaceLocation
+              kind="destination"
+              title={destination.title}
+              location={destination.location}
+              withMap={withMap}
+            />
+          ) : null}
+
+          <footer className="portal-destination-meta">
+            <p>Actualizado el {updated}.</p>
+          </footer>
+        </div>
+      </div>
+
+      <NearbyPlaces tenantId={tenantId} title={destination.title} places={extras.nearby} />
       <NearbyNotice targets={targets} radius={nearbyRadiusOf(view.resolved.presentation)} />
     </article>
   );

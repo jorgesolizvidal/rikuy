@@ -1,7 +1,5 @@
 "use client";
 
-import "./hours.css";
-
 import { describeOpenState, localClock, openStateAt, type OpeningHours } from "@rikuy/core/geo";
 import { useSyncExternalStore } from "react";
 
