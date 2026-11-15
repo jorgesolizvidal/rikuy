@@ -5,8 +5,11 @@
  * zod contracts, which cannot be tree-shaken and would add ~35 KB to every portal page.
  */
 export * from "./domain/geo/bounds";
+export * from "./domain/geo/nearby";
 export * from "./domain/geo/proximity";
 // Opening hours and the local clock (ADR-039): «Abierto ahora» is computed in the browser.
 export * from "./domain/plan/clock";
 export * from "./domain/plan/hours";
+// How far an event is (C3 · Paso 4): «Hoy», «En curso»… with the municipality's clock.
+export * from "./domain/events/countdown";
 export type { GeoPoint } from "./contracts/destination";

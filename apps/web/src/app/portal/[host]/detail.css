@@ -1,0 +1,543 @@
+/* A destination's or an event's page (C3 · Paso 4, ADR-063): the cover with the title over it,
+   the text with a «Para tu visita» card beside it (after the summary on a phone), the photos
+   opened large on the same page, «Ubicación» and «Cerca de aquí». Only these pages load this
+   sheet; colors come from the palette. */
+
+/* ── Cover ──────────────────────────────────────────────────────────────── */
+
+.portal-detail-hero {
+  position: relative;
+  display: grid;
+  align-items: end;
+}
+
+/* With a photo: the title over it, white on a dark gradient that is legible on any image. */
+.portal-detail-hero[data-photo] {
+  isolation: isolate;
+  min-height: clamp(17rem, 52vh, 34rem);
+  border-radius: var(--radius-media);
+  overflow: hidden;
+  background: var(--surface);
+  color: #ffffff;
+}
+
+.portal-detail-cover {
+  position: absolute;
+  inset: 0;
+  z-index: -2;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portal-detail-hero[data-photo]::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(
+    to top,
+    rgb(6 8 7 / 86%) 0%,
+    rgb(6 8 7 / 52%) 38%,
+    rgb(6 8 7 / 0%) 72%
+  );
+}
+
+.portal-detail-heading {
+  display: flex;
+  align-items: flex-end;
+  gap: 1rem 1.25rem;
+  min-width: 0;
+}
+
+.portal-detail-heading > div {
+  min-width: 0;
+}
+
+.portal-detail-hero[data-photo] .portal-detail-heading {
+  padding: clamp(1.25rem, 4vw, 2.5rem);
+  padding-top: 4rem;
+}
+
+.portal-detail-hero[data-photo] .portal-kicker {
+  color: #ffffff;
+}
+
+.portal-detail-hero[data-photo] .portal-page-title {
+  color: #ffffff;
+  text-shadow: 0 2px 18px rgb(0 0 0 / 40%);
+}
+
+/* Without a photo the badges sit above the title instead of on the image. */
+.portal-detail-hero:not([data-photo]) .portal-card-flags {
+  position: static;
+  margin-bottom: 1rem;
+}
+
+.portal-detail-hero[data-photo] .portal-card-flags {
+  top: clamp(1rem, 3vw, 1.5rem);
+  left: clamp(1rem, 3vw, 1.5rem);
+}
+
+/* An event's date block, larger than in the lists. */
+.portal-detail-hero .portal-event-date {
+  width: 4.5rem;
+  padding: 0.75rem 0;
+}
+
+.portal-detail-hero .portal-event-day {
+  font-size: 2rem;
+}
+
+.portal-detail > .portal-ended {
+  margin-top: 1.25rem;
+}
+
+/* ── Text and the visit card ────────────────────────────────────────────── */
+
+.portal-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-areas:
+    "lead"
+    "visit"
+    "main";
+  gap: 1.75rem;
+  margin-top: 2rem;
+}
+
+.portal-detail-lead {
+  grid-area: lead;
+  margin: 0;
+  max-width: 60ch;
+}
+
+.portal-visit {
+  grid-area: visit;
+}
+
+.portal-detail-main {
+  grid-area: main;
+  min-width: 0;
+}
+
+.portal-detail-main > .portal-prose:first-child {
+  margin-top: 0;
+}
+
+@media (min-width: 60rem) {
+  .portal-detail-grid {
+    grid-template-columns: minmax(0, 1fr) 21rem;
+    grid-template-rows: auto 1fr;
+    grid-template-areas:
+      "lead visit"
+      "main visit";
+    gap: 2rem 3rem;
+  }
+
+  .portal-visit {
+    align-self: start;
+  }
+}
+
+.portal-visit {
+  display: grid;
+  gap: 1.25rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.portal-visit h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: var(--title-weight);
+}
+
+.portal-visit h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.8125rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.portal-visit > * + * {
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+}
+
+.portal-visit > h2 + * {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.portal-visit p {
+  margin: 0;
+}
+
+.portal-visit .portal-actions {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.portal-visit .portal-actions .portal-button {
+  width: 100%;
+}
+
+.portal-visit-venue,
+.portal-visit-note {
+  margin-top: 0.375rem;
+}
+
+.portal-visit-note {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.portal-event-headline {
+  font-weight: 600;
+}
+
+/* «Hoy a las 19:00», «En 5 días», «En curso»: its line keeps its space before it is known. */
+.portal-event-status {
+  min-height: 1.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.portal-event-status-pill {
+  display: inline-block;
+  padding: 0.125rem 0.625rem;
+  border-radius: 999px;
+  background: var(--brand);
+  color: var(--on-brand);
+  font-size: 0.875rem;
+  font-weight: 700;
+}
+
+.portal-event-status[data-state="ended"] .portal-event-status-pill {
+  background: var(--fg);
+  color: var(--bg);
+}
+
+.portal-visit-distance {
+  display: grid;
+  gap: 0.5rem;
+}
+
+.portal-visit-distance .portal-distance {
+  margin: 0;
+  color: var(--fg);
+  font-size: 1rem;
+}
+
+.portal-visit-stamp a {
+  font-weight: 600;
+}
+
+/* ── Opening hours (ADR-039) ────────────────────────────────────────────── */
+
+.portal-open-now {
+  min-height: 1.5em;
+  margin: 0 0 0.5rem;
+  font-weight: 600;
+}
+
+.portal-open-now[data-open="true"] {
+  color: var(--brand);
+}
+
+.portal-hours-week {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0;
+  font-size: 0.9375rem;
+}
+
+.portal-hours-week div {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.9fr) minmax(0, 1fr);
+  gap: 0 0.75rem;
+}
+
+.portal-hours-week dt {
+  font-weight: 600;
+}
+
+.portal-hours-week dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.portal-hours-note {
+  margin-top: 0.5rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* ── Sections of the text column ────────────────────────────────────────── */
+
+.portal-gallery,
+.portal-detail-section,
+.portal-location {
+  margin-top: 3rem;
+}
+
+.portal-gallery h2,
+.portal-detail-section h2,
+.portal-location h2,
+.portal-close h2 {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  font-weight: var(--title-weight);
+}
+
+.portal-gallery ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(45%, 13rem), 1fr));
+  gap: 0.75rem;
+}
+
+.portal-gallery-link {
+  display: block;
+  border-radius: var(--radius-media);
+  overflow: hidden;
+  aspect-ratio: 4 / 3;
+  background: var(--surface);
+}
+
+.portal-gallery-link img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .portal-gallery-link img {
+    transition: transform 0.25s ease;
+  }
+
+  .portal-gallery-link:hover img {
+    transform: scale(1.03);
+  }
+}
+
+.portal-detail-more {
+  margin: 1rem 0 0;
+}
+
+.portal-location p {
+  margin: 0.75rem 0 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-destination-meta {
+  margin-top: 3rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-destination-meta p {
+  margin: 0;
+}
+
+/* ── The small map (ADR-023): its space is reserved from the start ─────── */
+
+.portal-mini-map {
+  position: relative;
+  border-radius: var(--radius-media);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+/* A fixed height (not aspect-ratio + min-height, which widened the box past narrow screens). */
+.portal-mini-map {
+  width: 100%;
+  max-width: 48rem;
+  height: clamp(12rem, 44vw, 21rem);
+}
+
+.portal-mini-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.portal-mini-map-start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  border: 0;
+  background:
+    repeating-linear-gradient(
+      35deg,
+      transparent 0 22px,
+      color-mix(in srgb, var(--muted) 12%, transparent) 22px 23px
+    ),
+    var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.portal-mini-map-start .map-marker {
+  position: relative;
+  pointer-events: none;
+}
+
+/* ── «Cerca de aquí» ────────────────────────────────────────────────────── */
+
+.portal-close {
+  margin-top: 4rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--line);
+}
+
+.portal-close-note {
+  margin: -0.5rem 0 1.25rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-close ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+}
+
+.portal-close a {
+  display: grid;
+  grid-template-columns: 6.5rem minmax(0, 1fr);
+  gap: 1rem;
+  align-items: center;
+  height: 100%;
+  padding: 0.625rem;
+  box-sizing: border-box;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.portal-close a:hover .portal-close-title {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.portal-close-media {
+  aspect-ratio: 1;
+  border-radius: calc(var(--radius-card) * 0.6);
+  overflow: hidden;
+  background:
+    repeating-linear-gradient(
+      35deg,
+      transparent 0 14px,
+      color-mix(in srgb, var(--muted) 14%, transparent) 14px 15px
+    ),
+    var(--bg);
+}
+
+.portal-close-media img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.portal-close-text {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+}
+
+.portal-close-title {
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.portal-close-detail,
+.portal-close-distance {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.portal-close-distance {
+  color: var(--fg);
+  font-weight: 600;
+}
+
+/* ── A photo opened large (native modal dialog) ─────────────────────────── */
+
+.portal-lightbox {
+  width: min(100vw, 72rem);
+  max-width: 100vw;
+  max-height: 100dvh;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #ffffff;
+}
+
+.portal-lightbox::backdrop {
+  background: rgb(6 8 7 / 92%);
+}
+
+.portal-lightbox-body {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.75rem var(--gutter, 1rem);
+  box-sizing: border-box;
+}
+
+.portal-lightbox-bar,
+.portal-lightbox-nav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.portal-lightbox-count {
+  margin: 0;
+  font-weight: 700;
+}
+
+.portal-lightbox-figure {
+  display: grid;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.portal-lightbox-figure img {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: calc(100dvh - 11rem);
+  object-fit: contain;
+}
+
+.portal-lightbox-figure figcaption {
+  font-size: 0.9375rem;
+  color: rgb(255 255 255 / 86%);
+}

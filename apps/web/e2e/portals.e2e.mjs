@@ -295,7 +295,7 @@ if (withLogo) {
   const slug = /href="\/destinos\/(integracion-\d+)"/.exec(list)?.[1];
   check(() => assert.ok(slug, "the integration destination is listed"));
   const html = (await get("demo-norte.localhost", `/destinos/${slug}`)).body.toString();
-  const cover = /<img[^>]*class="portal-cover"[^>]*>/.exec(html)?.[0] ?? "";
+  const cover = /<img[^>]*class="portal-detail-cover"[^>]*>/.exec(html)?.[0] ?? "";
   check(() => assert.match(cover, /fetchPriority="high"|fetchpriority="high"/));
   check(() => assert.match(cover, /width="\d+" height="\d+"/));
   const src = /src="([^"]+)"/.exec(cover)?.[1];

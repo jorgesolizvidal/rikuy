@@ -1,14 +1,20 @@
 import "server-only";
 
 import {
+  categoryBySlug,
   formatEventSchedule,
   imageCandidates,
   loadAssistantPlaces,
+  nearestPlaces,
   mapPlacePath,
   PORTAL_PATHS,
   portalMediaPath,
   tourPath,
+  type GeoPoint,
+  type PortalCircuit,
+  type PortalIndexEntry,
   type PortalMapPlace,
+  type PublishedEventSummary,
   type PublishedImage,
 } from "@rikuy/core";
 import { notFound, permanentRedirect, redirect } from "next/navigation";
@@ -133,17 +139,49 @@ export interface MapPointDto {
   readonly lng: number;
   /** Its number in a route of the assistant (`/mapa?ruta=…`, ADR-039). */
   readonly order?: number;
+  /** The municipality's category (ADR-062), for the map's filter (C3 · Paso 4). */
+  readonly category?: string | null;
+  /** The smallest derivative of its cover, for the list (decorative: the title is beside it). */
+  readonly thumb?: string | null;
 }
 
-export function toMapPoint(place: PortalMapPlace): MapPointDto {
+/** The categories of what is published, by `kind:slug` (for the map's points). */
+export function categoriesByKey(index: readonly PortalIndexEntry[]): ReadonlyMap<string, string> {
+  return new Map(
+    (["destination", "event"] as const).flatMap((kind) =>
+      [...categoryBySlug(index, kind)].map(([slug, category]) => [
+        `${kind}:${slug}`,
+        category.name,
+      ]),
+    ),
+  );
+}
+
+/** The smallest derivative of a photo, from the portal's own address (ADR-050). */
+export function thumbnailOf(tenantId: string, image: PublishedImage | null): string | null {
+  const smallest = image ? imageCandidates(tenantId, image)[0] : undefined;
+  return smallest ? portalMediaPath(smallest.path) : null;
+}
+
+export function toMapPoint(
+  place: PortalMapPlace,
+  extras?: { readonly tenantId: string; readonly categories: ReadonlyMap<string, string> },
+): MapPointDto {
+  const key = `${place.kind}:${place.slug}`;
   return {
-    key: `${place.kind}:${place.slug}`,
+    key,
     kind: place.kind,
     title: place.title,
     href: mapPlacePath(place),
     detail: place.schedule ? formatEventSchedule(place.schedule) : place.summary,
     lat: place.location.lat,
     lng: place.location.lng,
+    ...(extras
+      ? {
+          category: extras.categories.get(key) ?? null,
+          thumb: thumbnailOf(extras.tenantId, place.cover),
+        }
+      : {}),
   };
 }
 
@@ -303,4 +341,104 @@ export async function tourMovedOrNotFound(
     );
   }
   notFound();
+}
+
+/** A place in «Cerca de aquí» (ADR-063): straight-line meters from the page's place. */
+export interface NearbyPlaceDto {
+  readonly key: string;
+  readonly kind: "destination" | "event";
+  readonly title: string;
+  readonly href: string;
+  /** The event's date, or the destination's category. */
+  readonly detail: string | null;
+  readonly meters: number;
+  readonly cover: PublishedImage | null;
+}
+
+/** What a destination's or an event's page shows besides the place itself (ADR-063). */
+export interface PlaceExtras {
+  /** Its category (ADR-062), for the cover. */
+  readonly category: string | null;
+  /** The published circuits it is a stop of (destinations only): its stamp. */
+  readonly circuits: readonly Pick<PortalCircuit, "slug" | "name">[];
+  /** Upcoming events at this destination (none for an event). */
+  readonly eventsHere: readonly PublishedEventSummary[];
+  readonly nearby: readonly NearbyPlaceDto[];
+}
+
+/**
+ * From reads the page already shares with the layout (destinations, events, index, passport):
+ * no extra query per page. Any failure leaves a section out; the page still renders.
+ */
+export async function portalPlaceExtras(
+  view: PortalView,
+  here: {
+    readonly kind: "destination" | "event";
+    readonly slug: string;
+    readonly location: GeoPoint | null;
+    /** An event's venue: already linked on its page, so not «cerca» again. */
+    readonly venue?: string | null;
+  },
+): Promise<PlaceExtras> {
+  const [destinations, events, index, circuits] = await Promise.all([
+    portalDestinations(view).catch(() => []),
+    portalEvents(view).catch(() => []),
+    portalIndex(view),
+    here.kind === "destination" ? portalPassport(view) : Promise.resolve([]),
+  ]);
+  const categories = categoriesByKey(index);
+  const eventsHere =
+    here.kind === "destination" ? events.filter((event) => event.venue?.slug === here.slug) : [];
+  const candidates: {
+    readonly place: Omit<NearbyPlaceDto, "meters">;
+    readonly at: GeoPoint | null;
+  }[] = [
+    ...destinations
+      .filter(
+        (destination) =>
+          !(here.kind === "destination" && destination.slug === here.slug) &&
+          destination.slug !== here.venue,
+      )
+      .map((destination) => ({
+        place: {
+          key: `destination:${destination.slug}`,
+          kind: "destination" as const,
+          title: destination.title,
+          href: PORTAL_PATHS.destination(destination.slug),
+          detail: categories.get(`destination:${destination.slug}`) ?? null,
+          cover: destination.cover,
+        },
+        at: destination.location,
+      })),
+    ...events
+      .filter(
+        (event) =>
+          !(here.kind === "event" && event.slug === here.slug) &&
+          !(here.kind === "destination" && event.venue?.slug === here.slug),
+      )
+      .map((event) => ({
+        place: {
+          key: `event:${event.slug}`,
+          kind: "event" as const,
+          title: event.title,
+          href: PORTAL_PATHS.event(event.slug),
+          detail: formatEventSchedule(event.schedule),
+          cover: event.cover,
+        },
+        at: event.location,
+      })),
+  ];
+  const nearby = here.location
+    ? nearestPlaces(here.location, candidates, (candidate) => candidate.at).map(
+        ({ place: candidate, meters }) => ({ ...candidate.place, meters }),
+      )
+    : [];
+  return {
+    category: categories.get(`${here.kind}:${here.slug}`) ?? null,
+    circuits: circuits
+      .filter((circuit) => circuit.stops.some((stop) => stop.slug === here.slug))
+      .map(({ slug, name }) => ({ slug, name })),
+    eventsHere,
+    nearby,
+  };
 }

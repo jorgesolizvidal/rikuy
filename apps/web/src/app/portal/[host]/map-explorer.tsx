@@ -33,8 +33,8 @@ const LAYERS: readonly { kind: Kind; label: string }[] = [
 ];
 
 /**
- * The /mapa experience: layers, the map (loaded on demand) and the same places as an
- * ordinary list of links, which is what keyboards, screen readers and phones without
+ * The /mapa experience: layers, the municipality's categories (C3 · Paso 4, ADR-063), the map
+ * (loaded on demand) and the same places as an ordinary list of links, which is what keyboards, screen readers and phones without
  * WebGL use. Views inside the municipality's area are filtered here from the places the
  * page already has; only views beyond it ask the server (and never a view that followed
  * the visitor's position, which would reveal where they are).
@@ -55,6 +55,8 @@ export function MapExplorer({
 }) {
   const [points, setPoints] = useState(initialPoints);
   const [layers, setLayers] = useState<Record<Kind, boolean>>({ destination: true, event: true });
+  // The municipality's category (ADR-062) to show alone; null shows every place.
+  const [category, setCategory] = useState<string | null>(null);
   const [area, setArea] = useState<BoundingBox>(initialArea);
   // A place's own center (from its page) until the visitor asks to see everything.
   const [focus, setFocus] = useState(center);
@@ -132,10 +134,19 @@ export function MapExplorer({
     }, 350);
   }
 
+  const categories = useMemo(() => {
+    const names = new Set<string>();
+    for (const point of [...initialPoints, ...points]) {
+      if (point.category) names.add(point.category);
+    }
+    return [...names].sort((a, b) => a.localeCompare(b, "es"));
+  }, [initialPoints, points]);
   const visible = useMemo(() => {
-    const shown = points.filter((point) => layers[point.kind]);
+    const shown = points.filter(
+      (point) => layers[point.kind] && (category === null || point.category === category),
+    );
     return fix ? sortByDistance(shown, fix, (point) => point) : shown;
-  }, [points, layers, fix]);
+  }, [points, layers, category, fix]);
   const targets = useMemo(
     () =>
       initialPoints
@@ -153,60 +164,78 @@ export function MapExplorer({
 
   return (
     <div className="portal-map-layout">
-      <fieldset className="portal-map-layers">
-        <legend>Mostrar</legend>
-        {LAYERS.map((layer) => (
-          <label key={layer.kind} className="portal-map-layer" data-kind={layer.kind}>
-            <input
-              type="checkbox"
-              checked={layers[layer.kind]}
-              onChange={(event) =>
-                setLayers((current) => ({ ...current, [layer.kind]: event.target.checked }))
-              }
-            />
-            <span className="portal-map-swatch" aria-hidden="true" />
-            {layer.label} ({counts[layer.kind]})
-          </label>
-        ))}
-        <button
-          type="button"
-          className="portal-button"
-          onClick={() => {
-            setFollow(false);
-            setFocus(undefined);
-            setArea({ ...initialArea });
-          }}
-          disabled={failed}
-        >
-          Ver todos
-        </button>
-      </fieldset>
+      <div className="portal-map-controls">
+        <fieldset className="portal-map-layers">
+          <legend>Mostrar</legend>
+          {LAYERS.map((layer) => (
+            <label key={layer.kind} className="portal-map-layer" data-kind={layer.kind}>
+              <input
+                type="checkbox"
+                checked={layers[layer.kind]}
+                onChange={(event) =>
+                  setLayers((current) => ({ ...current, [layer.kind]: event.target.checked }))
+                }
+              />
+              <span className="portal-map-swatch" aria-hidden="true" />
+              {layer.label} ({counts[layer.kind]})
+            </label>
+          ))}
+        </fieldset>
 
-      <div className="portal-map-visitor">
-        <LocationButton />
-        {fix ? (
+        {categories.length > 0 ? (
+          <div className="portal-map-categories" role="group" aria-label="Categoría">
+            {[null, ...categories].map((name) => (
+              <button
+                key={name ?? ""}
+                type="button"
+                className="portal-map-chip"
+                aria-pressed={category === name}
+                onClick={() => setCategory(name)}
+              >
+                {name ?? "Todas"}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="portal-map-visitor">
+          <LocationButton />
+          {fix ? (
+            <button
+              type="button"
+              className="portal-button"
+              aria-pressed={follow}
+              onClick={() => setFollow((current) => !current)}
+              disabled={failed}
+            >
+              {follow ? "Siguiéndote" : "Seguirme"}
+            </button>
+          ) : null}
           <button
             type="button"
             className="portal-button"
-            aria-pressed={follow}
-            onClick={() => setFollow((current) => !current)}
+            onClick={() => {
+              setFollow(false);
+              setFocus(undefined);
+              setArea({ ...initialArea });
+            }}
             disabled={failed}
           >
-            {follow ? "Siguiéndote" : "Seguirme"}
+            Ver todos
           </button>
-        ) : null}
-        {fix && placedVisitor === "far" ? (
-          <p className="portal-map-far">
-            Estás{" "}
-            {describeProximity(distanceMeters(fix, centerOf(initialArea)))
-              .distance.replace(/^A /u, "a ")
-              .replace(" en línea recta", "")}{" "}
-            de esta zona; el mapa muestra dónde estás tú y dónde están los lugares. Las distancias
-            de la lista son en línea recta desde donde estás.
-          </p>
-        ) : null}
+          {fix && placedVisitor === "far" ? (
+            <p className="portal-map-far">
+              Estás{" "}
+              {describeProximity(distanceMeters(fix, centerOf(initialArea)))
+                .distance.replace(/^A /u, "a ")
+                .replace(" en línea recta", "")}{" "}
+              de esta zona; el mapa muestra dónde estás tú y dónde están los lugares. Las distancias
+              de la lista son en línea recta desde donde estás.
+            </p>
+          ) : null}
+        </div>
+        <NearbyNotice targets={targets} radius={nearbyRadius} />
       </div>
-      <NearbyNotice targets={targets} radius={nearbyRadius} />
 
       <div className="portal-map-frame" ref={frame}>
         {failed ? (
@@ -233,7 +262,9 @@ export function MapExplorer({
           {loading
             ? "Buscando lugares…"
             : visible.length === 0
-              ? "No hay lugares en esta zona. Aleja el mapa o activa otra capa."
+              ? category === null
+                ? "No hay lugares en esta zona. Aleja el mapa o activa otra capa."
+                : `No hay lugares de «${category}» en esta zona. Aleja el mapa o elige «Todas».`
               : `${visible.length} ${visible.length === 1 ? "lugar" : "lugares"}${
                   fix ? ", del más cercano al más lejano" : ""
                 }`}
@@ -242,16 +273,25 @@ export function MapExplorer({
           {visible.map((point) => (
             <li key={point.key} data-kind={point.kind}>
               <a href={point.href}>
-                <span className="portal-map-kind">
-                  {point.kind === "event" ? "Evento" : "Destino"}
+                <span className="portal-map-thumb" aria-hidden="true">
+                  {point.thumb ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={point.thumb} alt="" width={64} height={64} loading="lazy" />
+                  ) : null}
                 </span>
-                <span className="portal-map-title">{point.title}</span>
-                {point.detail ? <span className="portal-map-detail">{point.detail}</span> : null}
-                {fix ? (
-                  <span className="portal-distance">
-                    {describeProximity(distanceMeters(fix, point)).distance}
+                <span className="portal-map-text">
+                  <span className="portal-map-kind">
+                    {point.kind === "event" ? "Evento" : "Destino"}
+                    {point.category ? ` · ${point.category}` : ""}
                   </span>
-                ) : null}
+                  <span className="portal-map-title">{point.title}</span>
+                  {point.detail ? <span className="portal-map-detail">{point.detail}</span> : null}
+                  {fix ? (
+                    <span className="portal-distance">
+                      {describeProximity(distanceMeters(fix, point)).distance}
+                    </span>
+                  ) : null}
+                </span>
               </a>
             </li>
           ))}

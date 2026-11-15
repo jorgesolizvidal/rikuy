@@ -1,7 +1,7 @@
 import { parseBoundingBox } from "@rikuy/core";
 
 import { publishedMapReader } from "@/server/platform";
-import { toMapPoint } from "@/server/portal-content";
+import { categoriesByKey, portalIndex, toMapPoint } from "@/server/portal-content";
 import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
 
@@ -19,12 +19,14 @@ async function handle(request: Request, { params }: PlacesContext) {
   const area = parseBoundingBox(new URL(request.url).searchParams.get("area"));
   if (area === null) return Response.json({ error: "invalid_area" }, { status: 400 });
 
-  const places = await publishedMapReader().places(view.context.tenant.tenantId, area, [
-    "destination",
-    "event",
+  const tenantId = view.context.tenant.tenantId;
+  const [places, index] = await Promise.all([
+    publishedMapReader().places(tenantId, area, ["destination", "event"]),
+    portalIndex(view),
   ]);
+  const extras = { tenantId, categories: categoriesByKey(index) };
   return Response.json(
-    { places: places.map(toMapPoint) },
+    { places: places.map((place) => toMapPoint(place, extras)) },
     { headers: { "cache-control": "public, max-age=30" } },
   );
 }

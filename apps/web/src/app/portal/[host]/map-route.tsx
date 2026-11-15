@@ -39,11 +39,13 @@ export function MapRoute({
 
   return (
     <div className="portal-map-layout portal-map-route">
-      <div className="portal-map-visitor">
-        <LocationButton />
-        <a className="portal-button" href={PORTAL_PATHS.map}>
-          Quitar la ruta
-        </a>
+      <div className="portal-map-controls">
+        <div className="portal-map-visitor">
+          <LocationButton />
+          <a className="portal-button" href={PORTAL_PATHS.map}>
+            Quitar la ruta
+          </a>
+        </div>
       </div>
 
       <div className="portal-map-frame">

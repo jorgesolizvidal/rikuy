@@ -11,7 +11,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { publishedMapReader } from "@/server/platform";
-import { portalMapExtent, toMapPoint } from "@/server/portal-content";
+import { categoriesByKey, portalIndex, portalMapExtent, toMapPoint } from "@/server/portal-content";
 import { portalViewWith } from "@/server/portal-view";
 
 import { MapExplorer } from "../map-explorer";
@@ -78,7 +78,12 @@ function capped(box: BoundingBox): BoundingBox {
 export default async function MapPage({ params, searchParams }: MapPageProps) {
   const view = await portalViewWith((await params).host, "map");
   if (view === null) notFound();
-  const [extent, query] = await Promise.all([portalMapExtent(view), searchParams]);
+  const [extent, query, index] = await Promise.all([
+    portalMapExtent(view),
+    searchParams,
+    portalIndex(view),
+  ]);
+  const extras = { tenantId: view.context.tenant.tenantId, categories: categoriesByKey(index) };
   const center = requestedCenter(query);
   const routeKeys = requestedRoute(query);
   const { siteName } = view.resolved.presentation.identity;
@@ -100,7 +105,7 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
   const route = routeKeys
     .flatMap((key) => {
       const place = byKey.get(key);
-      return place ? [{ ...toMapPoint(place), order: 0 }] : [];
+      return place ? [{ ...toMapPoint(place, extras), order: 0 }] : [];
     })
     .map((point, index) => ({ ...point, order: index + 1 }));
   const routeArea =
@@ -141,7 +146,7 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
         <p className="portal-empty">Todavía no hay lugares en el mapa.</p>
       ) : (
         <MapExplorer
-          initialPoints={places.map(toMapPoint)}
+          initialPoints={places.map((place) => toMapPoint(place, extras))}
           initialArea={area}
           complete={places.length >= extent.destinations + extent.events}
           nearbyRadius={nearbyRadiusOf(view.resolved.presentation)}
