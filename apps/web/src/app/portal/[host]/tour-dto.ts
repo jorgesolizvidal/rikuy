@@ -87,6 +87,11 @@ export interface TourMenuEntryDto {
   readonly location: { readonly lat: number; readonly lng: number } | null;
   /** The tour the general tour starts with. */
   readonly start: boolean;
+  /**
+   * The place (content id) when it is a stop of a published circuit (ADR-056): the menu says
+   * «Sello del pasaporte», or «Sellado» once this phone has it (C3 · Paso 5).
+   */
+  readonly stampPlaceId?: string | null;
 }
 
 export function tourKey(tour: { readonly kind: TourKind; readonly slug: string }): string {

@@ -119,8 +119,14 @@ export function tourData(view: PortalView, tour: PublishedTour): TourDataDto {
   };
 }
 
-/** The general tour's menu: every visible tour, in the municipality's order. */
-export function tourMenu(index: readonly PublishedTourIndexEntry[]): TourMenuEntryDto[] {
+/**
+ * The general tour's menu: every visible tour, in the municipality's order. `stops` maps a
+ * destination that is a stop of a published circuit to its place id (its stamp, ADR-064).
+ */
+export function tourMenu(
+  index: readonly PublishedTourIndexEntry[],
+  stops: ReadonlyMap<string, string> = new Map(),
+): TourMenuEntryDto[] {
   return index.map((entry) => ({
     kind: entry.kind,
     slug: entry.slug,
@@ -134,5 +140,6 @@ export function tourMenu(index: readonly PublishedTourIndexEntry[]): TourMenuEnt
     },
     location: entry.location,
     start: entry.start,
+    stampPlaceId: entry.kind === "destination" ? (stops.get(entry.slug) ?? null) : null,
   }));
 }

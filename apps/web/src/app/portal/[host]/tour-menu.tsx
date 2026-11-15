@@ -3,6 +3,7 @@
 import { describeProximity, distanceMeters, sortByDistance } from "@rikuy/core/geo";
 import { useEffect, useRef, type RefObject } from "react";
 
+import { usePassport } from "@/lib/passport-store";
 import { useVisitorLocation } from "@/lib/use-visitor-location";
 
 import { tourKey, type TourMenuEntryDto } from "./tour-dto";
@@ -40,6 +41,7 @@ export function TourMenu({
   readonly toggle: RefObject<HTMLButtonElement | null>;
 }) {
   const { fix } = useVisitorLocation();
+  const passport = usePassport();
   const panel = useRef<HTMLDivElement>(null);
   const ordered = fix ? sortByDistance(entries, fix, (entry) => entry.location) : entries;
 
@@ -122,6 +124,13 @@ export function TourMenu({
                     {entry.scenes === 1 ? "1 escena" : `${entry.scenes} escenas`}
                     {distance ? ` · ${distance.replace(/^A /u, "a ")}` : ""}
                   </span>
+                  {entry.stampPlaceId ? (
+                    <span className="tour-menu-stamp">
+                      {passport?.stamps[entry.stampPlaceId]
+                        ? "✓ Sellado en el pasaporte"
+                        : "Sello del pasaporte"}
+                    </span>
+                  ) : null}
                   {key === loading ? <span className="tour-menu-loading">Abriendo…</span> : null}
                 </span>
               </a>

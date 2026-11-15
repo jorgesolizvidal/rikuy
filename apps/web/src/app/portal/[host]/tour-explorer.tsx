@@ -187,6 +187,8 @@ export function TourExplorer({
   const reducedMotion = browser?.reducedMotion ?? false;
   const [attempt, setAttempt] = useState(0);
   const [menuOpen, setMenuOpen] = useState(false);
+  // The strip of scenes (C3 · Paso 5, ADR-064): its previews load only once it is open.
+  const [stripOpen, setStripOpen] = useState(false);
   /** The tour being fetched, and one that could not be. */
   const [loadingTour, setLoadingTour] = useState<string | null>(null);
   const [tourError, setTourError] = useState<TourMenuEntryDto | null>(null);
@@ -476,6 +478,30 @@ export function TourExplorer({
             />
           ) : null}
         </div>
+        {scenes.length > 1 ? (
+          <div id="tour-strip" className="tour-strip" hidden={!stripOpen}>
+            {stripOpen ? (
+              <ol aria-label="Escenas de este tour">
+                {scenes.map((item, index) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      className="tour-strip-scene"
+                      aria-current={item.id === scene.id ? "true" : undefined}
+                      onClick={() => goTo(item.id)}
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element -- published, versioned preview */}
+                      <img src={item.previewUrl} alt="" width={160} height={80} decoding="async" />
+                      <span>
+                        <span className="tour-strip-number">{index + 1}</span> {item.title}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ol>
+            ) : null}
+          </div>
+        ) : null}
         <div className="tour-bar" data-menu={others.length > 0 ? "true" : undefined}>
           {others.length > 0 ? (
             <button
@@ -489,6 +515,18 @@ export function TourExplorer({
               <span aria-hidden="true">☰</span>
               <span className="tour-bar-label">Tours</span>
               <span className="visually-hidden"> del municipio</span>
+            </button>
+          ) : null}
+          {scenes.length > 1 ? (
+            <button
+              type="button"
+              className="tour-bar-button"
+              aria-expanded={stripOpen}
+              aria-controls="tour-strip"
+              onClick={() => setStripOpen((value) => !value)}
+            >
+              <span aria-hidden="true">▦</span>
+              <span className="tour-bar-label">Escenas</span>
             </button>
           ) : null}
           <button

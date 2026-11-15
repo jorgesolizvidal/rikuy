@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 4 — fichas de destino y evento, y mapa ✅
-- **Rama:** `feat/c3-step4-detail-pages` → PR hacia `main`
+- **Último paso completado:** C3 · Paso 5 — tour, recorrido general, pasaporte, sello y canje ✅
+- **Rama:** `feat/c3-step5-tour-passport` → PR hacia `main`
 
 ## Historial
 
@@ -2487,16 +2487,51 @@ Lo que encontró el CI del push, ya corregido:
 - El filtro de categorías del mapa no queda en la dirección (la página del mapa ya es dinámica y tiene sus propios parámetros).
 - Las fichas quedan con LCP 2,24–2,40 s en el CI (límite 2,5 s): el margen de antes, a cuidar en los próximos pasos.
 
+### C3 · Paso 5 — tour, recorrido general, pasaporte, sello y canje ✅
+
+- Decisiones del usuario ([ADR-064](../adr/ADR-064-tour-passport-design.md)), 2026-11-14:
+  - **sellos estampados** en la página del circuito: anillo de avance, cada parada como un sello circular, la siguiente sugerida marcada (ninguna bloqueada), el premio con lo que falta y un mapa pequeño del recorrido;
+  - **lector de QR en la página** con la cámara del teléfono;
+  - **tira de escenas** en el tour y el sello del pasaporte en el menú del recorrido general;
+  - **sello estampado** al sellar y el canje con el resultado bien visible.
+- Sin cambios en la base de datos ni en lo que se envía: los sellos siguen solo en el teléfono.
+- `@rikuy/core` (`domain/passport/scan`, también en `@rikuy/core/passport-client`):
+  - `readScannedCode`: un código leído es un sello solo si es `https://…/sello/{código}` del mismo origen y con un código válido (se descarta la consulta); otro sitio u otra ruta es «otro», y un texto que no es enlace, «texto»;
+  - `nextSuggestedStop`: la primera parada sin sello en el orden del circuito.
+- Portal:
+  - **sellos** (`stamp-seal.tsx`): un SVG circular con el nombre en el borde y, sellado, la marca, la fecha («14 NOV») y un pin si fue con ubicación; gris y punteado si falta, con el acento si es la siguiente sugerida. Decorativo: la página lo dice en palabras al lado. Y un **anillo de avance** («1/2»);
+  - **página del circuito**: cabecera con «Escanear el código del lugar»; «Tu avance» con el anillo, el premio y «Te faltan N sellos»; «N lugares, en el orden sugerido» con un sello por parada, «Parada N», «Siguiente sugerida», el enlace y «Sellado el … · con ubicación» o «Falta el sello»; el premio; **«El recorrido»** con un mapa pequeño de las paradas numeradas unidas en orden (carga al llegar y usar la página, o con su botón) y «Ver el recorrido en el mapa del municipio»;
+  - **`/pasaporte`**: cada circuito con la fila de sus sellos y su anillo; el lector en la cabecera;
+  - **lector de QR** (`qr-scanner.tsx`): un diálogo con la cámara trasera y el `BarcodeDetector` del navegador, 4 veces por segundo; solo abre un sello de este portal y avisa de cualquier otro código sin seguirlo; la cámara se pide al pulsar y se apaga al cerrar (el foco vuelve al botón). Sin lector (iPhone, la mayoría de las computadoras), sin permiso o sin cámara, dice que se use la cámara del teléfono. `Permissions-Policy: camera=(self)`;
+  - **página del sello**: el sello del lugar grande, que se «estampa» al sellar (sin movimiento con «reducir movimiento»), y el anillo de cada circuito; la portada pasa después;
+  - **canje**: el formulario y el resultado en tarjetas; «Comprobante válido» con el color del municipio, «¡Canjeado!» relleno y los demás en gris, con un ícono;
+  - **tour**: botón «Escenas» que abre una tira con la vista previa de cada escena (las imágenes se ponen en la página solo al abrirla, con la actual marcada); barra, menú y diálogos con los radios, letras y un tono oscuro del color del municipio; en el menú del recorrido general, «Sello del pasaporte» o «✓ Sellado en el pasaporte» en cada destino que es parada de un circuito publicado;
+  - privacidad: el lector y la cámara.
+- Corrección encontrada en las pruebas: el mapa pequeño (de la ficha y del recorrido) estaba dentro de un contenedor `aria-hidden` y sus enlaces de atribución recibían el foco (axe `aria-hidden-focus`). Ahora es un grupo con nombre («Mapa de la ubicación», «Mapa del recorrido»); el mapa sigue quieto y sin foco.
+- CI: nuevo paso **«Passport pages in a real browser»** (grupo «Lighthouse · visitas»).
+- Tests:
+  - unitarios: core 718 (+3: lo que abre el lector y la siguiente parada sugerida), web 54;
+  - **e2e en un navegador real** (`passport-pages.e2e.test.ts`, 3 casos): los sellos del circuito antes de sellar (la plaza sugerida, el mirador faltante, ninguno bloqueado, «Te faltan 2 sellos»), el sello del mirador estampado con su fecha y el anillo «1/2», el circuito y el pasaporte después; el lector con un lector simulado y la cámara falsa de Chrome: otro sitio con la ruta de un sello se informa y no se sigue, cerrar apaga la cámara y devuelve el foco, un sello de este portal abre su página; sin lector, el aviso de usar la cámara del teléfono; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - `tour.e2e.test.ts`: la tira no pide vistas previas hasta abrirla, tiene una por escena, lleva a la escena elegida y se cierra;
+  - pasaporte, sellos, premio, métricas del pasaporte y fichas en verde.
+- Verificado en local, en el navegador (390 y 1280 px): circuito antes y después de sellar, sello, pasaporte, lector y canje.
+
+**Desviaciones:**
+
+- El lector en la página solo funciona donde el navegador tiene `BarcodeDetector` (Chrome en Android); en los demás, la página manda a la cámara del teléfono, que abre el QR igual.
+- La tira de escenas no se desplaza sola hasta la escena actual en tours largos.
+
 ## Cómo verificarlo
 
-- Tras el merge, abre en el celular y en la PC una ficha de Ucureña (por ejemplo, la iglesia): la foto grande con el título encima, la tarjeta «Para tu visita» (horario si lo tiene, «Cómo llegar», el tour 360° y el sello de «Corazón de Ucureña»), «Cerca de aquí» con los otros lugares y sus distancias.
-- Toca una foto de la galería: se abre grande, con «Siguiente» y «Anterior»; Escape o «Cerrar» vuelven a la ficha.
-- La ficha del carnaval o de la feria: el bloque de fecha y «En N días», «Mañana», «Hoy» o «En curso».
-- `/mapa`: en la PC la lista a la izquierda y el mapa a la derecha; en el celular el mapa arriba. Con las categorías publicadas, toca una y el mapa y la lista muestran solo esos lugares.
+- Tras el merge, en el celular (Chrome en Android), abre `/pasaporte/corazon-de-ucurena` en Ucureña: el anillo con tus sellos, cada lugar como un sello (los que ya tienes, con la fecha) y la siguiente parada sugerida marcada.
+- Pulsa «Escanear el código del lugar», permite la cámara y apunta al QR de un lugar (desde el panel, en otra pantalla): abre la página de su sello. Un QR de otra cosa dice que no es un sello. En el iPhone, la página pide usar la cámara del teléfono.
+- Sella un lugar: el sello se «estampa» y el anillo del circuito sube.
+- En un tour, el botón «Escenas» abre la tira con las vistas previas y lleva a la elegida; en `/recorrido`, el menú dice qué destinos dan sello.
+- En `/canje`, el resultado de un comprobante se ve en una tarjeta grande.
 
 ## Siguiente paso
 
-**C3 · Paso 5 — tour, recorrido general, pasaporte, sello y canje** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): esas páginas con el sistema de diseño (sin los elementos que Stitch inventó en el pasaporte: folio, rango, paradas en orden, «Sellar en 360°»). Antes de empezar, confirmar con el usuario qué cambia en cada una.
+**C3 · Paso 6 — asistente** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): el panel del asistente con el sistema de diseño. Antes de empezar, confirmar con el usuario qué cambia.
 
 ## Decisiones pendientes del usuario
 

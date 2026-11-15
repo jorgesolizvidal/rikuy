@@ -129,13 +129,15 @@ describe("the tourist passport's circuits (ADR-056)", () => {
 
     await page.getByRole("link", { name: "Ruta del valle" }).click();
     await page.waitForURL(`${NORTE}/pasaporte/ruta-del-valle`);
-    expect(await page.locator(".passport-stops .portal-card-title").allInnerTexts()).toEqual([
+    expect(await page.locator(".passport-stops .passport-stop-title").allInnerTexts()).toEqual([
       "Plaza principal",
       "Mirador del Valle",
     ]);
     expect(await page.getByText(/Una postal del valle/u).count()).toBe(1);
     expect(
-      await page.getByRole("link", { name: "Ver el recorrido en el mapa" }).getAttribute("href"),
+      await page
+        .getByRole("link", { name: "Ver el recorrido en el mapa del municipio" })
+        .getAttribute("href"),
     ).toBe("/mapa?ruta=destination:plaza-principal,destination:mirador-del-valle");
     await accessible(page);
 

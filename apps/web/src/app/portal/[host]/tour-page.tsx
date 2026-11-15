@@ -6,7 +6,12 @@ import type { Metadata } from "next";
 import { preload } from "react-dom";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { portalTour, portalTourIndex, tourMovedOrNotFound } from "@/server/portal-content";
+import {
+  portalPassport,
+  portalTour,
+  portalTourIndex,
+  tourMovedOrNotFound,
+} from "@/server/portal-content";
 import { tourData, tourMenu } from "@/server/portal-tours";
 import type { PortalView } from "@/server/portal-view";
 import { portalView } from "@/server/portal-view";
@@ -73,11 +78,18 @@ export async function TourArticle({
   // The entry's preview is the first thing on screen (and the page's largest image).
   const entry = tour.scenes.find((scene) => scene.id === tour.entrySceneId);
   if (entry) preload(entry.previewUrl, { as: "image", fetchPriority: "high" });
+  const [index, circuits] = await Promise.all([portalTourIndex(view), portalPassport(view)]);
+  // The stops of the passport, for the menu's «Sello del pasaporte» (ADR-064).
+  const stops = new Map(
+    circuits.flatMap((circuit) =>
+      circuit.stops.flatMap((stop) => (stop.id ? [[stop.slug, stop.id] as const] : [])),
+    ),
+  );
   return (
     <article className="portal-page portal-tour">
       <TourExplorer
         tour={tour}
-        menu={tourMenu(await portalTourIndex(view))}
+        menu={tourMenu(index, stops)}
         dataPath={PORTAL_PATHS.tourData}
         siteName={view.resolved.presentation.identity.siteName}
         assistant={assistantTarget(view)}
