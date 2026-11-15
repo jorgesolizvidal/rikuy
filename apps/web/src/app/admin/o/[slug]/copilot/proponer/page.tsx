@@ -15,7 +15,6 @@ import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../../sign-out-button";
 import { ProposeForm } from "./propose-form";
 
 export const metadata: Metadata = { title: "Proponer con el Copilot" };
@@ -55,7 +54,6 @@ export default async function ProposePage({ params, searchParams }: ProposePageP
         <Link href={COPILOT_PATHS.home(org)} className="eyebrow">
           ← Copilot
         </Link>
-        <SignOutButton />
       </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Proponer con el Copilot</h1>

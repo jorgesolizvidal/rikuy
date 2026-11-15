@@ -1,5 +1,59 @@
 /* The panel (app.<dominio>). Loaded by the admin layout only: the portal and the platform
    pages share globals.css and never wait for these rules. */
+
+/* ── Rikuy's own look (C3 · Paso 7, ADR-066) ───────────────────────────
+   The same neutral palette and the «Editorial» font for every municipality: a municipality's
+   brand is seen only in its preview and in its portal. Every text color is ≥ 4.5:1 on --bg and
+   on --surface. */
+.admin {
+  --bg: #f6f7f4;
+  --surface: #ffffff;
+  --fg: #1d2320;
+  --muted: #5a625d;
+  --accent: #1e5b47;
+  --accent-soft: #e3efe8;
+  --on-accent: #ffffff;
+  --danger: #9c2a1f;
+  --danger-soft: #fbe9e6;
+  --warn: #7a4d06;
+  --warn-soft: #fbf1dc;
+  --disabled-bg: #e4e6e3;
+  --disabled-fg: #5a625d;
+  --line: color-mix(in srgb, var(--fg) 14%, transparent);
+  --radius: 0.75rem;
+  --font-panel: "Rikuy Editorial Text", "Rikuy Editorial Fallback", var(--font-sans);
+  --font-panel-title: "Rikuy Editorial", "Rikuy Editorial Fallback", var(--font-sans);
+  min-height: 100dvh;
+  background: var(--bg);
+  color: var(--fg);
+  font-family: var(--font-panel);
+}
+
+@media (prefers-color-scheme: dark) {
+  .admin {
+    --bg: #121614;
+    --surface: #1b201d;
+    --fg: #eef1ee;
+    --muted: #a7b0ab;
+    --accent: #7fd1b0;
+    --accent-soft: #1f3a30;
+    --on-accent: #121614;
+    --danger: #f08a7c;
+    --danger-soft: #3a1f1b;
+    --warn: #e8c27a;
+    --warn-soft: #2a2416;
+    --disabled-bg: #2a302c;
+    --disabled-fg: #a7b0ab;
+  }
+}
+
+.admin .title,
+.admin h1,
+.admin h2,
+.admin h3,
+.admin legend {
+  font-family: var(--font-panel-title);
+}
 /* ── Admin ───────────────────────────────────────────────────────────── */
 
 .shell-narrow {
@@ -89,13 +143,8 @@ main:focus {
   border-radius: 0.5rem;
   border: 1px solid var(--accent);
   background: var(--accent);
-  color: #fff;
+  color: var(--on-accent);
   cursor: pointer;
-}
-
-.button[disabled] {
-  opacity: 0.6;
-  cursor: progress;
 }
 
 .button-quiet {
@@ -185,7 +234,7 @@ main:focus {
 a.button {
   display: inline-block;
   text-decoration: none;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 a.button-quiet {
@@ -2516,4 +2565,475 @@ p.metrics-sources {
   border: 1px solid color-mix(in srgb, var(--fg) 25%, transparent);
   background: var(--bg);
   color: var(--fg);
+}
+
+/* ── Admin · menú, resumen y retoques (C3 · Paso 7, ADR-066) ─────────── */
+
+/* Buttons: primary (filled), secondary (quiet), danger. */
+.admin .button {
+  border-radius: 0.625rem;
+  transition:
+    background-color 0.15s,
+    border-color 0.15s;
+}
+
+.admin .button:not(:disabled):hover {
+  background: color-mix(in srgb, var(--accent) 86%, var(--fg));
+}
+
+.admin .button-quiet {
+  background: var(--surface);
+  color: var(--fg);
+  border-color: color-mix(in srgb, var(--fg) 28%, transparent);
+}
+
+.admin .button-quiet:not(:disabled):hover {
+  background: color-mix(in srgb, var(--fg) 6%, var(--surface));
+  border-color: var(--fg);
+}
+
+.admin .button-danger {
+  background: var(--surface);
+  color: var(--danger);
+  border: 1px solid var(--danger);
+}
+
+.admin .button-danger:not(:disabled):hover {
+  background: var(--danger-soft);
+}
+
+/* Disabled reads as disabled: grey, not a faded brand color. */
+.admin .button:disabled {
+  background: var(--disabled-bg);
+  border-color: var(--disabled-bg);
+  color: var(--disabled-fg);
+  cursor: not-allowed;
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .admin .button {
+    transition: none;
+  }
+}
+
+/* Links in the text take the panel's color. */
+.admin main a:not([class]) {
+  color: var(--accent);
+  text-underline-offset: 0.15em;
+}
+
+.admin .data-table td > a:first-child:not(.button) {
+  color: var(--fg);
+  font-weight: 650;
+}
+
+/* States: color and words (the label always says it). */
+.admin .status-pill {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--fg);
+}
+
+.admin .status-pill[data-status="published"],
+.admin .status-pill[data-status="active"],
+.admin .status-pill[data-status="ready"] {
+  background: var(--accent-soft);
+  border-color: transparent;
+  color: var(--accent);
+}
+
+.admin .status-pill[data-status="changed"],
+.admin .status-pill[data-status="pending"],
+.admin .status-pill[data-status="processing"],
+.admin .status-pill[data-status="uploading"] {
+  background: var(--warn-soft);
+  border-color: transparent;
+  color: var(--warn);
+}
+
+.admin .status-pill[data-status="draft"] {
+  border-style: dashed;
+  border-color: color-mix(in srgb, var(--fg) 40%, transparent);
+  color: var(--muted);
+}
+
+.admin .status-pill[data-status="failed"],
+.admin .status-pill[data-status="dead_letter"],
+.admin .status-pill[data-status="lease_expired"],
+.admin .status-pill[data-status="rejected"],
+.admin .status-pill[data-status="suspended"] {
+  background: var(--danger-soft);
+  border-color: transparent;
+  color: var(--danger);
+}
+
+/* The frame: the menu and the page. */
+.panel-frame {
+  display: grid;
+  min-height: 100dvh;
+  align-content: start;
+}
+
+.panel-main {
+  min-width: 0;
+}
+
+.panel-main > .shell {
+  min-height: 0;
+  justify-content: flex-start;
+}
+
+.panel-nav {
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+
+.panel-nav-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.panel-nav-org {
+  margin: 0;
+  display: grid;
+  min-width: 0;
+}
+
+.panel-nav-name {
+  font-family: var(--font-panel-title);
+  font-weight: 800;
+  overflow-wrap: anywhere;
+}
+
+.panel-nav-role {
+  color: var(--muted);
+  font-size: 0.8125rem;
+}
+
+.panel-nav-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  flex: none;
+  font: inherit;
+  font-weight: 650;
+  padding: 0.5rem 0.875rem;
+  border-radius: 0.625rem;
+  border: 1px solid color-mix(in srgb, var(--fg) 28%, transparent);
+  background: var(--surface);
+  color: var(--fg);
+  cursor: pointer;
+}
+
+.panel-nav-menu {
+  display: none;
+  padding: 0 1rem 1rem;
+}
+
+.panel-nav-menu[data-open] {
+  display: grid;
+  gap: 1rem;
+}
+
+.panel-nav-group ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.125rem;
+}
+
+.panel-nav-title {
+  margin: 0 0 0.25rem;
+  padding: 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.panel-nav-link {
+  display: block;
+  padding: 0.4375rem 0.75rem;
+  border-radius: 0.5rem;
+  color: var(--fg);
+  text-decoration: none;
+  font-size: 0.9375rem;
+}
+
+.panel-nav-link:hover {
+  background: color-mix(in srgb, var(--fg) 6%, var(--surface));
+}
+
+.panel-nav-link[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 700;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.panel-nav-link:focus-visible,
+.panel-nav-toggle:focus-visible {
+  outline: 3px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.panel-nav-foot {
+  display: grid;
+  gap: 0.5rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--line);
+}
+
+.panel-nav-quiet {
+  color: var(--muted);
+}
+
+.panel-nav-foot form,
+.panel-nav-foot .button {
+  width: 100%;
+}
+
+@media (min-width: 64rem) {
+  .panel-frame {
+    grid-template-columns: 16.5rem minmax(0, 1fr);
+  }
+
+  .panel-nav {
+    position: sticky;
+    top: 0;
+    height: 100dvh;
+    overflow-y: auto;
+    border-bottom: 0;
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .panel-nav-head {
+    padding: 1.5rem 1.25rem 1rem;
+  }
+
+  .panel-nav-toggle {
+    display: none;
+  }
+
+  .panel-nav-menu,
+  .panel-nav-menu[data-open] {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    flex: 1;
+    padding: 0 0.75rem 1.25rem;
+  }
+
+  .panel-nav-menu nav {
+    display: grid;
+    gap: 1rem;
+  }
+
+  .panel-nav-foot {
+    margin-top: auto;
+  }
+}
+
+/* The municipality's home: a summary with real numbers. */
+.panel-summary {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.panel-summary h2 {
+  margin: 0;
+  font-size: 1.125rem;
+}
+
+.summary-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+
+.summary-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  padding: 1.125rem 1.25rem;
+  border-radius: var(--radius);
+  border: 1px solid var(--line);
+  background: var(--surface);
+  min-width: 0;
+}
+
+.summary-tile p {
+  margin: 0;
+}
+
+.summary-label {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.summary-value {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.summary-number {
+  font-family: var(--font-panel-title);
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.summary-detail {
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.summary-detail strong {
+  color: var(--fg);
+}
+
+.summary-link {
+  margin-top: auto;
+  padding-top: 0.25rem;
+  color: var(--accent);
+  font-weight: 650;
+  font-size: 0.9375rem;
+  overflow-wrap: anywhere;
+}
+
+/* Long editors: every block a titled section, «Guardar / Publicar» always at hand. */
+.admin .branding-layout > *,
+.admin .branding-form {
+  min-width: 0;
+}
+
+.admin .destination-form fieldset,
+.admin .branding-form fieldset {
+  /* A fieldset is as wide as its content by default: on a phone it would widen the page. */
+  min-width: 0;
+  padding: 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+
+@media (min-width: 40rem) {
+  .admin .destination-form fieldset,
+  .admin .branding-form fieldset {
+    padding: 1.25rem;
+  }
+}
+
+.admin .destination-form legend,
+.admin .branding-form legend {
+  float: left;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+}
+
+.admin .destination-form fieldset fieldset,
+.admin .branding-form fieldset fieldset {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+
+.admin .sticky-actions {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  margin: 0 -0.5rem;
+  padding: 0.75rem 0.5rem;
+  background: color-mix(in srgb, var(--bg) 94%, transparent);
+  border-top: 1px solid var(--line);
+  backdrop-filter: blur(6px);
+}
+
+/* Lists as cards on a phone: one card per row, each value with its column's name. */
+.data-table thead th {
+  background: color-mix(in srgb, var(--fg) 4%, var(--bg));
+}
+
+@media (max-width: 40rem) {
+  .data-table-cards thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
+  }
+
+  .data-table-cards,
+  .data-table-cards tbody,
+  .data-table-cards tr,
+  .data-table-cards td {
+    display: block;
+    width: 100%;
+  }
+
+  .data-table-cards tbody {
+    display: grid;
+    gap: 0.75rem;
+  }
+
+  .data-table-cards tr {
+    display: grid;
+    gap: 0.625rem;
+    padding: 0.875rem 1rem;
+    border-radius: var(--radius);
+    border: 1px solid var(--line);
+    background: var(--surface);
+  }
+
+  .data-table-cards td {
+    padding: 0;
+    border: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .data-table-cards td[data-label]::before {
+    content: attr(data-label);
+    display: block;
+    margin-bottom: 0.125rem;
+    color: var(--muted);
+    font-size: 0.75rem;
+    font-weight: 650;
+  }
+
+  .data-table-cards .cell-actions {
+    text-align: left;
+  }
+
+  .data-table-cards .cell-actions .inline-form,
+  .data-table-cards .row-actions {
+    justify-content: flex-start;
+    align-items: flex-start;
+  }
+}
+
+@media print {
+  .panel-nav {
+    display: none;
+  }
+
+  .panel-frame {
+    display: block;
+  }
 }

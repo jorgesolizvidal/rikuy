@@ -22,7 +22,6 @@ import { RecommendationList } from "@/components/statistics/recommendation-list"
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import "../estadisticas/statistics.css";
 import { PrintButton, SendReportForm } from "./report-actions";
 import "./report.css";
@@ -93,13 +92,6 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide report">
-      <header className="admin-header report-screen-only">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
-
       <div className="branding-heading">
         <p className="eyebrow report-print-only">{membership.displayName}</p>
         <h1 className="title title-sm">

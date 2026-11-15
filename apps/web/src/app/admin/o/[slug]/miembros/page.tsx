@@ -1,13 +1,11 @@
 import { assignableRoles, canAssignRole, listMembers, ROLE_LABELS } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { invitationMailConfigured } from "@/server/mail-settings";
 import { requireOrganization } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { InviteMemberForm, MemberRowActions } from "./member-forms";
 
 export const metadata: Metadata = { title: "Miembros" };
@@ -33,12 +31,6 @@ export default async function MembersPage({ params }: MembersPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Miembros</h1>
         <p className="lead">
@@ -58,7 +50,7 @@ export default async function MembersPage({ params }: MembersPageProps) {
 
       {/* Focusable so the table can be scrolled sideways with the keyboard on a phone. */}
       <div className="table-wrap" role="region" aria-label="Lista de miembros" tabIndex={0}>
-        <table className="data-table">
+        <table className="data-table data-table-cards">
           <caption className="visually-hidden">Miembros de {membership.displayName}</caption>
           <thead>
             <tr>
@@ -77,7 +69,7 @@ export default async function MembersPage({ params }: MembersPageProps) {
               return (
                 <tr key={member.membershipId} data-status={member.status}>
                   <td>{member.email}</td>
-                  <td>
+                  <td data-label="Rol">
                     {ROLE_LABELS[member.role]}
                     {member.secondFactor === null || member.status === "revoked" ? null : (
                       <span className="org-detail">
@@ -87,7 +79,7 @@ export default async function MembersPage({ params }: MembersPageProps) {
                       </span>
                     )}
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     {STATUS_LABELS[member.status]}
                     {member.status === "invited" ? (
                       <span className="org-detail">

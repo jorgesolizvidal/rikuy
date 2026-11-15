@@ -1,13 +1,11 @@
 import { loadSampleContentStatus } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 import { notFound } from "next/navigation";
 
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { AutoRefresh } from "../panoramas/auto-refresh";
 import { SamplePanel } from "./sample-panel";
 
@@ -34,12 +32,6 @@ export default async function SamplePage({ params }: SamplePageProps) {
   return (
     <main id="contenido" tabIndex={-1} className="shell">
       <AutoRefresh active={status.tour === "processing"} />
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Contenido de muestra</h1>
         <p className="lead">

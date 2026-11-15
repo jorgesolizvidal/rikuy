@@ -1,13 +1,10 @@
 import { loadAiUsage, loadUsage, loadVoiceUsage } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { UsageBar } from "@/components/usage/usage-bar";
 import { RESOURCE_DETAILS, RESOURCE_LABELS } from "@/components/usage/usage-format";
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
-
-import { SignOutButton } from "../../../sign-out-button";
 
 export const metadata: Metadata = { title: "Uso del plan" };
 
@@ -26,12 +23,6 @@ export default async function UsagePage({ params }: UsagePageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Uso del plan</h1>
         <p className="lead">

@@ -1,19 +1,20 @@
 import {
-  canEditContent,
-  canManageBranding,
-  canManageMembers,
-  hasModule,
+  loadPanelOverview,
   MODULE_KEYS,
   MODULE_NAMES,
   ROLE_LABELS,
-  type ModuleKey,
+  type PanelContentCounts,
 } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { Change } from "@/components/statistics/change";
+import { formatCount } from "@/components/statistics/format";
+import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
+import { platformSettings } from "@/server/platform";
 
-import { SignOutButton } from "../../sign-out-button";
+import "./estadisticas/statistics.css";
 
 interface OrganizationPageProps {
   readonly params: Promise<{ slug: string }>;
@@ -23,215 +24,161 @@ export async function generateMetadata({ params }: OrganizationPageProps): Promi
   return { title: (await requireOrganization((await params).slug)).displayName };
 }
 
+const plural = (count: number, one: string, many: string) =>
+  `${formatCount(count)} ${count === 1 ? one : many}`;
+
+function contentLine(counts: PanelContentCounts, one: string, many: string): string {
+  const parts = [plural(counts.published, `${one} publicado`, `${many} publicados`)];
+  if (counts.changed > 0) parts.push(`${formatCount(counts.changed)} con cambios sin publicar`);
+  if (counts.drafts > 0) parts.push(plural(counts.drafts, "borrador", "borradores"));
+  return parts.join(" · ");
+}
+
+/**
+ * The municipality's home in the panel (C3 · Paso 7, ADR-066): a summary with real numbers
+ * (the portal, the last 7 days, what visitors asked without an answer, what the Copilot's
+ * review says is missing, the content); the menu has every section.
+ */
 export default async function OrganizationPage({ params }: OrganizationPageProps) {
   const membership = await requireOrganization((await params).slug);
-  const has = (key: ModuleKey) => hasModule(membership.modules, key);
+  const session = await adminSession();
+  const overview = await loadPanelOverview(membership, {
+    statistics: session.statistics,
+    questions: session.questions,
+    copilot: session.copilot,
+    content: session.content,
+  });
+  const base = `/o/${membership.slug}`;
   const modules = membership.modules ?? MODULE_KEYS;
+  const { portal, visits, questions, review, content } = overview;
 
   return (
-    <main id="contenido" tabIndex={-1} className="shell">
-      <header className="admin-header">
-        <Link href="/" className="eyebrow">
-          ← Tus municipios
-        </Link>
-        <SignOutButton />
-      </header>
-      <h1 className="title title-sm">{membership.displayName}</h1>
-      <p className="lead">Tu rol: {ROLE_LABELS[membership.role]}.</p>
-      <ul className="org-list">
-        <li>
-          <Link href={`/o/${membership.slug}/destinos`} className="org-card">
-            <span>
-              <span className="org-name">Destinos</span>
-              <span className="org-detail">Lugares para visitar: texto, ubicación y fotos</span>
-            </span>
-            <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-          </Link>
-        </li>
-        {has("agenda") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/agenda`} className="org-card">
-              <span>
-                <span className="org-name">Agenda</span>
-                <span className="org-detail">Eventos con fecha, lugar y fotos</span>
+    <main id="contenido" tabIndex={-1} className="shell shell-wide panel-home">
+      <div className="branding-heading">
+        <h1 className="title title-sm">{membership.displayName}</h1>
+        <p className="lead">
+          Tu rol: {ROLE_LABELS[membership.role]}. Aquí está lo principal del portal; en el menú,
+          cada sección.
+        </p>
+      </div>
+
+      <section aria-labelledby="resumen" className="panel-summary">
+        <h2 id="resumen">Resumen</h2>
+        <ul className="summary-grid">
+          <li className="summary-tile">
+            <p className="summary-label">Portal</p>
+            <p className="summary-value">
+              <span className="status-pill" data-status={portal.online ? "active" : "pending"}>
+                {portal.online ? "En línea" : "En preparación"}
               </span>
-              <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-            </Link>
+            </p>
+            <p className="summary-detail">
+              {portal.online
+                ? "Los visitantes lo ven en su dirección."
+                : "Todavía no está en línea: lo pone en línea el operador de la plataforma."}
+            </p>
+            {portal.hostname ? (
+              <a
+                className="summary-link"
+                href={platformSettings().portalOrigin(portal.hostname)}
+                target="_blank"
+                rel="noopener"
+              >
+                {portal.hostname}
+                <span className="visually-hidden"> (se abre en otra pestaña)</span>
+              </a>
+            ) : null}
           </li>
+
+          {visits ? (
+            <li className="summary-tile">
+              <p className="summary-label">Visitas · últimos 7 días</p>
+              <p className="summary-value">
+                <span className="summary-number">{formatCount(visits.views.value)}</span>{" "}
+                <Change measure={visits.views} />
+              </p>
+              <p className="summary-detail">
+                {visits.counting
+                  ? "Todavía no se contó ninguna visita."
+                  : `${plural(visits.visitors, "visitante", "visitantes")} (sumados por día)`}
+              </p>
+              <Link
+                prefetch={false}
+                className="summary-link"
+                href={`${base}/estadisticas?periodo=7-dias`}
+              >
+                Ver las estadísticas
+              </Link>
+            </li>
+          ) : null}
+
+          {questions ? (
+            <li className="summary-tile">
+              <p className="summary-label">Preguntas sin respuesta · últimos 7 días</p>
+              <p className="summary-value">
+                <span className="summary-number">{formatCount(questions.total)}</span>
+              </p>
+              <p className="summary-detail">
+                {questions.total === 0
+                  ? "El asistente encontró respuesta para todo lo que le preguntaron."
+                  : `${plural(questions.distinct, "pregunta distinta", "preguntas distintas")}: publica la respuesta y el asistente la usará.`}
+              </p>
+              <Link
+                prefetch={false}
+                className="summary-link"
+                href={`${base}/preguntas?periodo=7-dias`}
+              >
+                Ver qué preguntaron
+              </Link>
+            </li>
+          ) : null}
+
+          {review ? (
+            <li className="summary-tile">
+              <p className="summary-label">Revisión del Copilot</p>
+              <p className="summary-value">
+                <span className="summary-number">{formatCount(review.contents)}</span>
+              </p>
+              <p className="summary-detail">
+                {review.contents === 0 && review.scenes === 0
+                  ? "Nada pendiente: el contenido tiene lo que la revisión pide."
+                  : `${review.contents === 1 ? "contenido con algo por completar" : "contenidos con algo por completar"}${
+                      review.scenes > 0
+                        ? ` y ${plural(review.scenes, "escena sin descripción", "escenas sin descripción")}`
+                        : ""
+                    }.`}
+              </p>
+              <Link prefetch={false} className="summary-link" href={`${base}/copilot`}>
+                Ver la revisión
+              </Link>
+            </li>
+          ) : null}
+
+          {content ? (
+            <li className="summary-tile">
+              <p className="summary-label">Contenido</p>
+              <p className="summary-detail">
+                <strong>Destinos:</strong>{" "}
+                {contentLine(content.destinations, "destino", "destinos")}
+              </p>
+              {content.events ? (
+                <p className="summary-detail">
+                  <strong>Eventos:</strong> {contentLine(content.events, "evento", "eventos")}
+                </p>
+              ) : null}
+              <Link prefetch={false} className="summary-link" href={`${base}/destinos`}>
+                Ir a la lista de destinos
+              </Link>
+            </li>
+          ) : null}
+        </ul>
+        {visits === null || content === null ? (
+          <p className="field-hint">
+            Una parte del resumen no se pudo leer ahora; recarga la página.
+          </p>
         ) : null}
-        {has("tours") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/tours`} className="org-card">
-              <span>
-                <span className="org-name">Tours 360°</span>
-                <span className="org-detail">Recorridos virtuales de los destinos y eventos</span>
-              </span>
-              <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-            </Link>
-          </li>
-        ) : null}
-        {has("tours") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/panoramas`} className="org-card">
-              <span>
-                <span className="org-name">Panoramas 360°</span>
-                <span className="org-detail">Fotos 360° para los recorridos virtuales</span>
-              </span>
-              <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
-            </Link>
-          </li>
-        ) : null}
-        {has("models") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/modelos`} className="org-card">
-              <span>
-                <span className="org-name">Modelos 3D</span>
-                <span className="org-detail">
-                  Objetos en 3D para los recorridos, optimizados para celulares
-                </span>
-              </span>
-              <span className="org-role">{canEditContent(membership.role) ? "Subir" : "Ver"}</span>
-            </Link>
-          </li>
-        ) : null}
-        {has("assistant") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/conocimiento`} className="org-card">
-              <span>
-                <span className="org-name">Conocimiento del asistente</span>
-                <span className="org-detail">
-                  Textos y documentos que lee el asistente, y prueba de lo que encuentra
-                </span>
-              </span>
-              <span className="org-role">{canEditContent(membership.role) ? "Editar" : "Ver"}</span>
-            </Link>
-          </li>
-        ) : null}
-        {has("copilot") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/copilot`} className="org-card">
-              <span>
-                <span className="org-name">Copilot</span>
-                <span className="org-detail">
-                  Revisa lo que le falta al contenido y propone textos que tú decides guardar
-                </span>
-              </span>
-              <span className="org-role">
-                {canEditContent(membership.role) ? "Usar" : "Preguntar"}
-              </span>
-            </Link>
-          </li>
-        ) : null}
-        <li>
-          <Link href={`/o/${membership.slug}/categorias`} className="org-card">
-            <span>
-              <span className="org-name">Categorías</span>
-              <span className="org-detail">
-                Para filtrar los destinos{has("agenda") ? " y los eventos" : ""} en el portal
-              </span>
-            </span>
-            <span className="org-role">
-              {canManageBranding(membership.role) ? "Editar" : "Ver"}
-            </span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/configuracion`} className="org-card">
-            <span>
-              <span className="org-name">Marca del portal</span>
-              <span className="org-detail">
-                Nombre, colores, tema, inicio del portal, contacto y redes sociales
-              </span>
-            </span>
-            <span className="org-role">
-              {canManageBranding(membership.role) ? "Editar" : "Ver"}
-            </span>
-          </Link>
-        </li>
-        <li>
-          <Link href={`/o/${membership.slug}/estadisticas`} className="org-card">
-            <span>
-              <span className="org-name">Estadísticas</span>
-              <span className="org-detail">
-                Visitas, lo más visto, tours, códigos QR y de dónde vienen
-              </span>
-            </span>
-            <span className="org-role">Ver</span>
-          </Link>
-        </li>
-        {has("passport") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/pasaporte`} className="org-card">
-              <span>
-                <span className="org-name">Pasaporte turístico</span>
-                <span className="org-detail">
-                  Circuitos de destinos con un premio para quien los completa
-                </span>
-              </span>
-              <span className="org-role">Ver</span>
-            </Link>
-          </li>
-        ) : null}
-        <li>
-          <Link href={`/o/${membership.slug}/informe`} className="org-card">
-            <span>
-              <span className="org-name">Informe mensual</span>
-              <span className="org-detail">
-                El mes para la alcaldía: visitas, lo más visto, preguntas y recomendaciones
-              </span>
-            </span>
-            <span className="org-role">Ver</span>
-          </Link>
-        </li>
-        {has("assistant") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/preguntas`} className="org-card">
-              <span>
-                <span className="org-name">Lo que preguntan los visitantes</span>
-                <span className="org-detail">
-                  Las preguntas que el asistente no pudo responder con lo publicado
-                </span>
-              </span>
-              <span className="org-role">Ver</span>
-            </Link>
-          </li>
-        ) : null}
-        <li>
-          <Link href={`/o/${membership.slug}/uso`} className="org-card">
-            <span>
-              <span className="org-name">Uso del plan</span>
-              <span className="org-detail">
-                Almacenamiento y procesamiento usados y disponibles
-              </span>
-            </span>
-            <span className="org-role">Ver</span>
-          </Link>
-        </li>
-        {membership.demo && (membership.role === "owner" || membership.role === "admin") ? (
-          <li>
-            <Link href={`/o/${membership.slug}/muestra`} className="org-card">
-              <span>
-                <span className="org-name">Contenido de muestra</span>
-                <span className="org-detail">
-                  Destinos, eventos y un tour de ejemplo para la demostración
-                </span>
-              </span>
-              <span className="org-role">Cargar</span>
-            </Link>
-          </li>
-        ) : null}
-        {canManageMembers(membership.role) ? (
-          <li>
-            <Link href={`/o/${membership.slug}/miembros`} className="org-card">
-              <span>
-                <span className="org-name">Miembros</span>
-                <span className="org-detail">Invitar personas, cambiar roles y quitar accesos</span>
-              </span>
-              <span className="org-role">Gestionar</span>
-            </Link>
-          </li>
-        ) : null}
-      </ul>
+      </section>
+
       <p className="field-hint org-modules">
         Módulos de este municipio:{" "}
         {modules.length > 0 ? modules.map((key) => MODULE_NAMES[key]).join(", ") : "ninguno"}. Los

@@ -17,7 +17,6 @@ import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings, publishedContentReader } from "@/server/platform";
 
-import { SignOutButton } from "../../../../sign-out-button";
 import { DestinationEditor, type EditorValues } from "./destination-editor";
 import { toHoursValues } from "./hours-values";
 import type { EditorImage } from "./image-fields";
@@ -104,7 +103,6 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
         <Link href={`/o/${membership.slug}/destinos`} className="eyebrow">
           ← Destinos de {membership.displayName}
         </Link>
-        <SignOutButton />
       </header>
 
       <div className="branding-heading">

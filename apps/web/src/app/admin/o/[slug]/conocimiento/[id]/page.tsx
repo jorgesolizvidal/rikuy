@@ -6,7 +6,6 @@ import { notFound } from "next/navigation";
 import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../../sign-out-button";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
 import { KnowledgeEditor, type KnowledgeValues } from "./knowledge-editor";
 
@@ -48,7 +47,6 @@ export default async function KnowledgeEditorPage({ params }: EditorPageProps) {
         <Link href={`/o/${membership.slug}/conocimiento`} className="eyebrow">
           ← Conocimiento del asistente
         </Link>
-        <SignOutButton />
       </header>
 
       <div className="branding-heading">

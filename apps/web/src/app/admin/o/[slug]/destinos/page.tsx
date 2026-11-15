@@ -5,7 +5,6 @@ import Link from "next/link";
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { NewDestinationForm } from "./new-destination-form";
 
 export const metadata: Metadata = { title: "Destinos" };
@@ -13,7 +12,7 @@ export const metadata: Metadata = { title: "Destinos" };
 const STATUS = {
   draft: { label: "Borrador", detail: "Nunca publicado" },
   published: { label: "Publicado", detail: "Sin cambios pendientes" },
-  changed: { label: "Publicado", detail: "Con cambios sin publicar" },
+  changed: { label: "Con cambios", detail: "Publicado; los cambios todavía no se ven" },
 } as const;
 
 const DATE = new Intl.DateTimeFormat("es-BO", {
@@ -34,12 +33,6 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Destinos</h1>
         <p className="lead">
@@ -67,7 +60,7 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
         <p className="notice">Todavía no hay destinos. Crea el primero con su nombre.</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table data-table-cards">
             <caption className="visually-hidden">Destinos de {membership.displayName}</caption>
             <thead>
               <tr>
@@ -85,13 +78,15 @@ export default async function DestinationsPage({ params }: DestinationsPageProps
                     </Link>
                     <span className="cell-detail">/{destination.slug}</span>
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     <span className="status-pill" data-status={destination.status}>
                       {STATUS[destination.status].label}
                     </span>
                     <span className="cell-detail">{STATUS[destination.status].detail}</span>
                   </td>
-                  <td>{DATE.format(new Date(destination.updatedAt))}</td>
+                  <td data-label="Última modificación">
+                    {DATE.format(new Date(destination.updatedAt))}
+                  </td>
                 </tr>
               ))}
             </tbody>

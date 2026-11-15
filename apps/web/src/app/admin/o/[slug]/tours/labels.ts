@@ -2,7 +2,7 @@
 export const TOUR_STATUS = {
   draft: { label: "Borrador", detail: "Nunca publicado" },
   published: { label: "Publicado", detail: "Sin cambios pendientes" },
-  changed: { label: "Publicado", detail: "Con cambios sin publicar" },
+  changed: { label: "Con cambios", detail: "Publicado; los cambios todavía no se ven" },
 } as const;
 
 export const KIND = {

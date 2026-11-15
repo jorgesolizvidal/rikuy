@@ -14,7 +14,6 @@ import { notFound } from "next/navigation";
 import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../../../sign-out-button";
 import { ProposalReview, type FieldDiff } from "./proposal-review";
 
 export const metadata: Metadata = { title: "Propuesta del Copilot" };
@@ -71,7 +70,6 @@ export default async function ProposalPage({ params }: ProposalPageProps) {
         <Link href={COPILOT_PATHS.home(org)} className="eyebrow">
           ← Copilot
         </Link>
-        <SignOutButton />
       </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Propuesta del Copilot</h1>

@@ -18,7 +18,6 @@ import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireModule } from "@/server/organization";
 import { platformSettings, publishedContentReader } from "@/server/platform";
 
-import { SignOutButton } from "../../../../sign-out-button";
 import { DestinationEditor, type EditorValues } from "../../destinos/[id]/destination-editor";
 import type { EditorImage } from "../../destinos/[id]/image-fields";
 import { CopilotProposeLink } from "../../copilot/copilot-link";
@@ -108,7 +107,6 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
         <Link href={`/o/${membership.slug}/agenda`} className="eyebrow">
           ← Agenda de {membership.displayName}
         </Link>
-        <SignOutButton />
       </header>
 
       <div className="branding-heading">

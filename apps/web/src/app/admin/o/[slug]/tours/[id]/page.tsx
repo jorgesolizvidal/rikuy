@@ -9,7 +9,6 @@ import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireModule } from "@/server/organization";
 import { tourCandidates } from "@/server/tour-candidates";
 
-import { SignOutButton } from "../../../../sign-out-button";
 import { PortalShare } from "../../destinos/[id]/portal-share";
 import { KIND, TOUR_STATUS } from "../labels";
 import { TourEditor } from "./tour-editor";
@@ -58,7 +57,6 @@ export default async function TourPage({ params }: TourPageProps) {
         <Link href={`/o/${membership.slug}/tours`} className="eyebrow">
           ← Tours 360°
         </Link>
-        <SignOutButton />
       </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Tour de {record.content.title}</h1>

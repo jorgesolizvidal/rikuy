@@ -1,11 +1,9 @@
 import { loadModels } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { AutoRefresh } from "../panoramas/auto-refresh";
 import {
   formatCount,
@@ -47,12 +45,6 @@ export default async function ModelsPage({ params }: ModelsPageProps) {
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <AutoRefresh active={processing} />
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Modelos 3D</h1>
         <p className="lead">

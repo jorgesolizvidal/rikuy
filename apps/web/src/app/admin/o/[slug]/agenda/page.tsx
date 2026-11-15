@@ -5,7 +5,6 @@ import Link from "next/link";
 import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { NewDestinationForm } from "../destinos/new-destination-form";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -13,7 +12,7 @@ export const metadata: Metadata = { title: "Agenda" };
 const STATUS = {
   draft: { label: "Borrador", detail: "Nunca publicado" },
   published: { label: "Publicado", detail: "Sin cambios pendientes" },
-  changed: { label: "Publicado", detail: "Con cambios sin publicar" },
+  changed: { label: "Con cambios", detail: "Publicado; los cambios todavía no se ven" },
 } as const;
 
 interface AgendaPageProps {
@@ -31,7 +30,7 @@ function EventTable({
 }) {
   return (
     <div className="table-wrap">
-      <table className="data-table">
+      <table className="data-table data-table-cards">
         <caption className="visually-hidden">{caption}</caption>
         <thead>
           <tr>
@@ -47,8 +46,10 @@ function EventTable({
                 <Link href={`/o/${org}/agenda/${event.contentId}`}>{event.title}</Link>
                 <span className="cell-detail">/{event.slug}</span>
               </td>
-              <td>{event.schedule ? formatEventSchedule(event.schedule) : "Sin fecha"}</td>
-              <td>
+              <td data-label="Cuándo">
+                {event.schedule ? formatEventSchedule(event.schedule) : "Sin fecha"}
+              </td>
+              <td data-label="Estado">
                 <span className="status-pill" data-status={event.status}>
                   {STATUS[event.status].label}
                 </span>
@@ -70,12 +71,6 @@ export default async function AgendaPage({ params }: AgendaPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Agenda</h1>
         <p className="lead">
