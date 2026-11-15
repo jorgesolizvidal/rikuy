@@ -512,11 +512,28 @@
   background: rgb(6 8 7 / 92%);
 }
 
+/* Its own dark background: the white text never depends on what the backdrop covers. */
 .portal-lightbox-body {
   display: grid;
   gap: 0.75rem;
+  background: rgb(6 8 7);
   padding: 0.75rem var(--gutter, 1rem);
   box-sizing: border-box;
+}
+
+/* White buttons on the dark dialog, in every theme. */
+.portal .portal-lightbox .portal-button {
+  border-color: rgb(255 255 255 / 70%);
+  background: transparent;
+  color: #ffffff;
+}
+
+.portal .portal-lightbox .portal-button:hover {
+  background: rgb(255 255 255 / 12%);
+}
+
+.portal-lightbox :focus-visible {
+  outline-color: #ffffff;
 }
 
 .portal-lightbox-bar,

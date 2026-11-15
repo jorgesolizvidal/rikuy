@@ -141,7 +141,7 @@ async function look(origin: string): Promise<Look> {
     return {
       theme: portal.dataset.theme ?? null,
       titleFont: style(".portal-hero h1").fontFamily,
-      bodyFont: style(".portal-intro").fontFamily,
+      bodyFont: style(".portal-card-text").fontFamily,
       titleOverPhoto: title.bottom <= media.bottom,
       // The monogram's square is the brand color.
       footerIsBrand:

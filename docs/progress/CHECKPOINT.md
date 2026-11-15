@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz ✅. C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 7 — panel del municipio ✅
-- **Rama:** `feat/c3-step7-panel` → PR hacia `main`
+- **Último paso completado:** C3 · Paso 8 — pulido de la interfaz ✅
+- **Rama:** `feat/c3-step8-polish` → PR hacia `main`
 
 ## Historial
 
@@ -2585,12 +2585,52 @@ Lo que encontró el CI del push, ya corregido:
 - El resumen no tiene una cifra del pasaporte (está en «Estadísticas» y en el informe).
 - Las páginas de la plataforma (operador) toman los colores nuevos, pero no tienen menú propio.
 
+### C3 · Paso 8 — pulido de la interfaz ✅
+
+- Pedido del usuario (2026-11-15), después de revisar el portal de Ucureña y el panel con sus capturas: una evaluación profesional de cada pantalla y corregir lo que se repite o no se ve limpio, sobre todo en la PC, antes de C4. Las tres preguntas de alcance no se respondieron: se tomaron las propuestas de la evaluación ([ADR-067](../adr/ADR-067-interface-polish.md)).
+- `@rikuy/core`:
+  - `DEFAULT_HOME` deja fuera la franja de cifras y «¿Tienes una pregunta?»: son secciones que el municipio enciende en «Marca del portal» (un inicio ya guardado no cambia);
+  - `bottomBar`: Inicio · Destinos · 360° · Agenda · Pasaporte; el mapa entra solo si hay lugar y ya no hay «Más»;
+  - `formatEventShort` («Miércoles · 10:00–18:00», «30 nov – 2 dic»): lo que el bloque de día y mes no dice.
+- Portal:
+  - **portada**: la foto del destino de fondo, de borde a borde, con velo y texto blanco en los dos temas; el lema como texto; un solo botón (el recorrido 360° si existe, si no los lugares); un enlace pequeño nombra el lugar de la foto;
+  - **un solo ancho de página** (`--page`, `--edge`) en cabecera, secciones, avisos y pie; cuatro tarjetas en una fila de cuatro; los eventos del inicio a lo ancho;
+  - **tarjetas**: «Recorrido 360°» y «Sello del pasaporte» como una línea discreta debajo del texto (no más píldoras sobre la foto); en los eventos, la fecha corta junto al bloque y la completa para lectores de pantalla;
+  - sin la barra de acento sobre cada título (tema «Editorial»); avisos del inicio más chicos, sin el sello decorativo; aire antes del pie; el pie suma el nombre y el lema del municipio;
+  - **Destinos y Agenda**: título y una frase (sin el nombre del municipio en mayúsculas ni tarjetas de cifras); sin el aviso del pasaporte; en el celular, «Ordenar por cercanía» y «Ver en el mapa» en una fila;
+  - **barra del celular**: «Destinos» queda marcado en `/mapa`;
+  - **fichas**: «Cómo llegar» principal y el resto lado a lado; la ubicación sin coordenadas en números («Ver en el mapa del municipio», «Abrir en OpenStreetMap»); la foto ampliada con su propio fondo oscuro;
+  - **tour**: el visor ocupa lo que queda de la pantalla; el zoom del visor es una píldora en una esquina (sin las flechas; siguen con el teclado); con una escena, sin «Anterior», «Siguiente» ni el contador; «Más tours del municipio» como tarjetas con su número de escenas, sin imágenes;
+  - **pasaporte**: el mapa del recorrido se ajusta a las paradas (antes, un mínimo de ~2 km); los sellos pequeños de la lista sin el nombre ilegible en el borde.
+- Panel:
+  - títulos más chicos y una frase corta; «← Destinos» y «← Agenda» sin «de Municipio…»;
+  - **página del municipio**: acciones rápidas (Nuevo destino, Nuevo evento, Ver el portal) según rol y módulos; sale «Tu rol…»; los módulos pasan a «Uso del plan»;
+  - **«Nuevo …»** (`components/panel/new-item.tsx`): un botón que abre el formulario en destinos, agenda, tours y pasaporte; abierto si la lista está vacía o con `?nuevo` (lo usan las acciones rápidas);
+  - **«Subir», «Bajar» y «Quitar»** como íconos (`components/panel/panel-icon.tsx`) con su nombre para lectores de pantalla y al pasar el mouse, en fotos, categorías, secciones del inicio, paradas del circuito, escenas y recorrido general;
+  - las listas de destinos y eventos no muestran la dirección técnica; en el editor, las fotos van justo después del texto;
+  - **Estadísticas**: las siete cifras en una fila; lo que cuenta cada una, en «Cómo se cuenta».
+- Tests:
+  - unitarios: core 723 (casos nuevos del inicio por defecto, la barra y la fecha corta), web 59;
+  - e2e actualizados: inicio (el inicio por defecto y encender «Cifras» desde el panel), temas (fuente del texto en las tarjetas), módulos (acciones rápidas y módulos en «Uso del plan»), panel y pasaporte (abrir «Nuevo …»);
+  - inicio, temas, módulos, panel, pasaporte, fichas, páginas del pasaporte, tarjetas del asistente, estadísticas, informe mensual, tours, sellos, premio, visitas, métricas del pasaporte, recomendaciones, preguntas, portales (161) y contratos RC-09/10/11/12 (216) en verde.
+- Lo que encontraron las pruebas, ya corregido: el pie de la foto ampliada se medía contra el fondo de la página (axe): ahora el diálogo tiene su fondo oscuro y sus botones son blancos en los dos temas.
+- Lighthouse local (móvil, CPU ×4, seed): inicio, listados y fichas de los dos municipios 96–100, LCP 1,7–2,5 s, CLS 0 y JS 149–151 KB. `/mapa` no se puede medir aquí (sin acceso a OpenFreeMap); lo mide el CI.
+- Verificado en local, en el navegador (390 y 1280 px, los dos temas): inicio, destinos, agenda, ficha, circuito, pasaporte y el panel (inicio, destinos, editor, estadísticas, marca, uso), sin desbordes ni hallazgos de axe.
+
+**Desviaciones:**
+
+- Ucureña guardó su inicio con «Cifras» y «¿Tienes una pregunta?» encendidas: se apagan en su «Marca del portal» (no se cambian datos de producción desde el código).
+- En la barra del celular la sección se llama «Destinos» (como en la cabecera y en su página), no «Lugares» como se propuso.
+- «Más tours» sin foto: mostrarla descargaría la vista previa de cada tour al abrir la página.
+- El editor de destinos no se rehízo en dos columnas: ya tenía la columna lateral (Copilot, dirección, QR, historial); solo cambió el orden.
+
 ## Cómo verificarlo
 
-- Tras el merge, entra al panel y abre Ucureña: a la izquierda el menú con «Contenido», «Para visitantes», «Resultados» y «Ajustes»; arriba, el «Resumen» con el portal en línea, las visitas de 7 días, las preguntas sin respuesta, la revisión del Copilot y el contenido. Toca cada enlace del resumen: la página muestra el mismo número.
-- Abre «Destinos»: el estado «Con cambios» en ámbar si un destino tiene un borrador sin publicar. Abre uno: la barra «Publicar / Guardar borrador» queda abajo mientras bajas.
-- En el celular, «Menú» abre y cierra las secciones, y las listas se ven como tarjetas.
-- Abre Demo Norte: el panel se ve igual (los colores de cada municipio solo están en su portal y en la vista previa de la marca).
+- Tras el merge, en el panel de Ucureña → «Marca del portal» → «Inicio del portal», desmarca «Cifras» y «¿Tienes una pregunta?» y publica.
+- Abre el portal en la PC: la foto de portada de fondo con un solo botón; las secciones con el mismo ancho que la cabecera; las tarjetas con «Recorrido 360°» y «Sello del pasaporte» debajo del texto; los eventos con «Miércoles · 10:00–18:00» junto al bloque de fecha.
+- En el celular: la barra Inicio · Destinos · 360° · Agenda · Pasaporte; «Destinos» empieza con su título y una frase.
+- Abre un tour de una sola escena: sin «Anterior», «Siguiente» ni «Escena 1 de 1», y el zoom en una esquina.
+- En el panel: la página del municipio con «Nuevo destino», «Nuevo evento» y «Ver el portal»; «Nuevo destino» abre el formulario; «Subir», «Bajar» y «Quitar» como íconos en «Marca del portal» y «Categorías».
 
 ## Siguiente paso
 
