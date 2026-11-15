@@ -490,6 +490,16 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-home 2>&1 | tee ../../home.log
+      # C3 · Paso 5 (ADR-064): the passport's pages with the design system — the stops as
+      # seals, the next one marked and none locked, the stamp inked right after stamping, and
+      # «Escanear el código del lugar» with a simulated barcode reader and Chrome's fake camera:
+      # only a stamp of this portal opens, and closing the dialog stops the camera.
+      - name: Passport pages in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-passport-pages 2>&1 | tee ../../passport-pages.log
       # C3 · Paso 4 (ADR-063): a destination's and an event's page (cover, «Para tu visita»,
       # «Eventos en este lugar», «Cerca de aquí» from published data only, the event's status
       # with the municipality's clock), the photos opened large and the focus back (the owner
@@ -560,7 +570,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log detail.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

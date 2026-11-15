@@ -7,7 +7,8 @@ import { portalViewWith } from "@/server/portal-view";
 
 import "../passport.css";
 import { PassportHowItWorks } from "../passport-how";
-import { CircuitProgressLine, PassportSummary } from "../passport-progress";
+import { CircuitProgressLine, CircuitSeals, PassportSummary } from "../passport-progress";
+import { QrScanner } from "../qr-scanner";
 
 interface PassportPageProps {
   readonly params: Promise<{ host: string }>;
@@ -26,14 +27,17 @@ export async function generateMetadata({ params }: PassportPageProps): Promise<M
   };
 }
 
-/** The tourist passport (C2, ADR-056): the municipality's published circuits. */
+/**
+ * The tourist passport (C2, ADR-056): the municipality's published circuits, each with its
+ * seals and its progress in this phone (C3 · Paso 5, ADR-064), and the code scanner.
+ */
 export default async function PassportPage({ params }: PassportPageProps) {
   const view = await portalViewWith((await params).host, "passport");
   if (view === null) notFound();
   const circuits = await portalPassport(view);
 
   return (
-    <div className="portal-page">
+    <div className="portal-page passport-page">
       <nav aria-label="Ruta de navegación" className="portal-breadcrumb">
         <ol>
           <li>
@@ -42,33 +46,52 @@ export default async function PassportPage({ params }: PassportPageProps) {
           <li aria-current="page">Pasaporte turístico</li>
         </ol>
       </nav>
-      <h1 className="portal-page-title">Pasaporte turístico</h1>
-      <p className="portal-lead">
-        Recorre los lugares de un circuito de {view.resolved.presentation.identity.siteName} y
-        llévate el premio del municipio.
-      </p>
-      {circuits.length > 0 ? <PassportSummary /> : null}
+      <header className="passport-head">
+        <h1 className="portal-page-title">Pasaporte turístico</h1>
+        <p className="portal-lead">
+          Recorre los lugares de un circuito de {view.resolved.presentation.identity.siteName} y
+          llévate el premio del municipio.
+        </p>
+        {circuits.length > 0 ? (
+          <>
+            <PassportSummary />
+            <div className="passport-head-actions">
+              <QrScanner />
+            </div>
+          </>
+        ) : null}
+      </header>
       {circuits.length === 0 ? (
         <p className="portal-empty">Pronto publicaremos aquí los circuitos del pasaporte.</p>
       ) : (
         <ul className="passport-circuits">
-          {circuits.map((circuit) => (
-            <li key={circuit.slug} className="passport-circuit">
-              <h2 className="passport-circuit-name">
-                <a href={PORTAL_PATHS.passportCircuit(circuit.slug)}>{circuit.name}</a>
-              </h2>
-              {circuit.summary ? <p>{circuit.summary}</p> : null}
-              <p className="passport-circuit-meta">
-                {circuit.stops.length} lugares: {circuit.stops.map((stop) => stop.title).join(", ")}
-              </p>
-              {circuit.reward ? (
-                <p className="passport-reward">
-                  <strong>Premio:</strong> {circuit.reward}
+          {circuits.map((circuit) => {
+            const stops = circuit.stops.map((stop) => ({
+              id: stop.id,
+              slug: stop.slug,
+              title: stop.title,
+              href: PORTAL_PATHS.destination(stop.slug),
+            }));
+            return (
+              <li key={circuit.slug} className="passport-circuit">
+                <h2 className="passport-circuit-name">
+                  <a href={PORTAL_PATHS.passportCircuit(circuit.slug)}>{circuit.name}</a>
+                </h2>
+                {circuit.summary ? <p>{circuit.summary}</p> : null}
+                <CircuitSeals circuit={circuit.slug} stops={stops} />
+                <p className="passport-circuit-meta">
+                  {circuit.stops.length} lugares:{" "}
+                  {circuit.stops.map((stop) => stop.title).join(", ")}
                 </p>
-              ) : null}
-              <CircuitProgressLine stopIds={circuit.stops.map((stop) => stop.id)} />
-            </li>
-          ))}
+                {circuit.reward ? (
+                  <p className="passport-reward">
+                    <strong>Premio:</strong> {circuit.reward}
+                  </p>
+                ) : null}
+                <CircuitProgressLine stopIds={circuit.stops.map((stop) => stop.id)} />
+              </li>
+            );
+          })}
         </ul>
       )}
       <PassportHowItWorks />

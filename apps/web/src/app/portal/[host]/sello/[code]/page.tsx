@@ -79,15 +79,6 @@ export default async function StampPage({ params }: StampPageProps) {
       {breadcrumb}
       <p className="stamp-kicker">Sello del pasaporte</p>
       <h1 className="portal-page-title">{place.title}</h1>
-      {place.cover ? (
-        <div className="stamp-cover">
-          <PortalImage
-            image={responsiveImage(tenantId, place.cover)}
-            sizes="(min-width: 48rem) 40rem, 100vw"
-            priority
-          />
-        </div>
-      ) : null}
       <StampCollector
         code={code}
         placeId={place.id}
@@ -97,6 +88,14 @@ export default async function StampPage({ params }: StampPageProps) {
         circuits={circuits}
         passportHref={PORTAL_PATHS.passport}
       />
+      {place.cover ? (
+        <div className="stamp-cover">
+          <PortalImage
+            image={responsiveImage(tenantId, place.cover)}
+            sizes="(min-width: 48rem) 40rem, 100vw"
+          />
+        </div>
+      ) : null}
       <p className="stamp-place-link">
         <a href={PORTAL_PATHS.destination(place.slug)}>Ver la ficha de «{place.title}»</a>
       </p>

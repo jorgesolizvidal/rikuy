@@ -195,6 +195,11 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
       </p>
       <ul>
         <li>
+          «Escanear el código del lugar» usa la cámara solo después de que lo pulsas y solo mientras
+          está abierto. El código lo lee tu navegador, en tu teléfono: la imagen no se envía ni se
+          guarda. Solo se abre un sello de este portal; cualquier otro enlace se ignora.
+        </li>
+        <li>
           Al sellar, tu navegador envía el código escaneado, un identificador al azar del pasaporte
           (lo crea tu teléfono; no dice quién eres) y si estás o no en el lugar. Tu posición no se
           envía: si compartes tu ubicación, la distancia al lugar se calcula en tu teléfono.

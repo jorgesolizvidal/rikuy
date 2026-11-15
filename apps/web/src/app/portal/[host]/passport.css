@@ -10,8 +10,10 @@
 
 .passport-circuit {
   padding: 1.25rem;
-  border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent);
-  border-radius: 0.75rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
   overflow-wrap: anywhere;
 }
 
@@ -23,7 +25,7 @@
   margin: 0;
   font-family: var(--font-display);
   font-size: clamp(1.25rem, 2.6vw, 1.5rem);
-  font-weight: 650;
+  font-weight: var(--title-weight);
 }
 
 .passport-circuit-meta {
@@ -38,29 +40,17 @@
   overflow-wrap: anywhere;
 }
 
-.passport-reward-lead {
-  max-width: 48rem;
-  margin: 1.5rem 0 0;
-}
-
 .passport-stops-title {
   margin: 2.5rem 0 0;
   font-family: var(--font-display);
   font-size: clamp(1.25rem, 2.6vw, 1.5rem);
-  font-weight: 650;
+  font-weight: var(--title-weight);
 }
 
-.passport-map-link {
-  margin: 0.5rem 0 0;
-}
-
-.passport-stops {
-  counter-reset: stop;
-}
-
-.passport-stops .portal-card-title::before {
-  counter-increment: stop;
-  content: counter(stop) ". ";
+.passport-stops-note {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
 }
 
 .passport-how {
@@ -88,26 +78,442 @@
 .passport-summary,
 .passport-progress {
   min-height: 1.5em;
-  margin: 0.75rem 0 0;
+  margin: 0;
   color: var(--muted);
 }
 
 .passport-summary {
   max-width: 48rem;
+  margin-top: 0.75rem;
 }
 
 .passport-progress[data-complete="true"] {
   color: var(--fg);
-  font-weight: 600;
+  font-weight: 700;
+}
+
+.passport-progress-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
 }
 
 .passport-stop-stamp {
   display: block;
   min-height: 1.5em;
-  margin-top: 0.25rem;
-  font-size: 0.9375rem;
+  font-size: 0.875rem;
   font-weight: 600;
+  color: var(--muted);
+}
+
+.passport-stop-stamp[data-stamped="true"] {
   color: var(--brand);
+}
+
+/* ── Header and the scanner's button (C3 · Paso 5, ADR-064) ──────────────── */
+
+.passport-head .portal-kicker {
+  margin-bottom: 0.75rem;
+}
+
+.passport-head-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+}
+
+.qr-scan-button {
+  gap: 0.5rem;
+  min-height: 3rem;
+}
+
+/* ── The progress panel ─────────────────────────────────────────────────── */
+
+.passport-panel {
+  display: flex;
+  align-items: center;
+  gap: 1.25rem;
+  max-width: 48rem;
+  margin-top: 2rem;
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.passport-panel-text {
+  display: grid;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.passport-panel-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.25rem;
+  font-weight: var(--title-weight);
+}
+
+.passport-panel .passport-reward {
+  margin: 0;
+}
+
+.passport-reward-missing {
+  color: var(--muted);
+}
+
+/* The ring: the track in a light tint, the value in the municipality's color. */
+.progress-ring {
+  flex: none;
+}
+
+.progress-ring-track,
+.progress-ring-value {
+  fill: none;
+  stroke-width: 7;
+}
+
+.progress-ring-track {
+  stroke: color-mix(in srgb, var(--fg) 12%, transparent);
+}
+
+.progress-ring-value {
+  stroke: var(--brand);
+  stroke-linecap: round;
+}
+
+.progress-ring-text {
+  fill: var(--fg);
+  font-family: var(--font-display);
+  font-size: 17px;
+  font-weight: 700;
+}
+
+/* ── The stops as seals ─────────────────────────────────────────────────── */
+
+.passport-stops {
+  list-style: none;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 12rem), 1fr));
+  gap: 1rem;
+}
+
+@media (max-width: 30rem) {
+  .passport-stops {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+}
+
+.passport-stop {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 0.5rem;
+  padding: 1rem 0.75rem 1.125rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  text-align: center;
+  overflow-wrap: anywhere;
+}
+
+.passport-stop[data-state="next"] {
+  border: 2px solid var(--accent);
+}
+
+.passport-stop-number {
+  justify-self: start;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.passport-stop-next {
+  justify-self: start;
+  margin-top: -0.25rem;
+  padding: 0.0625rem 0.5rem;
+  border: 2px solid var(--accent);
+  border-radius: 999px;
+  background: var(--bg);
+  color: var(--fg);
+  font-size: 0.6875rem;
+  font-weight: 700;
+}
+
+.passport-stop-title {
+  color: var(--fg);
+  font-weight: 700;
+  line-height: 1.25;
+  text-decoration: none;
+}
+
+.passport-stop-title:hover {
+  text-decoration: underline;
+  text-underline-offset: 0.2em;
+}
+
+.passport-seal-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem;
+  margin-top: 0.75rem;
+}
+
+.passport-seal-more {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+/* ── The round seal ─────────────────────────────────────────────────────── */
+
+.stamp-seal {
+  flex: none;
+  overflow: visible;
+}
+
+.stamp-seal-outer,
+.stamp-seal-inner {
+  fill: none;
+  stroke-width: 2.5;
+}
+
+.stamp-seal-rim {
+  font-family: var(--font-display);
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.stamp-seal-date {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.stamp-seal-mark {
+  fill: none;
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.stamp-seal-missing {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.stamp-seal[data-state="stamped"] {
+  color: var(--brand);
+  transform: rotate(-8deg);
+}
+
+.stamp-seal[data-state="stamped"] .stamp-seal-outer,
+.stamp-seal[data-state="stamped"] .stamp-seal-inner,
+.stamp-seal[data-state="stamped"] .stamp-seal-mark {
+  stroke: currentColor;
+}
+
+.stamp-seal[data-state="stamped"] .stamp-seal-inner {
+  fill: color-mix(in srgb, currentColor 10%, transparent);
+}
+
+.stamp-seal[data-state="stamped"] text,
+.stamp-seal[data-state="stamped"] .stamp-seal-pin {
+  fill: currentColor;
+}
+
+.stamp-seal[data-state="missing"],
+.stamp-seal[data-state="next"] {
+  color: var(--muted);
+}
+
+.stamp-seal[data-state="next"] {
+  color: var(--accent);
+}
+
+.stamp-seal[data-state="missing"] .stamp-seal-outer,
+.stamp-seal[data-state="next"] .stamp-seal-outer {
+  stroke: currentColor;
+  stroke-dasharray: 5 5;
+}
+
+.stamp-seal[data-state="missing"] .stamp-seal-inner,
+.stamp-seal[data-state="next"] .stamp-seal-inner {
+  stroke: color-mix(in srgb, currentColor 45%, transparent);
+}
+
+.stamp-seal[data-state="missing"] text,
+.stamp-seal[data-state="next"] text {
+  fill: currentColor;
+}
+
+/* Right after stamping: the seal comes down on the paper. */
+@media (prefers-reduced-motion: no-preference) {
+  .stamp-seal[data-animate="true"] {
+    animation: stamp-down 0.45s cubic-bezier(0.2, 0.9, 0.3, 1.2) both;
+  }
+}
+
+@keyframes stamp-down {
+  from {
+    opacity: 0;
+    transform: scale(1.6) rotate(-20deg);
+  }
+
+  to {
+    opacity: 1;
+    transform: scale(1) rotate(-8deg);
+  }
+}
+
+/* ── The route of a circuit ─────────────────────────────────────────────── */
+
+.passport-route {
+  max-width: 48rem;
+  margin-top: 3rem;
+}
+
+.passport-route h2 {
+  margin: 0 0 1rem;
+  font-family: var(--font-display);
+  font-size: clamp(1.25rem, 2.6vw, 1.5rem);
+  font-weight: var(--title-weight);
+}
+
+.passport-route p {
+  margin: 0.75rem 0 0;
+}
+
+/* The small map (the same as on a destination's page, ADR-063). */
+.portal-mini-map {
+  position: relative;
+  width: 100%;
+  height: clamp(12rem, 44vw, 21rem);
+  border-radius: var(--radius-media);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.portal-mini-map-canvas {
+  position: absolute;
+  inset: 0;
+}
+
+.portal-mini-map-start {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  border: 0;
+  background:
+    repeating-linear-gradient(
+      35deg,
+      transparent 0 22px,
+      color-mix(in srgb, var(--muted) 12%, transparent) 22px 23px
+    ),
+    var(--surface);
+  color: var(--fg);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.portal-mini-map-start .map-marker {
+  position: relative;
+  pointer-events: none;
+}
+
+/* ── The scanner ────────────────────────────────────────────────────────── */
+
+.qr-scanner {
+  width: min(100vw - 2rem, 30rem);
+  max-height: 100dvh;
+  padding: 1rem;
+  border: 0;
+  border-radius: var(--radius-card);
+  background: var(--bg);
+  color: var(--fg);
+}
+
+.qr-scanner::backdrop {
+  background: rgb(6 8 7 / 80%);
+}
+
+.qr-scanner-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.qr-scanner-bar h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: var(--title-weight);
+}
+
+.qr-scanner-view {
+  position: relative;
+  margin-top: 1rem;
+  aspect-ratio: 1;
+  border-radius: calc(var(--radius-card) * 0.75);
+  overflow: hidden;
+  background: #0c110e;
+}
+
+.qr-scanner-view:not([data-phase="scanning"]) video {
+  visibility: hidden;
+}
+
+/* Without a camera to show, only the message. */
+.qr-scanner-view[data-phase="unsupported"],
+.qr-scanner-view[data-phase="denied"],
+.qr-scanner-view[data-phase="no-camera"] {
+  display: none;
+}
+
+.qr-scanner-view video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.qr-scanner-frame {
+  position: absolute;
+  inset: 18%;
+  border: 3px solid #ffffff;
+  border-radius: 1rem;
+  box-shadow: 0 0 0 100vmax rgb(0 0 0 / 35%);
+}
+
+.qr-scanner-status {
+  min-height: 3em;
+  margin: 1rem 0 0;
+  font-weight: 600;
+}
+
+.qr-scanner-note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+  font-size: 0.875rem;
 }
 
 /* The page a stamp QR opens. */
@@ -129,7 +535,7 @@
 }
 
 .stamp-cover {
-  margin-top: 1.25rem;
+  margin-top: 2rem;
   aspect-ratio: 3 / 2;
   overflow: hidden;
   border-radius: 0.75rem;
@@ -145,6 +551,17 @@
 
 .stamp-collector {
   margin-top: 1.5rem;
+}
+
+.stamp-seal-box {
+  display: grid;
+  place-items: center;
+  margin-bottom: 1.5rem;
+  padding: 1.5rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .stamp-actions {
@@ -214,12 +631,17 @@
 }
 
 .stamp-circuits {
+  list-style: none;
+  display: grid;
+  gap: 0.75rem;
   margin: 1rem 0 0;
-  padding-left: 1.25rem;
+  padding: 0;
 }
 
-.stamp-circuits li + li {
-  margin-top: 0.5rem;
+.stamp-circuits li {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
 }
 
 .stamp-circuits li[data-complete="true"] {
@@ -240,7 +662,9 @@
 .circuit-reward:not(:empty) {
   padding: 1.25rem;
   border: 2px solid var(--brand);
-  border-radius: 0.75rem;
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
 }
 
 .circuit-reward h2 {
@@ -288,11 +712,19 @@
   font-weight: 600;
 }
 
+.redeem-form {
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
 .redeem-form input {
   min-height: 3rem;
   padding: 0.5rem 0.75rem;
   border: 1px solid color-mix(in srgb, var(--fg) 35%, transparent);
-  border-radius: 0.5rem;
+  border-radius: calc(var(--radius-card) * 0.5);
   background: var(--bg);
   color: var(--fg);
   font: inherit;
@@ -313,20 +745,68 @@
   outline: none;
 }
 
+/* The answer for the shop, big and clear (C3 · Paso 5): valid in the municipality's color,
+   redeemed filled with it, anything else in grey. */
 .redeem-result > div {
-  padding: 1.25rem;
-  border-left: 4px solid var(--brand);
-  background: color-mix(in srgb, var(--brand) 8%, transparent);
-  border-radius: 0 0.75rem 0.75rem 0;
+  padding: 1.5rem;
+  border: 2px solid var(--brand);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+}
+
+.redeem-result > div[data-status="redeemed"] {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.redeem-result > div[data-status="redeemed"] dt {
+  color: inherit;
+  opacity: 0.85;
 }
 
 .redeem-result > div:not([data-status="valid"]):not([data-status="redeemed"]) {
-  border-left-color: var(--muted);
-  background: color-mix(in srgb, var(--fg) 5%, transparent);
+  border-color: var(--muted);
 }
 
 .redeem-result h2 {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
   margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.375rem, 4vw, 1.75rem);
+  font-weight: var(--title-weight);
+  line-height: 1.15;
+}
+
+.redeem-result h2::before {
+  content: "!";
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: var(--muted);
+  color: var(--bg);
+  font-size: 1.25rem;
+}
+
+.redeem-result > div[data-status="valid"] h2::before {
+  content: "✓";
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.redeem-result > div[data-status="redeemed"] h2::before {
+  content: "✓";
+  background: var(--on-brand);
+  color: var(--brand);
+}
+
+.redeem-result > div[data-status="redeemed"] .stamp-secondary {
+  color: inherit;
 }
 
 .redeem-result dl {

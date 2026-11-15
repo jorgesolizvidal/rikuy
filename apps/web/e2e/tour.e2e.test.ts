@@ -796,6 +796,21 @@ describe.runIf(ready)("RC-07 · a tour in the portal", () => {
         await visit(index);
       }
 
+      // The strip of scenes (C3 · Paso 5, ADR-064): its previews are on the page only once it
+      // opens, and a scene in it goes there.
+      expect(await page.locator("#tour-strip img").count()).toBe(0);
+      const strip = page.getByRole("button", { name: "Escenas", exact: true });
+      await strip.click();
+      expect(await strip.getAttribute("aria-expanded")).toBe("true");
+      const thumbs = page.getByRole("list", { name: "Escenas de este tour" }).getByRole("button");
+      expect(await thumbs.count()).toBe(total);
+      expect(await page.locator("#tour-strip img").count()).toBe(total);
+      await thumbs.nth(total - 1).click();
+      await visit(total - 1);
+      expect(await thumbs.nth(total - 1).getAttribute("aria-current")).toBe("true");
+      await strip.click();
+      expect(await page.locator("#tour-strip").isVisible()).toBe(false);
+
       // Out: back to the destination.
       await page.getByRole("link", { name: `← Volver a ${reference.title}` }).click();
       await page.waitForURL(`${PORTAL}/destinos/${reference.slug}`);

@@ -4,3 +4,5 @@
  */
 export * from "./domain/passport/stamps";
 export * from "./domain/passport/rewards";
+// What a scanned QR means and the stop that comes next (C3 · Paso 5, ADR-064).
+export * from "./domain/passport/scan";

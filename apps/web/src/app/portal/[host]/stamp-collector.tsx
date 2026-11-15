@@ -11,7 +11,8 @@ import { useRef, useState } from "react";
 
 import { ensurePassportId, keepStamp, usePassport } from "@/lib/passport-store";
 
-import { stampWords } from "./passport-progress";
+import { sealDate, stampWords } from "./passport-progress";
+import { ProgressRing, StampSeal } from "./stamp-seal";
 
 export interface StampCircuitDto {
   readonly slug: string;
@@ -201,11 +202,27 @@ export function StampCollector({
           : `¡Sellado! Ya tienes el sello de «${title}».`
       : null;
 
+  // The seal of the place: inked once this phone has it, with a short «stamping» motion
+  // right after collecting it (none with reduced motion, see passport.css).
+  const shownStamp = state.step === "done" ? (passport?.stamps[placeId] ?? existing) : existing;
+  const justStamped = state.step === "done" && state.outcome !== "kept";
+
   return (
     <section className="stamp-collector" aria-labelledby="sello-titulo">
       <h2 id="sello-titulo" className="visually-hidden">
         Sellar
       </h2>
+      <div className="stamp-seal-box">
+        <StampSeal
+          id="sello-lugar"
+          title={title}
+          state={shownStamp ? "stamped" : "missing"}
+          date={shownStamp ? sealDate(shownStamp.at) : null}
+          located={shownStamp?.located ?? false}
+          size={176}
+          animate={justStamped}
+        />
+      </div>
       {existing && state.step !== "done" ? (
         <p className="stamp-existing">
           Ya tienes el sello de este lugar: {stampWords(existing).replace(/^Sellado/u, "sellado")}.
@@ -272,19 +289,22 @@ export function StampCollector({
             const progress = circuitProgress(circuit.stopIds, passport?.stamps ?? {});
             return (
               <li key={circuit.slug} data-complete={progress.complete}>
-                <a href={circuit.href}>{circuit.name}</a>:{" "}
-                {progress.complete ? (
-                  circuit.reward ? (
-                    <>
-                      ¡completaste el circuito! Premio: {sentence(circuit.reward)}{" "}
-                      <a href={`${circuit.href}#premio`}>Pedir mi premio</a>
-                    </>
+                <ProgressRing collected={progress.collected} total={progress.total} size={48} />
+                <span>
+                  <a href={circuit.href}>{circuit.name}</a>:{" "}
+                  {progress.complete ? (
+                    circuit.reward ? (
+                      <>
+                        ¡completaste el circuito! Premio: {sentence(circuit.reward)}{" "}
+                        <a href={`${circuit.href}#premio`}>Pedir mi premio</a>
+                      </>
+                    ) : (
+                      "¡completaste el circuito!"
+                    )
                   ) : (
-                    "¡completaste el circuito!"
-                  )
-                ) : (
-                  `${progress.collected} de ${progress.total} sellos.`
-                )}
+                    `${progress.collected} de ${progress.total} sellos.`
+                  )}
+                </span>
               </li>
             );
           })}

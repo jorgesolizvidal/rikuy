@@ -129,6 +129,7 @@ export * from "./domain/reports/monthly";
 export * from "./domain/passport/circuits";
 export * from "./application/passport/circuits";
 export * from "./domain/passport/stamps";
+export * from "./domain/passport/scan";
 export * from "./application/passport/stamps";
 export * from "./domain/passport/rewards";
 export * from "./application/passport/rewards";
