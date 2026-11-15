@@ -275,7 +275,8 @@ describe("the municipality's panel with the design system (ADR-066)", () => {
         .evaluate((cell) => getComputedStyle(cell, "::before").content),
     ).toBe('"Estado"');
 
-    // A disabled button is grey, not the panel's color.
+    // «Nuevo destino» opens the form; its disabled button is grey, not the panel's color.
+    await page.locator("summary", { hasText: "Nuevo destino" }).click();
     const create = page.getByRole("button", { name: "Crear destino" });
     expect(await create.isDisabled()).toBe(true);
     const disabled = await create.evaluate((button) => {

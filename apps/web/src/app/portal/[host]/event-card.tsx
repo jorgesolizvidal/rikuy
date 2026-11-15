@@ -1,6 +1,7 @@
 import {
   eventDateBadge,
   formatEventSchedule,
+  formatEventShort,
   PORTAL_PATHS,
   type PublishedEventSummary,
 } from "@rikuy/core";
@@ -51,7 +52,6 @@ export function EventCard({
               />
             ) : null}
             {date}
-            <CardFlags tour={badges.tour} />
           </span>
         ) : (
           date
@@ -59,11 +59,15 @@ export function EventCard({
         <span className="portal-event-text">
           {badges.category ? <span className="portal-card-kicker">{badges.category}</span> : null}
           <Heading className="portal-event-title">{event.title}</Heading>
-          <span className="portal-event-when">{formatEventSchedule(event.schedule)}</span>
+          <span className="portal-event-when">
+            <span aria-hidden="true">{formatEventShort(event.schedule)}</span>
+            <span className="visually-hidden">{formatEventSchedule(event.schedule)}</span>
+          </span>
           {event.venue ? <span className="portal-event-where">{event.venue.title}</span> : null}
           {photo && event.summary ? (
             <span className="portal-event-summary">{event.summary}</span>
           ) : null}
+          <CardFlags tour={badges.tour} placement="text" />
           {event.location ? <DistanceText point={event.location} compact /> : null}
         </span>
       </a>

@@ -4,57 +4,24 @@
 
 /* ── A list's header ────────────────────────────────────────────────────── */
 
-.portal-listing-head {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 1.5rem 2.5rem;
-}
-
-.portal-listing-head .portal-kicker {
-  margin-bottom: 0.75rem;
-}
-
-.portal-facts {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.75rem;
-  margin: 0;
-}
-
-.portal-facts > div {
-  display: flex;
-  flex-direction: column-reverse;
-  min-width: 6.5rem;
-  padding: 0.75rem 1rem;
-  border-radius: var(--radius-card);
-  background: var(--surface);
-  box-shadow: var(--shadow-card);
-  border: 1px solid var(--line);
-}
-
-.portal-facts dt {
-  color: var(--muted);
-  font-size: 0.8125rem;
-  font-weight: 600;
-  line-height: 1.3;
-  max-width: 10ch;
-}
-
-.portal-facts dd {
-  margin: 0;
-  font-family: var(--font-display);
-  font-size: 1.75rem;
-  font-weight: var(--title-weight);
-  line-height: 1.1;
-  color: var(--brand);
+.portal-listing-head .portal-lead {
+  margin-top: 0.5rem;
 }
 
 /* ── Search and categories ──────────────────────────────────────────────── */
 
 .portal-list-tools {
-  margin-top: 1.75rem;
+  margin-top: 1.25rem;
+  gap: 0.5rem 0.75rem;
+}
+
+/* On a phone the two tools share one row (C3 · Paso 8). */
+@media (max-width: 40rem) {
+  .portal-list-tools .portal-button,
+  .portal-list-tools .portal-location-button {
+    padding-inline: 0.875rem;
+    font-size: 0.9375rem;
+  }
 }
 
 .portal-filters {
@@ -197,7 +164,11 @@
     var(--tint);
 }
 
+/* Absolute, so the photo fills the block whatever its height (beside the text on a
+   computer the block is as tall as the text; C3 · Paso 8 fixed a strip below the photo). */
 .portal-event-media img {
+  position: absolute;
+  inset: 0;
   display: block;
   width: 100%;
   height: 100%;
@@ -209,10 +180,6 @@
   left: 0.875rem;
   bottom: 0.875rem;
   box-shadow: 0 0.25rem 0.75rem rgb(0 0 0 / 30%);
-}
-
-.portal-event[data-photo] .portal-card-flags {
-  left: auto;
 }
 
 .portal-event[data-photo] .portal-event-text {
@@ -248,6 +215,19 @@
   }
 }
 
+/* The home's upcoming events use the page's width on a computer (C3 · Paso 8). */
+@media (min-width: 64rem) {
+  .portal-section .portal-events[data-layout="list"] {
+    grid-template-columns: repeat(auto-fill, minmax(20rem, 1fr));
+    max-width: none;
+  }
+}
+
+/* The home's last section keeps its distance from the footer (C3 · Paso 8). */
+.home-section:last-child {
+  padding-bottom: clamp(3rem, 8vh, 5rem);
+}
+
 /* ── Banners: recorridos 360°, pasaporte, asistente ─────────────────────── */
 
 .home-banner {
@@ -260,16 +240,11 @@
   justify-content: space-between;
   gap: 1.5rem 2rem;
   max-width: 72rem;
-  margin: clamp(2.5rem, 8vh, 4.5rem) var(--gutter) 0;
-  padding: clamp(1.75rem, 5vw, 3rem);
-  border-radius: calc(var(--radius-card) * 1.25);
+  margin: clamp(2.5rem, 8vh, 4.5rem) var(--edge) 0;
+  padding: clamp(1.5rem, 4vw, 2.25rem) clamp(1.5rem, 4vw, 2.5rem);
+  border-radius: var(--radius-card);
   background: var(--brand);
   color: var(--on-brand);
-}
-
-/* Inside a page (Destinos, Agenda) the page already has its gutter. */
-.portal-page .home-banner {
-  margin-inline: 0;
 }
 
 .home-banner-text {
@@ -281,25 +256,22 @@
 .home-banner h3 {
   margin: 0;
   font-family: var(--font-display);
-  font-size: clamp(1.625rem, 4vw, 2.5rem);
+  font-size: clamp(1.5rem, 3.2vw, 2rem);
   font-weight: var(--title-weight);
-  line-height: 1.05;
+  line-height: 1.1;
   letter-spacing: var(--title-tracking);
 }
 
 .home-banner p {
-  margin: 0.75rem 0 0;
+  margin: 0.5rem 0 0;
   max-width: 46ch;
 }
 
-.home-banner .portal-kicker {
-  margin: 0 0 0.75rem;
-  color: inherit;
-  opacity: 0.85;
+.home-banner-text .portal-button {
+  margin-top: 1.25rem;
 }
 
 .home-banner .portal-button {
-  margin-top: 1.5rem;
   border-color: var(--on-brand);
   color: var(--on-brand);
 }
@@ -352,14 +324,6 @@
   font-weight: 650;
 }
 
-.home-banner-seal {
-  flex: none;
-  width: clamp(5.5rem, 14vw, 8rem);
-  height: auto;
-  opacity: 0.75;
-  rotate: -8deg;
-}
-
 .home-banner[data-kind="assistant"] {
   background: var(--surface);
   color: var(--fg);
@@ -368,7 +332,6 @@
 }
 
 .home-banner[data-kind="assistant"] .portal-button {
-  margin-top: 0;
   border-color: var(--brand);
 }
 
@@ -398,18 +361,6 @@
   opacity: 0.85;
 }
 
-.portal[data-theme="immersive"] .portal-card-flags {
-  z-index: 1;
-}
-
-.portal[data-theme="immersive"] .portal-facts > div {
-  background: transparent;
-  box-shadow: none;
-  border-radius: 0;
-  border-width: 0 0 0 2px;
-  border-color: var(--brand);
-}
-
 .portal[data-theme="immersive"] .portal-event[data-photo] a {
   padding: 0;
   border: 1px solid var(--line);
@@ -433,10 +384,6 @@
   background: transparent;
   color: var(--fg);
   border: 2px solid var(--brand);
-}
-
-.portal[data-theme="immersive"] .home-banner[data-kind="passport"] .home-banner-seal {
-  color: var(--brand);
 }
 
 .portal[data-theme="immersive"] .home-banner[data-kind="passport"] .portal-button {
@@ -466,49 +413,34 @@
   margin-top: 1.75rem;
 }
 
-.portal-hero .portal-kicker {
-  display: inline-block;
-  margin-bottom: 1.25rem;
-  padding: 0.375rem 0.875rem;
-  border: 1px solid color-mix(in srgb, var(--brand) 40%, transparent);
-  border-radius: var(--radius-control);
-  max-width: 100%;
-  box-sizing: border-box;
-}
-
-/* With a photo: words on the left, the destination's photo on the right (on a phone, the
-   photo below the words). */
+/* With a photo (C3 · Paso 8, every theme): the photo fills the cover, edge to edge, and the
+   words sit on it, at its foot, over a dark veil that keeps them legible on any photo. */
 .portal-hero[data-variant="photo"] {
+  --fg: #ffffff;
+  --muted: #e2e6e3;
   display: grid;
-  gap: 2rem clamp(2rem, 5vw, 4rem);
-  align-items: center;
-  padding-block: clamp(2rem, 6vh, 4rem) clamp(2.5rem, 7vh, 4.5rem);
+  min-height: clamp(24rem, 72svh, 42rem);
+  align-content: end;
+  padding-block: clamp(5rem, 16vh, 9rem) clamp(2.25rem, 7vh, 4rem);
+  background: rgb(6 8 7);
+  color: var(--fg);
 }
 
-@media (min-width: 60rem) {
-  .portal-hero[data-variant="photo"] {
-    grid-template-columns: minmax(0, 1fr) minmax(0, 34rem);
-  }
-}
-
-.portal-hero[data-variant="photo"] h1 {
-  font-size: clamp(2.5rem, 7.5vw, 5rem);
+.portal-hero[data-variant="photo"]::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    linear-gradient(to top, rgb(6 8 7 / 90%) 0%, rgb(6 8 7 / 55%) 45%, rgb(6 8 7 / 10%) 100%),
+    linear-gradient(to right, rgb(6 8 7 / 45%) 0%, rgb(6 8 7 / 0%) 60%);
 }
 
 .home-hero-photo {
-  position: relative;
-  display: block;
-  overflow: hidden;
-  aspect-ratio: 4 / 3;
-  border-radius: calc(var(--radius-card) * 1.25);
-  background: var(--tint);
-  box-shadow: var(--shadow-card);
-  color: #ffffff;
-  text-decoration: none;
-}
-
-.portal .home-hero-photo {
-  color: #ffffff;
+  position: absolute;
+  inset: 0;
+  z-index: -2;
 }
 
 .home-hero-photo img {
@@ -518,42 +450,60 @@
   object-fit: cover;
 }
 
-.home-hero-caption {
+.portal[data-theme] .portal-hero[data-variant="photo"] h1 {
+  font-size: clamp(2.75rem, 8vw, 5.5rem);
+}
+
+.portal .portal-hero[data-variant="photo"] .portal-tagline {
+  margin-top: 1rem;
+  color: #ffffff;
+  max-width: 32ch;
+}
+
+.portal-hero[data-variant="photo"] .portal-intro {
+  color: var(--muted);
+}
+
+.portal-hero[data-variant="photo"] .portal-button-primary {
+  border-color: #ffffff;
+  background: #ffffff;
+  color: rgb(6 8 7);
+}
+
+.portal-hero[data-variant="photo"] :focus-visible {
+  outline-color: #ffffff;
+}
+
+/* The photo names its place, small, at the cover's lower right (on a phone, above it). */
+.portal .home-hero-credit {
   position: absolute;
-  inset: auto 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  justify-content: space-between;
-  gap: 0.25rem 1rem;
-  padding: 3rem 1.25rem 1.125rem;
-  background: linear-gradient(to top, rgb(6 8 7 / 88%), rgb(6 8 7 / 0%));
-}
-
-.home-hero-place {
-  font-family: var(--font-display);
-  font-size: 1.25rem;
-  font-weight: 750;
-  line-height: 1.2;
-}
-
-.home-hero-more {
-  font-size: 0.9375rem;
-  font-weight: 650;
+  inset: auto var(--edge) 0.875rem auto;
+  max-width: calc(100% - 2 * var(--gutter));
+  overflow: hidden;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #e2e6e3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   text-decoration: underline;
   text-underline-offset: 0.2em;
 }
 
-.home-hero-photo:hover .home-hero-place {
-  text-decoration: underline;
-  text-underline-offset: 0.2em;
+.portal .home-hero-credit:hover {
+  color: #ffffff;
+}
+
+@media (max-width: 40rem) {
+  .portal .home-hero-credit {
+    inset: 0.875rem var(--edge) auto auto;
+  }
 }
 
 /* ── Figures band ───────────────────────────────────────────────────────── */
 
 .home-figures {
   margin-top: clamp(0.5rem, 2vh, 1.5rem);
-  padding: clamp(1.75rem, 5vh, 2.75rem) var(--gutter);
+  padding: clamp(1.75rem, 5vh, 2.75rem) var(--edge);
   background: var(--brand);
   color: var(--on-brand);
 }
@@ -591,81 +541,14 @@
 
 /* ── Themes ─────────────────────────────────────────────────────────────── */
 
-/* Immersive: the photo fills the cover and the words sit on it, at its foot. */
+/* Immersive: the larger title, without the glow (the photo is the background). */
 .portal[data-theme="immersive"] .portal-hero[data-variant="photo"] {
-  --fg: #ffffff;
-  --muted: #e2e6e3;
-  grid-template-columns: none;
-  min-height: min(88vh, 46rem);
-  align-content: end;
-  padding-block: clamp(6rem, 22vh, 12rem) clamp(2rem, 6vh, 3.5rem);
+  padding-block: clamp(5rem, 16vh, 9rem) clamp(2.25rem, 7vh, 4rem);
   background: rgb(6 8 7);
-  color: var(--fg);
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] .home-hero-photo {
-  position: absolute;
-  inset: 0;
-  z-index: -2;
-  aspect-ratio: auto;
-  border-radius: 0;
-  box-shadow: none;
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"]::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  z-index: -1;
-  pointer-events: none;
-  background: linear-gradient(
-    to top,
-    rgb(6 8 7 / 94%) 0%,
-    rgb(6 8 7 / 70%) 40%,
-    rgb(6 8 7 / 20%) 100%
-  );
-}
-
-/* The photo's link stays usable: its caption on top, at the top right. */
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] .home-hero-caption {
-  inset: 1rem 1rem auto auto;
-  z-index: 1;
-  padding: 0.5rem 0.875rem;
-  border-radius: var(--radius-control);
-  background: rgb(6 8 7 / 70%);
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] .home-hero-place {
-  font-size: 1rem;
 }
 
 .portal[data-theme="immersive"] .portal-hero[data-variant="photo"] h1 {
   font-size: clamp(3rem, 11vw, 7.5rem);
-}
-
-.portal[data-theme="immersive"] .portal-hero .portal-kicker {
-  background: transparent;
-  padding-inline: 0;
-  border: 0;
-  letter-spacing: 0.14em;
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] .portal-kicker {
-  color: #ffffff;
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] .portal-button {
-  border-color: #ffffff;
-  color: #ffffff;
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] .portal-button-primary {
-  background: #ffffff;
-  color: rgb(6 8 7);
-}
-
-.portal[data-theme="immersive"] .portal-hero[data-variant="photo"] :focus-visible {
-  outline-color: #ffffff;
 }
 
 .portal[data-theme="immersive"] .home-figures {

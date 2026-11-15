@@ -10,6 +10,7 @@ import { useId, useRef, useState } from "react";
 
 import { confirmContentImageUploadAction, startContentImageUploadAction } from "../actions";
 import { QUOTA_MESSAGES } from "@/lib/quota-messages";
+import { PanelIcon } from "@/components/panel/panel-icon";
 
 export interface EditorImage {
   readonly assetId: string;
@@ -279,27 +280,33 @@ export function GalleryField({
               />
               <div className="photo-actions">
                 <button
+                  title="Subir"
                   type="button"
                   className="button button-quiet"
                   disabled={index === 0}
                   onClick={() => move(index, index - 1)}
                 >
-                  Subir<span className="visually-hidden"> la foto {index + 1}</span>
+                  <PanelIcon name="up" />
+                  <span className="visually-hidden">Subir la foto {index + 1}</span>
                 </button>
                 <button
+                  title="Bajar"
                   type="button"
                   className="button button-quiet"
                   disabled={index === value.length - 1}
                   onClick={() => move(index, index + 1)}
                 >
-                  Bajar<span className="visually-hidden"> la foto {index + 1}</span>
+                  <PanelIcon name="down" />
+                  <span className="visually-hidden">Bajar la foto {index + 1}</span>
                 </button>
                 <button
+                  title="Quitar"
                   type="button"
                   className="button button-quiet"
                   onClick={() => onChange(value.filter((_, at) => at !== index))}
                 >
-                  Quitar<span className="visually-hidden"> la foto {index + 1}</span>
+                  <PanelIcon name="remove" />
+                  <span className="visually-hidden">Quitar la foto {index + 1}</span>
                 </button>
               </div>
             </div>

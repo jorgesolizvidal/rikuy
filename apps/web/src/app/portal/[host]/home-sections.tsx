@@ -9,7 +9,7 @@ import { responsiveImage } from "@/server/portal-content";
 
 import { AssistantInvite } from "./assistant-invite";
 import { Contour } from "./contour";
-import { CardFlags, DestinationCard, type CardBadges } from "./destination-card";
+import { DestinationCard, type CardBadges } from "./destination-card";
 import { EventCard } from "./event-card";
 import { PassportSummary } from "./passport-progress";
 import { PortalImage } from "./portal-image";
@@ -19,7 +19,8 @@ import { PortalImage } from "./portal-image";
  * published; the page decides which ones, in which order and variant, from its brand.
  */
 
-const HERO_SIZES = "(min-width: 60rem) 34rem, 100vw";
+/** The cover photo fills the window's width, edge to edge. */
+const HERO_SIZES = "100vw";
 
 export interface HeroProps {
   readonly tenantId: string;
@@ -28,60 +29,55 @@ export interface HeroProps {
   readonly description: string;
   /** The destination whose photo is the cover, or null for the text cover. */
   readonly destination: PublishedDestinationSummary | null;
-  readonly destinationHasTour: boolean;
-  /** «Recorrido 360°» button when the general tour exists. */
+  /** «Empezar el recorrido 360°» when the general tour exists. */
   readonly tours: number;
-  readonly agenda: boolean;
 }
 
-/** The cover: the portal's name, its words and the way in; with a destination's photo. */
+/**
+ * The cover (C3 · Paso 8): the portal's name and its tagline over a destination's photo, and
+ * one way in. The menu already has every section, so the cover does not repeat them: the
+ * general tour when there is one, else the places. The photo names its place in a small
+ * link (the place is also in the list below, so no card of its own).
+ */
 export function HomeHero(props: HeroProps) {
   const photo = props.destination?.cover ? props.destination : null;
-  const actions = (
-    <div className="home-hero-actions">
-      {props.tours > 0 ? (
-        <a className="portal-button portal-button-primary" href={PORTAL_PATHS.generalTour}>
-          Empezar el recorrido 360°
-        </a>
-      ) : null}
-      <a
-        className={props.tours > 0 ? "portal-button" : "portal-button portal-button-primary"}
-        href={PORTAL_PATHS.destinations}
-      >
+  const action =
+    props.tours > 0 ? (
+      <a className="portal-button portal-button-primary" href={PORTAL_PATHS.generalTour}>
+        Empezar el recorrido 360°
+      </a>
+    ) : (
+      <a className="portal-button portal-button-primary" href={PORTAL_PATHS.destinations}>
         Ver los lugares
       </a>
-      {props.agenda ? (
-        <a className="portal-button" href={PORTAL_PATHS.agenda}>
-          Ver la agenda
-        </a>
-      ) : null}
-    </div>
-  );
+    );
   const text = (
     <div className="portal-hero-text">
-      {props.tagline ? <p className="portal-kicker">{props.tagline}</p> : null}
       <h1 id="portal-title">{props.siteName}</h1>
-      {props.description ? <p className="portal-intro">{props.description}</p> : null}
-      {actions}
+      {props.tagline ? (
+        <p className="portal-tagline">{props.tagline}</p>
+      ) : props.description ? (
+        <p className="portal-intro">{props.description}</p>
+      ) : null}
+      <div className="home-hero-actions">{action}</div>
     </div>
   );
 
   if (photo?.cover) {
     return (
       <section className="portal-hero" data-variant="photo" aria-labelledby="portal-title">
-        {text}
-        <a className="home-hero-photo" href={PORTAL_PATHS.destination(photo.slug)}>
+        <div className="home-hero-photo">
           <PortalImage
             image={responsiveImage(props.tenantId, photo.cover)}
             sizes={HERO_SIZES}
             // The largest element of the page on a phone and on a computer (LCP).
             priority
           />
-          <CardFlags tour={props.destinationHasTour} />
-          <span className="home-hero-caption">
-            <span className="home-hero-place">{photo.title}</span>
-            <span className="home-hero-more">Ver el lugar</span>
-          </span>
+        </div>
+        {text}
+        <a className="home-hero-credit" href={PORTAL_PATHS.destination(photo.slug)}>
+          <span className="visually-hidden">Foto: </span>
+          {photo.title}
         </a>
       </section>
     );
@@ -218,7 +214,6 @@ export function ToursBanner({
         />
       ) : null}
       <div className="home-banner-text">
-        <p className="portal-kicker">Desde tu celular o tu computadora</p>
         <h2 id="recorridos">Recorridos 360°</h2>
         <p>
           {tours === 1
@@ -233,49 +228,20 @@ export function ToursBanner({
   );
 }
 
-export function PassportBanner({
-  circuits,
-  headingLevel = 2,
-}: {
-  readonly circuits: number;
-  readonly headingLevel?: 2 | 3;
-}) {
+export function PassportBanner({ circuits }: { readonly circuits: number }) {
   if (circuits === 0) return null;
-  const Heading = headingLevel === 2 ? "h2" : "h3";
   return (
     <section className="home-banner" data-kind="passport" aria-labelledby="pasaporte">
       <div className="home-banner-text">
-        <p className="portal-kicker">Sellos con código QR</p>
-        <Heading id="pasaporte">Pasaporte turístico</Heading>
+        <h2 id="pasaporte">Pasaporte turístico</h2>
         <p>
-          Visita los lugares de un circuito, sella tu pasaporte con el código QR de cada uno y
-          llévate el premio del municipio.
+          Sella con el código QR de cada lugar de un circuito y llévate el premio del municipio.
         </p>
         <PassportSummary />
-        <a className="portal-button portal-button-primary" href={PORTAL_PATHS.passport}>
-          {circuits === 1 ? "Ver el circuito" : `Ver los ${String(circuits)} circuitos`}
-        </a>
       </div>
-      <svg className="home-banner-seal" aria-hidden="true" viewBox="0 0 120 120" focusable="false">
-        <circle cx="60" cy="60" r="54" fill="none" stroke="currentColor" strokeWidth="3" />
-        <circle
-          cx="60"
-          cy="60"
-          r="44"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2"
-          strokeDasharray="4 6"
-        />
-        <path
-          d="m40 61 13 13 27-28"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="7"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
+      <a className="portal-button portal-button-primary" href={PORTAL_PATHS.passport}>
+        {circuits === 1 ? "Ver el circuito" : `Ver los ${String(circuits)} circuitos`}
+      </a>
     </section>
   );
 }

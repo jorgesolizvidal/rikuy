@@ -168,7 +168,9 @@ export default function TourCanvas({
         defaultZoomLvl: zoomLevelOf(first.initialView.fov),
         minFov: MIN_FOV,
         maxFov: MAX_FOV,
-        navbar: ["zoom", "move"],
+        // Only zoom, floating in a corner (C3 · Paso 8): the tour bar below has the rest, and the
+        // arrows turn the view with the keyboard while it has focus.
+        navbar: ["zoom"],
         keyboard: false,
         mousewheelCtrlKey: true,
         touchmoveTwoFingers: false,

@@ -10,6 +10,7 @@ import {
 } from "@rikuy/core";
 
 import type { BrandingField, HomeFigureValues, HomeValues } from "./branding-fields";
+import { PanelIcon } from "@/components/panel/panel-icon";
 
 /** A destination the cover can show. */
 export interface CoverOption {
@@ -255,22 +256,26 @@ export function HomeFields({
                 )}
                 <span className="home-section-move">
                   <button
+                    title="Subir"
                     type="button"
                     className="button button-quiet"
                     disabled={index === 0}
                     aria-label={`Subir «${info.name}»`}
                     onClick={() => move(index, -1)}
                   >
-                    Subir
+                    <PanelIcon name="up" />
+                    <span className="visually-hidden">Subir</span>
                   </button>
                   <button
+                    title="Bajar"
                     type="button"
                     className="button button-quiet"
                     disabled={index === value.sections.length - 1}
                     aria-label={`Bajar «${info.name}»`}
                     onClick={() => move(index, 1)}
                   >
-                    Bajar
+                    <PanelIcon name="down" />
+                    <span className="visually-hidden">Bajar</span>
                   </button>
                 </span>
               </li>

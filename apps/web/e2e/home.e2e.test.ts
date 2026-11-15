@@ -171,14 +171,8 @@ describe("home by sections, categories and bottom bar (ADR-062)", () => {
     expect(sur).toMatch(/data-layout="cards"/u);
 
     const norte = await html(NORTE);
-    expect(sectionsOf(norte)).toEqual([
-      "figures",
-      "destinations",
-      "events",
-      "tours",
-      "passport",
-      "assistant",
-    ]);
+    // The default home (C3 · Paso 8, ADR-067): no figures band and no assistant section.
+    expect(sectionsOf(norte)).toEqual(["destinations", "events", "tours", "passport"]);
     // Without destination photos, the cover is the text one.
     expect(norte).toMatch(/class="portal-hero" data-variant="text"/u);
     // Real badges only: the passport's stops say so; nothing invented (no ratings).
@@ -308,26 +302,30 @@ describe("home by sections, categories and bottom bar (ADR-062)", () => {
       "Museos",
     ]);
 
-    // The home: events first and a figure of the municipality.
+    // The home: events first and the figures band, off by default (ADR-067), turned on.
     await page.goto(`${ADMIN}/o/demo-norte/configuracion`);
     await page.getByRole("group", { name: "Inicio del portal" }).waitFor();
     await page.getByRole("button", { name: "Subir «Próximos eventos»" }).click();
+    await page.getByRole("checkbox", { name: /^Cifras/u }).check();
     await page.locator("#home-figure-1-value").fill("1953");
     await page.locator("#home-figure-1-label").fill("Año de la primera feria");
     await accessible(page, "/configuracion");
     await page.getByRole("button", { name: "Publicar" }).click();
     await page.getByText(/Publicado\./u).waitFor({ timeout: 20_000 });
     const changed = await until(NORTE, (body) => body.includes("Año de la primera feria"));
-    expect(sectionsOf(changed).slice(0, 3)).toEqual(["figures", "events", "destinations"]);
+    expect(sectionsOf(changed).slice(0, 2)).toEqual(["events", "destinations"]);
+    expect(sectionsOf(changed)).toContain("figures");
     expect(changed).toMatch(/home-figure-value">1953</u);
 
     // Back to the seed's home and categories.
     await page.getByRole("button", { name: "Bajar «Próximos eventos»" }).click();
+    await page.getByRole("checkbox", { name: /^Cifras/u }).uncheck();
     await page.locator("#home-figure-1-value").fill("");
     await page.locator("#home-figure-1-label").fill("");
     await page.getByRole("button", { name: "Publicar" }).click();
     const restored = await until(NORTE, (body) => !body.includes("Año de la primera feria"));
-    expect(sectionsOf(restored).slice(0, 3)).toEqual(["figures", "destinations", "events"]);
+    expect(sectionsOf(restored).slice(0, 2)).toEqual(["destinations", "events"]);
+    expect(sectionsOf(restored)).not.toContain("figures");
     await page.goto(`${ADMIN}/o/demo-norte/categorias`);
     await destinations.getByRole("button", { name: "Quitar «Museos»" }).click();
     await destinations.getByRole("button", { name: "Guardar" }).click();

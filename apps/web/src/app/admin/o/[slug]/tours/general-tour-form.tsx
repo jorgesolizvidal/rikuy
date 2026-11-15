@@ -8,6 +8,7 @@ import { useId, useState, useTransition } from "react";
 
 import { saveGeneralTourAction, type SaveGeneralTourState } from "./actions";
 import { KIND } from "./labels";
+import { PanelIcon } from "@/components/panel/panel-icon";
 
 /**
  * The general tour's order and the tour it starts with (P4 · Paso 5). Every tour with a
@@ -106,20 +107,24 @@ export function GeneralTourForm({
                     Empezar aquí
                   </label>
                   <button
+                    title="Subir"
                     type="button"
                     className="button button-quiet"
                     disabled={index === 0 || pending}
                     onClick={() => move(index, -1)}
                   >
-                    Subir<span className="visually-hidden"> «{title}»</span>
+                    <PanelIcon name="up" />
+                    <span className="visually-hidden">Subir «{title}»</span>
                   </button>
                   <button
+                    title="Bajar"
                     type="button"
                     className="button button-quiet"
                     disabled={index === order.length - 1 || pending}
                     onClick={() => move(index, 1)}
                   >
-                    Bajar<span className="visually-hidden"> «{title}»</span>
+                    <PanelIcon name="down" />
+                    <span className="visually-hidden">Bajar «{title}»</span>
                   </button>
                 </span>
               ) : null}

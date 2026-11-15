@@ -140,16 +140,21 @@ export interface HomeLayout {
 }
 
 /**
+ * Sections a brand turns on itself (C3 · Paso 8, ADR-067): the figures band repeated what the
+ * lists below already count, and the assistant has its own button on every page.
+ */
+const OPT_IN_SECTIONS: readonly HomeSectionKey[] = ["figures", "assistant"];
+
+/**
  * The platform's home when a brand has none: the photo of the first destination that has
- * one, the figures, and every section in the catalog's order and default variant.
+ * one and the catalog's sections in its order and default variant, without the opt-in ones.
  */
 export const DEFAULT_HOME: HomeLayout = {
   hero: { variant: "photo", destinationId: null },
   figures: [],
-  sections: HOME_SECTIONS.map((section) => ({
-    key: section.key,
-    variant: section.variants[0]?.key ?? "",
-  })),
+  sections: HOME_SECTIONS.filter((section) => !OPT_IN_SECTIONS.includes(section.key)).map(
+    (section) => ({ key: section.key, variant: section.variants[0]?.key ?? "" }),
+  ),
 };
 
 /** The sections this municipality can show (its modules), in its order. */
@@ -242,22 +247,25 @@ export const BOTTOM_BAR_SIZE = 5;
 
 /**
  * The phone's bottom bar, by what the municipality has (decided with the user: no
- * configuration). Always «Inicio» and «Destinos», then the agenda, the passport, the map and
- * the tours, in that order. When they do not fit, the bar keeps four and the rest go into
- * «Más».
+ * configuration). Always «Inicio» and «Destinos», then the 360° tours, the agenda and the
+ * passport (C3 · Paso 8, ADR-067). The map is reached from «Destinos» (its list links to it),
+ * so it takes a place only when the bar has room: with all five, nothing goes into «Más».
  */
 export function bottomBar(sections: PortalSections): {
   readonly items: readonly BottomBarItem[];
   readonly more: readonly BottomBarItem[];
 } {
-  const all: BottomBarItem[] = [
+  const main: BottomBarItem[] = [
     { key: "home", label: "Inicio" },
     { key: "destinations", label: "Destinos" },
+    ...(sections.tours ? [{ key: "tours" as const, label: "360°" }] : []),
     ...(sections.agenda ? [{ key: "agenda" as const, label: "Agenda" }] : []),
     ...(sections.passport ? [{ key: "passport" as const, label: "Pasaporte" }] : []),
-    ...(sections.map ? [{ key: "map" as const, label: "Mapa" }] : []),
-    ...(sections.tours ? [{ key: "tours" as const, label: "Tours 360°" }] : []),
   ];
+  const all =
+    sections.map && main.length < BOTTOM_BAR_SIZE
+      ? [...main, { key: "map" as const, label: "Mapa" }]
+      : main;
   if (all.length <= BOTTOM_BAR_SIZE) return { items: all, more: [] };
   return { items: all.slice(0, BOTTOM_BAR_SIZE - 1), more: all.slice(BOTTOM_BAR_SIZE - 1) };
 }

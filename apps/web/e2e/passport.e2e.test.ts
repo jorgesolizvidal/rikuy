@@ -165,6 +165,8 @@ describe("the tourist passport's circuits (ADR-056)", () => {
     expect(await page.getByRole("link", { name: "Ruta del valle" }).count()).toBe(1);
     await accessible(page);
 
+    // «Nuevo circuito» opens the form (C3 · Paso 8).
+    await page.locator("summary", { hasText: "Nuevo circuito" }).click();
     await page.getByLabel("Nombre del circuito").fill("Ruta de prueba");
     expect(await page.getByLabel("Dirección en el portal").inputValue()).toBe("ruta-de-prueba");
     await page.getByRole("button", { name: "Crear circuito" }).click();
@@ -227,7 +229,7 @@ describe("the tourist passport's circuits (ADR-056)", () => {
 
   it("lets an editor build drafts, never change a published circuit", async () => {
     const { context, page } = await signedIn(EDITOR_EMAIL);
-    await page.goto(`${ADMIN}/o/demo-norte/pasaporte`);
+    await page.goto(`${ADMIN}/o/demo-norte/pasaporte?nuevo`);
     await page.getByLabel("Nombre del circuito").fill("Borrador del editor");
     await page.getByRole("button", { name: "Crear circuito" }).click();
     await page.waitForURL(/\/o\/demo-norte\/pasaporte\/[0-9a-f-]{36}$/u);

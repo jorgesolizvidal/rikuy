@@ -1,10 +1,4 @@
-import {
-  loadPanelOverview,
-  MODULE_KEYS,
-  MODULE_NAMES,
-  ROLE_LABELS,
-  type PanelContentCounts,
-} from "@rikuy/core";
+import { canEditContent, hasModule, loadPanelOverview, type PanelContentCounts } from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -49,17 +43,42 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
     content: session.content,
   });
   const base = `/o/${membership.slug}`;
-  const modules = membership.modules ?? MODULE_KEYS;
+  const canEdit = canEditContent(membership.role);
   const { portal, visits, questions, review, content } = overview;
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide panel-home">
       <div className="branding-heading">
         <h1 className="title title-sm">{membership.displayName}</h1>
-        <p className="lead">
-          Tu rol: {ROLE_LABELS[membership.role]}. Aquí está lo principal del portal; en el menú,
-          cada sección.
-        </p>
+        {/* What people come here to do (C3 · Paso 8): one tap away, by role and module. */}
+        <ul className="panel-quick" aria-label="Acciones rápidas">
+          {canEdit ? (
+            <li>
+              <Link prefetch={false} className="button" href={`${base}/destinos?nuevo`}>
+                Nuevo destino
+              </Link>
+            </li>
+          ) : null}
+          {canEdit && hasModule(membership.modules, "agenda") ? (
+            <li>
+              <Link prefetch={false} className="button button-quiet" href={`${base}/agenda?nuevo`}>
+                Nuevo evento
+              </Link>
+            </li>
+          ) : null}
+          {portal.hostname ? (
+            <li>
+              <a
+                className="button button-quiet"
+                href={platformSettings().portalOrigin(portal.hostname)}
+                target="_blank"
+                rel="noopener"
+              >
+                Ver el portal<span className="visually-hidden"> (se abre en otra pestaña)</span>
+              </a>
+            </li>
+          ) : null}
+        </ul>
       </div>
 
       <section aria-labelledby="resumen" className="panel-summary">
@@ -179,11 +198,6 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
         ) : null}
       </section>
 
-      <p className="field-hint org-modules">
-        Módulos de este municipio:{" "}
-        {modules.length > 0 ? modules.map((key) => MODULE_NAMES[key]).join(", ") : "ninguno"}. Los
-        activa el operador de la plataforma.
-      </p>
       {membership.demo ? (
         <p className="notice">
           Es una demo comercial: su portal no aparece en buscadores y avisa a los visitantes que es

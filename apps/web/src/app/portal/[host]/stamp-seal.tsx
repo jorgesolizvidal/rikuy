@@ -24,6 +24,7 @@ export function StampSeal({
   located = false,
   size = 112,
   animate = false,
+  rim = true,
 }: {
   /** Unique on the page: names the circle the text runs along. */
   readonly id: string;
@@ -36,6 +37,8 @@ export function StampSeal({
   readonly size?: number;
   /** The «stamping» motion right after collecting it (none with reduced motion). */
   readonly animate?: boolean;
+  /** The name around the rim; off where the seal is too small to read it (C3 · Paso 8). */
+  readonly rim?: boolean;
 }) {
   const path = `${id}-rim`;
   return (
@@ -55,11 +58,13 @@ export function StampSeal({
       </defs>
       <circle className="stamp-seal-outer" cx="60" cy="60" r="56" />
       <circle className="stamp-seal-inner" cx="60" cy="60" r="36" />
-      <text className="stamp-seal-rim">
-        <textPath href={`#${path}`} startOffset="50%" textAnchor="middle">
-          {rimText(title)}
-        </textPath>
-      </text>
+      {rim ? (
+        <text className="stamp-seal-rim">
+          <textPath href={`#${path}`} startOffset="50%" textAnchor="middle">
+            {rimText(title)}
+          </textPath>
+        </text>
+      ) : null}
       {state === "stamped" ? (
         <>
           <path className="stamp-seal-mark" d="m47 58 9 9 18-19" />

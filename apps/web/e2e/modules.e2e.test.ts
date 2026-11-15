@@ -249,10 +249,17 @@ describe("the modules of a municipality (ADR-060)", () => {
       ).toBe(0);
     }
     expect(await owner.getByRole("link", { name: /^Copilot/u }).count()).toBe(1);
-    expect(
-      await owner.getByText(/Módulos de este municipio: Asistente del visitante/u).count(),
-    ).toBe(1);
+    // The quick actions follow the modules too (C3 · Paso 8).
+    expect(await owner.getByRole("link", { name: "Nuevo destino" }).count()).toBe(1);
+    expect(await owner.getByRole("link", { name: "Nuevo evento" }).count()).toBe(0);
     await accessible(owner, "/o/demo-sur sin módulos");
+    await owner.goto(`${ADMIN}/o/demo-sur/uso`);
+    expect(
+      await owner
+        .locator(".usage-modules")
+        .getByText(/^Asistente del visitante/u)
+        .count(),
+    ).toBe(1);
     for (const path of ["agenda", "tours", "panoramas", "modelos", "pasaporte"]) {
       const response = await owner.goto(`${ADMIN}/o/demo-sur/${path}`);
       expect(response?.status(), path).toBe(404);
