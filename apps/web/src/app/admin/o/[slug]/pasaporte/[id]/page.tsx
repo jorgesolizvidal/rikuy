@@ -13,7 +13,6 @@ import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
-import { SignOutButton } from "../../../../sign-out-button";
 import { PortalShare } from "../../destinos/[id]/portal-share";
 import { CircuitEditor } from "./circuit-editor";
 import { RedeemPinForm } from "./redeem-pin";
@@ -47,7 +46,6 @@ export default async function CircuitAdminPage({ params }: CircuitPageProps) {
         <Link href={`/o/${membership.slug}/pasaporte`} className="eyebrow">
           ← Pasaporte turístico
         </Link>
-        <SignOutButton />
       </header>
       <div className="branding-heading">
         <h1 className="title title-sm">{circuit.name}</h1>

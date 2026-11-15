@@ -25,7 +25,6 @@ import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { RecommendationsForm } from "./recommendations-form";
 import "./statistics.css";
 
@@ -103,12 +102,6 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Estadísticas</h1>
         <p className="lead">

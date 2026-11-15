@@ -406,7 +406,7 @@ export function BrandingForm({
         </fieldset>
 
         {canEdit ? (
-          <div className="form-actions branding-actions">
+          <div className="form-actions branding-actions sticky-actions">
             <button
               type="submit"
               name="intent"

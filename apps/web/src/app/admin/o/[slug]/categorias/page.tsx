@@ -1,11 +1,9 @@
 import { hasModule, loadCategories } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { CategoryList } from "./category-list";
 
 export const metadata: Metadata = { title: "Categorías" };
@@ -26,12 +24,6 @@ export default async function CategoriesPage({ params }: CategoriesPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Categorías</h1>
         <p className="lead">

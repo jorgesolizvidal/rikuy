@@ -5,7 +5,6 @@ import Link from "next/link";
 import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { KnowledgeSearchForm, NewKnowledgeForm } from "./knowledge-forms";
 
 export const metadata: Metadata = { title: "Conocimiento del asistente" };
@@ -13,7 +12,7 @@ export const metadata: Metadata = { title: "Conocimiento del asistente" };
 const STATUS = {
   draft: { label: "Borrador", detail: "El asistente todavía no lo usa" },
   published: { label: "Publicado", detail: "El asistente lo usa" },
-  changed: { label: "Publicado", detail: "Con cambios sin publicar" },
+  changed: { label: "Con cambios", detail: "El asistente usa la versión publicada" },
   retired: { label: "Retirado", detail: "El asistente ya no lo usa" },
 } as const;
 
@@ -50,12 +49,6 @@ export default async function KnowledgePage({ params, searchParams }: KnowledgeP
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Conocimiento del asistente</h1>
         <p className="lead">
@@ -94,7 +87,7 @@ export default async function KnowledgePage({ params, searchParams }: KnowledgeP
           </p>
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-labelledby="documentos">
-            <table className="data-table">
+            <table className="data-table data-table-cards">
               <caption className="visually-hidden">
                 Textos y documentos de {membership.displayName}
               </caption>
@@ -113,7 +106,7 @@ export default async function KnowledgePage({ params, searchParams }: KnowledgeP
                         {item.title}
                       </Link>
                     </td>
-                    <td>
+                    <td data-label="Estado">
                       <span
                         className="status-pill"
                         data-status={item.status === "retired" ? "draft" : item.status}
@@ -122,7 +115,9 @@ export default async function KnowledgePage({ params, searchParams }: KnowledgeP
                       </span>
                       <span className="cell-detail">{STATUS[item.status].detail}</span>
                     </td>
-                    <td>{DATE.format(new Date(item.updatedAt))}</td>
+                    <td data-label="Última modificación">
+                      {DATE.format(new Date(item.updatedAt))}
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -143,7 +138,7 @@ export default async function KnowledgePage({ params, searchParams }: KnowledgeP
         </p>
         {overview.sources.length > 0 ? (
           <div className="table-wrap" tabIndex={0} role="region" aria-labelledby="sabe">
-            <table className="data-table">
+            <table className="data-table data-table-cards">
               <caption className="visually-hidden">
                 Publicaciones que lee el asistente de {membership.displayName}
               </caption>
@@ -161,8 +156,10 @@ export default async function KnowledgePage({ params, searchParams }: KnowledgeP
                       {source.title}
                       <span className="cell-detail">Versión {source.revisionNo}</span>
                     </td>
-                    <td>{source.source === "tour" ? "Tour 360°" : KIND[source.kind]}</td>
-                    <td>
+                    <td data-label="Tipo">
+                      {source.source === "tour" ? "Tour 360°" : KIND[source.kind]}
+                    </td>
+                    <td data-label="Lectura">
                       {source.chunks !== null ? (
                         <span>
                           Leído

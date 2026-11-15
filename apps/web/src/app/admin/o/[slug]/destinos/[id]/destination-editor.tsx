@@ -468,7 +468,7 @@ export function DestinationEditor({
       ) : null}
 
       {canEdit ? (
-        <div className="form-actions branding-actions">
+        <div className="form-actions branding-actions sticky-actions">
           {canPublish ? (
             <button
               type="submit"

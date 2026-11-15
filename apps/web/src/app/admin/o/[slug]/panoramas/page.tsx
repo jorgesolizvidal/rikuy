@@ -1,11 +1,9 @@
 import { loadPanoramas } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { AutoRefresh } from "./auto-refresh";
 import { formatMegabytes, PANORAMA_STATUS, panoramaDetail } from "./labels";
 import { MediaAssetActions } from "./media-asset-actions";
@@ -31,12 +29,6 @@ export default async function PanoramasPage({ params }: PanoramasPageProps) {
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
       <AutoRefresh active={processing} />
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Panoramas 360°</h1>
         <p className="lead">

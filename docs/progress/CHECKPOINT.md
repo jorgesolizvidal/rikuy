@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 6 — asistente ✅
-- **Rama:** `feat/c3-step6-assistant` → PR hacia `main`
+- **Fase:** C3 — rediseño de la interfaz ✅. C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** C3 · Paso 7 — panel del municipio ✅
+- **Rama:** `feat/c3-step7-panel` → PR hacia `main`
 
 ## Historial
 
@@ -2554,17 +2554,47 @@ Lo que encontró el CI del push, ya corregido:
 - La conversación guardada en el teléfono conserva las tarjetas como llegaron: un lugar que cambia de foto se ve con la anterior en las respuestas viejas.
 - Las preguntas frecuentes siguen siendo fijas (por página); no salen de las preguntas reales de los visitantes.
 
+### C3 · Paso 7 — panel del municipio ✅
+
+- Decisiones del usuario ([ADR-066](../adr/ADR-066-panel-design.md)), 2026-11-14:
+  - **menú lateral agrupado** (Contenido, Para visitantes, Resultados, Ajustes) con la sección actual marcada; en el celular, un botón «Menú»; solo los módulos del municipio y lo que el rol puede usar;
+  - **resumen con datos reales** arriba de la página del municipio, cada número con su enlace;
+  - **colores neutros de Rikuy**, iguales para todos los municipios; la marca del municipio, solo en su vista previa y en su portal;
+  - **retoques:** botones y estados coherentes, listas como tarjetas en el celular y formularios largos en secciones con «Publicar / Guardar» a la vista.
+- Sin cambios en la base de datos.
+- `@rikuy/core`: `loadPanelOverview` (`application/panel/overview.ts`): dirección del portal, visitas de 7 días con la comparación de «Estadísticas» (sin leer el pasaporte), preguntas sin respuesta de 7 días (con el asistente), la revisión del Copilot (contenidos y escenas, con el Copilot) y cuántos destinos y eventos están publicados, con cambios o en borrador. Lo que no se puede leer queda fuera, nunca como cero.
+- Web:
+  - **`app/admin/o/[slug]/layout.tsx`**: todas las páginas del municipio con el menú (`panel-nav.tsx`). Los grupos salen de `panelNav` (`src/lib/panel-nav.ts`, módulos y rol) y la página actual de `currentNavHref` (un editor pertenece a su lista). En el menú están «Tus municipios» y «Cerrar sesión»; las páginas ya no repiten «← Municipio» ni «Cerrar sesión» (las de detalle conservan su «← Destinos…»);
+  - en el celular (menos de 64 rem) el menú abre con «Menú» (`aria-expanded`), se cierra con Escape (el foco vuelve al botón) y al elegir una página;
+  - **sin precarga en el menú** (`prefetch={false}`): las pruebas encontraron que Next.js precargaba los ~16 enlaces en cada visita y tras cada actualización (cada uno, un renderizado en el servidor), y la página tardaba más de 5 s en mostrar las recomendaciones recién generadas;
+  - **página del municipio**: «Resumen» con Portal («En línea» o «En preparación» y su dirección), «Visitas · últimos 7 días» (con ▲/▼), «Preguntas sin respuesta», «Revisión del Copilot» y «Contenido», cada uno con su enlace; la lista larga de tarjetas sale (está en el menú);
+  - **aspecto** (`admin.css`, en `.admin`): paleta propia con acento verde `#1e5b47`, peligro, aviso y modo oscuro, todos ≥ 4,5:1; la fuente del tema «Editorial» (`themeFontFaces("editorial")`) precargada desde el layout del panel;
+  - botones principal, secundario y de peligro; **deshabilitado en gris** con `cursor: not-allowed`; estados «Publicado» (verde), **«Con cambios»** (ámbar; antes decía «Publicado»), «Borrador» (punteado) y fallidos (rojo), siempre con su texto;
+  - **listas como tarjetas** a menos de 40 rem (destinos, agenda, tours, pasaporte, conocimiento, Copilot y miembros), con el nombre de cada columna (`data-label`); las tablas de cifras siguen desplazándose;
+  - **editores en secciones** (destino, evento, conocimiento y marca): cada bloque con borde y título, y la barra «Publicar / Guardar borrador» fija abajo mientras se desplaza el formulario.
+- CI: nuevo paso **«Panel in a real browser»** (grupo de contratos).
+- Tests:
+  - unitarios: core 723 (+4: el resumen, sin módulos, sin comparación y una parte que falla), web 59 (+5: el menú por módulos, rol y demo, y la sección marcada);
+  - **e2e en un navegador real** (`panel.e2e.test.ts`, 4 casos): en la PC, el menú con sus grupos, «Inicio» marcado, ninguna precarga de páginas, el portal en línea con su dirección y cada número del resumen igual al de su página (estadísticas, preguntas, revisión del Copilot y lista de destinos), y el editor de un destino marca «Destinos»; un editor sin «Miembros» y con todas sus entradas abriendo; en el celular, «Menú», Escape con el foco de vuelta, cerrar al elegir una página, listas como tarjetas con el nombre de la columna, «Crear destino» deshabilitado en gris, un borrador sobre el mirador que muestra «Con cambios» con la barra a la vista, y descartarlo; el mismo aspecto en Demo Norte y Demo Sur; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - contratos RC-09/10/11/12 (216), portales (161) y las e2e del panel (Copilot, segundo factor, dirección, medios, borrar tours, preguntas, recomendaciones, métricas, estadísticas, informe mensual, pasaporte, sellos, premio, métricas del pasaporte, módulos, temas, inicio, fichas y evaluación) en verde.
+- Lo que encontraron las pruebas, ya corregido: la página de la marca desbordaba a 360 px (los bloques con borde agrandaban el formulario); un botón-enlace dentro de una tabla tomaba el color del texto sobre el fondo verde; la precarga del menú.
+- Verificado en local, en el navegador (390 y 1280 px, claro y oscuro): inicio con el resumen, destinos, editor con la barra fija, miembros, marca, Copilot, uso y tours; el menú abierto en el celular; al imprimir el informe el menú no sale.
+
+**Desviaciones:**
+
+- El resumen no tiene una cifra del pasaporte (está en «Estadísticas» y en el informe).
+- Las páginas de la plataforma (operador) toman los colores nuevos, pero no tienen menú propio.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el celular, abre Ucureña: el botón del asistente es un círculo con el ícono sobre la barra inferior.
-- Ábrelo: arriba el logo, «Chaski», «Asistente de Explora Ucureña» y «Responde con lo publicado»; el saludo en una tarjeta y las preguntas frecuentes con íconos.
-- Pregunta por un lugar (por ejemplo, el museo): en «Fuentes» aparece su tarjeta con la foto, la categoría y «Sello del pasaporte» (o «✓ Sellado en tu pasaporte» si ya lo sellaste).
-- Toca «Ruta sugerida»: la tarjeta con la foto, paradas, recorrido, tiempo a pie, sellos y «Ver la ruta en el mapa».
-- En la PC, el botón conserva el nombre y el panel se abre a la derecha.
+- Tras el merge, entra al panel y abre Ucureña: a la izquierda el menú con «Contenido», «Para visitantes», «Resultados» y «Ajustes»; arriba, el «Resumen» con el portal en línea, las visitas de 7 días, las preguntas sin respuesta, la revisión del Copilot y el contenido. Toca cada enlace del resumen: la página muestra el mismo número.
+- Abre «Destinos»: el estado «Con cambios» en ámbar si un destino tiene un borrador sin publicar. Abre uno: la barra «Publicar / Guardar borrador» queda abajo mientras bajas.
+- En el celular, «Menú» abre y cierra las secciones, y las listas se ven como tarjetas.
+- Abre Demo Norte: el panel se ve igual (los colores de cada municipio solo están en su portal y en la vista previa de la marca).
 
 ## Siguiente paso
 
-**C3 · Paso 7 — panel del municipio, con un retoque más liviano** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): el panel con el sistema de diseño sin perder sus contratos. Antes de empezar, confirmar con el usuario qué cambia.
+**C4 — portal en español e inglés** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): definir con el usuario los pasos de C4 (selector, direcciones por idioma, `hreflang`, traducción del contenido) antes de empezar.
 
 ## Decisiones pendientes del usuario
 

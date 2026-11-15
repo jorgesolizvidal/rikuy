@@ -1,13 +1,11 @@
 import { loadBrandingEditor, logoPreviewUrl, ROLE_LABELS, THEME_STYLES } from "@rikuy/core";
 import type { Metadata } from "next";
-import Link from "next/link";
 
 import { themeFontFaces } from "@/lib/theme-fonts";
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { BrandingForm } from "./branding-form";
 import { valuesFromPresentation } from "./branding-fields";
 
@@ -42,12 +40,6 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
       <style href="rikuy-theme-fonts-preview" precedence="default">
         {THEME_STYLES.map(themeFontFaces).join("")}
       </style>
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
 
       <div className="branding-heading">
         <h1 className="title title-sm">Marca del portal</h1>

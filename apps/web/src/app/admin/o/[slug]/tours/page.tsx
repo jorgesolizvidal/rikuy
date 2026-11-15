@@ -7,7 +7,6 @@ import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 import { tourCandidates } from "@/server/tour-candidates";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { PortalShare } from "../destinos/[id]/portal-share";
 import { GeneralTourForm } from "./general-tour-form";
 import { KIND, scenesLabel, TOUR_STATUS } from "./labels";
@@ -41,12 +40,6 @@ export default async function ToursPage({ params }: ToursPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Tours 360°</h1>
         <p className="lead">
@@ -79,7 +72,7 @@ export default async function ToursPage({ params }: ToursPageProps) {
         <p className="notice">Todavía no hay tours.</p>
       ) : (
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table data-table-cards">
             <caption className="visually-hidden">Tours de {membership.displayName}</caption>
             <thead>
               <tr>
@@ -99,13 +92,13 @@ export default async function ToursPage({ params }: ToursPageProps) {
                       {KIND[tour.contentKind].label} · {scenesLabel(tour.scenes)}
                     </span>
                   </td>
-                  <td>
+                  <td data-label="Estado">
                     <span className="status-pill" data-status={tour.status}>
                       {TOUR_STATUS[tour.status].label}
                     </span>
                     <span className="cell-detail">{TOUR_STATUS[tour.status].detail}</span>
                   </td>
-                  <td>{DATE.format(new Date(tour.updatedAt))}</td>
+                  <td data-label="Última modificación">{DATE.format(new Date(tour.updatedAt))}</td>
                 </tr>
               ))}
             </tbody>

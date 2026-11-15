@@ -6,7 +6,6 @@ import { adminSession } from "@/server/admin-session";
 import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { NewCircuitForm } from "./new-circuit-form";
 import { StampCodes } from "./stamp-codes";
 import "./passport.css";
@@ -36,12 +35,6 @@ export default async function PassportAdminPage({ params }: PassportPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${membership.slug}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Pasaporte turístico</h1>
         <p className="lead">
@@ -66,7 +59,7 @@ export default async function PassportAdminPage({ params }: PassportPageProps) {
         <p className="notice">Todavía no hay circuitos.</p>
       ) : (
         <div className="table-wrap" role="region" aria-label="Circuitos" tabIndex={0}>
-          <table className="data-table">
+          <table className="data-table data-table-cards">
             <caption className="visually-hidden">Circuitos de {membership.displayName}</caption>
             <thead>
               <tr>
@@ -93,7 +86,7 @@ export default async function PassportAdminPage({ params }: PassportPageProps) {
                           : ""}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Estado">
                       <span className="status-pill" data-status={circuit.status}>
                         {circuit.status === "published" ? "Publicado" : "Borrador"}
                       </span>
@@ -101,7 +94,9 @@ export default async function PassportAdminPage({ params }: PassportPageProps) {
                         <span className="cell-detail">Retirado del portal</span>
                       ) : null}
                     </td>
-                    <td>{DATE.format(new Date(circuit.updatedAt))}</td>
+                    <td data-label="Última modificación">
+                      {DATE.format(new Date(circuit.updatedAt))}
+                    </td>
                   </tr>
                 );
               })}

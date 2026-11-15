@@ -15,7 +15,6 @@ import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireModule } from "@/server/organization";
 
-import { SignOutButton } from "../../../sign-out-button";
 import { CopilotChat } from "./copilot-chat";
 
 export const metadata: Metadata = { title: "Copilot" };
@@ -68,12 +67,6 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide">
-      <header className="admin-header">
-        <Link href={`/o/${org}`} className="eyebrow">
-          ← {membership.displayName}
-        </Link>
-        <SignOutButton />
-      </header>
       <div className="branding-heading">
         <h1 className="title title-sm">Copilot</h1>
         <p className="lead">
@@ -109,7 +102,7 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
           </p>
         ) : (
           <div className="table-wrap" tabIndex={0} role="region" aria-labelledby="revision">
-            <table className="data-table">
+            <table className="data-table data-table-cards">
               <caption className="visually-hidden">
                 Revisión del contenido de {membership.displayName}
               </caption>
@@ -136,7 +129,7 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
                           {row.sceneId ? "Tour 360°" : KIND[row.kind]}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <span
                           className="status-pill"
                           data-status={row.status === "changed" ? "published" : row.status}
@@ -144,7 +137,7 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
                           {STATE[row.status]}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Qué le falta">
                         <ul className="copilot-issues">
                           {row.issues.map((issue) => (
                             <li key={issue}>{COPILOT_ISSUE_LABELS[issue]}</li>
@@ -185,7 +178,7 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
             </p>
           ) : (
             <div className="table-wrap" tabIndex={0} role="region" aria-labelledby="propuestas">
-              <table className="data-table">
+              <table className="data-table data-table-cards">
                 <caption className="visually-hidden">Propuestas del Copilot</caption>
                 <thead>
                   <tr>
@@ -205,10 +198,10 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
                             : proposal.title}
                         </Link>
                       </td>
-                      <td>
+                      <td data-label="Campos">
                         {proposal.fields.map((field) => PROPOSAL_FIELD_LABELS[field]).join(", ")}
                       </td>
-                      <td>
+                      <td data-label="Estado">
                         <span
                           className="status-pill"
                           data-status={
@@ -220,7 +213,7 @@ export default async function CopilotPage({ params }: CopilotPageProps) {
                             : PROPOSAL_STATUS[proposal.status]}
                         </span>
                       </td>
-                      <td>
+                      <td data-label="Pedida">
                         {DATE.format(new Date(proposal.createdAt))}
                         {proposal.mine ? <span className="cell-detail">Por ti</span> : null}
                       </td>
