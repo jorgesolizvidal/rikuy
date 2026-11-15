@@ -231,6 +231,8 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           named={persona.named}
           greeting={persona.greeting}
           siteName={identity.siteName}
+          logo={view.logo?.webp ?? null}
+          mark={monogram(identity.shortName)}
           voice={portalHas(view, "voice")}
         />
       ) : null}

@@ -866,6 +866,30 @@ describe("plans in the assistant", () => {
       distance: null,
     });
     expect(reply.plan.stops.map((stop) => stop.title)).not.toContain("Concierto de ayer");
+    // At a glance (ADR-065): the stops and the walk between them, from their own legs.
+    const legs = reply.plan.stops.filter((stop) => stop.distance !== null).length;
+    expect(reply.plan.summary).toMatchObject({ stops: reply.plan.stops.length });
+    expect(reply.plan.summary?.distance === null).toBe(legs === 0);
+  });
+
+  it("a route's summary adds up every leg; «qué hay cerca» has none", async () => {
+    const { deps } = setup({ places: PLACES, now: WEDNESDAY_10 });
+    const route = await askAssistant(tenant, { question: "¿Me sugieres una ruta?" }, "v", deps);
+    if (route.reply.status !== "answered" || !route.reply.plan) throw new Error("no plan");
+    const { summary, stops } = route.reply.plan;
+    expect(stops.length).toBeGreaterThan(1);
+    expect(summary?.stops).toBe(stops.length);
+    expect(summary?.distance).toMatch(/^\d[\d.,]* (m|km)$/u);
+    expect(summary?.walk).toMatch(/min|h/u);
+
+    const nearby = await askAssistant(
+      tenant,
+      { question: "¿Qué hay cerca?", intent: "nearby", distances: { "destination:plaza": 120 } },
+      "v",
+      deps,
+    );
+    if (nearby.reply.status !== "answered" || !nearby.reply.plan) throw new Error("no plan");
+    expect(nearby.reply.plan.summary).toBeUndefined();
   });
 
   it("without the model (the visitor's hour used up), the plan still shows with a fixed sentence", async () => {

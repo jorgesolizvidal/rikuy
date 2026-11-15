@@ -1402,9 +1402,28 @@
     font-size: 0.9375rem;
   }
 
-  /* The assistant's button and the footer's last lines stay above the bar. */
+  /* The assistant's button and the footer's last lines stay above the bar. On a phone it is a
+     round icon (ADR-065): the name stays in its accessible name, out of sight. */
   .portal-assistant-launcher {
     bottom: calc(4.5rem + env(safe-area-inset-bottom));
+    justify-content: center;
+    width: 3.5rem;
+    height: 3.5rem;
+    padding: 0;
+  }
+
+  .portal-assistant-launcher svg {
+    width: 1.625rem;
+    height: 1.625rem;
+  }
+
+  .portal-assistant-launcher .portal-assistant-launcher-name {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+    white-space: nowrap;
   }
 
   .portal-footer {

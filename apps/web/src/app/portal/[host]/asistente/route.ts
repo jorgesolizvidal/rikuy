@@ -1,7 +1,7 @@
 import { after } from "next/server";
 
 import { recordUnansweredQuestion } from "@/server/ai-gateway";
-import { askPortalAssistant } from "@/server/portal-assistant";
+import { askPortalAssistant, assistantPlaceCards } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
@@ -49,7 +49,9 @@ async function handle(request: Request, { params }: AssistantContext) {
     const tenantId = view.context.tenant.tenantId;
     after(() => recordUnansweredQuestion(tenantId, unanswered));
   }
-  return Response.json(reply, {
+  // What the places it names look like (ADR-065), from what is published.
+  const places = await assistantPlaceCards(view, reply);
+  return Response.json(places.length > 0 ? { ...reply, places } : reply, {
     status: reply.status === "invalid" ? 400 : 200,
     headers: NO_STORE,
   });

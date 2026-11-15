@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz. C0, C1 y C2 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 5 — tour, recorrido general, pasaporte, sello y canje ✅
-- **Rama:** `feat/c3-step5-tour-passport` → PR hacia `main`
+- **Último paso completado:** C3 · Paso 6 — asistente ✅
+- **Rama:** `feat/c3-step6-assistant` → PR hacia `main`
 
 ## Historial
 
@@ -2521,17 +2521,50 @@ Lo que encontró el CI del push, ya corregido:
 - El lector en la página solo funciona donde el navegador tiene `BarcodeDetector` (Chrome en Android); en los demás, la página manda a la cámara del teléfono, que abre el QR igual.
 - La tira de escenas no se desplaza sola hasta la escena actual en tours largos.
 
+### C3 · Paso 6 — asistente ✅
+
+- Decisiones del usuario ([ADR-065](../adr/ADR-065-assistant-design.md)), 2026-11-14:
+  - **tarjetas en las respuestas:** lugares con foto, el plan como tarjeta y el sello del pasaporte en los lugares;
+  - **cabecera con el logo y bienvenida**, con las sugerencias bajo «Preguntas frecuentes»;
+  - **en la PC, el panel lateral**, un poco más ancho;
+  - **en el celular, un botón redondo** sobre la barra inferior.
+- Sin lo que Stitch inventó: «en línea», quechua, «Validado por…», guía de voz en vivo, relatos en audio, guía GPS, locales no publicados, «Validar con QR» en el chat.
+- Sin cambios en la base de datos ni en lo que el visitante envía.
+- `@rikuy/core`: `AssistantPlan.summary` para «Plan para hoy» y «Ruta sugerida» con dos paradas o más (paradas, recorrido en línea recta y tiempo a pie estimado, sumando cada tramo del motor); «Qué hay cerca» no tiene (cada distancia es desde el visitante).
+- Web:
+  - **`POST /asistente`** suma `places` a la respuesta (`assistantPlaceCards`): por cada destino o evento citado y cada parada del plan, título, categoría, fecha, portada desde `/medios`, si tiene tour y el lugar de su sello si es parada de un circuito publicado. Sale del servidor con lo publicado, nunca del modelo; un lugar no publicado queda como enlace en texto y un fallo deja la respuesta sin tarjetas;
+  - **panel** (`assistant-panel.tsx`, `assistant-place.tsx`):
+    - cabecera con la cara del asistente (logo del municipio o sus iniciales), su nombre, el municipio y «Responde con lo publicado»; «Nueva conversación» como botón de ícono;
+    - el saludo como tarjeta de bienvenida y «Preguntas frecuentes» con íconos; cada respuesta con la cara al lado;
+    - **«Fuentes»**: cada lugar citado como tarjeta (portada, «Destino · categoría», fecha, «Recorrido 360°», «Sello del pasaporte» o «✓ Sellado en tu pasaporte» según este teléfono); documentos y escenas de tours, en texto como antes;
+    - **plan**: portada de la primera parada con velo oscuro y el título, el resumen (paradas, recorrido, a pie, sellos y cuántos ya tiene el teléfono), «Ver la ruta en el mapa» y cada parada con su foto, horas, notas y sellos;
+    - barra para escribir con el campo redondeado, el micrófono y «Enviar» como botones redondos;
+  - **botón del asistente**: en el celular, un círculo con el ícono sobre la barra inferior (el nombre sigue en su nombre accesible); en la PC, con su nombre. El panel lateral pasa a 28 rem;
+  - estilos con los radios, letras y colores del tema; todo en `assistant.css`, que se descarga con el panel.
+- CI: nuevo paso **«Assistant cards in a real browser»** (grupo de contratos).
+- Tests:
+  - unitarios: core 719 (+1: el resumen del plan y que «qué hay cerca» no tiene), web 54;
+  - **e2e en un navegador real** (`assistant-cards.e2e.test.ts`, 2 casos): en el celular, el botón redondo con su nombre accesible, la cara con las iniciales, «Responde con lo publicado», la bienvenida y las 3 preguntas frecuentes; el mirador citado como tarjeta con «Destino · Miradores» y «Sello del pasaporte», que pasa a «✓ Sellado en tu pasaporte» después de sellarlo; «Ruta sugerida» con «Paradas 2», el recorrido, el tiempo a pie, «Sellos 2 (ya tienes 1)», la ruta en el mapa con las dos paradas y cada parada con su foto y su sello; en la PC, el botón con el nombre, el panel a la derecha (≤ 448 px), las preguntas de la ficha y «Nueva conversación»; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
+  - asistente (6), preguntas sin respuesta (3), páginas del pasaporte (3), tours (10), contratos RC-09/10/11/12 (216) y portales (161) en verde.
+- Verificado en local, en el navegador (390 y 1280 px, los dos temas): bienvenida, respuesta con tarjeta, ruta con portada y resumen.
+- Lighthouse local (móvil, CPU ×4, seed): inicio, listados y fichas 96–99, CLS 0 y JS inicial sin cambios (151–153 KB); `/mapa` 66–68.
+
+**Desviaciones:**
+
+- La conversación guardada en el teléfono conserva las tarjetas como llegaron: un lugar que cambia de foto se ve con la anterior en las respuestas viejas.
+- Las preguntas frecuentes siguen siendo fijas (por página); no salen de las preguntas reales de los visitantes.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el celular (Chrome en Android), abre `/pasaporte/corazon-de-ucurena` en Ucureña: el anillo con tus sellos, cada lugar como un sello (los que ya tienes, con la fecha) y la siguiente parada sugerida marcada.
-- Pulsa «Escanear el código del lugar», permite la cámara y apunta al QR de un lugar (desde el panel, en otra pantalla): abre la página de su sello. Un QR de otra cosa dice que no es un sello. En el iPhone, la página pide usar la cámara del teléfono.
-- Sella un lugar: el sello se «estampa» y el anillo del circuito sube.
-- En un tour, el botón «Escenas» abre la tira con las vistas previas y lleva a la elegida; en `/recorrido`, el menú dice qué destinos dan sello.
-- En `/canje`, el resultado de un comprobante se ve en una tarjeta grande.
+- Tras el merge, en el celular, abre Ucureña: el botón del asistente es un círculo con el ícono sobre la barra inferior.
+- Ábrelo: arriba el logo, «Chaski», «Asistente de Explora Ucureña» y «Responde con lo publicado»; el saludo en una tarjeta y las preguntas frecuentes con íconos.
+- Pregunta por un lugar (por ejemplo, el museo): en «Fuentes» aparece su tarjeta con la foto, la categoría y «Sello del pasaporte» (o «✓ Sellado en tu pasaporte» si ya lo sellaste).
+- Toca «Ruta sugerida»: la tarjeta con la foto, paradas, recorrido, tiempo a pie, sellos y «Ver la ruta en el mapa».
+- En la PC, el botón conserva el nombre y el panel se abre a la derecha.
 
 ## Siguiente paso
 
-**C3 · Paso 6 — asistente** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): el panel del asistente con el sistema de diseño. Antes de empezar, confirmar con el usuario qué cambia.
+**C3 · Paso 7 — panel del municipio, con un retoque más liviano** ([roadmap](../roadmap.md#c3--rediseño-de-la-interfaz)): el panel con el sistema de diseño sin perder sus contratos. Antes de empezar, confirmar con el usuario qué cambia.
 
 ## Decisiones pendientes del usuario
 

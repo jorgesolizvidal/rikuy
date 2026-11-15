@@ -25,6 +25,9 @@ export interface AssistantLauncherProps {
   readonly named: boolean;
   readonly greeting: string;
   readonly siteName: string;
+  /** The municipality's logo, or its initials without one: the assistant's face (ADR-065). */
+  readonly logo: string | null;
+  readonly mark: string;
   /** The municipality has the assistant's voice (ADR-060): dictation and «Escuchar». */
   readonly voice: boolean;
 }
@@ -107,7 +110,8 @@ export function AssistantLauncher(props: AssistantLauncherProps) {
           <circle cx="12" cy="10.5" r="1.3" fill="var(--brand)" />
           <circle cx="15.5" cy="10.5" r="1.3" fill="var(--brand)" />
         </svg>
-        <span>{props.name}</span>
+        {/* On a phone the button is a round icon; the name stays in its accessible name. */}
+        <span className="portal-assistant-launcher-name">{props.name}</span>
         <span className="visually-hidden">: hacer una pregunta</span>
       </button>
       {loaded ? <AssistantPanel {...props} open={open} onClose={close} request={request} /> : null}
