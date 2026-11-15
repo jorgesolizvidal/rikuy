@@ -2476,7 +2476,8 @@ Lo que encontró el CI del push, ya corregido:
 - Tests:
   - unitarios: core 715 (+6: lugares cercanos y el estado del evento, con la zona horaria del municipio);
   - **e2e en un navegador real** (`detail.e2e.test.ts`, nuevo paso del grupo «Lighthouse · visitas», 4 casos): la ficha del mirador con su portada, «Para tu visita», «Ruta del valle», la feria en «Eventos en este lugar» y la plaza en «Cerca de aquí» (sin el borrador ni Demo Sur); la feria con el reloj del navegador fijado: «En 3 días» y «En curso»; el evento terminado sin estado ni calendario; el propietario sube dos fotos a la plaza y en el portal se abren grandes, se recorren con flechas y «Siguiente» y el foco vuelve; el mapa con la lista al costado (PC) y debajo (celular), filtrado por «Miradores»; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px;
-  - portales 161, ubicación RC-06 35 (la distancia ahora está en la tarjeta), contratos RC-09/10/11/12 CONTRACTS, temas, inicio, módulos y tours en verde.
+  - portales 161, ubicación RC-06 35 (la distancia ahora está en la tarjeta), contratos RC-09/10/11/12 216, temas 4, inicio 4, módulos 4 y tours 10 en verde.
+- Lighthouse en el CI (móvil, CPU ×4, seed): fichas 98 (LCP 2,24–2,40 s), inicio, destinos y agenda 98–100, CLS 0 y JS 150–151 KB en todas; `/mapa` 68–70 (LCP 2,1 s, umbral 60).
 - Verificado en local, en el navegador (390 y 1280 px): la ficha del mirador con tres fotos, la feria, el mapa con categorías.
 
 **Desviaciones:**
@@ -2484,6 +2485,7 @@ Lo que encontró el CI del push, ya corregido:
 - La tarjeta «Para tu visita» no queda fija al desplazarse: con horario y circuitos puede ser más alta que la pantalla.
 - «Cerca de aquí» es en línea recta (la página lo dice) y solo cuenta destinos y eventos próximos.
 - El filtro de categorías del mapa no queda en la dirección (la página del mapa ya es dinámica y tiene sus propios parámetros).
+- Las fichas quedan con LCP 2,24–2,40 s en el CI (límite 2,5 s): el margen de antes, a cuidar en los próximos pasos.
 
 ## Cómo verificarlo
 
