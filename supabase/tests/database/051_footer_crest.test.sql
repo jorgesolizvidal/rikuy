@@ -28,7 +28,7 @@ insert into public.memberships (tenant_id, user_id, role, status, accepted_at) v
 update public.tenants set status = 'active';
 set constraints all immediate;
 
-select plan(17);
+select plan(16);
 
 -- ── Shape ───────────────────────────────────────────────────────────────────
 select ok(private.is_valid_presentation(:'brand'::jsonb),

@@ -2643,7 +2643,7 @@ Lo que encontró el CI del push, ya corregido:
   - la posición sigue sin salir del teléfono.
 - Tests:
   - unitarios: core 725, web 60 (el escudo en el formulario y en `publishBranding`, el tipo de cada cifra);
-  - pgTAP `051_footer_crest` (17): forma (URL, campos extra, versión 0), escudo subiendo, foto de contenido o imagen de otro municipio rechazados, guardar, publicar antes de los derivados (`PT409`), editor sin permiso, publicar con los derivados, la limpieza diaria lo conserva;
+  - pgTAP `051_footer_crest` (16): forma (URL, campos extra, versión 0), escudo subiendo, foto de contenido o imagen de otro municipio rechazados, guardar, publicar antes de los derivados (`PT409`), editor sin permiso, publicar con los derivados, la limpieza diaria lo conserva;
   - e2e: inicio (la tarjeta: cifra propia sin enlace, la de lugares lleva a `/destinos`) y fichas (caso nuevo: el mapa con + y −, el punto del visitante y el lugar en pantalla, la distancia, «Cómo llegar» y ninguna petición con la posición; axe a 390 px).
 - Verificado en el navegador con una compilación local leyendo producción (solo lectura, sin contar visitas): inicio de Ucureña a 390 y 1280 px, el pie con una imagen en lugar del escudo, la ficha del museo con el mapa, la ubicación simulada a 23 km y a 1 km, y la ficha del carnaval; sin desbordes.
 
