@@ -499,44 +499,182 @@
   }
 }
 
-/* ── Figures band ───────────────────────────────────────────────────────── */
+/* ── Figures (ADR-068) ──────────────────────────────────────────────────── */
 
+/* One white card, its figures in a row (two by two on a phone), separated by thin lines. */
 .home-figures {
-  margin-top: clamp(0.5rem, 2vh, 1.5rem);
-  padding: clamp(1.75rem, 5vh, 2.75rem) var(--edge);
-  background: var(--brand);
-  color: var(--on-brand);
+  width: 100%;
+  max-width: calc(var(--page) + 2 * var(--gutter));
+  margin: clamp(1.5rem, 4vh, 2.5rem) auto 0;
+  padding: 0 var(--gutter);
 }
 
 .home-figures ul {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 9.5rem), 1fr));
-  gap: 1.5rem clamp(1.5rem, 4vw, 3rem);
-  max-width: 72rem;
+  grid-template-columns: repeat(var(--figures, 4), minmax(0, 1fr));
   margin: 0;
-  padding: 0;
+  padding: 0.5rem;
   list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: 0 1rem 2.5rem -1.5rem color-mix(in srgb, var(--fg) 45%, transparent);
+}
+
+.home-figures ul[data-count="1"] {
+  --figures: 1;
+}
+
+.home-figures ul[data-count="2"] {
+  --figures: 2;
+}
+
+.home-figures ul[data-count="3"] {
+  --figures: 3;
 }
 
 .home-figures li {
+  display: flex;
+  min-width: 0;
+}
+
+.home-figures li + li {
+  border-left: 1px solid var(--line);
+}
+
+.portal .home-figure {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 0;
+  padding: 0.875rem clamp(0.75rem, 1.5vw, 1rem);
+  border-radius: 0.75rem;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.portal a.home-figure:hover {
+  background: color-mix(in srgb, var(--brand) 6%, transparent);
+}
+
+.home-figure-icon {
+  --tint: var(--brand);
   display: grid;
-  gap: 0.375rem;
-  align-content: start;
+  flex: none;
+  place-items: center;
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.75rem;
+  background: color-mix(in srgb, var(--tint) 14%, var(--surface));
+  color: color-mix(in srgb, var(--tint) 85%, var(--fg));
+}
+
+/* A fixed hue per kind (the platform's, not a municipality's): the same in every portal. */
+.home-figures li[data-kind="tours"] .home-figure-icon {
+  --tint: #2563eb;
+}
+
+.home-figures li[data-kind="events"] .home-figure-icon {
+  --tint: #d97706;
+}
+
+.home-figures li[data-kind="circuits"] .home-figure-icon {
+  --tint: #dc2626;
+}
+
+.home-figures li[data-kind="own"] .home-figure-icon {
+  --tint: var(--accent);
+}
+
+.home-figure-text {
+  display: grid;
+  flex: 1;
+  gap: 0.125rem;
+  min-width: 0;
 }
 
 .home-figure-value {
   font-family: var(--font-display);
-  font-size: clamp(2rem, 5vw, 2.75rem);
+  font-size: clamp(1.5rem, 3vw, 1.875rem);
   font-weight: var(--title-weight);
-  line-height: 1;
+  line-height: 1.05;
   letter-spacing: var(--title-tracking);
   overflow-wrap: anywhere;
 }
 
 .home-figure-label {
-  max-width: 24ch;
-  font-size: 0.9375rem;
-  line-height: 1.35;
+  color: var(--muted);
+  font-size: 0.875rem;
+  line-height: 1.3;
+}
+
+.home-figure-go {
+  flex: none;
+  color: var(--muted);
+}
+
+/* Right after a photo cover, the card rests on its lower edge (the cover makes room so the
+   photo's credit stays visible). Without :has(), the card simply follows the cover. */
+.portal-hero[data-variant="photo"]:has(+ .home-section[data-section="figures"]) {
+  padding-bottom: calc(clamp(2.25rem, 7vh, 4rem) + 3rem);
+}
+
+@media (min-width: 40.01rem) {
+  .portal-hero[data-variant="photo"]:has(+ .home-section[data-section="figures"])
+    .home-hero-credit {
+    bottom: 3.875rem;
+  }
+}
+
+.portal-hero[data-variant="photo"] + .home-section[data-section="figures"] {
+  position: relative;
+  z-index: 1;
+}
+
+.portal-hero[data-variant="photo"]:has(+ .home-section[data-section="figures"])
+  + .home-section
+  .home-figures {
+  margin-top: -3rem;
+}
+
+/* Two by two on a phone, with the lines between them. */
+@media (max-width: 47.99rem) {
+  .home-figures ul,
+  .home-figures ul[data-count] {
+    grid-template-columns: repeat(min(var(--figures, 4), 2), minmax(0, 1fr));
+  }
+
+  .home-figures li + li {
+    border-left: 0;
+  }
+
+  .home-figures li:nth-child(even) {
+    border-left: 1px solid var(--line);
+  }
+
+  .home-figures li:nth-child(n + 3) {
+    border-top: 1px solid var(--line);
+  }
+
+  .portal .home-figure {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.625rem;
+    position: relative;
+    padding: 0.875rem 0.75rem;
+  }
+
+  .home-figure-go {
+    position: absolute;
+    top: 1rem;
+    right: 0.625rem;
+  }
+
+  .home-figure-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
 }
 
 /* ── Themes ─────────────────────────────────────────────────────────────── */
@@ -551,13 +689,14 @@
   font-size: clamp(3rem, 11vw, 7.5rem);
 }
 
-.portal[data-theme="immersive"] .home-figures {
-  background: transparent;
-  color: var(--fg);
-  border-block: 1px solid var(--line);
+/* Immersive: the card on the dark surface, with the theme's square corners. */
+.portal[data-theme="immersive"] .home-figures ul {
+  border-radius: 0.375rem;
+  box-shadow: 0 1rem 2.5rem -1rem rgb(0 0 0 / 70%);
 }
 
-.portal[data-theme="immersive"] .home-figure-value {
-  color: var(--brand);
-  font-size: clamp(2.5rem, 7vw, 4rem);
+.portal[data-theme="immersive"] .home-figure-icon {
+  border-radius: 0.25rem;
+  background: color-mix(in srgb, var(--tint) 22%, var(--surface));
+  color: color-mix(in srgb, var(--tint) 55%, #ffffff);
 }

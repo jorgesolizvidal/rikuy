@@ -27,6 +27,7 @@ import { DetailHero } from "../../detail-hero";
 import { EventStatus } from "../../event-status";
 import { PhotoGallery } from "../../photo-gallery";
 import { NearbyPlaces, PlaceLocation, VisitorDistance } from "../../place-sections";
+import { ActionIcon } from "../../action-icon";
 import { ShareButton } from "../../share-button";
 import { NearbyNotice } from "../../visitor-location";
 
@@ -181,6 +182,7 @@ export default async function EventPage({ params }: EventPageProps) {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
+                  <ActionIcon name="directions" />
                   Cómo llegar<span className="visually-hidden"> (abre la app de mapas)</span>
                 </a>
               ) : null}
@@ -191,12 +193,14 @@ export default async function EventPage({ params }: EventPageProps) {
                   href={PORTAL_PATHS.eventCalendar(event.slug)}
                   download={`${event.slug}.ics`}
                 >
-                  Añadir al calendario
+                  <ActionIcon name="calendar" />
+                  <span className="visually-hidden">Añadir al </span>Calendario
                 </a>
               )}
               {tour ? (
                 <a className="portal-button portal-tour-link" href={tourPath("event", event.slug)}>
-                  Ver el tour 360°
+                  <ActionIcon name="tour" />
+                  <span className="visually-hidden">Ver el </span>Tour 360°
                 </a>
               ) : null}
               {event.ended ? null : <ShareButton title={event.title} url={url} />}
@@ -221,6 +225,7 @@ export default async function EventPage({ params }: EventPageProps) {
               title={event.title}
               location={event.location}
               withMap={withMap}
+              directions={!event.ended}
             />
           ) : null}
         </div>

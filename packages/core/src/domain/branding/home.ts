@@ -176,6 +176,14 @@ export interface PortalCounts {
   readonly circuits: number;
 }
 
+/** What a figure in the band counts: the portal's own counts link to their section. */
+export type FigureKind = "own" | "destinations" | "tours" | "events" | "circuits";
+
+/** A figure of the band, with what it counts (its icon and its link, ADR-068). */
+export interface BandFigure extends HomeFigure {
+  readonly kind: FigureKind;
+}
+
 /** At most four figures in the band. */
 export const FIGURES_IN_BAND = 4;
 
@@ -187,12 +195,13 @@ export function homeFigures(
   own: readonly HomeFigure[],
   counts: PortalCounts,
   has: (module: ModuleKey) => boolean,
-): readonly HomeFigure[] {
+): readonly BandFigure[] {
   const plural = (count: number, one: string, many: string) => (count === 1 ? one : many);
-  const counted: HomeFigure[] = [
+  const counted: BandFigure[] = [
     ...(counts.destinations > 0
       ? [
           {
+            kind: "destinations" as const,
             value: String(counts.destinations),
             label: plural(counts.destinations, "Lugar para visitar", "Lugares para visitar"),
           },
@@ -201,6 +210,7 @@ export function homeFigures(
     ...(counts.tours > 0 && has("tours")
       ? [
           {
+            kind: "tours" as const,
             value: String(counts.tours),
             label: plural(counts.tours, "Recorrido 360°", "Recorridos 360°"),
           },
@@ -209,6 +219,7 @@ export function homeFigures(
     ...(counts.events > 0 && has("agenda")
       ? [
           {
+            kind: "events" as const,
             value: String(counts.events),
             label: plural(counts.events, "Evento próximo", "Eventos próximos"),
           },
@@ -217,13 +228,17 @@ export function homeFigures(
     ...(counts.circuits > 0 && has("passport")
       ? [
           {
+            kind: "circuits" as const,
             value: String(counts.circuits),
             label: plural(counts.circuits, "Circuito con premio", "Circuitos con premio"),
           },
         ]
       : []),
   ];
-  return [...own, ...counted].slice(0, FIGURES_IN_BAND);
+  return [
+    ...own.map((figure) => ({ kind: "own" as const, value: figure.value, label: figure.label })),
+    ...counted,
+  ].slice(0, FIGURES_IN_BAND);
 }
 
 /** One entry of the phone's bottom bar. */

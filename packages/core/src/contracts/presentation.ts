@@ -150,6 +150,16 @@ export const tenantPresentationSchema = z.strictObject({
       version: z.number().int().min(1).max(999_999),
     })
     .optional(),
+  /**
+   * Optional coat of arms of the municipality, shown in the portal's footer: a reference to
+   * a ready logo-type image of the same tenant, like the logo (ADR-068).
+   */
+  crest: z
+    .strictObject({
+      assetId: z.string().regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/),
+      version: z.number().int().min(1).max(999_999),
+    })
+    .optional(),
   /** Optional visitor settings; absent means the defaults. */
   visitors: z
     .strictObject({

@@ -167,6 +167,10 @@ describe("home by sections, categories and bottom bar (ADR-062)", () => {
       published?.count === 1 ? "Lugar para visitar" : "Lugares para visitar",
     ]);
     expect(figures.length).toBeLessThanOrEqual(4);
+    // One card (ADR-068): what the portal counts leads to its section; the municipality's own
+    // figure is only text.
+    expect(sur).toMatch(/<li data-kind="own"><div class="home-figure">/u);
+    expect(sur).toMatch(/<li data-kind="destinations"><a class="home-figure" href="\/destinos">/u);
     expect(sur).toMatch(/data-variant="featured"/u);
     expect(sur).toMatch(/data-layout="cards"/u);
 

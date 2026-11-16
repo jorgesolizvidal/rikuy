@@ -1,6 +1,7 @@
 import {
   PORTAL_PATHS,
-  type HomeFigure,
+  type BandFigure,
+  type FigureKind,
   type PublishedDestinationSummary,
   type PublishedEventSummary,
 } from "@rikuy/core";
@@ -91,17 +92,88 @@ export function HomeHero(props: HeroProps) {
 }
 
 /** «En cifras»: the municipality's own figures and what the portal counts by itself. */
-export function FiguresBand({ figures }: { readonly figures: readonly HomeFigure[] }) {
+/** Each figure's icon (24-unit outline paths) and where it leads (ADR-068). */
+const FIGURE_ICONS: Readonly<Record<FigureKind, string>> = {
+  destinations:
+    "M12 21s-6.5-5.6-6.5-11a6.5 6.5 0 0 1 13 0C18.5 15.4 12 21 12 21Zm0-8.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
+  tours: "M3 12c0-2.2 4-4 9-4s9 1.8 9 4-4 4-9 4M8.5 15.6 12 16l-2.6 2.6M12 8V4",
+  events: "M5 6h14v14H5zM5 10h14M9 4v4M15 4v4",
+  circuits:
+    "M8 4h8v4a4 4 0 0 1-8 0zM8 6H5a3 3 0 0 0 3 3M16 6h3a3 3 0 0 1-3 3M12 12v4M8 20h8M9 16h6",
+  own: "M12 4.5l2.2 4.6 5 .7-3.6 3.5.9 5-4.5-2.4-4.5 2.4.9-5L4.8 9.8l5-.7z",
+};
+
+const FIGURE_HREF: Readonly<Record<FigureKind, string | null>> = {
+  destinations: PORTAL_PATHS.destinations,
+  tours: PORTAL_PATHS.generalTour,
+  events: PORTAL_PATHS.agenda,
+  circuits: PORTAL_PATHS.passport,
+  own: null,
+};
+
+/**
+ * The figures (ADR-068): one white card with up to four figures, each with its icon, its
+ * number and what it counts. What the portal counts leads to its section; the municipality's
+ * own figures are only text. Right after a photo cover, the card rests on its lower edge.
+ */
+export function FiguresBand({ figures }: { readonly figures: readonly BandFigure[] }) {
   if (figures.length === 0) return null;
   return (
     <section className="home-figures" aria-label="En cifras">
-      <ul>
-        {figures.map((figure) => (
-          <li key={`${figure.value} ${figure.label}`}>
-            <span className="home-figure-value">{figure.value}</span>
-            <span className="home-figure-label">{figure.label}</span>
-          </li>
-        ))}
+      <ul data-count={figures.length}>
+        {figures.map((figure) => {
+          const href = FIGURE_HREF[figure.kind];
+          const body = (
+            <>
+              <span className="home-figure-icon" aria-hidden="true">
+                <svg viewBox="0 0 24 24" width="22" height="22" focusable="false">
+                  <path
+                    d={FIGURE_ICONS[figure.kind]}
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </span>
+              <span className="home-figure-text">
+                <span className="home-figure-value">{figure.value}</span>
+                <span className="home-figure-label">{figure.label}</span>
+              </span>
+              {href ? (
+                <svg
+                  className="home-figure-go"
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  width="18"
+                  height="18"
+                  focusable="false"
+                >
+                  <path
+                    d="m9 6 6 6-6 6"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              ) : null}
+            </>
+          );
+          return (
+            <li key={`${figure.value} ${figure.label}`} data-kind={figure.kind}>
+              {href ? (
+                <a className="home-figure" href={href}>
+                  {body}
+                </a>
+              ) : (
+                <div className="home-figure">{body}</div>
+              )}
+            </li>
+          );
+        })}
       </ul>
     </section>
   );

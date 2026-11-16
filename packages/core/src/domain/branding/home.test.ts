@@ -102,10 +102,10 @@ describe("figures band", () => {
   it("the municipality's figures first, then what the portal counts, up to four", () => {
     const own = [{ value: "1953", label: "Firma del Decreto de Reforma Agraria" }];
     expect(homeFigures(own, counts, all)).toEqual([
-      own[0],
-      { value: "7", label: "Lugares para visitar" },
-      { value: "3", label: "Recorridos 360°" },
-      { value: "1", label: "Evento próximo" },
+      { kind: "own", ...own[0] },
+      { kind: "destinations", value: "7", label: "Lugares para visitar" },
+      { kind: "tours", value: "3", label: "Recorridos 360°" },
+      { kind: "events", value: "1", label: "Evento próximo" },
     ]);
   });
 
@@ -113,8 +113,8 @@ describe("figures band", () => {
     expect(
       homeFigures([], { destinations: 1, tours: 0, events: 4, circuits: 2 }, without("passport")),
     ).toEqual([
-      { value: "1", label: "Lugar para visitar" },
-      { value: "4", label: "Eventos próximos" },
+      { kind: "destinations", value: "1", label: "Lugar para visitar" },
+      { kind: "events", value: "4", label: "Eventos próximos" },
     ]);
     expect(homeFigures([], { destinations: 0, tours: 0, events: 0, circuits: 0 }, all)).toEqual([]);
   });

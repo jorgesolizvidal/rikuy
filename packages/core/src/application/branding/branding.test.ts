@@ -149,6 +149,43 @@ describe("saving and publishing", () => {
     expect(calls).toEqual(["save:null", "publish-after-logo:1"]);
   });
 
+  it("publishes the crest derivatives too, before the brand (ADR-068)", async () => {
+    published.length = 0;
+    const CREST = "5eed4000-0000-4000-8000-000000000002";
+    const { repo, calls } = repository({
+      async publish(_tenant, configId) {
+        calls.push(`publish-after-images:${published.length}`);
+        return { status: "published", configId, version: 2 };
+      },
+    });
+    const withBoth = {
+      ...samplePresentation(),
+      logo: { assetId: LOGO, version: 3 },
+      crest: { assetId: CREST, version: 1 },
+    };
+    expect(
+      (await publishBranding(member("owner"), withBoth, null, repo, logoPublisher)).status,
+    ).toBe("published");
+    expect(published).toEqual([
+      `${TENANT}/${LOGO}/3:logo.webp,logo.png`,
+      `${TENANT}/${CREST}/1:logo.webp,logo.png`,
+    ]);
+    expect(calls).toEqual(["save:null", "publish-after-images:2"]);
+  });
+
+  it("points at the crest when the database refuses its reference", async () => {
+    published.length = 0;
+    const { repo } = repository({ saveDraft: async () => ({ status: "invalid" }) });
+    const withCrest = {
+      ...samplePresentation(),
+      crest: { assetId: "5eed4000-0000-4000-8000-000000000002", version: 1 },
+    };
+    expect(await publishBranding(member("owner"), withCrest, null, repo, logoPublisher)).toEqual({
+      status: "invalid",
+      issues: [{ path: "crest", code: "invalid" }],
+    });
+  });
+
   it("points at the logo when the database refuses its reference", async () => {
     published.length = 0;
     const { repo } = repository({ saveDraft: async () => ({ status: "invalid" }) });

@@ -53,14 +53,19 @@ export async function confirmLogoUpload(
     : result;
 }
 
-/** Preview of the logo currently in the editor (draft or published), if any. */
+/**
+ * Preview of the logo (or, with `slot: "crest"`, the coat of arms, ADR-068) currently in the
+ * editor (draft or published), if any. Both are logo-type images with the same derivatives.
+ */
 export async function logoPreviewUrl(
   tenantId: string,
   presentation: TenantPresentation,
   media: MediaRepository,
+  slot: "logo" | "crest" = "logo",
 ): Promise<string | null> {
-  if (!presentation.logo) return null;
-  return media.signedPreviewUrl(imageFilePath(tenantId, presentation.logo, "logo.webp"));
+  const image = presentation[slot];
+  if (!image) return null;
+  return media.signedPreviewUrl(imageFilePath(tenantId, image, "logo.webp"));
 }
 
 /** Publishes the logo's derivatives (no-op without a logo). Used right before the brand. */

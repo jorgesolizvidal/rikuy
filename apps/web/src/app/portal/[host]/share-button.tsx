@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { ActionIcon } from "./action-icon";
+
 /**
  * Shares the page with the phone's share sheet; where there is none (most desktops),
  * copies the link instead. The result is announced to screen readers.
@@ -29,6 +31,7 @@ export function ShareButton({ title, url }: { readonly title: string; readonly u
   return (
     <>
       <button type="button" className="portal-button" data-visit="share" onClick={share}>
+        <ActionIcon name="share" />
         Compartir
       </button>
       <span className="portal-status" role="status">
