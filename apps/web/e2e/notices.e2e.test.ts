@@ -228,7 +228,7 @@ describe("notices of the municipality (ADR-069)", () => {
       .getByRole("link", { name: `Ver el aviso «${TITLE}»` })
       .click();
     await visitor.waitForURL(/\/avisos#corte-de-agua-/u);
-    const article = visitor.locator("article", {
+    const article = visitor.locator(".portal-notice-list article", {
       has: visitor.getByRole("heading", { name: TITLE }),
     });
     await expect(article.innerText()).resolves.toMatch(
