@@ -76,6 +76,11 @@ export {
 export { createSharpSampleImageRenderer, sampleIllustrationSvg } from "./sample-images";
 export { createOperationsRepository } from "./operations";
 export { createKnowledgeRepository, mapPassageRow } from "./knowledge";
+export {
+  createNoticeRepository,
+  createSupabasePublishedNoticeReader,
+  mapPortalNoticeRow,
+} from "./notices";
 export { createCopilotRepository } from "./copilot";
 export { createMetricsRepository } from "./metrics";
 export { createEvalRepository } from "./evaluations";

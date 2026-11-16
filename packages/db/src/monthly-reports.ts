@@ -35,7 +35,7 @@ const activitySchema = z.object({
   items: z.array(
     z.object({
       contentId: z.uuid(),
-      kind: z.enum(["destination", "event", "knowledge"]),
+      kind: z.enum(["destination", "event", "knowledge", "notice"]),
       title: z.string(),
       tour: z.boolean(),
       times: count,

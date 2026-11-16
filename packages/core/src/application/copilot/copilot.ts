@@ -269,14 +269,18 @@ function sourceLinks(
           ? COPILOT_PATHS.tour(org, passage.sourceId)
           : passage.kind === "knowledge"
             ? COPILOT_PATHS.knowledge(org, passage.sourceId)
-            : COPILOT_PATHS.editor(org, passage.kind, passage.sourceId);
+            : passage.kind === "notice"
+              ? COPILOT_PATHS.notice(org, passage.sourceId)
+              : COPILOT_PATHS.editor(org, passage.kind, passage.sourceId);
       add({
         label:
           passage.source === "tour"
             ? "Tour 360°"
             : passage.kind === "knowledge"
               ? "Documento"
-              : KIND_NAMES[passage.kind],
+              : passage.kind === "notice"
+                ? "Aviso"
+                : KIND_NAMES[passage.kind],
         title: passage.heading ? `${passage.title} · ${passage.heading}` : passage.title,
         href,
       });
@@ -540,7 +544,12 @@ function sameValue(a: unknown, b: unknown): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
 }
 
-const PASSAGE_LABELS = { destination: "Destino", event: "Evento", knowledge: "Documento" } as const;
+const PASSAGE_LABELS = {
+  destination: "Destino",
+  event: "Evento",
+  knowledge: "Documento",
+  notice: "Aviso",
+} as const;
 
 /** V2: the model proposes the asked texts; the proposal is saved for the staff to decide. */
 export async function proposeWithCopilot(

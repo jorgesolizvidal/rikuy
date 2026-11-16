@@ -66,7 +66,12 @@ export async function loadKnowledgeOverview(
   return { sources, indexed, pending, failed, chunks };
 }
 
-const LABELS = { destination: "Destino", event: "Evento", knowledge: "Documento" } as const;
+const LABELS = {
+  destination: "Destino",
+  event: "Evento",
+  knowledge: "Documento",
+  notice: "Aviso",
+} as const;
 
 function pageLabel(pages: KnowledgePassage["pages"]): string | null {
   if (!pages) return null;
@@ -75,13 +80,13 @@ function pageLabel(pages: KnowledgePassage["pages"]): string | null {
 
 /**
  * The citation as the visitor sees it: title (and section), page, and a link inside the
- * portal — the destination, the event or the tour on its scene. Documents are only for the
- * assistant: no link (ADR-037). Never an internal id.
+ * portal — the destination, the event, the tour on its scene or the notice on `/avisos`.
+ * Documents are only for the assistant: no link (ADR-037). Never an internal id.
  */
 export function publicCitation(passage: KnowledgePassage): PublicCitation {
   const title = passage.heading ? `${passage.title} · ${passage.heading}` : passage.title;
   const common = { title, page: pageLabel(passage.pages), ended: passage.ended };
-  if (passage.source === "tour" && passage.kind !== "knowledge") {
+  if (passage.source === "tour" && (passage.kind === "destination" || passage.kind === "event")) {
     const scene = passage.sceneId
       ? `?${TOUR_SCENE_QUERY}=${encodeURIComponent(passage.sceneId)}`
       : "";
@@ -92,6 +97,8 @@ export function publicCitation(passage: KnowledgePassage): PublicCitation {
       ? PORTAL_PATHS.destination(passage.slug)
       : passage.kind === "event"
         ? PORTAL_PATHS.event(passage.slug)
-        : null;
+        : passage.kind === "notice"
+          ? PORTAL_PATHS.notice(passage.slug)
+          : null;
   return { ...common, label: LABELS[passage.kind], href };
 }

@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { KnowledgePassage } from "../../contracts/knowledge";
 import { chunkUnits, CHUNK_SIZE, richTextBlocks, sentences, type ChunkUnit } from "./chunker";
 import { validateCitations } from "./citations";
-import { contentUnits, tourUnits } from "./sources";
+import { contentIndexSourceSchema, contentUnits, tourUnits } from "./sources";
 import { decodeTextFile, splitTextPages, textBlocks } from "./text";
 
 const SECTION = "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor.";
@@ -185,8 +185,40 @@ describe("sources", () => {
     timezone: "America/La_Paz",
     venueTitle: "Plaza principal",
     hours: null,
+    validity: null,
+    placeTitle: null,
     document: null,
   };
+
+  it("a notice says how long it is in force and its place", () => {
+    const units = contentUnits(
+      {
+        ...base,
+        kind: "notice",
+        title: "Corte de ruta",
+        summary: "El puente está cerrado por obras.",
+        body: [],
+        schedule: null,
+        venueTitle: null,
+        validity: { from: "2026-12-01T08:00", until: "2026-12-03T18:00" },
+        placeTitle: "Puente viejo",
+      },
+      null,
+    );
+    expect(units[0]?.blocks.map((block) => block.text)).toEqual([
+      "El puente está cerrado por obras.",
+      "Aviso vigente del 1 de diciembre de 2026, 08:00 al 3 de diciembre de 2026, 18:00. Lugar: Puente viejo.",
+    ]);
+  });
+
+  it("an index source of before the notices still reads", () => {
+    const before: Record<string, unknown> = { ...base, kind: "destination", schedule: null };
+    delete before.validity;
+    delete before.placeTitle;
+    const parsed = contentIndexSourceSchema.parse(before);
+    expect(parsed.validity).toBeNull();
+    expect(parsed.placeTitle).toBeNull();
+  });
 
   it("an event says its date and place in words", () => {
     const units = contentUnits(

@@ -63,6 +63,15 @@ export interface AssistantDeps {
   ): Promise<AiSessionResult<T>>;
   /** ai_api.search_knowledge: published passages of this municipality, best first. */
   search(tenantId: string, query: string, limit: number): Promise<KnowledgePassage[]>;
+  /**
+   * ai_api.place_notices (ADR-069): the notices in force that name the destination or event
+   * the visitor is on (its page or its tour), read even when the question does not mention
+   * them. Absent: no place notices (the search still finds notices that match).
+   */
+  placeNotices?(
+    tenantId: string,
+    item: { readonly kind: "destination" | "event"; readonly slug: string },
+  ): Promise<KnowledgePassage[]>;
   /** The published destination, event or tour the visitor is on; null if none. */
   page(tenantId: string, page: AssistantPage): Promise<AssistantPageItem | null>;
   /** Published destinations (with hours) and upcoming events, for plans (ADR-039). */
@@ -208,16 +217,24 @@ function answerReservation(context: AnswerContext, passages: number): number {
 /** Inside a tour the guide reads one more passage: the scene's, its point's and the place's. */
 const GUIDE_PASSAGES = ASSISTANT_LIMITS.passages + 1;
 
-/** The scene's passages first, then what the search found, without repeating one. */
-function bestPassages(
+/** A notice in force reads before everything else (ADR-069). */
+const NOTICES_FIRST = (a: KnowledgePassage, b: KnowledgePassage) =>
+  Number(b.kind === "notice") - Number(a.kind === "notice");
+
+/**
+ * The place's notices and the scene's passages first, then what the search found, without
+ * repeating one; among them, notices before the rest.
+ */
+export function bestPassages(
   found: readonly KnowledgePassage[],
   guide: TourGuideContext | null,
+  notices: readonly KnowledgePassage[] = [],
 ): KnowledgePassage[] {
-  if (!guide) return found.slice(0, ASSISTANT_LIMITS.passages);
   const seen = new Set<string>();
-  return [...guide.passages, ...found]
+  return [...notices, ...(guide?.passages ?? []), ...found]
     .filter((passage) => !seen.has(passage.chunkId) && seen.add(passage.chunkId))
-    .slice(0, GUIDE_PASSAGES);
+    .slice(0, guide ? GUIDE_PASSAGES : ASSISTANT_LIMITS.passages)
+    .sort(NOTICES_FIRST);
 }
 
 export async function askAssistant(
@@ -245,7 +262,14 @@ export async function askAssistant(
           slug: request.page.slug,
         }
       : null;
-  const [item, guide] = await Promise.all([
+  // The destination or event the visitor is on (its page or its tour): its notices in force.
+  const noticeItem =
+    tourItem ??
+    ((request.page.kind === "destination" || request.page.kind === "event") &&
+    request.page.slug !== null
+      ? { kind: request.page.kind, slug: request.page.slug }
+      : null);
+  const [item, guide, notices] = await Promise.all([
     pageHasItem(request.page.kind)
       ? deps.page(tenant.tenantId, request.page).catch(() => null)
       : Promise.resolve(null),
@@ -259,6 +283,9 @@ export async function askAssistant(
           )
           .catch(() => null)
       : Promise.resolve(null),
+    noticeItem && deps.placeNotices
+      ? deps.placeNotices(tenant.tenantId, noticeItem).catch(() => [])
+      : Promise.resolve([] as KnowledgePassage[]),
   ]);
   const page = item?.label ?? null;
   const context: AnswerContext = {
@@ -310,7 +337,7 @@ export async function askAssistant(
     async (call) => {
       let query = request.question;
       if (guideOnly && guide) {
-        const passages = bestPassages([], guide);
+        const passages = bestPassages([], guide, notices);
         const answer = await call({
           messages: answerMessages(context, passages),
           maxOutputTokens: ANSWER_OUTPUT,
@@ -358,7 +385,7 @@ export async function askAssistant(
           if (!(error instanceof AiStepFailed)) throw error;
         }
       }
-      const passages = bestPassages(found, guide);
+      const passages = bestPassages(found, guide, notices);
       const answer = await call({
         messages: answerMessages(context, passages),
         maxOutputTokens: ANSWER_OUTPUT,

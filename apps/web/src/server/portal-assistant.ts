@@ -15,7 +15,13 @@ import {
   type AssistantTenant,
 } from "@rikuy/core";
 
-import { aiTourContext, runAiWork, searchAiKnowledge, transcribeAudio } from "./ai-gateway";
+import {
+  aiPlaceNotices,
+  aiTourContext,
+  runAiWork,
+  searchAiKnowledge,
+  transcribeAudio,
+} from "./ai-gateway";
 import type { AssistantPlaceCard } from "@/app/portal/[host]/assistant-cards";
 
 import {
@@ -78,6 +84,8 @@ export async function askPortalAssistant(
         .slice(0, limit),
     page: (_tenantId, page) => pageItem(view, page),
     places: () => portalPlanPlaces(view),
+    // The notices in force of the place the visitor is on (ADR-069): read first.
+    placeNotices: aiPlaceNotices,
     tourContext: aiTourContext,
     now: () => new Date(),
   });

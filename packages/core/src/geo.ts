@@ -12,4 +12,6 @@ export * from "./domain/plan/clock";
 export * from "./domain/plan/hours";
 // How far an event is (C3 · Paso 4): «Hoy», «En curso»… with the municipality's clock.
 export * from "./domain/events/countdown";
+// Notices in force (ADR-069): the cached page's strip is checked with the browser's clock.
+export * from "./domain/notices/in-force";
 export type { GeoPoint } from "./contracts/destination";

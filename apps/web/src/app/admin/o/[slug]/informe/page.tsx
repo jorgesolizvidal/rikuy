@@ -38,7 +38,12 @@ const TOTALS: readonly { key: StatisticsTotal; label: string }[] = [
   { key: "scenes", label: "Escenas de tours vistas" },
 ];
 
-const KIND_NAMES = { destination: "Destino", event: "Evento", knowledge: "Conocimiento" } as const;
+const KIND_NAMES = {
+  destination: "Destino",
+  event: "Evento",
+  knowledge: "Conocimiento",
+  notice: "Aviso",
+} as const;
 
 /** «12 nov 2026, 19:40», in the municipality's time. */
 function dateTime(iso: string, timezone: string): string {

@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** A — El asistente del municipio (por empezar). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** fase A en el roadmap (documentación), tras la corrección `fix/interface-details` ✅
-- **Rama:** `docs/assistant-phase` → PR hacia `main`
+- **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** A · Paso 1.1 — avisos del municipio ✅ (falta la verificación en producción)
+- **Rama:** `feat/a-step1-notices` → PR hacia `main`
 
 ## Historial
 
@@ -2671,13 +2671,51 @@ Lo que encontró el CI del push, ya corregido:
 - Decisión del usuario: la fase va **antes de C4**, empezando por el conocimiento más útil (Paso 1) y «Solo asistente» (Paso 2). WhatsApp (Paso 6) llega cuando una alcaldía interesada tenga su cuenta de Meta.
 - [Roadmap](../roadmap.md#a--el-asistente-del-municipio): la fase A con sus 6 pasos, cuándo se da cada uno por terminado y los requisitos y costos de WhatsApp (por confirmar con Meta antes de cotizar). El asistente dentro de WhatsApp sale de «Más adelante».
 
+### A · Paso 1.1 — avisos del municipio ✅
+
+- Decisiones del usuario ([ADR-069](../adr/ADR-069-useful-knowledge.md)), 2026-11-16, para todo el Paso 1:
+  - **un ADR y tres PR:** 1.1 avisos, 1.2 servicios locales, 1.3 memoria de la comunidad;
+  - avisos: **fin obligatorio, máximo 90 días**; **franja en todo el portal y en la ficha** de su lugar; **los publican como los destinos** (editores arman borradores, propietarios y administradores publican y retiran); **sin módulo** (todo municipio los tiene);
+  - servicios: **lista fija de categorías** de la plataforma; **página, mapa y asistente**; módulo `services`;
+  - memoria: **la carga el equipo del municipio**, **siempre como relato atribuido**, en **página, ficha y asistente**; módulo `community_memory`.
+- Base de datos (`20261127000000_a1_notice_enum.sql` y `20261127000100_a1_notices.sql`, solo expand):
+  - tipo de contenido `notice`, con el mismo flujo de revisiones que destinos y eventos (borrador → publicar → volver a una versión, «Retirar» como el conocimiento);
+  - en la revisión: `notice_from_local` / `notice_until_local` (hora del municipio, como los eventos) y `notice_place_id` (un destino o evento del mismo municipio, FK compuesta). La base exige que el fin sea posterior al inicio y a menos de 90 días;
+  - `save_content_draft` acepta `{ title, summary, body, validity: { from, until }, placeId }` (fechas `AAAA-MM-DDTHH:MM` que existen, años 2000–2100, lugar del municipio y del tipo correcto); `publish_content` exige texto y fin, un fin en el futuro y dentro de 90 días desde ahora o desde su inicio; `retire_content` acepta avisos;
+  - **vigente se comprueba al leer**, con la zona horaria del municipio (`private.notice_is_active`): un aviso que venció deja de encontrarse en la búsqueda del asistente y en el portal sin esperar a ningún trabajo, y uno programado no aparece antes de tiempo. En la búsqueda, un aviso vigente pesa más que el resto;
+  - `ai_api.place_notices` (solo `rikuy_ai`): los avisos vigentes de un destino o evento publicado, para que el asistente los cite primero cuando la pregunta viene desde su ficha;
+  - `worker_api.knowledge_source` suma la vigencia y el nombre **publicado** del lugar al texto indexado;
+  - `portal_notices` (anónima, municipios activos): los que terminan en el futuro y empiezan dentro de un día, con sus instantes, para que el navegador decida.
+- `@rikuy/core`: contrato `contracts/notice` (límites, vigencia, documento); `domain/notices` (`noticeInForce` también en `@rikuy/core/geo`, `noticeState`, lo que falta para publicar, `describeNoticeValidity`: «Hasta el 18 de noviembre de 2026, 18:00»); casos de uso `listNotices`, `createNotice`, `loadNoticeEditor`, `saveNoticeDraft`, `publishNotice` (revisa la vigencia antes de la base), `retireNotice`, `restoreNoticeRevision` y `discardNoticeDraft`; el asistente pone los avisos del lugar primero (`placeNotices`) y su regla 3 dice que un «Aviso del municipio» vigente va primero; la cita de un aviso es «Aviso» y lleva a `/avisos#…`; el Copilot y el informe mensual conocen el tipo.
+- `@rikuy/db`: `createNoticeRepository` y `createSupabasePublishedNoticeReader` (antes de la migración: sin avisos), y `placeNotices` en la conexión de la IA.
+- Panel: **«Avisos»** en «Contenido» (`/o/{slug}/avisos`): lista con estado (Vigente, Programado, Borrador, Vencido, Retirado) y vigencia; «Nuevo aviso»; editor con título, texto, detalle con formato, «Desde» y «Hasta» en la hora del municipio, «¿Es sobre un lugar o un evento?», vista previa de la franja, publicar, guardar borrador, «Retirar ahora» con confirmación, descartar y el historial con «Volver a esta versión». Publicar o retirar invalida la caché del portal del municipio.
+- Portal:
+  - **franja «Avisos del municipio»** debajo de la cabecera en todas las páginas (hasta 3; «Ver los N avisos» si hay más); en un tour, una sola línea para que el visor no pierda alto;
+  - en la ficha de su destino o evento, **«Aviso»** al principio de «Para tu visita»;
+  - **`/avisos`**: cada aviso con su ancla, la vigencia en la hora del municipio, el texto, el detalle y el enlace a su lugar; `noindex`, fuera del sitemap;
+  - las páginas están en caché: el servidor muestra los vigentes al armarla y **el navegador vuelve a comprobarlo con su reloj** (cada minuto), así un aviso vencido nunca queda en pantalla.
+- CI: nuevo paso **«Notices in a real browser»** (grupo «Lighthouse · visitas»); `/avisos` suma a las páginas de los contratos RC-09/10/11.
+- Tests:
+  - 1.085 unitarios (core 742, db 219, web 60, worker 50, config 14): vigencia y sus mensajes, estados, lo que falta para publicar, casos de uso con roles y lo que decide la base, el adaptador antes de la migración, los avisos primero en el asistente y que una falla al leerlos no rompe la respuesta;
+  - 1.872 pgTAP (54 nuevos, `052_notices`): fechas válidas e inválidas, sin fin, fin antes del inicio, más de 90 días; lugar de otro municipio o que es conocimiento; editor sin publicar, analista sin guardar, otro municipio sin nada; publicar sin fin, con un fin pasado o lejano; el portal con el vigente y el que empieza en 2 h, sin el que empieza en 10 días ni los de otro municipio; el indexador con la vigencia y el nombre publicado del lugar; la búsqueda con el aviso primero y nunca el programado; `place_notices` solo de su lugar y municipio; **al vencer** (simulado) desaparece de la búsqueda, del lugar y del portal aunque siga publicado; retirar (editor no, destino no);
+  - **e2e en un navegador real** (`notices.e2e.test.ts`): el propietario de Demo Sur crea y publica un aviso sobre un destino desde el panel («Vigente»); la franja en inicio, destinos y agenda; `/avisos` con su ancla, la vigencia y el lugar, `noindex`; la ficha del lugar; nada en Demo Norte; uno programado no aparece; con el reloj del navegador 3 días adelante, la página en caché lo quita; retirarlo lo quita al momento; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px.
+- Lo que encontraron las pruebas, ya corregido: el texto indexado usaba el nombre del borrador del lugar (podía mostrar un nombre todavía no publicado); el lector de la vigencia necesitaba la zona horaria del municipio, que ahora da el repositorio.
+
+**Desviaciones:**
+
+- La base local de Supabase no levanta en mi entorno (sus imágenes no se descargan): pgTAP, el lint de SQL, la integración y el e2e corren en el CI del PR.
+- Un aviso que empieza mientras la página está en caché aparece con el navegador (la franja crece una vez); uno que vence, se quita.
+- El asistente cita primero el aviso del lugar cuando se pregunta desde su ficha; desde otra página, el aviso compite en la búsqueda con un peso mayor.
+- `next build` en mi entorno se detiene a veces con un aviso de seguridad de Next.js 16.4.2 y pasa al repetirlo; actualizar Next.js va en un PR propio.
+
 ## Cómo verificarlo
 
-- En el [roadmap](../roadmap.md#a--el-asistente-del-municipio), la fase A entre C3 y C4, con sus 6 pasos y los requisitos de WhatsApp.
+- `pnpm check` en local; en el CI, `052_notices` (pgTAP) y «Notices in a real browser».
+- En producción, después del merge (las escrituras las hace el usuario): en Demo Norte, «Avisos» → «Nuevo aviso» con un fin en dos días y un lugar, «Publicar»; la franja en todas las páginas del portal, `/avisos` y la ficha del lugar; «Retirar ahora» lo quita.
 
 ## Siguiente paso
 
-**A · Paso 1 — conocimiento más útil** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)): definir con el usuario las decisiones del paso (avisos con vencimiento, servicios locales, memoria de la comunidad) y registrarlas en su ADR antes de empezar.
+**A · Paso 1.2 — servicios locales** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario después del merge de 1.1: tipo `service` y módulo `services`, categorías fijas, horario y contacto, `/servicios` con anclas, capa del mapa y el asistente.
 
 ## Decisiones pendientes del usuario
 

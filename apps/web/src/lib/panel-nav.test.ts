@@ -16,6 +16,7 @@ describe("the municipality's menu in the panel (ADR-066)", () => {
         [
           "Destinos",
           "Agenda",
+          "Avisos",
           "Categorías",
           "Tours 360°",
           "Panoramas 360°",
@@ -35,7 +36,7 @@ describe("the municipality's menu in the panel (ADR-066)", () => {
     const groups = panelNav({ slug: "x", role: "editor", modules: [] });
     expect(labels(groups)).toEqual([
       [null, ["Inicio"]],
-      ["Contenido", ["Destinos", "Categorías"]],
+      ["Contenido", ["Destinos", "Avisos", "Categorías"]],
       ["Resultados", ["Estadísticas", "Informe mensual"]],
       ["Ajustes", ["Marca del portal", "Uso del plan"]],
     ]);

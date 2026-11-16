@@ -26,7 +26,7 @@ import type { SessionClient } from "./session-client";
 const statusRowSchema = z.object({
   source: z.enum(["content", "tour"]),
   source_id: z.uuid(),
-  kind: z.enum(["destination", "event", "knowledge"]),
+  kind: z.enum(["destination", "event", "knowledge", "notice"]),
   slug: z.string(),
   title: z.string(),
   revision_no: z.number().int(),

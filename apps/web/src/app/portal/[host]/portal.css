@@ -108,6 +108,89 @@
   text-align: center;
 }
 
+/* ── Notices of the municipality (ADR-069) ─────────────────────────────── */
+
+.portal-notices {
+  padding: 0.625rem var(--edge);
+  border-block: 1px solid var(--line);
+  background: var(--tint);
+  font-size: 0.9375rem;
+}
+
+.portal-notices ul,
+.portal-notice-list,
+.portal-place-notices ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.portal-notices li,
+.portal-place-notices li {
+  display: flex;
+  gap: 0.5rem;
+  align-items: flex-start;
+}
+
+.portal-notices li + li {
+  margin-top: 0.375rem;
+}
+
+.portal-notices svg,
+.portal-place-notices svg {
+  flex: none;
+  margin-top: 0.1em;
+  color: var(--brand);
+}
+
+.portal-notices p,
+.portal-place-notices p {
+  margin: 0;
+}
+
+.portal-notices a,
+.portal-place-notices a,
+.portal-notice-place a {
+  font-weight: 600;
+  color: inherit;
+}
+
+.portal-notices-more {
+  margin: 0.375rem 0 0;
+}
+
+.portal-notice-list > li + li {
+  margin-top: 1.25rem;
+}
+
+.portal-notice-list article {
+  padding: 1rem 1.25rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  scroll-margin-top: 1rem;
+}
+
+.portal-notice-list h2 {
+  margin: 0 0 0.25rem;
+}
+
+.portal-notice-validity {
+  margin: 0 0 0.75rem;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.portal-notice-summary {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+.portal-notice-place {
+  margin: 0.75rem 0 0;
+}
+
 /* ── Header ─────────────────────────────────────────────────────────────── */
 
 .portal-header {
