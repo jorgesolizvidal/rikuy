@@ -156,6 +156,7 @@ describe("the municipality's panel with the design system (ADR-066)", () => {
         [
           "Destinos",
           "Agenda",
+          "Avisos",
           "Categorías",
           "Tours 360°",
           "Panoramas 360°",

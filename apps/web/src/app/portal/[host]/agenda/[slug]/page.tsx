@@ -19,6 +19,7 @@ import {
   portalHasTour,
   portalPlaceExtras,
   responsiveImage,
+  placeNoticeView,
 } from "@/server/portal-content";
 import { portalHas, portalViewWith } from "@/server/portal-view";
 
@@ -29,6 +30,7 @@ import { PhotoGallery } from "../../photo-gallery";
 import { NearbyPlaces, PlaceLocation, VisitorDistance } from "../../place-sections";
 import { ActionIcon } from "../../action-icon";
 import { ShareButton } from "../../share-button";
+import { PlaceNotices } from "../../notice-strip";
 import { NearbyNotice } from "../../visitor-location";
 
 interface EventPageProps {
@@ -86,7 +88,7 @@ export default async function EventPage({ params }: EventPageProps) {
   if (loaded === null) return movedOrNotFound(params, "event", PORTAL_PATHS.event);
   const { view, event } = loaded;
   const withMap = portalHas(view, "map");
-  const [targets, tour, extras] = await Promise.all([
+  const [targets, tour, extras, notices] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "event", event.slug, event.ended),
     portalPlaceExtras(view, {
@@ -95,6 +97,7 @@ export default async function EventPage({ params }: EventPageProps) {
       location: event.location,
       venue: event.venue?.slug ?? null,
     }),
+    placeNoticeView(view, "event", event.slug),
   ]);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
@@ -150,6 +153,7 @@ export default async function EventPage({ params }: EventPageProps) {
 
         <aside className="portal-visit" aria-labelledby="para-tu-visita">
           <h2 id="para-tu-visita">Para tu visita</h2>
+          <PlaceNotices notices={notices.notices} initial={notices.initial} />
           <section aria-labelledby="cuando" className="portal-visit-when">
             <h3 id="cuando">Cuándo</h3>
             {event.ended ? null : (

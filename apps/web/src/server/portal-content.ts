@@ -6,6 +6,7 @@ import {
   imageCandidates,
   loadAssistantPlaces,
   nearestPlaces,
+  noticesInForce,
   mapPlacePath,
   PORTAL_PATHS,
   portalMediaPath,
@@ -14,6 +15,7 @@ import {
   type PortalCircuit,
   type PortalIndexEntry,
   type PortalMapPlace,
+  type PublishedNotice,
   type PublishedEventSummary,
   type PublishedImage,
 } from "@rikuy/core";
@@ -26,11 +28,13 @@ import {
   publishedEventReader,
   publishedIndexReader,
   publishedMapReader,
+  publishedNoticeReader,
   publishedPassportReader,
   publishedRedirectReader,
   publishedTourReader,
   publishedTourRedirectReader,
 } from "./platform";
+import type { NoticeDto } from "@/app/portal/[host]/notice-strip";
 import type { NearbyTargetDto } from "@/app/portal/[host]/visitor-location";
 
 import { portalHas, portalView, type PortalView } from "./portal-view";
@@ -63,6 +67,66 @@ export function responsiveImage(tenantId: string, image: PublishedImage): Respon
     alt: image.alt,
     largest: { url: largest.url, width: largest.width, height: largest.height },
   };
+}
+
+/**
+ * The municipality's notices in force or starting within a day (ADR-069). Without them the
+ * page still shows: a failure here means no strip, never an error page.
+ */
+export const portalNotices = cache(async (view: PortalView): Promise<readonly PublishedNotice[]> =>
+  publishedNoticeReader()
+    .list(view.context.tenant.tenantId)
+    .catch(() => []),
+);
+
+export function noticeDto(notice: PublishedNotice): NoticeDto {
+  return {
+    slug: notice.slug,
+    title: notice.title,
+    summary: notice.summary,
+    startsAt: notice.startsAt,
+    endsAt: notice.endsAt,
+    href: PORTAL_PATHS.notice(notice.slug),
+    place: notice.place
+      ? {
+          ...notice.place,
+          href:
+            notice.place.kind === "destination"
+              ? PORTAL_PATHS.destination(notice.place.slug)
+              : PORTAL_PATHS.event(notice.place.slug),
+        }
+      : null,
+  };
+}
+
+/** The notices for the browser, and the ones in force when the page is built. */
+export interface NoticeView {
+  readonly notices: readonly NoticeDto[];
+  readonly initial: readonly string[];
+}
+
+function noticeView(notices: readonly PublishedNotice[]): NoticeView {
+  return {
+    notices: notices.map(noticeDto),
+    initial: noticesInForce(notices, new Date()).map((notice) => notice.slug),
+  };
+}
+
+/** Every notice, for the strip and /avisos. */
+export async function portalNoticeView(view: PortalView): Promise<NoticeView> {
+  return noticeView(await portalNotices(view));
+}
+
+/** The notices about one place, for its page. */
+export async function placeNoticeView(
+  view: PortalView,
+  kind: "destination" | "event",
+  slug: string,
+): Promise<NoticeView> {
+  const notices = await portalNotices(view);
+  return noticeView(
+    notices.filter((notice) => notice.place?.kind === kind && notice.place.slug === slug),
+  );
 }
 
 /** Published destinations of the portal's tenant (memoized per request). */

@@ -20,6 +20,7 @@ const KIND = {
   destination: "Destino",
   event: "Evento",
   knowledge: "Conocimiento",
+  notice: "Aviso",
 } as const;
 
 const DATE = new Intl.DateTimeFormat("es-BO", {

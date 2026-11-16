@@ -31,6 +31,7 @@ const GROUPS: readonly { readonly title: string | null; readonly entries: readon
     entries: [
       { path: "destinos", label: "Destinos" },
       { path: "agenda", label: "Agenda", module: "agenda" },
+      { path: "avisos", label: "Avisos" },
       { path: "categorias", label: "Categorías" },
       { path: "tours", label: "Tours 360°", module: "tours" },
       { path: "panoramas", label: "Panoramas 360°", module: "tours" },

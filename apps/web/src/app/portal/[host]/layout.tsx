@@ -18,7 +18,12 @@ import { THEME_FONTS, themeFontFaces } from "@/lib/theme-fonts";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { platformSettings } from "@/server/platform";
-import { portalIsEmpty, portalPassport, portalTourIndex } from "@/server/portal-content";
+import {
+  portalIsEmpty,
+  portalNoticeView,
+  portalPassport,
+  portalTourIndex,
+} from "@/server/portal-content";
 import { portalHas, portalView } from "@/server/portal-view";
 
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -26,6 +31,7 @@ import { SpeedInsights } from "@vercel/speed-insights/next";
 import { AssistantLauncher } from "./assistant-launcher";
 import { BottomBar } from "./bottom-bar";
 import { InstallButton } from "./install-button";
+import { NoticeStrip } from "./notice-strip";
 import { SocialLinks } from "./social-links";
 import { VisitTracker } from "./visit-tracker";
 
@@ -105,7 +111,11 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
-  const [tours, circuits] = await Promise.all([portalTourIndex(view), portalPassport(view)]);
+  const [tours, circuits, notices] = await Promise.all([
+    portalTourIndex(view),
+    portalPassport(view),
+    portalNoticeView(view),
+  ]);
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
@@ -191,6 +201,9 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           {circuits.length > 0 ? <a href={PORTAL_PATHS.passport}>Pasaporte</a> : null}
         </nav>
       </header>
+
+      {/* The municipality's notices in force (ADR-069), on every page. */}
+      <NoticeStrip notices={notices.notices} initial={notices.initial} />
 
       <main id="contenido">{children}</main>
 

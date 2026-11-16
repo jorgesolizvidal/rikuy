@@ -52,6 +52,9 @@ export const PORTAL_PATHS = {
   redeem: "/canje",
   /** POST: check or redeem a voucher (ADR-058). */
   redeemCheck: "/canje/verificar",
+  /** The municipality's notices in force (ADR-069), each with its anchor. */
+  notices: "/avisos",
+  notice: (slug: string) => `/avisos#${encodeURIComponent(slug)}`,
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;

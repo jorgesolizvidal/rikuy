@@ -19,6 +19,7 @@ import {
   portalHasTour,
   portalPlaceExtras,
   responsiveImage,
+  placeNoticeView,
 } from "@/server/portal-content";
 import { portalHas, portalView } from "@/server/portal-view";
 
@@ -29,6 +30,7 @@ import { PhotoGallery } from "../../photo-gallery";
 import { EventsHere, NearbyPlaces, PlaceLocation, VisitorDistance } from "../../place-sections";
 import { ActionIcon } from "../../action-icon";
 import { ShareButton } from "../../share-button";
+import { PlaceNotices } from "../../notice-strip";
 import { NearbyNotice } from "../../visitor-location";
 
 interface DestinationPageProps {
@@ -84,7 +86,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const loaded = await load(params);
   if (loaded === null) return movedOrNotFound(params, "destination", PORTAL_PATHS.destination);
   const { view, destination } = loaded;
-  const [targets, tour, allHours, extras] = await Promise.all([
+  const [targets, tour, allHours, extras, notices] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "destination", destination.slug),
     // Without the hours the page still shows: they are one more part of the visit card.
@@ -94,6 +96,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
       slug: destination.slug,
       location: destination.location,
     }),
+    placeNoticeView(view, "destination", destination.slug),
   ]);
   const hours = allHours.get(destination.slug) ?? null;
   const withMap = portalHas(view, "map");
@@ -147,6 +150,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
 
         <aside className="portal-visit" aria-labelledby="para-tu-visita">
           <h2 id="para-tu-visita">Para tu visita</h2>
+          <PlaceNotices notices={notices.notices} initial={notices.initial} />
           {hours ? (
             <section aria-labelledby="horario" className="portal-hours">
               <h3 id="horario">Horario</h3>

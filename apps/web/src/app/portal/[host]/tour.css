@@ -774,3 +774,14 @@
   border-radius: 999px;
   background: rgb(6 8 7 / 62%);
 }
+
+/* The municipality's notices (ADR-069) stay on a tour, in one short line: the viewer keeps
+   its height. The rest are one tap away in /avisos. */
+.portal-notices {
+  padding-block: 0.375rem;
+}
+
+.portal-notices li + li,
+.portal-notices li > p > span:not(.visually-hidden) {
+  display: none;
+}

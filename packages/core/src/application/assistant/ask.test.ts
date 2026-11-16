@@ -366,6 +366,88 @@ describe("askAssistant", () => {
     expect(l.begun).toHaveLength(0);
   });
 
+  it("reads a place's notices in force first, even when the question does not name them (ADR-069)", async () => {
+    const bridge = passage("puente-viejo", {
+      title: "Puente viejo",
+      heading: null,
+      text: "Un puente.",
+    });
+    const cut = passage("corte-de-ruta", {
+      kind: "notice",
+      title: "Corte de ruta",
+      heading: null,
+      text: "El puente está cerrado por obras.",
+    });
+    const { deps, complete } = setup({
+      found: [bridge],
+      page: { label: "Destino «Puente viejo»", title: "Puente viejo" },
+    });
+    const placeNotices = vi.fn(async () => [cut]);
+    deps.placeNotices = placeNotices;
+    const { reply, trace } = await askAssistant(
+      tenant,
+      { question: "¿Cómo llego?", page: { kind: "destination", slug: "puente-viejo" } },
+      null,
+      deps,
+    );
+    expect(placeNotices).toHaveBeenCalledWith(TENANT, {
+      kind: "destination",
+      slug: "puente-viejo",
+    });
+    const messages = complete.mock.calls.at(-1)?.[0].messages ?? [];
+    const user = messages.find((message) => message.role === "user")?.content ?? "";
+    expect(user.indexOf("Aviso del municipio «Corte de ruta»")).toBeGreaterThan(-1);
+    expect(user.indexOf("Aviso del municipio")).toBeLessThan(
+      user.indexOf("Destino «Puente viejo»"),
+    );
+    expect(trace?.retrieved[0]).toBe("notice:corte-de-ruta");
+    expect(reply.status).toBe("answered");
+  });
+
+  it("puts a notice the search found before the rest, and cites it on /avisos", async () => {
+    const museum = passage("museo-comunitario");
+    const change = passage("cambio-de-horario", {
+      kind: "notice",
+      title: "Cambio de horario",
+      heading: null,
+      text: "Desde hoy el museo abre a las 10.",
+      score: 1,
+    });
+    const { deps } = setup({ found: [museum, change] });
+    const { reply, trace } = await askAssistant(
+      tenant,
+      { question: "¿A qué hora abre el museo?", page: { kind: "home" } },
+      null,
+      deps,
+    );
+    expect(trace?.retrieved).toEqual(["notice:cambio-de-horario", "destination:museo-comunitario"]);
+    expect(reply).toMatchObject({
+      sources: expect.arrayContaining([
+        {
+          title: "Cambio de horario",
+          label: "Aviso",
+          href: "/avisos#cambio-de-horario",
+          page: null,
+          ended: false,
+        },
+      ]),
+    });
+  });
+
+  it("a place's notices failing to load change nothing", async () => {
+    const { deps } = setup({ found: [passage("museo-comunitario")] });
+    deps.placeNotices = async () => {
+      throw new Error("down");
+    };
+    const { reply } = await askAssistant(
+      tenant,
+      { question: "¿Qué hay aquí?", page: { kind: "destination", slug: "museo-comunitario" } },
+      null,
+      deps,
+    );
+    expect(reply.status).toBe("answered");
+  });
+
   it("ignores a page it cannot resolve", async () => {
     const { deps } = setup();
     deps.page = async () => {

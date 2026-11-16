@@ -36,6 +36,14 @@ export interface PostgresAiLedger extends AiLedger, DictationLedger {
    */
   searchKnowledge(tenantId: string, query: string, limit: number): Promise<KnowledgePassage[]>;
   /**
+   * ai_api.place_notices (ADR-069): the notices in force that name this published destination
+   * or event, at most two; nothing before the migration.
+   */
+  placeNotices(
+    tenantId: string,
+    item: { readonly kind: "destination" | "event"; readonly slug: string },
+  ): Promise<KnowledgePassage[]>;
+  /**
    * ai_api.tour_context (ADR-040): the scene and point named by the browser, resolved against
    * the published tour of that destination or event; null when it has none.
    */
@@ -146,6 +154,19 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
         select * from ai_api.search_knowledge(${tenantId}::uuid, ${query}, ${limit}::integer)
       `;
       return rows.map((row) => mapPassageRow({ ...row }));
+    },
+
+    async placeNotices(tenantId, item) {
+      try {
+        const rows = await sql`
+          select * from ai_api.place_notices(${tenantId}::uuid, ${item.kind}, ${item.slug})
+        `;
+        return rows.map((row) => mapPassageRow({ ...row }));
+      } catch (error) {
+        // The web app is deployed a few minutes before the migration that adds it.
+        if ((error as { code?: string }).code === "42883") return [];
+        throw error;
+      }
     },
 
     async tourContext(tenantId, item, sceneId, hotspotId) {

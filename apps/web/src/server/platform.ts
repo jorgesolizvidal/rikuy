@@ -12,6 +12,7 @@ import {
   type PublishedPresentationReader,
   type PublishedRedirectReader,
   type PublishedPassportReader,
+  type PublishedNoticeReader,
   type PublishedContentIndexReader,
   type PublishedRewardReader,
   type PublishedStampReader,
@@ -26,6 +27,7 @@ import {
   createSupabasePublishedMapReader,
   createSupabasePublishedRedirectReader,
   createSupabasePublishedPassportReader,
+  createSupabasePublishedNoticeReader,
   createSupabasePublishedContentIndexReader,
   createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
@@ -168,6 +170,19 @@ export function publishedPassportReader(): PublishedPassportReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedPassport;
+}
+
+let publishedNotices: PublishedNoticeReader | undefined;
+
+/** The municipality's notices that are or will soon be in force (anonymous, ADR-069). */
+export function publishedNoticeReader(): PublishedNoticeReader {
+  if (publishedNotices) return publishedNotices;
+  const { env } = platformSettings();
+  publishedNotices = createSupabasePublishedNoticeReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedNotices;
 }
 
 let publishedIndex: PublishedContentIndexReader | undefined;

@@ -217,6 +217,20 @@ export async function recordUnansweredQuestion(
 }
 
 /** ai_api.tour_context (ADR-040): the tour's scene and point, checked against what is published. */
+/**
+ * ai_api.place_notices (ADR-069): the notices in force that name the destination or event the
+ * visitor is on. Nothing without the AI configured.
+ */
+export async function aiPlaceNotices(
+  tenantId: string,
+  item: { readonly kind: "destination" | "event"; readonly slug: string },
+): Promise<KnowledgePassage[]> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return [];
+  return deps.ledger.placeNotices(tenantId, item);
+}
+
 export async function aiTourContext(
   tenantId: string,
   item: { readonly kind: "destination" | "event"; readonly slug: string },

@@ -146,6 +146,12 @@ export * from "./application/knowledge/documents";
 export * from "./application/knowledge/knowledge";
 export * from "./application/knowledge/search";
 export * from "./application/knowledge/indexing";
+// The municipality's notices, with an end (A · Paso 1.1, ADR-069).
+export * from "./contracts/notice";
+export * from "./domain/notices/in-force";
+export * from "./domain/notices/validity";
+export * from "./application/notices/ports";
+export * from "./application/notices/notices";
 export * from "./application/assistant/gold-set";
 export * from "./application/evaluation/fixtures-data";
 export * from "./application/evaluation/ports";

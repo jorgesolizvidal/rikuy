@@ -3,9 +3,11 @@ import { z } from "zod";
 import { openingHoursSchema } from "../../contracts/destination";
 import { eventScheduleSchema } from "../../contracts/event";
 import { documentManifestSchema, type DocumentText } from "../../contracts/knowledge";
+import { noticeValiditySchema } from "../../contracts/notice";
 import { richTextSchema } from "../../contracts/rich-text";
 import { tourManifestSchema } from "../../contracts/tour";
 import { formatEventSchedule } from "../events/schedule";
+import { describeNoticeValidity } from "../notices/validity";
 import { openingHoursText } from "../plan/hours";
 import { paragraph, richTextBlocks, type ChunkUnit } from "./chunker";
 import { textBlocks } from "./text";
@@ -18,7 +20,7 @@ import { textBlocks } from "./text";
 
 export const contentIndexSourceSchema = z.object({
   source: z.literal("content"),
-  kind: z.enum(["destination", "event", "knowledge"]),
+  kind: z.enum(["destination", "event", "knowledge", "notice"]),
   slug: z.string(),
   revisionNo: z.number().int().min(1),
   title: z.string().min(1),
@@ -29,6 +31,9 @@ export const contentIndexSourceSchema = z.object({
   /** A destination's opening hours (ADR-039); absent before P5 · Paso 4. */
   hours: openingHoursSchema.nullable().catch(null).default(null),
   venueTitle: z.string().nullable(),
+  /** A notice's validity and place (ADR-069); absent before A · Paso 1.1. */
+  validity: noticeValiditySchema.nullable().catch(null).default(null),
+  placeTitle: z.string().nullable().catch(null).default(null),
   document: z.object({ prefix: z.string(), manifest: documentManifestSchema }).nullable(),
 });
 
@@ -49,7 +54,10 @@ export const indexSourceSchema = z.discriminatedUnion("source", [
 export type IndexSource = z.infer<typeof indexSourceSchema>;
 export type ContentIndexSource = z.infer<typeof contentIndexSourceSchema>;
 
-/** The units of a content revision: summary, the event's date and place, text, document. */
+/**
+ * The units of a content revision: summary, the event's date and place (or the notice's
+ * validity and place), text, document.
+ */
 export function contentUnits(
   source: ContentIndexSource,
   document: DocumentText | null,
@@ -59,6 +67,12 @@ export function contentUnits(
     facts.push(`Fecha: ${formatEventSchedule(source.schedule)}.`);
   }
   if (source.kind === "event" && source.venueTitle) facts.push(`Lugar: ${source.venueTitle}.`);
+  if (source.kind === "notice" && source.validity) {
+    const validity = describeNoticeValidity(source.validity);
+    if (validity)
+      facts.push(`Aviso vigente ${validity.charAt(0).toLowerCase()}${validity.slice(1)}.`);
+  }
+  if (source.kind === "notice" && source.placeTitle) facts.push(`Lugar: ${source.placeTitle}.`);
   if (source.kind === "destination" && source.hours) {
     facts.push(`Horario de atención: ${openingHoursText(source.hours)}.`);
   }

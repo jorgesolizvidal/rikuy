@@ -49,7 +49,7 @@ import { viewsOf, type StatisticsRepository } from "../statistics/statistics";
 
 export interface ContentActivityItem {
   readonly contentId: string;
-  readonly kind: "destination" | "event" | "knowledge";
+  readonly kind: "destination" | "event" | "knowledge" | "notice";
   readonly title: string;
   /** Its tour 360° (true) or the place itself. */
   readonly tour: boolean;
