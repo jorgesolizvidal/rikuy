@@ -58,8 +58,9 @@ as $$
     'placeId', p_place);
 $$;
 
--- Stands in for the indexer: one chunk per claimed job, with the revision's summary.
-create function pg_temp.index_claimed(p_claims regclass)
+-- Stands in for the indexer: one chunk per claimed job, with the revision's summary. A job
+-- whose revision is p_keep stays claimed (its source is read before indexing it).
+create function pg_temp.index_claimed(p_claims regclass, p_keep uuid default null)
 returns void
 language plpgsql
 as $$
@@ -73,6 +74,11 @@ begin
     from public.background_jobs j
     join public.content_revisions r on j.subject_type = 'content_revision' and r.id = j.subject_id
     where j.id = v_claim.job_id;
+    if p_keep is not null and exists (
+      select 1 from public.background_jobs j where j.id = v_claim.job_id and j.subject_id = p_keep
+    ) then
+      continue;
+    end if;
     if v_title is null then
       perform worker_api.complete_job(v_claim.job_id, v_claim.fencing_token, '{"outcome":"skipped"}', '{}');
       continue;
@@ -267,15 +273,38 @@ select is((select count(*)::int from public.portal_notices(:'tb')), 0, 'another 
 
 -- ── The assistant ───────────────────────────────────────────────────────────
 reset role;
+-- At most two index jobs of a municipality run at once (its queue's tenant concurrency): the
+-- worker takes them in rounds. The notice's job stays claimed to read its source.
+create temp table keep as
+select published_revision_id as revision_id from public.content_items where id = (select content_id from cut);
+grant select on keep to rikuy_worker;
 set local role rikuy_worker;
 create temp table i1 as select * from worker_api.claim_jobs('runner-n', 10, array['knowledge.index']);
 reset role;
+grant select on i1 to postgres;
+select pg_temp.index_claimed('i1', (select revision_id from keep));
+set local role rikuy_worker;
+create temp table i2 as select * from worker_api.claim_jobs('runner-n', 10, array['knowledge.index']);
+reset role;
+grant select on i2 to postgres;
+select pg_temp.index_claimed('i2', (select revision_id from keep));
+set local role rikuy_worker;
+create temp table i3 as select * from worker_api.claim_jobs('runner-n', 10, array['knowledge.index']);
+reset role;
+grant select on i3 to postgres;
+select pg_temp.index_claimed('i3', (select revision_id from keep));
+set local role rikuy_worker;
+create temp table i4 as select * from worker_api.claim_jobs('runner-n', 10, array['knowledge.index']);
+reset role;
+grant select on i4 to postgres;
+select pg_temp.index_claimed('i4', (select revision_id from keep));
+create temp table claimed as
+select * from i1 union all select * from i2 union all select * from i3 union all select * from i4;
 create temp table cut_job as
 select c.job_id, c.fencing_token
-from i1 c
+from claimed c
 join public.background_jobs j on j.id = c.job_id
-join public.content_items i on i.published_revision_id = j.subject_id
-where i.slug = 'corte-de-ruta';
+where j.subject_id = (select revision_id from keep);
 grant select on cut_job to rikuy_worker;
 set local role rikuy_worker;
 select is(
@@ -287,8 +316,8 @@ select is(
   (select in2d from v), 'and its validity'
 );
 reset role;
-grant select on i1 to postgres;
-select pg_temp.index_claimed('i1');
+grant select on cut_job to postgres;
+select pg_temp.index_claimed('cut_job');
 
 set local role authenticated;
 set local request.jwt.claims to :'a4c';

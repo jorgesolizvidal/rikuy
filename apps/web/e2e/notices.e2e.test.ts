@@ -162,7 +162,7 @@ describe("notices of the municipality (ADR-069)", () => {
     if (tenant) timezone = tenant.timezone;
     // A destination of Demo Sur that visitors can open.
     const [destination] = await db<{ id: string; slug: string; title: string }[]>`
-      select ci.id, ci.slug, r.document->>'title' as title
+      select ci.id, ci.slug, r.title
         from public.content_items ci
         join public.content_revisions r on r.id = ci.published_revision_id
        where ci.tenant_id = ${SUR} and ci.kind = 'destination'
