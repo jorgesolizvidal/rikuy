@@ -4,9 +4,9 @@
 
 ## Estado actual
 
-- **Fase:** C3 — rediseño de la interfaz ✅. C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** corrección `fix/interface-details` — detalles de la interfaz después de C3 · Paso 8 ✅
-- **Rama:** `fix/interface-details` → PR hacia `main`
+- **Fase:** A — El asistente del municipio (por empezar). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
+- **Último paso completado:** fase A en el roadmap (documentación), tras la corrección `fix/interface-details` ✅
+- **Rama:** `docs/assistant-phase` → PR hacia `main`
 
 ## Historial
 
@@ -2653,18 +2653,35 @@ Lo que encontró el CI del push, ya corregido:
 - La línea hasta el lugar es en línea recta, no por calles («Cómo llegar» abre la app de mapas).
 - El mapa del recorrido del pasaporte sigue quieto.
 
+**Verificación en producción (2026-11-16):** el usuario hizo el merge (PR #89) y las pruebas en producción.
+
+### Fase A — El asistente del municipio (documentación) ✅
+
+- Idea del usuario (2026-11-16): que cada municipio tenga su asistente turístico oficial con IA, que responda con su historia, su museo y lo publicado, también por WhatsApp. Dos ofertas:
+  - municipios **con web propia**: solo el asistente (insertado en su sitio, por QR y por WhatsApp);
+  - municipios **sin web**: el portal completo con el asistente.
+- Investigación de mercado (2026-11-16): asistentes turísticos y de ciudades que ya existen (GuideGeek, Mindtrip, feratel AI plus, Boti, Xoli, Balam, Candelaria, Ask Mona) y la política y los precios de WhatsApp. De ahí salen ideas que se suman a la fase:
+  - avisos del municipio con vencimiento;
+  - servicios locales como conocimiento;
+  - memoria de la comunidad aprobada por el municipio;
+  - planes por tipo de visita;
+  - pasar a una persona;
+  - métricas por canal;
+  - preguntas frecuentes publicables para los buscadores con IA.
+- Decisión del usuario: la fase va **antes de C4**, empezando por el conocimiento más útil (Paso 1) y «Solo asistente» (Paso 2). WhatsApp (Paso 6) llega cuando una alcaldía interesada tenga su cuenta de Meta.
+- [Roadmap](../roadmap.md#a--el-asistente-del-municipio): la fase A con sus 6 pasos, cuándo se da cada uno por terminado y los requisitos y costos de WhatsApp (por confirmar con Meta antes de cotizar). El asistente dentro de WhatsApp sale de «Más adelante».
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Marca del portal» → «Identidad» → «Escudo del municipio», sube el escudo (PNG, JPG o WebP; mejor con fondo transparente) y publica la marca: aparece en el pie de todas las páginas.
-- En el inicio: el logo más grande y, si «Cifras» está encendida, la tarjeta blanca sobre el borde de la portada; cada cifra lleva a su sección.
-- En una ficha (por ejemplo, el museo) desde el celular: «Tour 360°» y «Compartir» compactos, lado a lado; en «Ubicación», acerca y aleja el mapa, pulsa «Ver dónde estoy en el mapa» y comprueba el punto azul, la línea hasta el lugar, la distancia y «Cómo llegar».
+- En el [roadmap](../roadmap.md#a--el-asistente-del-municipio), la fase A entre C3 y C4, con sus 6 pasos y los requisitos de WhatsApp.
 
 ## Siguiente paso
 
-**Proponer la fase «El asistente del municipio»** (pedido del usuario, 2026-11-16): pasos, ADR y requisitos y costos de WhatsApp, con las ideas de la investigación de mercado, para que el usuario la apruebe y decida si va antes de C4. Después, **C4 — portal en español e inglés**.
+**A · Paso 1 — conocimiento más útil** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)): definir con el usuario las decisiones del paso (avisos con vencimiento, servicios locales, memoria de la comunidad) y registrarlas en su ADR antes de empezar.
 
 ## Decisiones pendientes del usuario
 
+- La captura 3 del pedido de `fix/interface-details` (el enlace «Ver todos» con su flecha) no se tocó: el usuario no dijo qué cambiar.
 - El correo real del propietario de Ucureña se cambia más adelante desde «Miembros».
 - **Al final del proyecto, en Blender** (pedido del usuario, 2026-10-25; confirmado fuera de C0 el 2026-11-10):
   - corregir la iluminación de la ametralladora: sus mapas marcan casi todo como metal sobre colores muy oscuros;
