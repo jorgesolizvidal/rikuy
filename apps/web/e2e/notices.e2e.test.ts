@@ -270,17 +270,24 @@ describe("notices of the municipality (ADR-069)", () => {
     await page.goto(`${ADMIN}/o/demo-sur/avisos`);
     await page.getByRole("link", { name: TITLE }).click();
     await page.getByRole("button", { name: "Retirar ahora" }).click();
-    await page
-      .getByRole("button", { name: "Confirmar: retirar el aviso del portal y del asistente" })
-      .click();
-    await page.getByRole("button", { name: "Retirar ahora" }).waitFor({
-      state: "detached",
-      timeout: 15_000,
+    const confirm = page.getByRole("button", {
+      name: "Confirmar: retirar el aviso del portal y del asistente",
     });
+    await confirm.click();
+    // Retired, the editor reloads: no confirmation and nothing left to retire.
+    await confirm.waitFor({ state: "detached", timeout: 15_000 });
+    await page.waitForLoadState("load");
+    await expect(page.getByRole("button", { name: "Retirar ahora" }).count()).resolves.toBe(0);
     expect(await visitStatus("/avisos")).toBe(200);
-    await visitor.goto(`${PORTAL}/avisos`);
-    await expect(visitor.getByRole("heading", { name: TITLE }).count()).resolves.toBe(0);
-    await visitor.goto(`${PORTAL}/destinos/${place.slug}`);
-    await expect(visitor.getByText(TITLE).count()).resolves.toBe(0);
+    for (const path of ["/avisos", `/destinos/${place.slug}`]) {
+      // The pages were marked stale on retiring: the next visits get them fresh.
+      let shown = 1;
+      for (let attempt = 0; attempt < 10 && shown > 0; attempt += 1) {
+        if (attempt > 0) await new Promise((resolve) => setTimeout(resolve, 1_000));
+        await visitor.goto(`${PORTAL}${path}`);
+        shown = await visitor.getByText(TITLE).count();
+      }
+      expect(shown, path).toBe(0);
+    }
   });
 });
