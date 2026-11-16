@@ -98,6 +98,7 @@ export async function saveBrandingDraft(
 function databaseIssues(presentation: TenantPresentation): readonly PresentationIssue[] {
   return [
     ...(presentation.logo ? [{ path: "logo", code: "invalid" as const }] : []),
+    ...(presentation.crest ? [{ path: "crest", code: "invalid" as const }] : []),
     ...(presentation.home?.hero.destinationId
       ? [{ path: "home.hero.destinationId", code: "invalid" as const }]
       : []),
@@ -122,12 +123,14 @@ export async function publishBranding(
   const saved = await saveBrandingDraft(membership, input, expectedRevision, repository);
   if (saved.status !== "saved") return saved;
 
-  // The logo's public derivatives must exist before the portal points at them; the
-  // database refuses to publish a brand whose logo is not published.
+  // The logo's and the crest's public derivatives must exist before the portal points at
+  // them; the database refuses to publish a brand whose images are not published.
   const validated = validatePresentation(input);
-  if (validated.ok && validated.value.logo) {
-    const { assetId, version } = validated.value.logo;
-    await logoPublisher.publish(membership.tenantId, assetId, version, LOGO_FILES);
+  if (validated.ok) {
+    for (const image of [validated.value.logo, validated.value.crest]) {
+      if (!image) continue;
+      await logoPublisher.publish(membership.tenantId, image.assetId, image.version, LOGO_FILES);
+    }
   }
 
   const outcome = await repository.publish(membership.tenantId, saved.configId, saved.revision);

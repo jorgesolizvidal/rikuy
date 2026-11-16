@@ -91,6 +91,30 @@ describe("branding form mapping", () => {
     if (!refused.ok) expect(Object.keys(fieldErrors(refused.issues, []))).toEqual(["logo"]);
   });
 
+  it("carries the crest like the logo, and points at it when it is refused (ADR-068)", () => {
+    const asset = "5eed4000-0000-4000-8000-000000000002";
+    const withCrest = presentationInputFromForm(
+      form({ ...filled, "crest.assetId": asset, "crest.version": "1" }),
+    );
+    expect(withCrest.crest).toEqual({ assetId: asset, version: 1 });
+    const result = validatePresentation(withCrest);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(valuesFromPresentation(result.value)).toMatchObject({
+        crestAssetId: asset,
+        crestVersion: "1",
+      });
+    }
+    expect(presentationInputFromForm(form(filled))).not.toHaveProperty("crest");
+    const refused = validatePresentation(
+      presentationInputFromForm(
+        form({ ...filled, "crest.assetId": "../escudo", "crest.version": "x" }),
+      ),
+    );
+    expect(refused.ok).toBe(false);
+    if (!refused.ok) expect(fieldErrors(refused.issues, []).crest).toContain("escudo");
+  });
+
   it("ignores fields that are not part of the contract", () => {
     const input = presentationInputFromForm(
       form({ ...filled, css: "body{}", "social.myspace": "https://x" }),

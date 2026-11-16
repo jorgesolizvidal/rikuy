@@ -196,6 +196,18 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
 
       <footer className="portal-footer">
         <section aria-labelledby="pie-portal" className="portal-footer-brand">
+          {view.crest ? (
+            // The municipality's coat of arms (ADR-068): a versioned public derivative, below
+            // the fold, so it loads lazily and never competes with the page's photo.
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              className="portal-crest"
+              src={view.crest.webp}
+              alt={`Escudo de ${identity.siteName}`}
+              loading="lazy"
+              decoding="async"
+            />
+          ) : null}
           <h2 id="pie-portal">{identity.siteName}</h2>
           {identity.tagline ? <p>{identity.tagline}</p> : null}
         </section>

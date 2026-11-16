@@ -14,6 +14,8 @@ export interface LogoSelection {
 
 interface LogoFieldProps {
   readonly slug: string;
+  /** The logo (header, icons) or the coat of arms (footer, ADR-068): same image rules. */
+  readonly kind?: "logo" | "crest";
   readonly disabled: boolean;
   readonly hasLogo: boolean;
   readonly previewUrl: string | null;
@@ -33,14 +35,44 @@ const PROBLEMS: Readonly<Record<LogoProblem, string>> = {
   unreadable: "No pudimos leer la imagen. Prueba con otro archivo.",
 };
 
-const FAILURES = {
-  forbidden: "Tu rol ya no permite cambiar el logo de este municipio.",
-  signed_out: "Tu sesión venció. Inicia sesión de nuevo para subir el logo.",
-  rate_limited: "Hiciste muchas subidas seguidas. Espera unos minutos e inténtalo de nuevo.",
-  not_uploaded: "La imagen no terminó de subirse. Inténtalo de nuevo.",
-  not_found: "No encontramos esa subida. Inténtalo de nuevo.",
-  error: "No pudimos subir el logo. Inténtalo de nuevo en unos segundos.",
+/** What changes between the logo and the coat of arms: the words. */
+const TEXTS = {
+  logo: {
+    label: "Logo",
+    the: "el logo",
+    upload: "Subir logo",
+    replace: "Reemplazar logo",
+    remove: "Quitar logo",
+    chosen: "Logo elegido",
+    none: "Sin logo",
+    ready: "Logo listo. Publica la marca para que aparezca en el portal.",
+    removed: "Logo quitado. Al publicar, el portal mostrará las iniciales.",
+    hint: "Mejor con fondo transparente. Sin logo, el portal muestra las iniciales del nombre corto.",
+  },
+  crest: {
+    label: "Escudo del municipio",
+    the: "el escudo",
+    upload: "Subir escudo",
+    replace: "Reemplazar escudo",
+    remove: "Quitar escudo",
+    chosen: "Escudo elegido",
+    none: "Sin escudo",
+    ready: "Escudo listo. Publica la marca para que aparezca en el pie del portal.",
+    removed: "Escudo quitado. Al publicar, el pie del portal no lo mostrará.",
+    hint: "Se muestra en el pie de todas las páginas del portal. Mejor con fondo transparente. Opcional.",
+  },
 } as const;
+
+function failures(the: string) {
+  return {
+    forbidden: `Tu rol ya no permite cambiar ${the} de este municipio.`,
+    signed_out: `Tu sesión venció. Inicia sesión de nuevo para subir ${the}.`,
+    rate_limited: "Hiciste muchas subidas seguidas. Espera unos minutos e inténtalo de nuevo.",
+    not_uploaded: "La imagen no terminó de subirse. Inténtalo de nuevo.",
+    not_found: "No encontramos esa subida. Inténtalo de nuevo.",
+    error: `No pudimos subir ${the}. Inténtalo de nuevo en unos segundos.`,
+  } as const;
+}
 
 type Phase =
   | { readonly kind: "idle" }
@@ -55,6 +87,7 @@ type Phase =
  */
 export function LogoField({
   slug,
+  kind = "logo",
   disabled,
   hasLogo,
   previewUrl,
@@ -62,6 +95,8 @@ export function LogoField({
   onChange,
 }: LogoFieldProps) {
   const id = useId();
+  const words = TEXTS[kind];
+  const FAILURES = failures(words.the);
   const input = useRef<HTMLInputElement>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "idle" });
   const busy = phase.kind === "working";
@@ -109,28 +144,22 @@ export function LogoField({
       version: String(confirmed.logo.version),
       previewUrl: confirmed.previewUrl,
     });
-    setPhase({
-      kind: "done",
-      message: "Logo listo. Publica la marca para que aparezca en el portal.",
-    });
+    setPhase({ kind: "done", message: words.ready });
   }
 
   function remove() {
     onChange(null);
-    setPhase({
-      kind: "done",
-      message: "Logo quitado. Al publicar, el portal mostrará las iniciales.",
-    });
+    setPhase({ kind: "done", message: words.removed });
     input.current?.focus();
   }
 
-  const hint = `PNG, JPG o WebP de hasta ${MAX_MB} MB y al menos ${LOGO_RULES.minSide} px por lado. Mejor con fondo transparente. Sin logo, el portal muestra las iniciales del nombre corto.`;
+  const hint = `PNG, JPG o WebP de hasta ${MAX_MB} MB y al menos ${LOGO_RULES.minSide} px por lado. ${words.hint}`;
   const message = error ?? (phase.kind === "idle" ? "" : phase.message);
   const failed = Boolean(error) || phase.kind === "failed";
 
   return (
     <div className="field logo-field">
-      <span id={`${id}-label`}>Logo</span>
+      <span id={`${id}-label`}>{words.label}</span>
       <span id={`${id}-hint`} className="field-hint">
         {hint}
       </span>
@@ -139,9 +168,9 @@ export function LogoField({
           {hasLogo && previewUrl ? (
             // Short-lived signed URL from Storage: next/image would cache it past expiry.
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={previewUrl} alt="Logo elegido" />
+            <img src={previewUrl} alt={words.chosen} />
           ) : (
-            <span>{hasLogo ? "Logo elegido" : "Sin logo"}</span>
+            <span>{hasLogo ? words.chosen : words.none}</span>
           )}
         </div>
         <div className="logo-actions">
@@ -157,7 +186,7 @@ export function LogoField({
             onChange={upload}
           />
           <label htmlFor={id} className="button button-quiet" aria-disabled={disabled || busy}>
-            {busy ? "Subiendo…" : hasLogo ? "Reemplazar logo" : "Subir logo"}
+            {busy ? "Subiendo…" : hasLogo ? words.replace : words.upload}
           </label>
           {hasLogo ? (
             <button
@@ -166,7 +195,7 @@ export function LogoField({
               onClick={remove}
               disabled={disabled || busy}
             >
-              Quitar logo
+              {words.remove}
             </button>
           ) : null}
         </div>

@@ -27,6 +27,7 @@ import { DetailHero } from "../../detail-hero";
 import { OpenNow } from "../../open-now";
 import { PhotoGallery } from "../../photo-gallery";
 import { EventsHere, NearbyPlaces, PlaceLocation, VisitorDistance } from "../../place-sections";
+import { ActionIcon } from "../../action-icon";
 import { ShareButton } from "../../share-button";
 import { NearbyNotice } from "../../visitor-location";
 
@@ -171,6 +172,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
                 target="_blank"
                 rel="noopener noreferrer"
               >
+                <ActionIcon name="directions" />
                 Cómo llegar<span className="visually-hidden"> (abre la app de mapas)</span>
               </a>
             ) : null}
@@ -179,7 +181,8 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
                 className="portal-button portal-tour-link"
                 href={tourPath("destination", destination.slug)}
               >
-                Ver el tour 360°
+                <ActionIcon name="tour" />
+                <span className="visually-hidden">Ver el </span>Tour 360°
               </a>
             ) : null}
             <ShareButton title={destination.title} url={url} />

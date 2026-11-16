@@ -29,7 +29,10 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
     loadBrandingEditor(membership, session.config),
     session.content.listDestinations(membership.tenantId).catch(() => []),
   ]);
-  const logoPreview = await logoPreviewUrl(membership.tenantId, editor.initial, session.media);
+  const [logoPreview, crestPreview] = await Promise.all([
+    logoPreviewUrl(membership.tenantId, editor.initial, session.media),
+    logoPreviewUrl(membership.tenantId, editor.initial, session.media, "crest"),
+  ]);
   const portalUrl = editor.portalHostname
     ? platformSettings().portalOrigin(editor.portalHostname)
     : null;
@@ -71,6 +74,7 @@ export default async function BrandingPage({ params }: BrandingPageProps) {
         revision={editor.draft?.revision ?? null}
         canEdit={editor.canEdit}
         logoPreviewUrl={logoPreview}
+        crestPreviewUrl={crestPreview}
         destinations={destinations.map((destination) => ({
           id: destination.contentId,
           title: destination.title,

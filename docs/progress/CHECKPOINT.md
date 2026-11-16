@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** C3 — rediseño de la interfaz ✅. C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** C3 · Paso 8 — pulido de la interfaz ✅
-- **Rama:** `feat/c3-step8-polish` → PR hacia `main`
+- **Último paso completado:** corrección `fix/interface-details` — detalles de la interfaz después de C3 · Paso 8 ✅
+- **Rama:** `fix/interface-details` → PR hacia `main`
 
 ## Historial
 
@@ -2624,17 +2624,44 @@ Lo que encontró el CI del push, ya corregido:
 - «Más tours» sin foto: mostrarla descargaría la vista previa de cada tour al abrir la página.
 - El editor de destinos no se rehízo en dos columnas: ya tenía la columna lateral (Copilot, dirección, QR, historial); solo cambió el orden.
 
+### Corrección `fix/interface-details` — detalles de la interfaz ✅
+
+- Pedido del usuario (2026-11-16) con capturas del portal de Ucureña ([ADR-068](../adr/ADR-068-interface-details.md)). La navegación de la cabecera quedó a mi criterio: se queda a la derecha.
+- **Logo de la cabecera** más grande: 4,5 rem en la PC (antes 2,5) y 3,5 rem en el celular, con el alto fijo (la cabecera no cambia al cargar la imagen).
+- **Escudo del municipio en el pie:**
+  - base de datos (`20261126000000_c3_footer_crest.sql`, solo expand): la marca acepta `crest` con la misma forma que el logo; `private.is_valid_presentation`, `private.assert_logo_reference` (logo y escudo: imagen de tipo logo, del mismo municipio, lista al guardar y pública al publicar) y `private.is_unused_media` (la limpieza diaria no borra un escudo en uso), con `create or replace`;
+  - `@rikuy/core`: `crest` en el contrato, `publishBranding` publica sus derivados antes que la marca y `logoPreviewUrl` sirve a los dos;
+  - panel, «Marca del portal» → «Identidad»: «Escudo del municipio» (subir, reemplazar, quitar), con el mismo componente del logo;
+  - portal: el escudo encima del nombre, en el pie de todas las páginas, con `alt` «Escudo de …» y carga diferida.
+- **Cifras del inicio en una tarjeta:** blanca, con hasta cuatro cifras en una fila (dos por dos en el celular); cada una con su ícono en un cuadrado tintado, el número, lo que cuenta y una flecha. Lo que cuenta el portal lleva a su sección (destinos, recorrido general, agenda, pasaporte); las cifras propias del municipio son solo texto. Justo después de la portada con foto, la tarjeta se apoya sobre su borde. `homeFigures` devuelve el tipo de cada cifra (`BandFigure`).
+- **Botones de «Para tu visita»** compactos (2,5 rem), con ícono y sin partir el texto: «Cómo llegar» arriba y «Tour 360°», «Calendario» y «Compartir» lado a lado. Los nombres accesibles siguen siendo «Ver el tour 360°» y «Añadir al calendario».
+- **Mapa de la ficha:**
+  - se acerca y se mueve (+ y −, dos dedos en el celular, Ctrl + rueda en la PC);
+  - debajo: «Ver dónde estoy en el mapa», la distancia y «Cómo llegar» (no en un evento terminado);
+  - con la ubicación, el punto azul y una línea recta discontinua hasta el lugar, y el mapa encuadra a los dos una vez (a más de 300 km, solo el lugar);
+  - se carga también al compartir la ubicación; el pin del lugar no abre ventana; en mapas angostos los créditos empiezan plegados detrás de su «i»;
+  - la posición sigue sin salir del teléfono.
+- Tests:
+  - unitarios: core 725, web 60 (el escudo en el formulario y en `publishBranding`, el tipo de cada cifra);
+  - pgTAP `051_footer_crest` (17): forma (URL, campos extra, versión 0), escudo subiendo, foto de contenido o imagen de otro municipio rechazados, guardar, publicar antes de los derivados (`PT409`), editor sin permiso, publicar con los derivados, la limpieza diaria lo conserva;
+  - e2e: inicio (la tarjeta: cifra propia sin enlace, la de lugares lleva a `/destinos`) y fichas (caso nuevo: el mapa con + y −, el punto del visitante y el lugar en pantalla, la distancia, «Cómo llegar» y ninguna petición con la posición; axe a 390 px).
+- Verificado en el navegador con una compilación local leyendo producción (solo lectura, sin contar visitas): inicio de Ucureña a 390 y 1280 px, el pie con una imagen en lugar del escudo, la ficha del museo con el mapa, la ubicación simulada a 23 km y a 1 km, y la ficha del carnaval; sin desbordes.
+
+**Desviaciones:**
+
+- La revisión de integridad de lo publicado (ADR-044) no revisa el escudo todavía.
+- La línea hasta el lugar es en línea recta, no por calles («Cómo llegar» abre la app de mapas).
+- El mapa del recorrido del pasaporte sigue quieto.
+
 ## Cómo verificarlo
 
-- Tras el merge, en el panel de Ucureña → «Marca del portal» → «Inicio del portal», desmarca «Cifras» y «¿Tienes una pregunta?» y publica.
-- Abre el portal en la PC: la foto de portada de fondo con un solo botón; las secciones con el mismo ancho que la cabecera; las tarjetas con «Recorrido 360°» y «Sello del pasaporte» debajo del texto; los eventos con «Miércoles · 10:00–18:00» junto al bloque de fecha.
-- En el celular: la barra Inicio · Destinos · 360° · Agenda · Pasaporte; «Destinos» empieza con su título y una frase.
-- Abre un tour de una sola escena: sin «Anterior», «Siguiente» ni «Escena 1 de 1», y el zoom en una esquina.
-- En el panel: la página del municipio con «Nuevo destino», «Nuevo evento» y «Ver el portal»; «Nuevo destino» abre el formulario; «Subir», «Bajar» y «Quitar» como íconos en «Marca del portal» y «Categorías».
+- Tras el merge, en el panel de Ucureña → «Marca del portal» → «Identidad» → «Escudo del municipio», sube el escudo (PNG, JPG o WebP; mejor con fondo transparente) y publica la marca: aparece en el pie de todas las páginas.
+- En el inicio: el logo más grande y, si «Cifras» está encendida, la tarjeta blanca sobre el borde de la portada; cada cifra lleva a su sección.
+- En una ficha (por ejemplo, el museo) desde el celular: «Tour 360°» y «Compartir» compactos, lado a lado; en «Ubicación», acerca y aleja el mapa, pulsa «Ver dónde estoy en el mapa» y comprueba el punto azul, la línea hasta el lugar, la distancia y «Cómo llegar».
 
 ## Siguiente paso
 
-**C4 — portal en español e inglés** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)): definir con el usuario los pasos de C4 (selector, direcciones por idioma, `hreflang`, traducción del contenido) antes de empezar.
+**Proponer la fase «El asistente del municipio»** (pedido del usuario, 2026-11-16): pasos, ADR y requisitos y costos de WhatsApp, con las ideas de la investigación de mercado, para que el usuario la apruebe y decida si va antes de C4. Después, **C4 — portal en español e inglés**.
 
 ## Decisiones pendientes del usuario
 

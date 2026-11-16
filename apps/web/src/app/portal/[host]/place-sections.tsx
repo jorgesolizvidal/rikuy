@@ -1,5 +1,6 @@
 import {
   describeProximity,
+  directionsUrl,
   openStreetMapUrl,
   PORTAL_PATHS,
   type GeoPoint,
@@ -8,6 +9,7 @@ import {
 
 import { responsiveImage, type NearbyPlaceDto } from "@/server/portal-content";
 
+import { ActionIcon } from "./action-icon";
 import { EventCard } from "./event-card";
 import { MiniMap } from "./mini-map";
 import { PortalImage } from "./portal-image";
@@ -21,11 +23,14 @@ export function PlaceLocation({
   title,
   location,
   withMap,
+  directions = true,
 }: {
   readonly kind: "destination" | "event";
   readonly title: string;
   readonly location: GeoPoint;
   readonly withMap: boolean;
+  /** «Cómo llegar» under the map (not for an event that ended). */
+  readonly directions?: boolean;
 }) {
   return (
     <section aria-labelledby="ubicacion" className="portal-location">
@@ -42,6 +47,26 @@ export function PlaceLocation({
             lng: location.lng,
           }}
         />
+      ) : null}
+      {/* From here to there (ADR-068): the visitor's dot on the map, the distance and the
+          maps app, without leaving the section. */}
+      {withMap ? (
+        <div className="portal-location-tools">
+          <LocationButton label="Ver dónde estoy en el mapa" />
+          <DistanceText point={location} />
+          {directions ? (
+            <a
+              className="portal-button portal-button-primary portal-location-go"
+              data-visit="directions"
+              href={directionsUrl(location)}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              <ActionIcon name="directions" />
+              Cómo llegar<span className="visually-hidden"> (abre la app de mapas)</span>
+            </a>
+          ) : null}
+        </div>
       ) : null}
       {/* The coordinates stay in the links (C3 · Paso 8): raw numbers help no visitor. */}
       <p className="portal-location-links">

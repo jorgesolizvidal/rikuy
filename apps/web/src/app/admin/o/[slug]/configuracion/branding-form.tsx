@@ -38,6 +38,8 @@ interface BrandingFormProps {
   readonly canEdit: boolean;
   /** Signed preview of the logo the editor starts with (draft or published), if any. */
   readonly logoPreviewUrl: string | null;
+  /** The same for the coat of arms (ADR-068). */
+  readonly crestPreviewUrl: string | null;
   /** Destinations the home's cover can show (ADR-062). */
   readonly destinations: readonly CoverOption[];
   readonly modules: readonly ModuleKey[] | null;
@@ -60,11 +62,13 @@ export function BrandingForm({
   revision,
   canEdit,
   logoPreviewUrl,
+  crestPreviewUrl,
   destinations,
   modules,
 }: BrandingFormProps) {
   const [values, setValues] = useState(initial);
   const [logoPreview, setLogoPreview] = useState(logoPreviewUrl);
+  const [crestPreview, setCrestPreview] = useState(crestPreviewUrl);
   const [state, dispatch, pending] = useActionState(brandingAction, {
     status: "idle",
     revision,
@@ -99,6 +103,15 @@ export function BrandingForm({
     setLogoPreview(logo?.previewUrl ?? null);
   };
   const hasLogo = values.logoAssetId !== "";
+  const setCrest = (crest: LogoSelection | null) => {
+    setValues((current) => ({
+      ...current,
+      crestAssetId: crest?.assetId ?? "",
+      crestVersion: crest?.version ?? "",
+    }));
+    setCrestPreview(crest?.previewUrl ?? null);
+  };
+  const hasCrest = values.crestAssetId !== "";
 
   // Submitted manually (not through `action=`) so React does not reset the controlled
   // fields after the action; `intent` comes from the button that was pressed.
@@ -116,6 +129,8 @@ export function BrandingForm({
         <input type="hidden" name="revision" value={state.revision ?? ""} />
         <input type="hidden" name="logo.assetId" value={values.logoAssetId} />
         <input type="hidden" name="logo.version" value={values.logoVersion} />
+        <input type="hidden" name="crest.assetId" value={values.crestAssetId} />
+        <input type="hidden" name="crest.version" value={values.crestVersion} />
 
         <fieldset disabled={!canEdit || pending}>
           <legend>Identidad</legend>
@@ -155,6 +170,15 @@ export function BrandingForm({
             previewUrl={logoPreview}
             error={errors.logo}
             onChange={setLogo}
+          />
+          <LogoField
+            slug={slug}
+            kind="crest"
+            disabled={!canEdit || pending}
+            hasLogo={hasCrest}
+            previewUrl={crestPreview}
+            error={errors.crest}
+            onChange={setCrest}
           />
         </fieldset>
 

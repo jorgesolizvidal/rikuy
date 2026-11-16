@@ -40,6 +40,11 @@ export interface MapCanvasProps {
         readonly follow: boolean;
         /** Frame this area once (it contains the visitor), without asking the server. */
         readonly reveal?: BoundingBox | null;
+        /**
+         * A straight dashed line from the visitor to this place (a page's small map,
+         * ADR-068). Drawn on the device only, like the dot.
+         */
+        readonly lineTo?: { readonly lat: number; readonly lng: number } | null;
       }
     | undefined;
   /** The visitor dragged the map: stop following. */
@@ -111,6 +116,52 @@ function showRoute(instance: MapLibre, points: readonly MapPointDto[]) {
   });
 }
 const FROM_VISITOR = { fromVisitor: true } as const;
+const VISITOR_LINE_SOURCE = "rikuy-visitor-line";
+
+/** The visitor → place line of a page's small map (straight: the page says so). */
+function showVisitorLine(
+  instance: MapLibre,
+  fix: PositionFix | null,
+  to: { readonly lat: number; readonly lng: number } | null,
+) {
+  const data = {
+    type: "FeatureCollection" as const,
+    features:
+      fix && to
+        ? [
+            {
+              type: "Feature" as const,
+              properties: {},
+              geometry: {
+                type: "LineString" as const,
+                coordinates: [
+                  [fix.lng, fix.lat],
+                  [to.lng, to.lat],
+                ],
+              },
+            },
+          ]
+        : [],
+  };
+  const source = instance.getSource<GeoJSONSource>(VISITOR_LINE_SOURCE);
+  if (source) {
+    source.setData(data);
+    return;
+  }
+  instance.addSource(VISITOR_LINE_SOURCE, { type: "geojson", data });
+  instance.addLayer({
+    id: `${VISITOR_LINE_SOURCE}-line`,
+    type: "line",
+    source: VISITOR_LINE_SOURCE,
+    layout: { "line-cap": "round" },
+    paint: {
+      "line-color": "#1a73e8",
+      "line-width": 3,
+      "line-opacity": 0.75,
+      "line-dasharray": [1.5, 1.5],
+    },
+  });
+}
 
 /** The accuracy circle: a translucent area that says how sure the device is. */
 function showAccuracy(instance: MapLibre, fix: PositionFix | null) {
@@ -263,6 +314,14 @@ export default function MapCanvas({
     }, 12_000);
     instance.on("load", () => {
       loaded = true;
+      // On a small map the credits start folded behind their «i» button (still reachable),
+      // as MapLibre does once the map is moved: open, they covered a phone's map (ADR-068).
+      if (instance.getContainer().clientWidth < 640) {
+        instance
+          .getContainer()
+          .querySelector(".maplibregl-ctrl-attrib.maplibregl-compact-show")
+          ?.classList.remove("maplibregl-compact-show");
+      }
       window.clearTimeout(giveUp);
       setStyleReady(true);
       performance.mark("rikuy:map-ready");
@@ -355,11 +414,14 @@ export default function MapCanvas({
         existing.setOffset(offset);
         continue;
       }
-      const element = markerElement(point, interactive);
+      // A pin opens a card only when it leads somewhere: the place of a page's small map is
+      // the page itself.
+      const clickable = interactive && point.href !== "";
+      const element = markerElement(point, clickable);
       const marker = new Marker({ element, anchor: "bottom", offset })
         .setLngLat([point.lng, point.lat])
         .addTo(instance);
-      if (interactive) {
+      if (clickable) {
         // Our own handler so a keyboard "click" (Enter/Space on the button) opens it too.
         const popup = new Popup({
           offset: [offset[0], -32],
@@ -421,6 +483,14 @@ export default function MapCanvas({
       FROM_VISITOR,
     );
   }, [fix, follow]);
+
+  const lineTo = visitor?.lineTo ?? null;
+  useEffect(() => {
+    const instance = map.current;
+    if (!instance || !styleReady) return;
+    if (!lineTo && !instance.getSource(VISITOR_LINE_SOURCE)) return;
+    showVisitorLine(instance, fix, lineTo);
+  }, [fix, lineTo, styleReady]);
 
   const reveal = visitor?.reveal ?? null;
   useEffect(() => {

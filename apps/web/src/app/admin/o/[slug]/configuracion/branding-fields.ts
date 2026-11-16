@@ -46,6 +46,9 @@ export interface BrandingValues {
   /** Logo reference (hidden fields `logo.assetId` / `logo.version`); empty: no logo. */
   logoAssetId: string;
   logoVersion: string;
+  /** Coat of arms for the footer (hidden fields `crest.*`, ADR-068); empty: none. */
+  crestAssetId: string;
+  crestVersion: string;
   /** The portal's home (ADR-062). */
   home: HomeValues;
 }
@@ -72,9 +75,13 @@ export interface HomeFigureValues {
 }
 
 export type BrandingField =
-  | Exclude<keyof BrandingValues, "social" | "logoAssetId" | "logoVersion" | "home">
+  | Exclude<
+      keyof BrandingValues,
+      "social" | "logoAssetId" | "logoVersion" | "crestAssetId" | "crestVersion" | "home"
+    >
   | `social.${SocialNetwork}`
   | "logo"
+  | "crest"
   | "homeHero"
   | "homeFigure1"
   | "homeSections";
@@ -128,6 +135,8 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     social,
     logoAssetId: presentation.logo?.assetId ?? "",
     logoVersion: presentation.logo ? String(presentation.logo.version) : "",
+    crestAssetId: presentation.crest?.assetId ?? "",
+    crestVersion: presentation.crest ? String(presentation.crest.version) : "",
     home: homeValues(presentation),
   };
 }
@@ -164,7 +173,8 @@ export function presentationInputFromForm(formData: FormData) {
       return url === "" ? [] : [{ network, url }];
     }),
     seo: { description: text(formData, "description") },
-    ...logoFromForm(formData),
+    ...imageFromForm(formData, "logo"),
+    ...imageFromForm(formData, "crest"),
     ...visitorsFromForm(formData),
     ...assistantFromForm(formData),
     ...homeFromForm(formData),
@@ -238,12 +248,16 @@ function visitorsFromForm(formData: FormData) {
   return { visitors: { nearbyRadius: /^\d{1,5}$/u.test(radius) ? Number(radius) : Number.NaN } };
 }
 
-function logoFromForm(formData: FormData) {
-  const assetId = text(formData, "logo.assetId");
-  const version = text(formData, "logo.version");
+/** The logo or the crest (ADR-068) from its hidden fields; none when both are empty. */
+function imageFromForm<K extends "logo" | "crest">(
+  formData: FormData,
+  key: K,
+): Partial<Record<K, { assetId: string; version: number }>> {
+  const assetId = text(formData, `${key}.assetId`);
+  const version = text(formData, `${key}.version`);
   if (assetId === "" && version === "") return {};
-  // A non-numeric version becomes NaN and fails validation (never a silent default).
-  return { logo: { assetId, version: /^\d+$/u.test(version) ? Number(version) : Number.NaN } };
+  const image = { assetId, version: /^\d+$/u.test(version) ? Number(version) : Number.NaN };
+  return { [key]: image } as Partial<Record<K, { assetId: string; version: number }>>;
 }
 
 const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
@@ -267,6 +281,9 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   logo: "logo",
   "logo.assetId": "logo",
   "logo.version": "logo",
+  crest: "crest",
+  "crest.assetId": "crest",
+  "crest.version": "crest",
   home: "homeHero",
   "home.hero": "homeHero",
   "home.hero.variant": "homeHero",
@@ -300,6 +317,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   assistantTone: "Elige «Cercano» o «Formal».",
   social: "Pega el enlace completo de la página, empezando por https://.",
   logo: "Este logo ya no se puede usar. Sube otro o quítalo para publicar sin logo.",
+  crest: "Este escudo ya no se puede usar. Sube otro o quítalo para publicar sin escudo.",
   homeHero: "Elige la portada: con foto o solo texto.",
   homeFigure1:
     "En cada cifra escribe el número o dato (hasta 12 caracteres, como «1953») y qué es (hasta 60), o deja los dos vacíos.",

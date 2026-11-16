@@ -222,7 +222,7 @@ describe("the modules of a municipality (ADR-060)", () => {
     const ficha = await page.goto(`${SUR}/destinos/${place.slug}`);
     expect(ficha?.status()).toBe(200);
     expect(await page.getByRole("link", { name: "Ver en el mapa del municipio" }).count()).toBe(0);
-    expect(await page.getByRole("link", { name: /Ver el tour 360°/u }).count()).toBe(0);
+    expect(await page.getByRole("link", { name: /tour 360°/iu }).count()).toBe(0);
 
     const sitemap = (await get(`${SUR}/sitemap.xml`)).body;
     expect(sitemap).toContain("/destinos</loc>");

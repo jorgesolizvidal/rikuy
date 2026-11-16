@@ -188,14 +188,41 @@
   gap: 0.5rem;
 }
 
+/* Compact buttons with an icon (ADR-068): the secondary ones share a row, never break their
+   label into two lines, and stay a comfortable touch target (2.5rem). */
 .portal-visit .portal-actions .portal-button {
-  flex: 1 1 8rem;
+  flex: 1 1 auto;
   justify-content: center;
+  gap: 0.4375rem;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.75rem;
+  border-width: 1.5px;
+  font-size: 0.9375rem;
+  white-space: nowrap;
+}
+
+.portal-visit .portal-actions .portal-button:not(.portal-button-primary) {
+  border-color: var(--line);
+  color: var(--fg);
+}
+
+.portal-visit .portal-actions .portal-button:not(.portal-button-primary):hover {
+  border-color: var(--brand);
+  color: var(--brand);
+  filter: none;
+}
+
+.portal-action-icon {
+  flex: none;
 }
 
 .portal-visit .portal-actions .portal-button-primary,
 .portal-visit .portal-actions .portal-status {
   flex-basis: 100%;
+}
+
+.portal-visit .portal-actions .portal-button-primary {
+  min-height: 2.75rem;
 }
 
 .portal-visit-venue,
@@ -569,6 +596,29 @@
 }
 
 /* «Ver en el mapa del municipio» · «Abrir en OpenStreetMap» */
+/* Under the small map: «Ver dónde estoy», the distance once known and «Cómo llegar». */
+.portal-location-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin-top: 1rem;
+}
+
+.portal-location-tools .portal-location-status:empty {
+  display: none;
+}
+
+.portal-location-tools .portal-location-go {
+  gap: 0.4375rem;
+  margin-left: auto;
+}
+
+.portal-location-tools .portal-distance {
+  color: var(--fg);
+  font-size: 0.9375rem;
+}
+
 .portal-location-links {
   display: flex;
   flex-wrap: wrap;

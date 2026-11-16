@@ -1,9 +1,10 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import type { BoundingBox } from "@rikuy/core/geo";
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { distanceMeters, type BoundingBox } from "@rikuy/core/geo";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 
+import { useVisitorLocation } from "@/lib/use-visitor-location";
 import type { MapPointDto } from "@/server/portal-content";
 
 import type { MapCanvasProps } from "./map-canvas";
@@ -51,19 +52,53 @@ function useEngaged(box: RefObject<HTMLDivElement | null>, shown: boolean): bool
   return engaged;
 }
 
+/** Beyond this, framing the visitor and the place together would show half a continent. */
+const MAX_REVEAL_DISTANCE = 300_000;
+
 /**
- * A small, still map with the place's pin. Its space is reserved from the start (no
- * layout shift). MapLibre is heavy, so it loads only when the box is on screen AND the
- * visitor is using the page — or right away if they press the button. The coordinates,
- * "Cómo llegar" and the link to /mapa say the same in text.
+ * A page's small map with the place's pin (ADR-068): it zooms and pans (+/−, two fingers on a
+ * phone, Ctrl + wheel on a computer, so the page still scrolls) and, once the visitor shares
+ * their position, shows their dot with a straight line to the place, framing both. The
+ * position stays on the device (ADR-021). Its space is reserved from the start (no layout
+ * shift). MapLibre is heavy, so it loads only when the box is on screen AND the visitor is
+ * using the page, when they press the button, or when they share their position. "Cómo
+ * llegar" and the link to /mapa say the same in text.
  */
 export function MiniMap({ point }: { readonly point: MapPointDto }) {
+  const { fix } = useVisitorLocation();
+  const place = useMemo(() => ({ lat: point.lat, lng: point.lng }), [point.lat, point.lng]);
+  // Frame the visitor and the place once, when the position first arrives (not on every
+  // reading: the visitor may be moving the map). Far away, the place stays in view and the
+  // page says the distance in words.
+  const [framed, setFramed] = useState(false);
+  const [reveal, setReveal] = useState<BoundingBox | null>(null);
+  if (!fix && framed) {
+    setFramed(false);
+    setReveal(null);
+  }
+  if (fix && !framed) {
+    setFramed(true);
+    setReveal(
+      distanceMeters(fix, place) > MAX_REVEAL_DISTANCE
+        ? null
+        : {
+            west: Math.min(fix.lng, place.lng),
+            south: Math.min(fix.lat, place.lat),
+            east: Math.max(fix.lng, place.lng),
+            north: Math.max(fix.lat, place.lat),
+          },
+    );
+  }
+  const near = fix !== null && reveal !== null;
   return (
     <LazyMap
       points={[point]}
       center={{ lat: point.lat, lng: point.lng, zoom: 15 }}
       kind={point.kind}
       label="Mostrar el mapa"
+      interactive
+      ready={fix !== null}
+      visitor={{ fix, follow: false, reveal, lineTo: near ? place : null }}
     />
   );
 }
@@ -91,6 +126,9 @@ function LazyMap({
   route = false,
   kind,
   label,
+  interactive = false,
+  ready = false,
+  visitor,
 }: {
   readonly points: readonly MapPointDto[];
   readonly center?: { readonly lat: number; readonly lng: number; readonly zoom: number };
@@ -98,27 +136,33 @@ function LazyMap({
   readonly route?: boolean;
   readonly kind: MapPointDto["kind"];
   readonly label: string;
+  /** Zoom and pan (a page's map); a circuit's route stays still. */
+  readonly interactive?: boolean;
+  /** Load now (the visitor shared their position). */
+  readonly ready?: boolean;
+  readonly visitor?: MapCanvasProps["visitor"];
 }) {
   const box = useRef<HTMLDivElement>(null);
   const [pressed, setPressed] = useState(false);
-  const engaged = useEngaged(box, pressed);
+  const engaged = useEngaged(box, pressed || ready);
   const [failed, setFailed] = useState(false);
-  const show = pressed || engaged;
+  const show = pressed || engaged || ready;
   const mapLabel = route ? "Mapa del recorrido" : "Mapa de la ubicación";
 
   if (failed) return null;
   return (
     <div ref={box} className="portal-mini-map" data-route={route ? "true" : undefined}>
       {show ? (
-        // Not hidden from screen readers: the map's attribution links must stay reachable.
-        // The map is still (no focusable canvas) and the page says the same in words.
+        // Not hidden from screen readers: the map's attribution links and its +/− buttons
+        // must stay reachable. The page says the same in words.
         <div className="portal-mini-map-canvas" role="group" aria-label={mapLabel}>
           <MapCanvas
             points={points}
             {...(center ? { center } : {})}
             {...(bounds ? { bounds } : {})}
-            interactive={false}
+            interactive={interactive}
             route={route}
+            {...(visitor ? { visitor } : {})}
             onFailure={() => setFailed(true)}
           />
         </div>

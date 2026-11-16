@@ -36,7 +36,15 @@ export const portalView = cache(async (routeHost: string) => {
         ),
       }
     : null;
-  return { context, resolved, logo };
+  // The coat of arms in the footer (ADR-068): same derivatives as the logo.
+  const crestReference = resolved.presentation.crest;
+  const crest = crestReference
+    ? {
+        webp: portalMediaPath(publishedLogoPath(tenantId, crestReference, "logo.webp")),
+        png: portalMediaPath(publishedLogoPath(tenantId, crestReference, "logo.png")),
+      }
+    : null;
+  return { context, resolved, logo, crest };
 });
 
 export type PortalView = NonNullable<Awaited<ReturnType<typeof portalView>>>;

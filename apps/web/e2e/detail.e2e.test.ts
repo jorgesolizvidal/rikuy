@@ -12,6 +12,9 @@
  *   to the plaza in the panel first; this step runs last in its job);
  * - the map: the list beside the map on a computer and below it on a phone, filtered by the
  *   municipality's categories;
+ * - the place's small map (ADR-068): it zooms (+/−), shows the visitor's dot with a line to
+ *   the place once they share their position, and «Cómo llegar» under it; no request carries
+ *   the position;
  * - axe without critical or serious findings and no overflow at 390 and 1280 px.
  */
 import { request as httpRequest } from "node:http";
@@ -330,5 +333,65 @@ describe("destination and event pages, and the map (ADR-063)", () => {
       expect(await sur.getByRole("button").allInnerTexts()).not.toContain("Miradores");
     }
     await page.context().close();
+  });
+
+  it("the place's small map zooms and shows the way from the visitor (ADR-068)", async () => {
+    const plain = await portalPage();
+    await plain.goto(`${NORTE}/destinos/mirador-del-valle`);
+    const osm = await plain.getByRole("link", { name: /OpenStreetMap/u }).getAttribute("href");
+    const [, lat, lng] = /mlat=(-?[\d.]+)&mlon=(-?[\d.]+)/u.exec(osm ?? "") ?? [];
+    await plain.context().close();
+    // About 1 km south-west of the place.
+    const near = { latitude: Number(lat) - 0.008, longitude: Number(lng) - 0.004 };
+
+    const context = await browser.newContext({
+      viewport: { width: 390, height: 844 },
+      geolocation: near,
+      permissions: ["geolocation"],
+    });
+    const page = await context.newPage();
+    const sent: string[] = [];
+    page.on("request", (request) => sent.push(`${request.url()} ${request.postData() ?? ""}`));
+    await page.goto(`${NORTE}/destinos/mirador-del-valle`);
+    const location = page.getByRole("region", { name: "Ubicación" });
+    await location.scrollIntoViewIfNeeded();
+    await location.getByRole("button", { name: "Ver dónde estoy en el mapa" }).click();
+
+    const map = location.getByRole("group", { name: "Mapa de la ubicación" });
+    await map.locator(".maplibregl-canvas").waitFor({ timeout: 20_000 });
+    await map.locator(".map-visitor").waitFor({ timeout: 10_000 });
+    // It zooms: the same +/− as the municipality's map.
+    expect(await map.getByRole("button", { name: "Acercar" }).count()).toBe(1);
+    expect(await map.getByRole("button", { name: "Alejar" }).count()).toBe(1);
+    // The place's pin is the page itself: it opens nothing.
+    expect(await map.locator("button.map-marker").count()).toBe(0);
+    // Both on screen once the camera settles (it moves to frame them): the visitor and the
+    // place.
+    const inside = async (selector: string) => {
+      const [box, dot] = await Promise.all([
+        map.boundingBox(),
+        map.locator(selector).first().boundingBox(),
+      ]);
+      return Boolean(
+        box &&
+        dot &&
+        dot.x >= box.x &&
+        dot.x <= box.x + box.width &&
+        dot.y >= box.y - 40 &&
+        dot.y <= box.y + box.height,
+      );
+    };
+    await expect.poll(() => inside(".map-visitor"), { timeout: 10_000 }).toBe(true);
+    await expect.poll(() => inside(".map-marker"), { timeout: 10_000 }).toBe(true);
+    await expect
+      .poll(() => location.locator(".portal-distance-line").innerText())
+      .toMatch(/^A [\d.,]+ (m|km) en línea recta$/u);
+    expect(await location.getByRole("link", { name: /Cómo llegar/u }).count()).toBe(1);
+    // The position never leaves the phone (ADR-021).
+    const position = [near.latitude, near.longitude].map((value) => String(value).slice(0, 7));
+    expect(sent.filter((line) => position.some((value) => line.includes(value)))).toEqual([]);
+
+    await accessible(page, "destination page with the visitor on its map", [390]);
+    await context.close();
   });
 });
