@@ -12,6 +12,8 @@ export const JOB_KINDS = {
   processModel: "media.process_model",
   /** Removes a photo or a logo nothing uses after 7 days, freeing its quota (ADR-035). */
   removeUnusedMedia: "media.remove_unused",
+  /** The lighter hero versions of a photo uploaded before they existed (ADR-070). */
+  heroImages: "media.hero_images",
   /** Emails an invitation to administer a municipality (ADR-034). */
   membershipInvitationMail: "mail.membership_invitation",
   /** Reads the text of a knowledge document (TXT or PDF), page by page (ADR-037). */
@@ -43,6 +45,7 @@ export const processPanoramaPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const processModelPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const removeUnusedMediaPayloadSchema = expireAbandonedUploadPayloadSchema;
 export const extractDocumentPayloadSchema = expireAbandonedUploadPayloadSchema;
+export const heroImagesPayloadSchema = expireAbandonedUploadPayloadSchema;
 /** Nothing: the job's tenant is what gets probed. */
 export const probePortalPayloadSchema = z.object({}).strict();
 /** The sealed revision to index: of a content item or of a tour. */

@@ -6,7 +6,7 @@ import {
   type PublishedEventSummary,
 } from "@rikuy/core";
 
-import { responsiveImage } from "@/server/portal-content";
+import { heroImage } from "@/server/portal-content";
 
 import { AssistantInvite } from "./assistant-invite";
 import { Contour } from "./contour";
@@ -69,7 +69,7 @@ export function HomeHero(props: HeroProps) {
       <section className="portal-hero" data-variant="photo" aria-labelledby="portal-title">
         <div className="home-hero-photo">
           <PortalImage
-            image={responsiveImage(props.tenantId, photo.cover)}
+            image={heroImage(props.tenantId, photo.cover)}
             sizes={HERO_SIZES}
             // The largest element of the page on a phone and on a computer (LCP).
             priority

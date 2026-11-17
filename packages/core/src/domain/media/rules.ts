@@ -24,7 +24,18 @@ export const CONTENT_IMAGE_RULES: ImageRules = {
 /** Widths of the WebP derivatives of a content image (never enlarged). */
 export const CONTENT_IMAGE_WIDTHS = [480, 960, 1600] as const;
 export const CONTENT_IMAGE_FILES = ["w480.webp", "w960.webp", "w1600.webp"] as const;
-export type ContentImageFile = (typeof CONTENT_IMAGE_FILES)[number];
+
+/**
+ * Lighter versions of the same photo for the portal's home cover, which sits under a dark
+ * veil and the title: there a lower quality does not show, and the phone downloads less
+ * (ADR-070). Generated for every content photo; never enlarged.
+ */
+export const HERO_IMAGE_WIDTHS = [800, 1200] as const;
+export const HERO_IMAGE_FILES = ["hero-w800.webp", "hero-w1200.webp"] as const;
+export const HERO_IMAGE_QUALITY = 60;
+
+export type ContentImageFile =
+  (typeof CONTENT_IMAGE_FILES)[number] | (typeof HERO_IMAGE_FILES)[number];
 
 export function isAcceptedMime(rules: ImageRules, value: unknown): value is ImageMime {
   return typeof value === "string" && (rules.mimes as readonly string[]).includes(value);

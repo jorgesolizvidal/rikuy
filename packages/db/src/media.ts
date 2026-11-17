@@ -1,6 +1,8 @@
 import { createClient, type PostgrestError } from "@supabase/supabase-js";
 import {
   CONTENT_IMAGE_WIDTHS,
+  HERO_IMAGE_QUALITY,
+  HERO_IMAGE_WIDTHS,
   type CreateUploadOutcome,
   type DerivedFile,
   type ImageProcessor,
@@ -10,7 +12,7 @@ import {
   type OriginalRemover,
   type MediaRepository,
 } from "@rikuy/core";
-import sharp from "sharp";
+import sharp, { type Sharp } from "sharp";
 import { z } from "zod";
 
 import type { SessionClient } from "./session-client";
@@ -304,9 +306,18 @@ export function createSupabaseMediaAdmin(
       if (error) throw new Error(`Removing an original failed (${error.name || "unknown"})`);
     },
 
-    async publish(tenantId, assetId, version, files) {
+    async publish(tenantId, assetId, version, files, optional = []) {
       const prefix = `${tenantId}/${assetId}/${version}/`;
-      for (const name of files) {
+      // Optional files (the hero versions, ADR-070): only those the private folder has.
+      const present =
+        optional.length === 0
+          ? new Set<string>()
+          : new Set(
+              (await listFolder(MEDIA_BUCKETS.originals, prefix, 4)).map((name) =>
+                name.slice(prefix.length),
+              ),
+            );
+      for (const name of [...files, ...optional.filter((file) => present.has(file))]) {
         const source = await originals().download(`${prefix}${name}`);
         if (source.error || !source.data) throw unexpected(`Reading ${name}`, source.error ?? {});
         const { error: uploadError } = await admin.storage
@@ -342,26 +353,57 @@ export function createSupabaseMediaAdmin(
   };
 }
 
+/** A content photo, decoded safely: EXIF orientation applied, metadata never kept. */
+function contentBase(original: Uint8Array): Sharp {
+  // Photos up to 8192 px per side (CONTENT_IMAGE_RULES).
+  return sharp(original, { failOn: "error", limitInputPixels: 8192 * 8192 }).rotate();
+}
+
+/** The hero versions (ADR-070): lower quality, for the home cover under its dark veil. */
+function heroFiles(base: Sharp): Promise<DerivedFile[]> {
+  return Promise.all(
+    HERO_IMAGE_WIDTHS.map(async (width) => ({
+      name: `hero-w${width}.webp`,
+      contentType: "image/webp" as const,
+      bytes: new Uint8Array(
+        await base
+          .clone()
+          .resize({ width, withoutEnlargement: true })
+          .webp({ quality: HERO_IMAGE_QUALITY, effort: 4 })
+          .toBuffer(),
+      ),
+    })),
+  );
+}
+
 /** Logo derivatives: at most 512 px, WebP for pages and PNG for app icons. */
 export function createSharpImageProcessor(): ImageProcessor {
   return {
     async contentDerivatives(original) {
       // Photos up to 8192 px per side (CONTENT_IMAGE_RULES); EXIF orientation applied, then
       // every derivative is re-encoded without metadata (no GPS of the photographer).
-      const base = sharp(original, { failOn: "error", limitInputPixels: 8192 * 8192 }).rotate();
-      return Promise.all(
-        CONTENT_IMAGE_WIDTHS.map(async (width) => ({
-          name: `w${width}.webp`,
-          contentType: "image/webp" as const,
-          bytes: new Uint8Array(
-            await base
-              .clone()
-              .resize({ width, withoutEnlargement: true })
-              .webp({ quality: 80, effort: 4 })
-              .toBuffer(),
-          ),
-        })),
-      );
+      const base = contentBase(original);
+      const [regular, hero] = await Promise.all([
+        Promise.all(
+          CONTENT_IMAGE_WIDTHS.map(async (width) => ({
+            name: `w${width}.webp`,
+            contentType: "image/webp" as const,
+            bytes: new Uint8Array(
+              await base
+                .clone()
+                .resize({ width, withoutEnlargement: true })
+                .webp({ quality: 80, effort: 4 })
+                .toBuffer(),
+            ),
+          })),
+        ),
+        heroFiles(base),
+      ]);
+      return [...regular, ...hero];
+    },
+
+    async heroDerivatives(original) {
+      return heroFiles(contentBase(original));
     },
 
     async logoDerivatives(original) {

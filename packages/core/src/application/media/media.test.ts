@@ -4,7 +4,7 @@ import type { OrganizationMembership } from "../../contracts/organization";
 import { validatePresentation } from "../../contracts/presentation";
 import { inspectImage } from "../../domain/media/image";
 import { checkDeclaredLogo, checkUploadedLogo, LOGO_RULES } from "../../domain/media/logo";
-import { CONTENT_IMAGE_FILES } from "../../domain/media/rules";
+import { CONTENT_IMAGE_FILES, HERO_IMAGE_FILES } from "../../domain/media/rules";
 import {
   confirmContentImageUpload,
   publishContentImages,
@@ -225,6 +225,13 @@ function fakes(
         bytes: new Uint8Array([3]),
       }));
     },
+    async heroDerivatives() {
+      return HERO_IMAGE_FILES.map((name) => ({
+        name,
+        contentType: "image/webp" as const,
+        bytes: new Uint8Array([4]),
+      }));
+    },
   };
   return { media, admin, processor, calls };
 }
@@ -371,11 +378,13 @@ describe("content image use cases", () => {
         { assetId: VERSION, version: 2 },
       ],
       {
-        publish: async (tenant, asset, version, files) => {
-          published.push(`${asset}/${version}:${files.length}`);
+        publish: async (tenant, asset, version, files, optional = []) => {
+          published.push(`${asset}/${version}:${files.length}+${optional.join(",")}`);
         },
       },
     );
-    expect(published).toEqual([`${ASSET}/1:3`, `${VERSION}/2:3`]);
+    // The hero versions go along when the photo has them (ADR-070).
+    const hero = "hero-w800.webp,hero-w1200.webp";
+    expect(published).toEqual([`${ASSET}/1:3+${hero}`, `${VERSION}/2:3+${hero}`]);
   });
 });

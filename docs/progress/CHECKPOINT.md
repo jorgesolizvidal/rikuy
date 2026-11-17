@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 1.1 — avisos del municipio ✅ (verificado en producción); corrección `fix/next-upgrade`
-- **Rama:** `fix/next-upgrade` → PR hacia `main`
+- **Último paso completado:** A · Paso 1.1 — avisos del municipio ✅ (verificado en producción); correcciones `fix/next-upgrade` ✅ y `fix/hero-lcp`
+- **Rama:** `fix/hero-lcp` → PR hacia `main`
 
 ## Historial
 
@@ -2721,15 +2721,47 @@ Lo que encontró el CI del push, ya corregido:
 - `next` y `eslint-config-next` 16.4.2 → **16.4.6**, con versión fija; el registro de avisos de npm no tiene ninguno para 16.4.6.
 - Verificado en local: lint, tipos, 1.085 unitarios y el build (sin el aviso).
 
+**Verificación en producción (2026-11-16):** el usuario hizo el merge (PR #93); el portal y el panel responden normal.
+
+### Corrección `fix/hero-lcp` — versiones livianas de la foto de portada
+
+- «Lighthouse on production» falla desde el 15 de noviembre en el inicio de Ucureña (LCP 2,6–2,9 s, límite 2,5 s). Desde C3 · Paso 8 la portada es la foto de un destino de borde a borde y el elemento LCP; en el teléfono de Lighthouse (412 px a 1,75×) el navegador elige su versión de 960 px, 140 KB.
+- Decisión del usuario ([ADR-070](../adr/ADR-070-portal-hero-images.md)): **versiones livianas para la portada** (va debajo del velo oscuro, la calidad no se nota) y **un trabajo automático para las fotos ya subidas**. Medido sobre la foto de Ucureña: 800 px a calidad 60, **56 KB**.
+- `@rikuy/core`:
+  - `HERO_IMAGE_WIDTHS` (800, 1200), `HERO_IMAGE_FILES` y `HERO_IMAGE_QUALITY` (60);
+  - `heroCandidates`: `hero-w800`, `hero-w1200` y el `w1600` de siempre, sin repetir anchos (una foto de 957 px tiene 800 y 957); sin `hero: true`, las versiones de siempre;
+  - `PublishedImage.hero`, `ImageProcessor.heroDerivatives`, `MediaAdmin.publish(…, optional)` y `publishContentImages` con las versiones de portada como archivos opcionales;
+  - tipo de trabajo `media.hero_images` y el puerto `HeroImageStore`.
+- `@rikuy/db`: `contentDerivatives` genera también las dos versiones de portada (las fotos nuevas las traen desde la subida); `heroDerivatives`; `publish` copia los opcionales que la carpeta privada tiene; `hero` en las imágenes del portal; `ledger.heroes`.
+- `apps/worker`: procesador `media.hero_images`. Lee el original, guarda las dos versiones, vuelve a leer si la foto es pública y, si lo es, las copia al bucket público; después la base comprueba que están y mide la versión para la cuota.
+- Base de datos (`20261128000000_hero_images.sql`, solo expand):
+  - tipo de trabajo y su _payload_ (la versión);
+  - `private.has_hero_images` (los dos archivos en un bucket, por `storage.objects`);
+  - `private.public_image` agrega `"hero": true` **solo cuando los dos están en el bucket público**: la portada nunca apunta a un archivo que no está;
+  - `worker_api.hero_image_source` y `complete_hero_images`, solo para el ejecutor y bajo el arrendamiento;
+  - `private.enqueue_hero_images`, llamada una vez: un trabajo por foto de contenido lista sin ellas (en producción, 57; primero las publicadas).
+- Portal: la portada del inicio usa `heroImage`; tarjetas, fichas y galería no cambian.
+- Tests:
+  - 1.097 unitarios (core 745, db 220, web 60, worker 58, config 14): los candidatos de la portada (anchos, sin repetir, sin `hero`), la publicación con los opcionales, las versiones de portada más livianas que las de siempre del mismo ancho y un original dañado rechazado, y el procesador (pública, privada, publicada mientras corría, ya no existe, sin original, Storage caído, original dañado, archivos que no aparecen);
+  - pgTAP `053_hero_images` (24): tipo y _payload_; `"hero"` solo con los dos archivos públicos (no con solo privados ni con uno), el resto de la imagen igual; nadie más pregunta a Storage por ella; solo la foto sin versiones recibe un trabajo (no el logo, el panorama ni la rechazada) y una sola vez; solo el ejecutor lee y completa; otro token, otro tipo de trabajo, versión rechazada (`gone`), archivos que faltan (`missing`) y completo (`done`); la portada pasa a usarlas cuando son públicas;
+  - integración: `hero-images.int.test.ts` (una foto pública y otra privada subidas «antes», el trabajo real con Storage real, los archivos en cada bucket y `hero` solo cuando corresponde) y `content.int.test.ts` (una foto nueva publicada trae `hero` y su versión de 800 px responde);
+  - e2e de portales: las versiones de portada del inicio responden 200 como WebP.
+- Verificado en local: lint, tipos, unitarios y el build.
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Entre el merge y el fin de los trabajos (unos minutos), la portada sigue con su versión de siempre; las páginas en caché se renuevan solas.
+- Las ~57 fotos suman unos 15–20 MB entre los dos buckets.
+
 ## Cómo verificarlo
 
-- `pnpm check` en local y el CI del PR completo (base, integración y los tres grupos del navegador corren con Next.js 16.4.6).
-- Después del merge: el portal y el panel responden igual; «Lighthouse on production» y «Daily health» siguen como antes.
+- `pnpm check` en local y el CI del PR completo.
+- Después del merge y de «Deploy database»: en «Trabajos» de `/plataforma`, los trabajos «Versiones livianas de la portada de una foto» terminan en unos minutos; en el inicio de Ucureña, la portada lleva `hero-w800.webp` en su `srcset`; «Lighthouse on production» vuelve a verde en el inicio de Ucureña.
 
 ## Siguiente paso
 
-1. **Corrección `fix/hero-lcp`** (propuesta al usuario, 2026-11-16): «Lighthouse on production» falla desde el 15 de noviembre en el inicio de Ucureña (LCP 2,6–2,9 s, límite 2,5 s). La foto de portada ocupa toda la pantalla desde el Paso 8 de C3 y su versión de 960 px pesa 140 KB.
-2. **A · Paso 1.2 — servicios locales** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario: tipo `service` y módulo `services`, categorías fijas, horario y contacto, `/servicios` con anclas, capa del mapa y el asistente.
+1. **A · Paso 1.2 — servicios locales** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario: tipo `service` y módulo `services`, categorías fijas, horario y contacto, `/servicios` con anclas, capa del mapa y el asistente.
 
 ## Decisiones pendientes del usuario
 

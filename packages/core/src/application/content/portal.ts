@@ -1,4 +1,8 @@
-import { CONTENT_IMAGE_WIDTHS } from "../../domain/media/rules";
+import {
+  CONTENT_IMAGE_WIDTHS,
+  HERO_IMAGE_WIDTHS,
+  type ContentImageFile,
+} from "../../domain/media/rules";
 import { richTextToPlainText } from "../../contracts/rich-text";
 import { dayAfter } from "../../domain/events/schedule";
 import { contentImagePath } from "../media/content-images";
@@ -125,6 +129,30 @@ export function imageCandidates(tenantId: string, image: PublishedImage): ImageC
       height: Math.max(1, Math.round((image.height * width) / image.width)),
     });
   }
+  return candidates;
+}
+
+/**
+ * The home cover (ADR-070): its lighter hero versions, then the regular derivative for
+ * screens wider than they cover. Without hero versions, the regular candidates.
+ */
+export function heroCandidates(tenantId: string, image: PublishedImage): ImageCandidate[] {
+  if (image.hero !== true) return imageCandidates(tenantId, image);
+  const seen = new Set<number>();
+  const candidates: ImageCandidate[] = [];
+  const add = (target: number, file: ContentImageFile) => {
+    const width = Math.min(target, image.width);
+    if (seen.has(width)) return;
+    seen.add(width);
+    candidates.push({
+      path: contentImagePath(tenantId, image, file),
+      width,
+      height: Math.max(1, Math.round((image.height * width) / image.width)),
+    });
+  };
+  for (const target of HERO_IMAGE_WIDTHS) add(target, `hero-w${target}.webp`);
+  const widest = CONTENT_IMAGE_WIDTHS.at(-1);
+  if (widest !== undefined) add(widest, `w${widest}.webp`);
   return candidates;
 }
 
