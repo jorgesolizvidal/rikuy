@@ -149,6 +149,13 @@ describe.runIf(stackAvailable)("destinations against local Supabase", () => {
     );
     expect(image.status).toBe(200);
     expect(image.headers.get("content-type")).toBe("image/webp");
+    // New uploads come with the home cover's hero versions, public with the rest (ADR-070).
+    expect(v1?.cover?.hero).toBe(true);
+    const hero = await fetch(
+      publicMediaUrl(env.url, contentImagePath(NORTE, ready.image, "hero-w800.webp")),
+    );
+    expect(hero.status).toBe(200);
+    expect(hero.headers.get("content-type")).toBe("image/webp");
 
     // A new draft does not reach visitors until it is published.
     const second = { ...first, summary: "Segunda versión, con más detalle.", cover: null };

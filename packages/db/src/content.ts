@@ -441,6 +441,8 @@ export const publicImageSchema = z.object({
   alt: z.string(),
   width: z.number().int().positive(),
   height: z.number().int().positive(),
+  /** Only when its hero versions are public (ADR-070); absent before the migration. */
+  hero: z.literal(true).optional(),
 });
 
 const point = (latitude: number | null, longitude: number | null) =>

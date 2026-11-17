@@ -142,8 +142,15 @@ describe("sharp image processor", () => {
       .jpeg()
       .toBuffer();
     const files = await createSharpImageProcessor().contentDerivatives(new Uint8Array(photo));
-    expect(files.map((file) => file.name)).toEqual(["w480.webp", "w960.webp", "w1600.webp"]);
-    for (const [file, width] of files.map((f, i) => [f, [480, 960, 1600][i]] as const)) {
+    expect(files.map((file) => file.name)).toEqual([
+      "w480.webp",
+      "w960.webp",
+      "w1600.webp",
+      "hero-w800.webp",
+      "hero-w1200.webp",
+    ]);
+    const widths = [480, 960, 1600, 800, 1200];
+    for (const [file, width] of files.map((f, i) => [f, widths[i]] as const)) {
       expect(inspectImage(file.bytes)).toMatchObject({ mime: "image/webp", width });
       expect((await sharp(file.bytes).metadata()).exif).toBeUndefined();
     }
@@ -153,9 +160,36 @@ describe("sharp image processor", () => {
     })
       .png()
       .toBuffer();
-    const widths = (
+    const smallWidths = (
       await createSharpImageProcessor().contentDerivatives(new Uint8Array(small))
     ).map((file) => inspectImage(file.bytes)?.width);
-    expect(widths).toEqual([480, 700, 700]);
+    expect(smallWidths).toEqual([480, 700, 700, 700, 700]);
+  });
+
+  it("makes the hero versions lighter than the regular ones of the same width (ADR-070)", async () => {
+    // A noisy photo: flat colors compress to nothing whatever the quality.
+    const width = 1200;
+    const height = 800;
+    const pixels = new Uint8Array(width * height * 3);
+    let seed = 7;
+    for (let i = 0; i < pixels.length; i++) {
+      seed = (seed * 1103515245 + 12345) % 2147483648;
+      pixels[i] = (seed >> 16) & 255;
+    }
+    const photo = await sharp(pixels, { raw: { width, height, channels: 3 } })
+      .blur(1.5)
+      .jpeg({ quality: 95 })
+      .toBuffer();
+    const processor = createSharpImageProcessor();
+    const hero = await processor.heroDerivatives(new Uint8Array(photo));
+    expect(hero.map((file) => [file.name, inspectImage(file.bytes)?.width])).toEqual([
+      ["hero-w800.webp", 800],
+      ["hero-w1200.webp", 1200],
+    ]);
+    const regular = await sharp(photo).resize({ width: 1200 }).webp({ quality: 80 }).toBuffer();
+    expect(hero[1]?.bytes.byteLength ?? Infinity).toBeLessThan(regular.byteLength * 0.8);
+    await expect(
+      processor.heroDerivatives(new Uint8Array(photo.subarray(0, 80))),
+    ).rejects.toThrow();
   });
 });

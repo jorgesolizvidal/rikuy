@@ -78,6 +78,14 @@ for (const portal of portals) {
   for (const other of portals.filter((p) => p !== portal)) {
     check(() => assert.doesNotMatch(html, new RegExp(other.name)));
   }
+  // The home cover: its lighter hero versions when they are public (ADR-070), reachable.
+  const cover = /class="home-hero-photo"><img[^>]*srcSet="([^"]+)"/.exec(html)?.[1];
+  for (const url of cover?.split(", ").map((entry) => entry.split(" ")[0]) ?? []) {
+    if (!url.includes("/hero-w")) continue;
+    const photo = await get(portal.host, url);
+    check(() => assert.equal(photo.status, 200, `${portal.host} hero ${url}`));
+    check(() => assert.equal(photo.headers["content-type"], "image/webp"));
+  }
 
   // Logo: a versioned public derivative, from the portal's own address (ADR-050), or the
   // monogram when there is none.

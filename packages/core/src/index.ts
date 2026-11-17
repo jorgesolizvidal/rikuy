@@ -95,6 +95,7 @@ export * from "./application/mail/invitations";
 export * from "./domain/demo/sample-template";
 export * from "./application/demo/sample-content";
 export * from "./application/media/unused-media";
+export * from "./application/media/hero-images";
 export * from "./application/platform/operations";
 export * from "./contracts/ai";
 export * from "./contracts/voice";

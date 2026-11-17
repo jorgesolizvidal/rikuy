@@ -24,7 +24,7 @@ import {
 import { createProcessors, LONG_JOB_KINDS } from "@rikuy/worker";
 
 import { runAiWork } from "./ai-gateway";
-import { mediaAdmin } from "./media-admin";
+import { imageProcessor, mediaAdmin } from "./media-admin";
 import { platformSettings } from "./platform";
 
 /**
@@ -157,6 +157,9 @@ export async function runJobQueue(options: JobRunOptions): Promise<DrainReport |
           adminOrigin: platformSettings().adminOrigin,
           unusedMedia: ledger.unusedMedia,
           folders: mediaAdmin(),
+          heroes: ledger.heroes,
+          heroMedia: mediaAdmin(),
+          imageProcessor: imageProcessor(),
           documents: ledger.documents,
           pdf: createPdfTextReader(),
           knowledge: ledger.knowledge,

@@ -10,6 +10,7 @@ import type {
   MonthlyReportStore,
   OperationsReport,
   UnusedMediaStore,
+  HeroImageStore,
   ModelStore,
   PanoramaStore,
 } from "@rikuy/core";
@@ -48,6 +49,8 @@ export interface PostgresJobLedger extends JobLedger {
   readonly invitations: InvitationMailStore;
   /** media.remove_unused: worker_api.claim_unused_media. */
   readonly unusedMedia: UnusedMediaStore;
+  /** media.hero_images: worker_api.hero_image_source / complete_hero_images (ADR-070). */
+  readonly heroes: HeroImageStore;
   /** media.extract_document: worker_api.document_source / complete_document / reject_document. */
   readonly documents: DocumentStore;
   /** knowledge.index: worker_api.knowledge_source / store_knowledge_chunks. */
@@ -218,6 +221,48 @@ export function createPostgresJobLedger(options: PostgresJobLedgerOptions): Post
             select worker_api.claim_unused_media(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as folder
           `;
           return typeof row?.folder === "string" ? row.folder : null;
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+    },
+
+    heroes: {
+      async source(lease) {
+        try {
+          const rows = await sql`
+            select * from worker_api.hero_image_source(${lease.jobId}::uuid, ${lease.fencingToken}::bigint)
+          `;
+          const row = rows[0];
+          if (!row) return null;
+          const parsed = z
+            .object({
+              tenant_id: z.uuid(),
+              asset_id: z.uuid(),
+              version: z.number().int().positive(),
+              original_path: z.string().min(1),
+              published: z.boolean(),
+            })
+            .parse(row);
+          return {
+            tenantId: parsed.tenant_id,
+            assetId: parsed.asset_id,
+            version: parsed.version,
+            originalPath: parsed.original_path,
+            published: parsed.published,
+          };
+        } catch (error) {
+          if (leaseLost(error)) return "lease_lost";
+          throw error;
+        }
+      },
+      async complete(lease) {
+        try {
+          const [row] = await sql`
+            select worker_api.complete_hero_images(${lease.jobId}::uuid, ${lease.fencingToken}::bigint) as outcome
+          `;
+          return z.enum(["done", "gone", "missing"]).parse(row?.outcome);
         } catch (error) {
           if (leaseLost(error)) return "lease_lost";
           throw error;

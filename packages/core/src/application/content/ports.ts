@@ -162,6 +162,8 @@ export interface PublishedImage {
   readonly alt: string;
   readonly width: number;
   readonly height: number;
+  /** Its hero versions are public (ADR-070): the portal's home cover uses them. */
+  readonly hero?: boolean | undefined;
 }
 
 export interface PublishedDestinationSummary {

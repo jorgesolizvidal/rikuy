@@ -92,6 +92,8 @@ export interface MediaAdmin {
     assetId: string,
     version: number,
     files: readonly string[],
+    /** Copied too when the private folder has them (the hero versions, ADR-070). */
+    optional?: readonly string[],
   ): Promise<void>;
   /**
    * Same for panoramas and models: many files (tiles), copied inside Storage without
@@ -117,8 +119,10 @@ export interface OriginalRemover {
 /** Re-encodes an image into safe, metadata-free derivatives. Throws on undecodable input. */
 export interface ImageProcessor {
   logoDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
-  /** WebP at each of CONTENT_IMAGE_WIDTHS (never enlarged). */
+  /** WebP at each of CONTENT_IMAGE_WIDTHS and the hero versions (never enlarged). */
   contentDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
+  /** Only the hero versions (HERO_IMAGE_FILES), for photos uploaded before them (ADR-070). */
+  heroDerivatives(original: Uint8Array): Promise<DerivedFile[]>;
   /** The poster of a 3D model, from the panel's capture: WebP, at most 1280 px wide. */
   modelPoster(captured: Uint8Array): Promise<{
     readonly file: DerivedFile;

@@ -19,6 +19,7 @@ import {
   createExtractDocumentProcessor,
   type ExtractDocumentDeps,
 } from "./processors/extract-document";
+import { createHeroImagesProcessor, type HeroImagesDeps } from "./processors/hero-images";
 import {
   createIndexKnowledgeProcessor,
   type IndexKnowledgeDeps,
@@ -43,6 +44,7 @@ import {
 export {
   createExpireAbandonedUploadProcessor,
   createExtractDocumentProcessor,
+  createHeroImagesProcessor,
   createIndexKnowledgeProcessor,
   createMembershipInvitationMailProcessor,
   createMonthlyReportProcessor,
@@ -56,6 +58,7 @@ export {
 export type {
   ExpireAbandonedUploadDeps,
   ExtractDocumentDeps,
+  HeroImagesDeps,
   IndexKnowledgeDeps,
   MembershipInvitationMailDeps,
   MonthlyReportDeps,
@@ -71,6 +74,7 @@ export type ProcessorDeps = ExpireAbandonedUploadDeps &
   Omit<ProcessModelDeps, "media"> &
   MembershipInvitationMailDeps &
   RemoveUnusedMediaDeps &
+  HeroImagesDeps &
   ProbePortalDeps &
   MonthlyReportDeps &
   Omit<ExtractDocumentDeps, "media"> &
@@ -91,6 +95,7 @@ export function createProcessors(deps: ProcessorDeps): readonly JobProcessor[] {
     createProcessModelProcessor(deps),
     createMembershipInvitationMailProcessor(deps),
     createRemoveUnusedMediaProcessor(deps),
+    createHeroImagesProcessor(deps),
     createExtractDocumentProcessor(deps),
     createIndexKnowledgeProcessor(deps),
     createProbePortalProcessor(deps),

@@ -15,6 +15,7 @@ import {
   mapPlacePath,
   destinationJsonLd,
   directionsUrl,
+  heroCandidates,
   imageCandidates,
   openStreetMapUrl,
   portalMediaPath,
@@ -36,6 +37,32 @@ const destination: PublishedDestination = {
   publishedAt: "2026-10-18T00:00:00Z",
   updatedAt: "2026-10-18T01:00:00Z",
 };
+
+describe("hero image candidates (ADR-070)", () => {
+  const photo = { assetId: ASSET, version: 1, alt: "x", width: 4000, height: 3000 };
+
+  it("uses the lighter hero versions, then the regular one for wider screens", () => {
+    expect(heroCandidates(TENANT, { ...photo, hero: true })).toEqual([
+      { path: `${TENANT}/${ASSET}/1/hero-w800.webp`, width: 800, height: 600 },
+      { path: `${TENANT}/${ASSET}/1/hero-w1200.webp`, width: 1200, height: 900 },
+      { path: `${TENANT}/${ASSET}/1/w1600.webp`, width: 1600, height: 1200 },
+    ]);
+  });
+
+  it("never lists two files of the same width: a 957 px photo has 800 and 957", () => {
+    expect(heroCandidates(TENANT, { ...photo, width: 957, height: 535, hero: true })).toEqual([
+      { path: `${TENANT}/${ASSET}/1/hero-w800.webp`, width: 800, height: 447 },
+      { path: `${TENANT}/${ASSET}/1/hero-w1200.webp`, width: 957, height: 535 },
+    ]);
+  });
+
+  it("keeps the regular versions while a photo has no public hero versions", () => {
+    expect(heroCandidates(TENANT, photo)).toEqual(imageCandidates(TENANT, photo));
+    expect(heroCandidates(TENANT, { ...photo, hero: undefined })).toEqual(
+      imageCandidates(TENANT, photo),
+    );
+  });
+});
 
 describe("responsive image candidates", () => {
   it("lists the three widths for a large original, with proportional heights", () => {

@@ -3,6 +3,7 @@ import "server-only";
 import {
   categoryBySlug,
   formatEventSchedule,
+  heroCandidates,
   imageCandidates,
   loadAssistantPlaces,
   nearestPlaces,
@@ -52,7 +53,19 @@ export interface ResponsiveImage {
 
 /** Photos are served from the portal's own address (ADR-050): relative URLs. */
 export function responsiveImage(tenantId: string, image: PublishedImage): ResponsiveImage {
-  const candidates = imageCandidates(tenantId, image).map((candidate) => ({
+  return toResponsive(image, imageCandidates(tenantId, image));
+}
+
+/** The home cover: its lighter hero versions when they are public (ADR-070). */
+export function heroImage(tenantId: string, image: PublishedImage): ResponsiveImage {
+  return toResponsive(image, heroCandidates(tenantId, image));
+}
+
+function toResponsive(
+  image: PublishedImage,
+  found: readonly { readonly path: string; readonly width: number; readonly height: number }[],
+): ResponsiveImage {
+  const candidates = found.map((candidate) => ({
     ...candidate,
     url: portalMediaPath(candidate.path),
   }));

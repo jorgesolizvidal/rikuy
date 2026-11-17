@@ -2,6 +2,7 @@ import type { OrganizationMembership } from "../../contracts/organization";
 import {
   CONTENT_IMAGE_FILES,
   CONTENT_IMAGE_RULES,
+  HERO_IMAGE_FILES,
   type ContentImageFile,
 } from "../../domain/media/rules";
 import {
@@ -53,7 +54,10 @@ export function contentImagePath(
   return imageFilePath(tenantId, image, file);
 }
 
-/** Copies the derivatives of every image to the public bucket (before publishing). */
+/**
+ * Copies the derivatives of every image to the public bucket (before publishing), with its
+ * hero versions when it has them (photos uploaded before ADR-070 may not, yet).
+ */
 export async function publishContentImages(
   tenantId: string,
   images: readonly ImageVersionReference[],
@@ -64,6 +68,12 @@ export async function publishContentImages(
     const key = `${image.assetId}/${image.version}`;
     if (seen.has(key)) continue;
     seen.add(key);
-    await admin.publish(tenantId, image.assetId, image.version, CONTENT_IMAGE_FILES);
+    await admin.publish(
+      tenantId,
+      image.assetId,
+      image.version,
+      CONTENT_IMAGE_FILES,
+      HERO_IMAGE_FILES,
+    );
   }
 }
