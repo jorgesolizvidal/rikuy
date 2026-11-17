@@ -29,8 +29,9 @@ insert into media (name, purpose, status) values
   ('gone', 'content', 'rejected');
 insert into public.assets (id, tenant_id, purpose) select asset, :'ta', purpose from media;
 insert into public.asset_versions (id, tenant_id, asset_id, version, status, declared_mime, declared_bytes,
-                                   mime, bytes, width, height, sha256, ready_at, published_at)
-select version_id, :'ta', asset, 1, status, 'image/jpeg', 1000, 'image/jpeg', 1000, 1600, 900, :'sha', now(), now()
+                                   mime, bytes, width, height, sha256, ready_at, published_at, rejected_reason)
+select version_id, :'ta', asset, 1, status, 'image/jpeg', 1000, 'image/jpeg', 1000, 1600, 900, :'sha', now(),
+       case when status = 'ready' then now() end, case when status = 'rejected' then 'Prueba' end
 from media;
 create function pg_temp.store(p_bucket text, p_names text[], p_files text[]) returns void
 language sql as $$
