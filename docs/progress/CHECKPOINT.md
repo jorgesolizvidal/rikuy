@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 1.1 — avisos del municipio ✅ (falta la verificación en producción)
-- **Rama:** `feat/a-step1-notices` → PR hacia `main`
+- **Último paso completado:** A · Paso 1.1 — avisos del municipio ✅ (verificado en producción); corrección `fix/next-upgrade`
+- **Rama:** `fix/next-upgrade` → PR hacia `main`
 
 ## Historial
 
@@ -2706,16 +2706,30 @@ Lo que encontró el CI del push, ya corregido:
 - La base local de Supabase no levanta en mi entorno (sus imágenes no se descargan): pgTAP, el lint de SQL, la integración y el e2e corren en el CI del PR.
 - Un aviso que empieza mientras la página está en caché aparece con el navegador (la franja crece una vez); uno que vence, se quita.
 - El asistente cita primero el aviso del lugar cuando se pregunta desde su ficha; desde otra página, el aviso compite en la búsqueda con un peso mayor.
-- `next build` en mi entorno se detiene a veces con un aviso de seguridad de Next.js 16.4.2 y pasa al repetirlo; actualizar Next.js va en un PR propio.
+- `next build` en mi entorno se detiene a veces con un aviso de seguridad de Next.js 16.4.2 y pasa al repetirlo; actualizar Next.js va en un PR propio (`fix/next-upgrade`).
+
+**Verificación en producción (2026-11-16):** el usuario hizo el merge (PR #91) y las pruebas en Demo Norte: aviso publicado con un lugar, la franja en el portal, `/avisos`, la ficha del lugar y «Retirar ahora».
+
+### Documentación `docs/work-environment` ✅
+
+`.claude/CLAUDE.md` suma «Entorno de trabajo» (decisión del usuario, 2026-11-16): el asistente trabaja en un contenedor en la nube con una copia del repositorio; la computadora del usuario solo se usa, en solo lectura, para consultar material; si la base local con Docker no levanta, pgTAP, integración y e2e valen en el CI del PR; en GitHub el asistente crea la rama, hace los commits, el push y revisa el CI, y el merge lo hace el usuario; Supabase de producción y Vercel, solo lectura; «Deploy database» aplica las migraciones después del merge. PR #92.
+
+### Corrección `fix/next-upgrade` — Next.js 16.4.6
+
+- `next build` avisaba de una vulnerabilidad conocida en Next.js 16.4.2: **GHSA-mfr8-8qww-v76h**, de la tanda de seguridad del 3 de noviembre (siete avisos, de 16.3.0 a 16.4.4, corregidos en 16.4.5).
+- **No afectaba a Rikuy:** ninguno de los siete se cumple aquí (sin Cache Components, `use cache` ni `unstable_cache`; producción en Vercel y no con `next start`; sin rutas Edge; sin el optimizador de imágenes de Next.js). Se actualiza igual, como parche menor (decisión del usuario).
+- `next` y `eslint-config-next` 16.4.2 → **16.4.6**, con versión fija; el registro de avisos de npm no tiene ninguno para 16.4.6.
+- Verificado en local: lint, tipos, 1.085 unitarios y el build (sin el aviso).
 
 ## Cómo verificarlo
 
-- `pnpm check` en local; en el CI, `052_notices` (pgTAP) y «Notices in a real browser».
-- En producción, después del merge (las escrituras las hace el usuario): en Demo Norte, «Avisos» → «Nuevo aviso» con un fin en dos días y un lugar, «Publicar»; la franja en todas las páginas del portal, `/avisos` y la ficha del lugar; «Retirar ahora» lo quita.
+- `pnpm check` en local y el CI del PR completo (base, integración y los tres grupos del navegador corren con Next.js 16.4.6).
+- Después del merge: el portal y el panel responden igual; «Lighthouse on production» y «Daily health» siguen como antes.
 
 ## Siguiente paso
 
-**A · Paso 1.2 — servicios locales** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario después del merge de 1.1: tipo `service` y módulo `services`, categorías fijas, horario y contacto, `/servicios` con anclas, capa del mapa y el asistente.
+1. **Corrección `fix/hero-lcp`** (propuesta al usuario, 2026-11-16): «Lighthouse on production» falla desde el 15 de noviembre en el inicio de Ucureña (LCP 2,6–2,9 s, límite 2,5 s). La foto de portada ocupa toda la pantalla desde el Paso 8 de C3 y su versión de 960 px pesa 140 KB.
+2. **A · Paso 1.2 — servicios locales** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario: tipo `service` y módulo `services`, categorías fijas, horario y contacto, `/servicios` con anclas, capa del mapa y el asistente.
 
 ## Decisiones pendientes del usuario
 
