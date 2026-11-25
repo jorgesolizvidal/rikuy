@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 1.3 — memoria de la comunidad; antes, A · Pasos 1.1 y 1.2 ✅ (verificados en producción)
-- **Rama:** `feat/a-step1-memory` → PR hacia `main`
+- **Último paso completado:** A · Paso 2 — «Solo asistente»; antes, A · Paso 1 ✅ (avisos, servicios y memoria, verificados en producción)
+- **Rama:** `feat/a-step2-assistant-only` → PR hacia `main`
 
 ## Historial
 
@@ -2822,19 +2822,71 @@ Lo que encontró el CI del push, ya corregido:
 - El asistente no tiene un caso del gold con el modelo real para los relatos: que los cuente atribuidos se revisa a mano en producción.
 - Un relato es solo texto; los audios llegan con las audioguías, como dice el ADR.
 
+**Verificación en producción (2026-11-25):** tras el merge (PR #96), «Deploy database», «Lighthouse on production» y el CI de `main` en verde. El usuario creó en Ucureña el relato «Reforma agraria y sindicalismo en Ucureña»: se ve en `/memoria`, y Chaski, al preguntarle por el tema, lo cita con la fuente «Relato» y el enlace al relato.
+
+### A · Paso 2 — «Solo asistente» ✅
+
+- Decisiones del usuario ([ADR-071](../adr/ADR-071-assistant-only.md)), 2026-11-25:
+  - **una línea de script** en la web del municipio: botón flotante y el asistente en un marco servido por Rikuy;
+  - **solo el operador** autoriza en qué webs se puede insertar;
+  - el **QR «Pregúntale a …»** de cada lugar abre una **página del asistente en Rikuy**, mínima y con la marca del municipio;
+  - **«Página en la web del municipio» por contenido**; sin portal y sin ese enlace, la fuente se muestra sin enlace.
+- Base de datos (`20261201000000_a2_assistant_only.sql`, solo expand):
+  - módulo **«Portal público»** (`portal`, primero del catálogo), encendido en todos los municipios que existen; **mapa, tours y pasaporte lo necesitan**;
+  - `assistant_embed_origins` (hasta 10 orígenes por municipio, `https` o `http` local; RLS sin permisos) con `platform_embed_origins`, `platform_add_embed_origin` y `platform_remove_embed_origin` (operador con segundo factor, auditados `platform.embed_origin_added` / `…_removed`) y `tenant_embed_origins` (cualquier miembro);
+  - `resolve_tenant_by_host` devuelve también `embed_origins`;
+  - `content_items.web_url` con `content_web_link` (miembros) y `set_content_web_link` (propietarios y administradores, solo en un origen autorizado, auditado `content.web_link_set`); destinos, eventos, avisos, servicios y relatos;
+  - `portal_web_links` (anónima): los enlaces de lo publicado cuyo origen sigue autorizado. Quitar un origen apaga sus enlaces al momento;
+  - seed: Demo Sur autoriza `http://localhost:4599` (la web de prueba del e2e).
+- `@rikuy/core`:
+  - módulos: `portal`, sus dependencias, el paquete **«Solo asistente»** (asistente, voz, agenda, servicios, memoria y Copilot) y `portalPathAccess` (qué sirve un municipio sin portal);
+  - `domain/assistant/embed`: orígenes (`parseEmbedOrigin`, `isEmbedOrigin`), enlaces (`webLinkOrigin`, `parseWebLink`), `parseEmbedPlace` (`data-lugar`) y `frameAncestors`;
+  - `application/assistant/links`: el canal (`portal`, `qr`, `embed`) y `retargetReply` / `retargetCards`: dentro de la web del municipio o sin portal, cada fuente, parada y tarjeta lleva a su página en la web; sin portal y sin ella, a ningún lado; sin portal, sin secciones ni mapa;
+  - `application/assistant/embed`: casos de uso del operador y del enlace por contenido;
+  - el asistente no nombra secciones de un portal que no existe; el aprovisionamiento acepta cualquier paquete del catálogo.
+- `@rikuy/db`: repositorios del operador y de los miembros, el lector anónimo de enlaces, y el registro de hosts lee las webs; **una base anterior** (sin la columna) recibe el portal en sus módulos, así ningún portal desaparece mientras la web sale antes que la migración.
+- Web:
+  - **proxy:** `/preguntar` y `/insertar` van al árbol nuevo `app/assistant/[host]`; sin portal, `/` → 307 a `/preguntar` y lo demás al 404 del municipio (privacidad, términos, íconos, manifiesto, `robots.txt`, `/visita` y `/asistente…` siguen); `X-Frame-Options: DENY` en todo salvo `/insertar`, que lleva `frame-ancestors 'self'` + las webs autorizadas (sale de `next.config.ts`);
+  - **`public/insertar.js`**: lee su origen, pide `GET /insertar/marca` (CORS solo para webs autorizadas: en otra web no muestra nada), dibuja el botón en un _shadow DOM_ con el color del municipio, prepara el marco al acercarse, lo abre al tocar (`allow="microphone; geolocation"`, `?lugar=` de `data-lugar`) y lo cierra con `postMessage` devolviendo el foco;
+  - **`/insertar`**: el asistente a pantalla completa (modo «embed»); **`/preguntar`** y **`/preguntar/destinos|agenda/{dirección}`**: «Pregúntale a …» con la marca, el lugar con su foto y enlace (ficha del portal o su web) y el asistente abierto en la página (modo «page»), sin indexar;
+  - el panel del asistente tiene tres modos; envía `?canal=qr|insertar`; dentro del marco, un enlace a la web abre en la misma ventana (`_top`) y uno al portal en otra pestaña; las tarjetas sin enlace se muestran igual;
+  - `POST /asistente` decide los enlaces con el canal (`linkAnswer`);
+  - sin portal, la privacidad, los términos y el 404 se ven con cabecera y pie mínimos (sin menú, avisos ni barra inferior) y `robots.txt` pide no indexar nada.
+- Panel:
+  - **«Asistente en tu web»** («Para visitantes»): las webs autorizadas, la línea para copiar, cómo usar `data-lugar` y el QR general;
+  - en el editor de destinos y eventos publicados, el **QR «Pregúntale a …»** junto al del portal (este, solo con portal);
+  - **«Página en la web del municipio»** en destinos, eventos, avisos, servicios y relatos, cuando hay webs autorizadas;
+  - el operador, en «Módulos» del municipio: **«Webs donde se puede insertar el asistente»** (agregar y quitar); apagar el portal apaga también lo que lo necesita (y lo que necesita eso);
+  - «Solo asistente» en el alta; el inicio del municipio dice «Ver el asistente» cuando no hay portal.
+- Tests:
+  - unitarios: core 796 (+20: módulos y paquetes, `portalPathAccess`, orígenes, enlaces, canales, `retargetReply` con y sin portal, casos de uso), db 240 (+8), web 64 (+4 del proxy y el menú);
+  - pgTAP `056_assistant_only` (49) y `048_tenant_modules` con el portal: el módulo y sus dependencias, el paquete sin portal en el registro; solo el operador con segundo factor autoriza (propietario, operador sin segundo factor y visitante no); `http` en internet, rutas, mayúsculas, usuario y comodín rechazados; tope de 10; nadie lee la tabla; miembros sí, otro municipio no; el enlace: editor y otro municipio no, otra web, `javascript:`, espacios, usuario escondido y un dominio que empieza igual rechazados, el conocimiento no tiene página; los visitantes ven solo lo publicado y nada al quitar la web; la tabla rechaza lo mismo;
+  - **e2e en un navegador real** (`assistant-only.e2e.test.ts`, nuevo paso del grupo de contratos): una web servida en `localhost:4599` con la línea muestra «Pregúntale al asistente», abre el marco con `?lugar=destinos/laguna-espejo`, la respuesta enlaza a la página de su web con `_top` y cerrar devuelve el foco; en `127.0.0.1:4599` no aparece nada, `/insertar/marca` no responde con CORS, el marco lleva `frame-ancestors` solo con la web autorizada y el asistente rechaza una llamada desde la web; «Pregúntale a …» sobre un lugar de Demo Norte (enlace a su ficha, `canal=qr`, la página del lugar en la pregunta); Demo Sur sin portal: `/` → `/preguntar`, el resto 404, `robots.txt` cerrado, privacidad sin menú y respuestas que solo enlazan a su web; axe y desbordes a 390 y 1280 px.
+- Verificado en local: `pnpm check` (formato, lint, tipos, unitarios y build).
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Autorizar o quitar una web tarda hasta un minuto en llegar a todas las instancias (caché del registro de hosts), y lo mismo apagar o encender el portal.
+- La web del municipio puede bloquear el micrófono o la ubicación con su propia `Permissions-Policy`: entonces el dictado y «¿Qué hay cerca?» no funcionan dentro de su web.
+- El 404 de un municipio sin portal todavía ofrece «Ver los destinos» (la página de 404 no sabe qué municipio es).
+- Las preguntas desde la web y desde los QR todavía no se cuentan por separado: las métricas por canal llegan con el Paso 5.
+- Durante los minutos del despliegue, el panel puede no mostrar el enlace y el QR del portal (las membresías todavía no traen el módulo).
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
-- Después del merge y de «Deploy database», en Ucureña:
-  1. Panel → «Memoria de la comunidad» → «Nuevo relato»: carga un relato de un vecino (con su nombre, su comunidad y un destino), intenta publicarlo sin marcar el permiso (no deja) y después márcalo y publícalo.
-  2. Portal → `/memoria`: el relato con «Relato de …» y su lugar; «Memoria» en la cabecera y en el pie; en la ficha de su destino, «Lo que cuenta la comunidad».
-  3. Pregúntale a Chaski por ese tema: tiene que contarlo como el relato de esa persona («Según el relato de…»), no como un dato oficial, con la fuente «Relato».
-  4. Márcalo como anónimo y publícalo otra vez: el portal dice «Relato anónimo».
-  5. Retíralo: desaparece de `/memoria`, de la ficha y del asistente.
+- Después del merge y de «Deploy database»:
+  1. **Nada cambia para los portales:** Ucureña y las demos se ven igual, y en `/plataforma` → «Módulos» aparece «Portal público» encendido en todos.
+  2. **Autorizar una web:** en `/plataforma` → «Módulos» de Demo Norte → «Webs donde se puede insertar el asistente», autoriza una web tuya (por ejemplo, la de tu portafolio en GitHub Pages: `https://{usuario}.github.io`).
+  3. **La línea:** en el panel de Demo Norte → «Asistente en tu web», copia la línea y pégala en una página de esa web; publica la página. Al abrirla aparece «Pregúntale a …»; pregunta algo y mira que responda. En otra web (o en un archivo abierto desde tu computadora) no aparece nada.
+  4. **Enlace a la web:** en un destino de Demo Norte, «Página en la web del municipio» con una dirección de esa web; pregunta por ese lugar desde tu web: la fuente lleva a tu página.
+  5. **QR «Pregúntale a …»:** en el editor de un destino publicado, abre el enlace del QR nuevo (o escanéalo con el celular): la página del asistente con el lugar, y la pregunta ya sabe de qué lugar se trata.
+  6. **Sin portal (opcional, en una demo):** apaga «Portal público» en una demo comercial; en un minuto su dirección lleva a `/preguntar` y `/destinos` da 404. Vuelve a encenderlo.
 
 ## Siguiente paso
 
-1. **A · Paso 2 — «Solo asistente»** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: un paquete sin portal público, el asistente insertable en la web propia del municipio (solo en los dominios que autoriza, con las respuestas enlazando a esa web) y un QR «Pregúntale a …» por lugar que abre el asistente con su contexto. Antes de empezar, sus decisiones y un ADR.
+1. **A · Paso 3 — planes por tipo de visita** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: «Tengo 2 horas», «Con niños», «Día completo» sobre el motor de planes (ADR-039), respetando el tiempo pedido y los horarios. Antes de empezar, sus decisiones y un ADR.
 
 ## Decisiones pendientes del usuario
 

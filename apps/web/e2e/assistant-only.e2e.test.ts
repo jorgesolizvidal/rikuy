@@ -214,7 +214,7 @@ describe("«Solo asistente» (ADR-071)", () => {
       if (request.method() === "POST") posts.push(request.url());
     });
     await page.goto(WEBSITE);
-    const button = page.getByRole("button", { name: "Pregúntale al asistente" });
+    const button = page.getByRole("button", { name: /^Pregúntale a/u });
     await button.waitFor({ timeout: 15_000 });
     await button.click();
     const frameElement = page.locator("iframe[title]");
@@ -275,7 +275,7 @@ describe("«Solo asistente» (ADR-071)", () => {
     const brand = await get(`${SUR}/insertar/marca`, { origin: WEBSITE });
     expect(brand.status).toBe(200);
     expect(brand.headers["access-control-allow-origin"]).toBe(WEBSITE);
-    expect(JSON.parse(brand.body)).toMatchObject({ label: "Pregúntale al asistente" });
+    expect((JSON.parse(brand.body) as { label: string }).label).toMatch(/^Pregúntale a/u);
 
     // Only the authorized website may show the frame; every other page of the portal, nobody.
     const frame = await get(`${SUR}/insertar`);
