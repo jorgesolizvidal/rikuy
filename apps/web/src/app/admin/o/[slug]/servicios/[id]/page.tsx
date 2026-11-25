@@ -8,6 +8,7 @@ import { requireModule } from "@/server/organization";
 import { publishedContentReader } from "@/server/platform";
 
 import { toHoursValues } from "../../destinos/[id]/hours-values";
+import { ContentWebLink } from "../../asistente-web/visitor-shares";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
 import { ServiceEditor, type ServiceValues } from "./service-editor";
 
@@ -96,6 +97,7 @@ export default async function ServiceEditorPage({ params }: EditorPageProps) {
           published={record.published !== null}
         />
         <aside className="history">
+          <ContentWebLink membership={membership} contentId={record.contentId} />
           <section aria-labelledby="historial">
             <h2 id="historial">Historial de publicaciones</h2>
             <p className="field-hint">

@@ -402,6 +402,18 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-recommendations 2>&1 | tee ../../recommendations.log
+      # A · Paso 2 (ADR-071): the line on the municipality's website (a page served at
+      # localhost:4599, authorized in the seed) shows «Pregúntale a …», opens the assistant in
+      # Rikuy's frame about the page's place and links to the website's own page; on a website
+      # that is not authorized nothing shows and the frame cannot be shown; «Pregúntale a …»
+      # about a place (its QR); Demo Sur without its portal answers only the assistant. Last of
+      # its job: it turns Demo Sur's portal off and waits until it is back.
+      - name: Assistant on the municipality's website in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-assistant-only 2>&1 | tee ../../assistant-only.log
       # Fails the PR when a public page breaks lighthouse-budget.json (median of 3 runs).
       - name: Lighthouse budget (mobile)
         if: matrix.suite == 'lighthouse' && (success() || failure())
@@ -623,7 +635,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log assistant-only.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

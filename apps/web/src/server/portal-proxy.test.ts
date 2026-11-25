@@ -25,9 +25,16 @@ function tenant(slug: string, overrides: Partial<PortalTenant> = {}): PortalTena
 }
 
 const registry: Record<string, PortalTenant> = {
-  "norte.localhost": tenant("norte"),
+  "norte.localhost": tenant("norte", {
+    embedOrigins: ["https://www.norte.gob.bo", "http://localhost:4599"],
+  }),
   "sur.localhost": tenant("sur"),
   "alias-norte.localhost": tenant("norte", { isCanonical: false }),
+  // «Solo asistente» (ADR-071): no public portal.
+  "solo.localhost": tenant("solo", {
+    modules: ["assistant", "agenda"],
+    embedOrigins: ["https://www.solo.gob.bo"],
+  }),
 };
 
 const directory: TenantDirectory = { findByHost: async (host) => registry[host] ?? null };
@@ -201,5 +208,47 @@ describe("portal proxy", () => {
     expect(rewrittenPath(response)).toBe("/admin/login");
     expect(response.headers.get("x-robots-tag")).toContain("noindex");
     expect(response.headers.get("x-frame-options")).toBe("DENY");
+  });
+
+  it("does not let other sites frame the portal's pages", async () => {
+    const response = await proxy(request("http://norte.localhost:3000/destinos"));
+    expect(response.headers.get("x-frame-options")).toBe("DENY");
+    expect(response.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("serves the assistant's pages outside the portal's layout (ADR-071)", async () => {
+    const ask = await proxy(request("http://norte.localhost:3000/preguntar/destinos/museo"));
+    expect(rewrittenPath(ask)).toBe("/assistant/norte.localhost/preguntar/destinos/museo");
+    expect(ask.headers.get("x-frame-options")).toBe("DENY");
+    const brand = await proxy(request("http://norte.localhost:3000/insertar/marca"));
+    expect(rewrittenPath(brand)).toBe("/assistant/norte.localhost/insertar/marca");
+    expect(brand.headers.get("content-security-policy")).toBeNull();
+  });
+
+  it("lets only the municipality's websites frame the assistant", async () => {
+    const frame = await proxy(request("http://norte.localhost:3000/insertar?lugar=destinos/museo"));
+    expect(rewrittenPath(frame)).toBe("/assistant/norte.localhost/insertar?lugar=destinos/museo");
+    expect(frame.headers.get("content-security-policy")).toBe(
+      "frame-ancestors 'self' https://www.norte.gob.bo http://localhost:4599",
+    );
+    expect(frame.headers.get("x-frame-options")).toBeNull();
+    const none = await proxy(request("http://sur.localhost:3000/insertar"));
+    expect(none.headers.get("content-security-policy")).toBe("frame-ancestors 'self'");
+  });
+
+  it("without its portal leads home to the assistant and answers 404 for the rest", async () => {
+    const home = await proxy(request("http://solo.localhost:3000/"));
+    expect(home.status).toBe(307);
+    expect(home.headers.get("location")).toBe("http://solo.localhost:3000/preguntar");
+    for (const path of ["/destinos", "/destinos/museo", "/agenda", "/sitemap.xml", "/servicios"]) {
+      const closed = await proxy(request(`http://solo.localhost:3000${path}`));
+      expect(rewrittenPath(closed), path).toBe("/portal/solo.localhost/_sin-portal");
+    }
+    for (const path of ["/privacidad", "/robots.txt", "/asistente"]) {
+      const open = await proxy(request(`http://solo.localhost:3000${path}`));
+      expect(rewrittenPath(open), path).toBe(`/portal/solo.localhost${path}`);
+    }
+    const ask = await proxy(request("http://solo.localhost:3000/preguntar"));
+    expect(rewrittenPath(ask)).toBe("/assistant/solo.localhost/preguntar");
   });
 });

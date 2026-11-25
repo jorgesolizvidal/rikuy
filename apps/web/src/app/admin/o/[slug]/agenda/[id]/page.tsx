@@ -16,12 +16,12 @@ import { notFound } from "next/navigation";
 import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireModule } from "@/server/organization";
-import { platformSettings, publishedContentReader } from "@/server/platform";
+import { publishedContentReader } from "@/server/platform";
 
 import { DestinationEditor, type EditorValues } from "../../destinos/[id]/destination-editor";
 import type { EditorImage } from "../../destinos/[id]/image-fields";
 import { CopilotProposeLink } from "../../copilot/copilot-link";
-import { PortalShare } from "../../destinos/[id]/portal-share";
+import { VisitorShares } from "../../asistente-web/visitor-shares";
 import { SlugField } from "../../destinos/[id]/slug-field";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
 import type { VenueOption } from "../../destinos/[id]/schedule-field";
@@ -162,14 +162,14 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
             previous={editor.previousSlugs}
             canChange={editor.canChangeSlug}
           />
-          {editor.portalPath ? (
-            <PortalShare
-              url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}
-              slug={record.slug}
-              title={live?.title ?? document.title}
-              portalOnline={membership.tenantStatus === "active"}
-            />
-          ) : null}
+          <VisitorShares
+            membership={membership}
+            kind="event"
+            contentId={record.contentId}
+            slug={record.slug}
+            title={live?.title ?? document.title}
+            portalPath={editor.portalPath ?? null}
+          />
           <section aria-labelledby="historial">
             <h2 id="historial">Historial de publicaciones</h2>
             <p className="field-hint">

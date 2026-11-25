@@ -43,6 +43,17 @@ export const PORTAL_PATHS = {
   assistantDictation: "/asistente/dictado",
   /** POST: an anonymous visit count, sent by the browser (ADR-051). */
   visit: "/visita",
+  /** «Pregúntale a …» (ADR-071): the assistant's own page, for the whole municipality. */
+  ask: "/preguntar",
+  /** The same page about one published place: what its QR on a sign opens. */
+  askAbout: (kind: "destination" | "event", slug: string) =>
+    `/preguntar/${kind === "destination" ? "destinos" : "agenda"}/${encodeURIComponent(slug)}`,
+  /** The assistant inside the municipality's own website (ADR-071): the frame's page. */
+  embed: "/insertar",
+  /** What the embed script asks for: the button's name and colors (CORS, authorized sites). */
+  embedBrand: "/insertar/marca",
+  /** The line the municipality pastes into its website. */
+  embedScript: "/insertar.js",
   /** The tourist passport: the published circuits (C2, ADR-056). */
   passport: "/pasaporte",
   passportCircuit: (slug: string) => `/pasaporte/${encodeURIComponent(slug)}`,

@@ -7,6 +7,8 @@
 export interface AssistantPlaceCard {
   /** The place's page: the key the panel looks it up by (a source's or a stop's href). */
   readonly href: string;
+  /** Where it actually leads, when not `href` (ADR-071); null: nowhere to open. */
+  readonly link?: string | null;
   readonly kind: "destination" | "event";
   readonly title: string;
   /** The municipality's category (ADR-062). */

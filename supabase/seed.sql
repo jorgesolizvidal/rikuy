@@ -346,5 +346,10 @@ select '5eed1000-0000-4000-8000-000000000001', '5eed4600-0000-4000-8000-00000000
        case when n <= 4 then now() - make_interval(days => n * 9) + interval '2 hours' end
 from generate_series(1, 6) n;
 
+-- «Solo asistente» (A · Paso 2, ADR-071): Demo Sur may embed its assistant on a page served
+-- on this machine (the e2e serves its test website at http://localhost:4599).
+insert into public.assistant_embed_origins (tenant_id, origin)
+values ('5eed1000-0000-4000-8000-000000000002', 'http://localhost:4599');
+
 insert into public.audit_events (scope, action, outcome, diff)
 values ('platform', 'platform.seed_loaded', 'success', '{"tenants": 2, "users": 5, "operators": 1, "published_configs": 2, "destinations": 3, "events": 4, "jobs": 2}');

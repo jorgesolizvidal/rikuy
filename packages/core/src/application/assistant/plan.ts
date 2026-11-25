@@ -76,6 +76,8 @@ export interface AssistantPlanStop {
   readonly kind: "destination" | "event";
   readonly title: string;
   readonly href: string;
+  /** Where it actually leads, when not `href` (ADR-071); null: no link. */
+  readonly link?: string | null;
   /** «10:30–11:15» in a plan for today. */
   readonly time: string | null;
   /** «A 350 m · ~5 min a pie». */

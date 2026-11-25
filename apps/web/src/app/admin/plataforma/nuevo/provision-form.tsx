@@ -185,7 +185,7 @@ export function ProvisionForm({
           Destinos, marca, miembros y estadísticas están siempre. Después puedes encender o apagar
           cada módulo desde la lista de municipios.
         </p>
-        {(["complete", "information"] as const).map((name) => (
+        {(["complete", "information", "assistant_only"] as const).map((name) => (
           <label key={name} className="checkbox">
             <input
               type="radio"

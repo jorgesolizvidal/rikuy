@@ -1,6 +1,9 @@
 import {
+  PORTAL_PATHS,
   classifyHost,
   encodeTenantContext,
+  frameAncestors,
+  portalPathAccess,
   resolvePortalTenant,
   type PlatformHosts,
   type TenantDirectory,
@@ -25,7 +28,20 @@ export interface PortalProxyDeps {
 }
 
 /** Internal route prefixes. Every request is re-prefixed, so they cannot be reached directly. */
-export const ROUTES = { platform: "/platform", admin: "/admin", portal: "/portal" } as const;
+export const ROUTES = {
+  platform: "/platform",
+  admin: "/admin",
+  portal: "/portal",
+  /** The assistant's own pages (ADR-071): «Pregúntale a …» and the website's frame. */
+  assistant: "/assistant",
+} as const;
+
+/** Pages of a portal host served by the assistant's tree, outside the portal's layout. */
+const ASSISTANT_PAGES = /^\/(?:preguntar|insertar)(?:\/|$)/u;
+/** The frame's page: the only one another website may show (ADR-071). */
+const EMBED_PAGE = /^\/insertar\/?$/u;
+/** A path inside the portal that no page answers: the municipality's own 404 page. */
+const NOT_FOUND_PATH = "/_sin-portal";
 
 function statusPage(
   status: number,
@@ -71,6 +87,11 @@ export function createPortalProxy(deps: PortalProxyDeps) {
     const requestId = crypto.randomUUID();
     const response = await route(request, requestId);
     response.headers.set(REQUEST_ID_RESPONSE_HEADER, requestId);
+    // No page is shown inside another site's frame, except the assistant's frame on the
+    // municipality's own websites, which carries its own frame-ancestors (ADR-071).
+    if (!response.headers.has("content-security-policy")) {
+      response.headers.set("x-frame-options", "DENY");
+    }
     return response;
   };
 
@@ -121,11 +142,33 @@ export function createPortalProxy(deps: PortalProxyDeps) {
         }
 
         headers.set(TENANT_CONTEXT_HEADER, encodeTenantContext(resolution.context));
-        return rewrite(
-          request,
-          `${ROUTES.portal}/${encodeURIComponent(surface.hostname)}`,
-          headers,
-        );
+        const { pathname } = request.nextUrl;
+        const { tenant } = resolution.context;
+        const host = encodeURIComponent(surface.hostname);
+        // Without its public portal, only the assistant's pages (ADR-071).
+        const access = portalPathAccess(tenant.modules, pathname);
+        if (access === "home") {
+          return NextResponse.redirect(new URL(PORTAL_PATHS.ask, request.url), 307);
+        }
+        if (access === "closed") {
+          return NextResponse.rewrite(
+            new URL(`${ROUTES.portal}/${host}${NOT_FOUND_PATH}`, request.url),
+            {
+              request: { headers },
+            },
+          );
+        }
+        if (ASSISTANT_PAGES.test(pathname)) {
+          const response = rewrite(request, `${ROUTES.assistant}/${host}`, headers);
+          if (EMBED_PAGE.test(pathname)) {
+            response.headers.set(
+              "content-security-policy",
+              `frame-ancestors ${frameAncestors(tenant.embedOrigins ?? [])}`,
+            );
+          }
+          return response;
+        }
+        return rewrite(request, `${ROUTES.portal}/${host}`, headers);
       }
     }
   }

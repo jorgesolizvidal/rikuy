@@ -41,14 +41,14 @@ set constraints all immediate;
 create temp table ids (name text primary key, id uuid);
 grant select, insert on ids to authenticated, anon;
 
-\set everything '{agenda,map,tours,models,passport,assistant,voice,copilot,services,community_memory}'
+\set everything '{portal,agenda,map,tours,models,passport,assistant,voice,copilot,services,community_memory}'
 
 select plan(40);
 
 -- ── Everyone starts with everything ────────────────────────────────────────
 select is(private.tenant_module_keys(:'ta'), :'everything'::text[], 'a new municipality has every module, in order');
 select is((select count(*)::int from public.tenant_modules m join public.tenants t on t.id = m.tenant_id
-           where t.slug in ('demo-norte', 'demo-sur')), 20, 'the municipalities that already exist keep everything');
+           where t.slug in ('demo-norte', 'demo-sur')), 22, 'the municipalities that already exist keep everything');
 select throws_ok('set local role anon; select * from public.tenant_modules', '42501', null,
   'visitors do not read the modules table');
 select throws_ok('set local role authenticated; select * from public.platform_modules', '42501', null,
@@ -91,14 +91,14 @@ insert into ids select 'feria', content_id from public.create_content_item(:'ta'
 insert into ids select 'circuito', public.create_passport_circuit(:'ta', 'ruta', 'Ruta');
 set local request.jwt.claims to :'op';
 
-select is(public.platform_set_tenant_modules(:'ta', '{map,agenda,tours}'), '{agenda,map,tours}'::text[],
+select is(public.platform_set_tenant_modules(:'ta', '{map,agenda,tours,portal}'), '{portal,agenda,map,tours}'::text[],
   'the operator sets a «solo información» package with tours (returned in the catalog order)');
 reset role;
 select is((select diff from public.audit_events where action = 'platform.modules_changed' and tenant_id = :'ta'),
-  jsonb_build_object('from', to_jsonb(:'everything'::text[]), 'to', to_jsonb('{agenda,map,tours}'::text[])),
+  jsonb_build_object('from', to_jsonb(:'everything'::text[]), 'to', to_jsonb('{portal,agenda,map,tours}'::text[])),
   'it is audited with the set before and after');
 set local role authenticated;
-select is(public.platform_set_tenant_modules(:'ta', '{agenda,map,tours}'), '{agenda,map,tours}'::text[],
+select is(public.platform_set_tenant_modules(:'ta', '{portal,agenda,map,tours}'), '{portal,agenda,map,tours}'::text[],
   'saving the same set again');
 reset role;
 select is((select count(*)::int from public.audit_events where action = 'platform.modules_changed' and tenant_id = :'ta'), 1,
@@ -108,14 +108,14 @@ set local role authenticated;
 
 -- ── The portal and the panel read the set ──────────────────────────────────
 set local role anon;
-select is((select modules from public.resolve_tenant_by_host('a.modulos.test')), '{agenda,map,tours}'::text[],
+select is((select modules from public.resolve_tenant_by_host('a.modulos.test')), '{portal,agenda,map,tours}'::text[],
   'the portal learns the set with the host');
 set local role authenticated;
 set local request.jwt.claims to :'editora';
-select is((select modules from public.my_memberships() where tenant_id = :'ta'), '{agenda,map,tours}'::text[],
+select is((select modules from public.my_memberships() where tenant_id = :'ta'), '{portal,agenda,map,tours}'::text[],
   'the panel reads it with the memberships');
 set local request.jwt.claims to :'op';
-select is((select modules from public.platform_list_tenants() where tenant_id = :'ta'), '{agenda,map,tours}'::text[],
+select is((select modules from public.platform_list_tenants() where tenant_id = :'ta'), '{portal,agenda,map,tours}'::text[],
   'and the operator with the list of municipalities');
 
 -- ── Nothing is deleted; nothing new of a module that is off ────────────────
@@ -141,7 +141,7 @@ select lives_ok(format('select public.create_passport_circuit(%L, %L, %L)', :'tb
   'the other municipality creates circuits as before');
 
 set local request.jwt.claims to :'op';
-select is(public.platform_set_tenant_modules(:'ta', '{map}'), '{map}'::text[], 'only the map left');
+select is(public.platform_set_tenant_modules(:'ta', '{portal,map}'), '{portal,map}'::text[], 'only the portal and its map left');
 set local request.jwt.claims to :'ownera';
 select throws_ok(format('select public.create_content_item(%L, %L, %L, %L)', :'ta', 'event', 'tercera', 'Tercera'),
   'PT403', null, 'no new event without the agenda');
@@ -167,10 +167,10 @@ select lives_ok(format('select public.create_passport_circuit(%L, %L, %L)', :'ta
 set local request.jwt.claims to :'op';
 insert into ids select 'nuevo', tenant_id from public.provision_tenant(
      'nuevo', 'Nuevo', 'nuevo.modulos.test', '00000000-0000-4000-8000-0000000000c1',
-     'es', 'America/La_Paz', false, '{agenda,map}');
+     'es', 'America/La_Paz', false, '{portal,agenda,map}');
 reset role;
-select is(private.tenant_module_keys((select id from ids where name = 'nuevo')), '{agenda,map}'::text[],
-  'a municipality provisioned with «Solo información» starts with agenda and map');
+select is(private.tenant_module_keys((select id from ids where name = 'nuevo')), '{portal,agenda,map}'::text[],
+  'a municipality provisioned with «Solo información» starts with its portal, agenda and map');
 set local role authenticated;
 select throws_ok(
   $$select * from public.provision_tenant('otro', 'Otro', 'otro.modulos.test',

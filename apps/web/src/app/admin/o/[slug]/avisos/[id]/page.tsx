@@ -11,6 +11,7 @@ import { notFound } from "next/navigation";
 import { adminSession } from "@/server/admin-session";
 import { requireOrganization } from "@/server/organization";
 
+import { ContentWebLink } from "../../asistente-web/visitor-shares";
 import { RevisionHistory } from "../../destinos/[id]/revision-history";
 import { NoticeEditor, type NoticeValues } from "./notice-editor";
 
@@ -88,6 +89,7 @@ export default async function NoticeEditorPage({ params }: EditorPageProps) {
           published={record.published !== null}
         />
         <aside className="history">
+          <ContentWebLink membership={membership} contentId={record.contentId} />
           <section aria-labelledby="historial">
             <h2 id="historial">Historial de publicaciones</h2>
             <p className="field-hint">

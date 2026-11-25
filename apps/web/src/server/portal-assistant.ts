@@ -6,6 +6,9 @@ import {
   formatEventSchedule,
   passageVisibleWith,
   PORTAL_PATHS,
+  retargetCards,
+  retargetReply,
+  type AssistantChannel,
   type AssistantLink,
   type AssistantReply,
   type DictationResult,
@@ -37,6 +40,7 @@ import {
   portalTourIndex,
   responsiveImage,
 } from "./portal-content";
+import { publishedWebLinkReader } from "./platform";
 import { portalHas, type PortalView } from "./portal-view";
 
 /**
@@ -72,6 +76,7 @@ export async function askPortalAssistant(
     timezone: view.context.tenant.timezone,
     presentation: view.resolved.presentation,
     hasTours: tours.length > 0,
+    portal: portalHas(view, "portal"),
   };
   const modules = view.context.tenant.modules;
   const result = await askAssistant(tenant, body, visitor, {
@@ -90,6 +95,27 @@ export async function askPortalAssistant(
     now: () => new Date(),
   });
   return withPortalSections(view, result);
+}
+
+/**
+ * Where an answer and its cards lead (ADR-071): inside the municipality's website, or without a
+ * public portal, to the page of that website about each item when it has one; without a portal
+ * and without such a page, nowhere. A failure to read the links leaves the portal's pages (or
+ * none without a portal): the answer is never lost for it.
+ */
+export async function linkAnswer<T extends { readonly href: string }>(
+  view: PortalView,
+  channel: AssistantChannel,
+  reply: AssistantReply,
+  cards: readonly T[],
+): Promise<{ reply: AssistantReply; cards: T[] }> {
+  const portal = portalHas(view, "portal");
+  if (portal && channel !== "embed") return { reply, cards: [...cards] };
+  const webLinks = await publishedWebLinkReader()
+    .links(view.context.tenant.tenantId)
+    .catch(() => new Map<string, string>());
+  const policy = { portal, channel, webLinks };
+  return { reply: retargetReply(reply, policy), cards: retargetCards(cards, policy) };
 }
 
 /** No link to a section the portal does not have (the agenda or the map, ADR-060). */

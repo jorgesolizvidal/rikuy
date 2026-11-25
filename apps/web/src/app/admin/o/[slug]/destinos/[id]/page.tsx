@@ -15,13 +15,13 @@ import { notFound } from "next/navigation";
 import { adminSession } from "@/server/admin-session";
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireOrganization } from "@/server/organization";
-import { platformSettings, publishedContentReader } from "@/server/platform";
+import { publishedContentReader } from "@/server/platform";
 
 import { DestinationEditor, type EditorValues } from "./destination-editor";
 import { toHoursValues } from "./hours-values";
 import type { EditorImage } from "./image-fields";
 import { CopilotProposeLink } from "../../copilot/copilot-link";
-import { PortalShare } from "./portal-share";
+import { VisitorShares } from "../../asistente-web/visitor-shares";
 import { SlugField } from "./slug-field";
 import { RevisionHistory } from "./revision-history";
 
@@ -156,14 +156,14 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
             previous={editor.previousSlugs}
             canChange={editor.canChangeSlug}
           />
-          {editor.portalPath ? (
-            <PortalShare
-              url={`${platformSettings().portalOrigin(editor.portalPath.hostname)}${editor.portalPath.path}`}
-              slug={record.slug}
-              title={published?.title ?? document.title}
-              portalOnline={membership.tenantStatus === "active"}
-            />
-          ) : null}
+          <VisitorShares
+            membership={membership}
+            kind="destination"
+            contentId={record.contentId}
+            slug={record.slug}
+            title={published?.title ?? document.title}
+            portalPath={editor.portalPath ?? null}
+          />
           <section aria-labelledby="historial">
             <h2 id="historial">Historial de publicaciones</h2>
             <p className="field-hint">

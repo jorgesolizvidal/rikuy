@@ -46,6 +46,7 @@ const GROUPS: readonly { readonly title: string | null; readonly entries: readon
     entries: [
       { path: "pasaporte", label: "Pasaporte turístico", module: "passport" },
       { path: "conocimiento", label: "Conocimiento del asistente", module: "assistant" },
+      { path: "asistente-web", label: "Asistente en tu web", module: "assistant" },
     ],
   },
   {

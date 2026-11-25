@@ -17,3 +17,4 @@ export type { PlanIntent } from "./domain/plan/engine";
 export type { AiNotice } from "./application/ai/notices";
 export type { PublicCitation } from "./contracts/knowledge";
 export * from "./contracts/voice";
+export { parseEmbedPlace } from "./domain/assistant/embed";

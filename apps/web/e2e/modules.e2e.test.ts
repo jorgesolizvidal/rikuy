@@ -31,6 +31,7 @@ const OPERATOR = "operador@rikuy.example.test";
 const OPERATOR_ID = "5eed0000-0000-4000-8000-000000000005";
 const OWNER_SUR = "owner@demo-sur.example.test";
 const ALL = [
+  "portal",
   "agenda",
   "map",
   "tours",
@@ -191,6 +192,7 @@ describe("the modules of a municipality (ADR-060)", () => {
     await operator.getByRole("button", { name: "Sí, guardar los módulos" }).click();
     await operator.getByText("Se guardaron los módulos.", { exact: false }).waitFor();
     expect(await modulesOfSur()).toEqual([
+      "portal",
       "assistant",
       "voice",
       "copilot",
@@ -204,7 +206,7 @@ describe("the modules of a municipality (ADR-060)", () => {
       order by occurred_at desc limit 1`;
     expect(audit?.diff).toEqual({
       from: ALL,
-      to: ["assistant", "voice", "copilot", "services", "community_memory"],
+      to: ["portal", "assistant", "voice", "copilot", "services", "community_memory"],
     });
   });
 

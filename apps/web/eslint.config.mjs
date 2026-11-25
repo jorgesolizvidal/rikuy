@@ -132,6 +132,7 @@ const config = [
       "e2e/tour.e2e.test.ts",
       "e2e/assistant.e2e.test.ts",
       "e2e/assistant-cards.e2e.test.ts",
+      "e2e/assistant-only.e2e.test.ts",
       "e2e/monthly-report.e2e.test.ts",
       "e2e/support/*.ts",
     ],

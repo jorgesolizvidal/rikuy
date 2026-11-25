@@ -28,6 +28,12 @@ import { tourAssistantContext, type TourAssistantContext } from "@/lib/assistant
 import { useVisitorLocation } from "@/lib/use-visitor-location";
 
 import type { AssistantPlaceCard } from "./assistant-cards";
+import {
+  AssistantModeContext,
+  linkProps,
+  useLinkProps,
+  type AssistantMode,
+} from "./assistant-links";
 import { AnswerSources, PlanCard } from "./assistant-place";
 import {
   dictationSupported,
@@ -47,6 +53,12 @@ import {
 
 const STORAGE_KEY = "rikuy.assistant.v1";
 const ENDPOINT = "/asistente";
+/** Where the question was asked (ADR-071): the server decides the answer's links with it. */
+const CHANNEL: Readonly<Record<AssistantMode, string>> = {
+  launcher: "",
+  page: "?canal=qr",
+  embed: "?canal=insertar",
+};
 /** Places a plan may include, with coordinates: the phone measures its distance to each. */
 const PLACES_ENDPOINT = "/asistente/lugares";
 const WIDE = "(min-width: 48rem)";
@@ -281,8 +293,13 @@ export interface AssistantPanelProps {
   /** The municipality has the assistant's voice (ADR-060). */
   readonly voice: boolean;
   readonly open: boolean;
-  readonly onClose: () => void;
+  /** Absent on its own page, where it never closes. */
+  readonly onClose?: () => void;
   readonly request?: AssistantRequestFromPage | null;
+  /** The portal's button (default), its own page, or the website's frame (ADR-071). */
+  readonly mode?: AssistantMode;
+  /** The portal page it is about, when not the browser's (a QR about a place: «/destinos/…»). */
+  readonly pagePath?: string | null;
 }
 
 export default function AssistantPanel({
@@ -296,7 +313,10 @@ export default function AssistantPanel({
   open,
   onClose,
   request = null,
+  mode = "launcher",
+  pagePath = null,
 }: AssistantPanelProps) {
+  const close = useCallback(() => onClose?.(), [onClose]);
   const avatar = <Avatar logo={logo} mark={mark} />;
   const ids = useId();
   const dialog = useRef<HTMLDialogElement>(null);
@@ -342,10 +362,15 @@ export default function AssistantPanel({
     setSpeaking(null);
   }, []);
 
-  // Open as a modal on a phone, as a panel beside the page on a wider screen.
+  // Open as a modal on a phone, as a panel beside the page on a wider screen. On its own page
+  // and in the website's frame it is the page itself: always open, never modal.
   useEffect(() => {
     const element = dialog.current;
     if (!element) return;
+    if (mode !== "launcher") {
+      if (!element.open) element.show();
+      return;
+    }
     if (open && !element.open) {
       // Over a fullscreen tour or a point's dialog, only a modal dialog is visible and usable.
       const over =
@@ -359,7 +384,24 @@ export default function AssistantPanel({
       cancelDictation();
       stopSpeaking();
     }
-  }, [open, cancelDictation]);
+  }, [open, cancelDictation, mode]);
+
+  // In the website's frame (ADR-071): the website says when it shows the frame, and the
+  // question field takes the focus then. Nothing else is read from the website.
+  useEffect(() => {
+    if (mode !== "embed") return;
+    const shown = (event: MessageEvent) => {
+      if (
+        event.source === window.parent &&
+        (event.data as { type?: unknown })?.type === "rikuy:open"
+      ) {
+        input.current?.focus();
+      }
+    };
+    window.addEventListener("message", shown);
+    window.parent.postMessage({ type: "rikuy:ready" }, "*");
+    return () => window.removeEventListener("message", shown);
+  }, [mode]);
 
   useEffect(() => {
     save(messages, startedAt);
@@ -391,13 +433,13 @@ export default function AssistantPanel({
         // Inside a tour: the scene and the point on screen, as IDs (ADR-040).
         const tour = tourContext ?? tourAssistantContext();
         const distances = plan && fix ? await distancesFrom(fix) : null;
-        const response = await fetch(ENDPOINT, {
+        const response = await fetch(`${ENDPOINT}${CHANNEL[mode]}`, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify({
             question: asked,
             history: context,
-            page: tour?.page ?? assistantPageFromPath(window.location.pathname),
+            page: tour?.page ?? assistantPageFromPath(pagePath ?? window.location.pathname),
             ...(tour ? { tour: { sceneId: tour.sceneId, hotspotId: tour.hotspotId } } : {}),
             ...(intent ? { intent } : {}),
             ...(distances && Object.keys(distances).length > 0 ? { distances } : {}),
@@ -427,7 +469,7 @@ export default function AssistantPanel({
         input.current?.focus();
       }
     },
-    [busy, messages, fix, quiet, read],
+    [busy, messages, fix, quiet, read, mode, pagePath],
   );
 
   // A question from the page (the tour's «¿Qué estoy viendo?»): asked once it is open.
@@ -463,196 +505,203 @@ export default function AssistantPanel({
   }
 
   const page =
-    typeof window === "undefined" ? null : assistantPageFromPath(window.location.pathname);
+    typeof window === "undefined"
+      ? null
+      : assistantPageFromPath(pagePath ?? window.location.pathname);
   const onItem = page !== null && page.slug !== null;
   const suggestions = SUGGESTIONS[onItem ? "item" : "any"] ?? [];
 
   return (
-    <dialog
-      ref={dialog}
-      className="assistant"
-      aria-labelledby={`${ids}-title`}
-      aria-describedby={`${ids}-note`}
-      onCancel={(event) => {
-        event.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(event) => {
-        if (event.key === "Escape") {
+    <AssistantModeContext.Provider value={mode}>
+      <dialog
+        ref={dialog}
+        className="assistant"
+        data-mode={mode}
+        aria-labelledby={`${ids}-title`}
+        aria-describedby={`${ids}-note`}
+        onCancel={(event) => {
           event.preventDefault();
-          // Escape first throws the recording away; then it closes the panel.
-          if (recording) dictation.cancel();
-          else onClose();
-        }
-      }}
-    >
-      <header className="assistant-header">
-        {avatar}
-        <div className="assistant-heading">
-          <h2 id={`${ids}-title`}>{name}</h2>
-          <p className="assistant-subtitle">
-            {named ? `Asistente de ${siteName}` : siteName}
-            <span className="assistant-status">Responde con lo publicado</span>
-          </p>
+          close();
+        }}
+        onKeyDown={(event) => {
+          if (event.key === "Escape") {
+            event.preventDefault();
+            // Escape first throws the recording away; then it closes the panel.
+            if (recording) dictation.cancel();
+            else close();
+          }
+        }}
+      >
+        <header className="assistant-header">
+          {avatar}
+          <div className="assistant-heading">
+            <h2 id={`${ids}-title`}>{name}</h2>
+            <p className="assistant-subtitle">
+              {named ? `Asistente de ${siteName}` : siteName}
+              <span className="assistant-status">Responde con lo publicado</span>
+            </p>
+          </div>
+          <div className="assistant-header-actions">
+            {messages.length > 0 ? (
+              <button
+                type="button"
+                className="assistant-quiet"
+                title="Nueva conversación"
+                onClick={restart}
+              >
+                <NewIcon />
+                <span className="visually-hidden">Nueva conversación</span>
+              </button>
+            ) : null}
+            {onClose ? (
+              <button type="button" className="assistant-close" onClick={close}>
+                <span aria-hidden="true">×</span>
+                <span className="visually-hidden">Cerrar el asistente</span>
+              </button>
+            ) : null}
+          </div>
+        </header>
+
+        <div
+          ref={log}
+          className="assistant-log"
+          role="log"
+          aria-live="polite"
+          aria-relevant="additions"
+          aria-busy={busy}
+          tabIndex={0}
+          aria-label="Conversación"
+        >
+          <div className="assistant-message assistant-from-assistant assistant-welcome">
+            {avatar}
+            <p>{greeting}</p>
+          </div>
+          {messages.length === 0 ? (
+            <div className="assistant-suggestions" aria-labelledby={`${ids}-faq`} role="group">
+              <p id={`${ids}-faq`} className="assistant-section-title">
+                Preguntas frecuentes
+              </p>
+              {suggestions.map((suggestion) => (
+                <button
+                  key={suggestion.text}
+                  type="button"
+                  className="assistant-chip"
+                  onClick={() => void ask(suggestion.text)}
+                >
+                  <ChipIcon icon={suggestion.icon} />
+                  {suggestion.text}
+                </button>
+              ))}
+            </div>
+          ) : null}
+          {messages.map((message) => (
+            <MessageView
+              key={message.id}
+              message={message}
+              avatar={avatar}
+              name={name}
+              speaking={speaking === message.id}
+              onRead={
+                canSpeak && message.role === "assistant"
+                  ? () => (speaking === message.id ? quiet() : read(message.id, message.reply))
+                  : null
+              }
+            />
+          ))}
+          {busy ? (
+            <p className="assistant-typing">
+              <span aria-hidden="true" className="assistant-dots">
+                <span />
+                <span />
+                <span />
+              </span>
+              {name} está escribiendo…
+            </p>
+          ) : null}
         </div>
-        <div className="assistant-header-actions">
-          {messages.length > 0 ? (
+
+        <div className="assistant-plans" role="group" aria-label="Planes con lo publicado">
+          {PLANS.map((plan) => (
+            <button
+              key={plan.intent}
+              type="button"
+              className="assistant-chip"
+              disabled={busy}
+              onClick={() => void ask(plan.label, plan.intent)}
+            >
+              <ChipIcon icon={plan.icon} />
+              {plan.label}
+            </button>
+          ))}
+        </div>
+
+        <form className="assistant-form" onSubmit={submit}>
+          <label htmlFor={`${ids}-question`} className="visually-hidden">
+            Tu pregunta para {name}
+          </label>
+          <textarea
+            ref={input}
+            id={`${ids}-question`}
+            rows={1}
+            maxLength={ASSISTANT_LIMITS.question}
+            placeholder="Escribe tu pregunta"
+            value={question}
+            enterKeyHint="send"
+            onChange={(event) => {
+              setQuestion(event.target.value);
+              if (!event.target.value.trim()) fromVoice.current = false;
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
+                event.preventDefault();
+                void ask(question);
+              }
+            }}
+          />
+          {canDictate ? (
             <button
               type="button"
-              className="assistant-quiet"
-              title="Nueva conversación"
-              onClick={restart}
+              className="assistant-mic"
+              data-recording={recording ? "" : undefined}
+              disabled={transcribing}
+              aria-describedby={`${ids}-voice`}
+              onClick={() => (recording ? dictation.stop() : void dictation.start())}
             >
-              <NewIcon />
-              <span className="visually-hidden">Nueva conversación</span>
+              <MicIcon />
+              <span className="visually-hidden">
+                {recording ? "Terminar de dictar" : "Dictar la pregunta"}
+              </span>
             </button>
           ) : null}
-          <button type="button" className="assistant-close" onClick={onClose}>
-            <span aria-hidden="true">×</span>
-            <span className="visually-hidden">Cerrar el asistente</span>
-          </button>
-        </div>
-      </header>
-
-      <div
-        ref={log}
-        className="assistant-log"
-        role="log"
-        aria-live="polite"
-        aria-relevant="additions"
-        aria-busy={busy}
-        tabIndex={0}
-        aria-label="Conversación"
-      >
-        <div className="assistant-message assistant-from-assistant assistant-welcome">
-          {avatar}
-          <p>{greeting}</p>
-        </div>
-        {messages.length === 0 ? (
-          <div className="assistant-suggestions" aria-labelledby={`${ids}-faq`} role="group">
-            <p id={`${ids}-faq`} className="assistant-section-title">
-              Preguntas frecuentes
-            </p>
-            {suggestions.map((suggestion) => (
-              <button
-                key={suggestion.text}
-                type="button"
-                className="assistant-chip"
-                onClick={() => void ask(suggestion.text)}
-              >
-                <ChipIcon icon={suggestion.icon} />
-                {suggestion.text}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {messages.map((message) => (
-          <MessageView
-            key={message.id}
-            message={message}
-            avatar={avatar}
-            name={name}
-            speaking={speaking === message.id}
-            onRead={
-              canSpeak && message.role === "assistant"
-                ? () => (speaking === message.id ? quiet() : read(message.id, message.reply))
-                : null
-            }
-          />
-        ))}
-        {busy ? (
-          <p className="assistant-typing">
-            <span aria-hidden="true" className="assistant-dots">
-              <span />
-              <span />
-              <span />
-            </span>
-            {name} está escribiendo…
-          </p>
-        ) : null}
-      </div>
-
-      <div className="assistant-plans" role="group" aria-label="Planes con lo publicado">
-        {PLANS.map((plan) => (
           <button
-            key={plan.intent}
-            type="button"
-            className="assistant-chip"
-            disabled={busy}
-            onClick={() => void ask(plan.label, plan.intent)}
+            type="submit"
+            className="assistant-send"
+            disabled={busy || recording || transcribing || question.trim().length < 2}
           >
-            <ChipIcon icon={plan.icon} />
-            {plan.label}
+            <SendIcon />
+            <span className="visually-hidden">Enviar</span>
           </button>
-        ))}
-      </div>
-
-      <form className="assistant-form" onSubmit={submit}>
-        <label htmlFor={`${ids}-question`} className="visually-hidden">
-          Tu pregunta para {name}
-        </label>
-        <textarea
-          ref={input}
-          id={`${ids}-question`}
-          rows={1}
-          maxLength={ASSISTANT_LIMITS.question}
-          placeholder="Escribe tu pregunta"
-          value={question}
-          enterKeyHint="send"
-          onChange={(event) => {
-            setQuestion(event.target.value);
-            if (!event.target.value.trim()) fromVoice.current = false;
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" && !event.shiftKey && !event.nativeEvent.isComposing) {
-              event.preventDefault();
-              void ask(question);
-            }
-          }}
-        />
-        {canDictate ? (
-          <button
-            type="button"
-            className="assistant-mic"
-            data-recording={recording ? "" : undefined}
-            disabled={transcribing}
-            aria-describedby={`${ids}-voice`}
-            onClick={() => (recording ? dictation.stop() : void dictation.start())}
-          >
-            <MicIcon />
-            <span className="visually-hidden">
-              {recording ? "Terminar de dictar" : "Dictar la pregunta"}
-            </span>
-          </button>
-        ) : null}
-        <button
-          type="submit"
-          className="assistant-send"
-          disabled={busy || recording || transcribing || question.trim().length < 2}
-        >
-          <SendIcon />
-          <span className="visually-hidden">Enviar</span>
-        </button>
-      </form>
-      <p id={`${ids}-voice`} className="assistant-voice" role="status">
-        {dictation.state.phase === "recording" ? (
-          <>
-            <span className="assistant-rec" aria-hidden="true" />
-            Escuchando… {dictation.state.seconds} s de {DICTATION_LIMITS.maxSeconds}. Toca el
-            micrófono cuando termines.
-          </>
-        ) : transcribing ? (
-          "Pasando tu voz a texto…"
-        ) : (
-          voiceMessage
-        )}
-      </p>
-      <p id={`${ids}-note`} className="assistant-note">
-        Responde con inteligencia artificial a partir de lo publicado en este portal y puede
-        equivocarse. La conversación se guarda solo en este dispositivo.{" "}
-        <a href="/privacidad#asistente">Privacidad</a>
-      </p>
-    </dialog>
+        </form>
+        <p id={`${ids}-voice`} className="assistant-voice" role="status">
+          {dictation.state.phase === "recording" ? (
+            <>
+              <span className="assistant-rec" aria-hidden="true" />
+              Escuchando… {dictation.state.seconds} s de {DICTATION_LIMITS.maxSeconds}. Toca el
+              micrófono cuando termines.
+            </>
+          ) : transcribing ? (
+            "Pasando tu voz a texto…"
+          ) : (
+            voiceMessage
+          )}
+        </p>
+        <p id={`${ids}-note`} className="assistant-note">
+          Responde con inteligencia artificial a partir de lo publicado por el municipio y puede
+          equivocarse. La conversación se guarda solo en este dispositivo.{" "}
+          <a {...linkProps("/privacidad#asistente", mode)}>Privacidad</a>
+        </p>
+      </dialog>
+    </AssistantModeContext.Provider>
   );
 }
 
@@ -681,11 +730,12 @@ function Links({
   readonly links: readonly AssistantLink[];
   readonly label: string;
 }) {
+  const attributes = useLinkProps();
   if (links.length === 0) return null;
   return (
     <nav className="assistant-links" aria-label={label}>
       {links.map((link) => (
-        <a key={link.href} href={link.href}>
+        <a key={link.href} {...attributes(link.href)}>
           {link.label}
         </a>
       ))}

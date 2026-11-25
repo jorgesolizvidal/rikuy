@@ -19,6 +19,11 @@ export const portalTenantSchema = z.object({
   demo: z.boolean().optional(),
   /** The modules it has (ADR-060). Absent: an older registry, which means all of them. */
   modules: z.array(z.enum(MODULE_KEYS)).optional(),
+  /**
+   * The websites where its assistant may be embedded (ADR-071): origins only, at most 10.
+   * Absent or empty: nowhere.
+   */
+  embedOrigins: z.array(z.string().min(1).max(200)).max(10).optional(),
 });
 
 export type PortalTenant = z.infer<typeof portalTenantSchema>;

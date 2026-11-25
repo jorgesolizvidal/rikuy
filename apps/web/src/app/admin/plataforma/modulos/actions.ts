@@ -1,6 +1,12 @@
 "use server";
 
-import { changeTenantModules, listPlatformTenants, type ModuleKey } from "@rikuy/core";
+import {
+  addEmbedOrigin,
+  changeTenantModules,
+  listPlatformTenants,
+  removeEmbedOrigin,
+  type ModuleKey,
+} from "@rikuy/core";
 
 import { adminSession, currentAdminActor } from "@/server/admin-session";
 import { refreshPortal } from "@/server/portal-cache";
@@ -37,6 +43,35 @@ export async function changeModulesAction(
       );
     }
     return { status: "updated", modules: result.modules };
+  } catch {
+    return { status: "error" };
+  }
+}
+
+export interface EmbedOriginsState {
+  readonly status:
+    "idle" | "added" | "removed" | "invalid" | "too_many" | "not_found" | "forbidden" | "error";
+}
+
+/**
+ * The websites where a municipality's assistant may be embedded (ADR-071). Only the operator
+ * with the second factor (the database checks it again); a change reaches every instance of
+ * the proxy within a minute (the registry's cache).
+ */
+export async function changeEmbedOriginAction(
+  _previous: EmbedOriginsState,
+  formData: FormData,
+): Promise<EmbedOriginsState> {
+  try {
+    if ((await currentAdminActor()) === null) return { status: "forbidden" };
+    const { platformEmbed } = await adminSession();
+    const tenantId = formData.get("tenantId");
+    const removing = formData.get("intent") === "remove";
+    const result = removing
+      ? await removeEmbedOrigin(platformEmbed, tenantId, formData.get("origin"))
+      : await addEmbedOrigin(platformEmbed, tenantId, formData.get("origin"));
+    if (result.status === "updated") return { status: removing ? "removed" : "added" };
+    return { status: result.status };
   } catch {
     return { status: "error" };
   }

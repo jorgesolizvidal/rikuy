@@ -7,6 +7,7 @@
  */
 
 export const MODULE_KEYS = [
+  "portal",
   "agenda",
   "map",
   "tours",
@@ -32,6 +33,12 @@ export interface ModuleInfo {
 
 export const MODULES: readonly ModuleInfo[] = [
   {
+    key: "portal",
+    name: "Portal público",
+    description:
+      "Las páginas del municipio para visitantes: inicio, destinos, fichas y más. Sin él, solo el asistente, en su web y por QR.",
+  },
+  {
     key: "agenda",
     name: "Agenda",
     description: "Eventos con fecha y lugar, y «Añadir al calendario».",
@@ -40,11 +47,13 @@ export const MODULES: readonly ModuleInfo[] = [
     key: "map",
     name: "Mapa",
     description: "El mapa del portal y el mapa pequeño de cada ficha.",
+    requires: "portal",
   },
   {
     key: "tours",
     name: "Tours 360°",
     description: "Panoramas 360°, tours de los destinos y eventos, y el recorrido general.",
+    requires: "portal",
   },
   {
     key: "models",
@@ -56,6 +65,7 @@ export const MODULES: readonly ModuleInfo[] = [
     key: "passport",
     name: "Pasaporte turístico",
     description: "Circuitos con sellos QR en cada lugar y un premio.",
+    requires: "portal",
   },
   {
     key: "assistant",
@@ -93,7 +103,9 @@ export const MODULE_NAMES: Readonly<Record<ModuleKey, string>> = Object.fromEntr
 /** Packages the operator chooses from when provisioning a municipality. */
 export const MODULE_PACKAGES = {
   complete: MODULE_KEYS,
-  information: ["agenda", "map", "services", "community_memory"],
+  information: ["portal", "agenda", "map", "services", "community_memory"],
+  /** For a municipality with its own website (ADR-071): the assistant and what it knows. */
+  assistant_only: ["agenda", "assistant", "voice", "copilot", "services", "community_memory"],
 } as const satisfies Record<string, readonly ModuleKey[]>;
 
 export type ModulePackage = keyof typeof MODULE_PACKAGES;
@@ -101,6 +113,7 @@ export type ModulePackage = keyof typeof MODULE_PACKAGES;
 export const MODULE_PACKAGE_NAMES: Readonly<Record<ModulePackage, string>> = {
   complete: "Completo",
   information: "Solo información",
+  assistant_only: "Solo asistente",
 };
 
 export function isModuleKey(value: unknown): value is ModuleKey {
@@ -158,4 +171,29 @@ export function withModule<T extends { readonly modules?: readonly ModuleKey[] |
   key: ModuleKey,
 ): T | null {
   return membership !== null && hasModule(membership.modules, key) ? membership : null;
+}
+
+/**
+ * What a municipality without its public portal still serves (ADR-071): the assistant's pages
+ * and calls, the legal pages, the icons and the manifest, robots.txt and the visit counts.
+ * Everything else answers its 404; the home leads to the assistant's page.
+ */
+const WITHOUT_PORTAL = [
+  /^\/preguntar(?:\/|$)/u,
+  /^\/insertar(?:\/|$)/u,
+  /^\/asistente(?:\/|$)/u,
+  /^\/(?:privacidad|terminos|robots\.txt|manifest\.webmanifest|visita)$/u,
+  /^\/icon(?:\/|$)/u,
+];
+
+export type PortalPathAccess = "open" | "home" | "closed";
+
+/** Whether a path of a portal host is served, given the municipality's modules. */
+export function portalPathAccess(
+  modules: readonly ModuleKey[] | undefined,
+  pathname: string,
+): PortalPathAccess {
+  if (hasModule(modules, "portal")) return "open";
+  if (pathname === "/" || pathname === "") return "home";
+  return WITHOUT_PORTAL.some((pattern) => pattern.test(pathname)) ? "open" : "closed";
 }

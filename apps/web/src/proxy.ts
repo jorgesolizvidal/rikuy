@@ -27,5 +27,8 @@ export const config = {
   // vendor/: versioned third-party files (the map worker), the same for every host.
   // _vercel/: Vercel's own endpoints (Speed Insights), served by the platform.
   // medios/: public media, forwarded to Storage by a rewrite (ADR-050).
-  matcher: ["/((?!_next/static|_next/image|_vercel/|favicon.ico|vendor/|medios/).*)"],
+  // insertar.js: the assistant's line for the municipality's website (ADR-071), static.
+  matcher: [
+    "/((?!_next/static|_next/image|_vercel/|favicon.ico|vendor/|medios/|insertar\\.js$).*)",
+  ],
 };

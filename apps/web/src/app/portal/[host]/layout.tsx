@@ -124,6 +124,9 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const { identity, contact, social } = presentation;
   const hasContact = Boolean(contact.email || contact.phone || contact.address);
   const demo = view.context.tenant.demo === true;
+  // «Solo asistente» (ADR-071): without its public portal only the legal pages and the 404
+  // are served here, with the brand and the footer, and no link to a section it does not have.
+  const portal = portalHas(view, "portal");
   // The assistant's button only where the platform has AI and the municipality has the
   // assistant (ADR-060); without them nothing is shown.
   const persona =
@@ -173,7 +176,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         </p>
       ) : null}
       <header className="portal-header">
-        <a href="/" className="portal-brand">
+        <a href={portal ? "/" : PORTAL_PATHS.ask} className="portal-brand">
           {view.logo ? (
             // Versioned, immutable public derivative (≤512 px WebP); the site name next to it
             // is the accessible name, so the image is decorative. Low priority: React would
@@ -196,20 +199,22 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         </a>
         {/* Outside the navigation: on a phone it shares the name's row, whose height is fixed,
             so its late appearance (when the browser offers to install) moves nothing below. */}
-        <InstallButton siteName={identity.siteName} />
-        <nav aria-label="Principal" className="portal-nav">
-          <a href={PORTAL_PATHS.destinations}>Destinos</a>
-          {portalHas(view, "agenda") ? <a href={PORTAL_PATHS.agenda}>Agenda</a> : null}
-          {portalHas(view, "map") ? <a href={PORTAL_PATHS.map}>Mapa</a> : null}
-          {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
-          {circuits.length > 0 ? <a href={PORTAL_PATHS.passport}>Pasaporte</a> : null}
-          {services.length > 0 ? <a href={PORTAL_PATHS.services}>Servicios</a> : null}
-          {stories.length > 0 ? <a href={PORTAL_PATHS.memory}>Memoria</a> : null}
-        </nav>
+        {portal ? <InstallButton siteName={identity.siteName} /> : null}
+        {portal ? (
+          <nav aria-label="Principal" className="portal-nav">
+            <a href={PORTAL_PATHS.destinations}>Destinos</a>
+            {portalHas(view, "agenda") ? <a href={PORTAL_PATHS.agenda}>Agenda</a> : null}
+            {portalHas(view, "map") ? <a href={PORTAL_PATHS.map}>Mapa</a> : null}
+            {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
+            {circuits.length > 0 ? <a href={PORTAL_PATHS.passport}>Pasaporte</a> : null}
+            {services.length > 0 ? <a href={PORTAL_PATHS.services}>Servicios</a> : null}
+            {stories.length > 0 ? <a href={PORTAL_PATHS.memory}>Memoria</a> : null}
+          </nav>
+        ) : null}
       </header>
 
       {/* The municipality's notices in force (ADR-069), on every page. */}
-      <NoticeStrip notices={notices.notices} initial={notices.initial} />
+      {portal ? <NoticeStrip notices={notices.notices} initial={notices.initial} /> : null}
 
       <main id="contenido">{children}</main>
 
@@ -254,7 +259,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
             <SocialLinks links={social} />
           </section>
         ) : null}
-        {services.length > 0 || stories.length > 0 ? (
+        {portal && (services.length > 0 || stories.length > 0) ? (
           // On a phone the header's links are hidden and the bar has no room for these.
           <nav aria-label="Para tu visita" className="portal-legal-links">
             {services.length > 0 ? (
@@ -272,11 +277,13 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
         <p className="portal-credit">
           {demo
             ? `Demostración del portal de ${identity.siteName}.`
-            : `Portal oficial de ${identity.siteName}.`}{" "}
+            : portal
+              ? `Portal oficial de ${identity.siteName}.`
+              : `Asistente oficial de ${identity.siteName}.`}{" "}
           Funciona con Rikuy.
         </p>
       </footer>
-      <BottomBar items={withHref(bar.items)} more={withHref(bar.more)} />
+      {portal ? <BottomBar items={withHref(bar.items)} more={withHref(bar.more)} /> : null}
       {persona ? (
         <AssistantLauncher
           name={persona.name}

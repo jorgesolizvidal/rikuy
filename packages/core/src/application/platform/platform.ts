@@ -146,7 +146,7 @@ export async function provisionTenant(
 
   const modulePackage = input.modulePackage ?? "complete";
   const modules =
-    modulePackage === "complete" || modulePackage === "information"
+    typeof modulePackage === "string" && Object.hasOwn(MODULE_PACKAGES, modulePackage)
       ? MODULE_PACKAGES[modulePackage as ModulePackage]
       : null;
   if (modules === null) fields.push("modules");
