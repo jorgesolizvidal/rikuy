@@ -90,6 +90,7 @@ function portalPages(portal) {
     "/mapa",
     "/avisos",
     "/servicios",
+    "/memoria",
     "/privacidad",
     "/terminos",
     "/destinos/no-existe",

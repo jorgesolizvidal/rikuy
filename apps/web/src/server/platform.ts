@@ -14,6 +14,7 @@ import {
   type PublishedPassportReader,
   type PublishedNoticeReader,
   type PublishedServiceReader,
+  type PublishedStoryReader,
   type PublishedContentIndexReader,
   type PublishedRewardReader,
   type PublishedStampReader,
@@ -30,6 +31,7 @@ import {
   createSupabasePublishedPassportReader,
   createSupabasePublishedNoticeReader,
   createSupabasePublishedServiceReader,
+  createSupabasePublishedStoryReader,
   createSupabasePublishedContentIndexReader,
   createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
@@ -198,6 +200,19 @@ export function publishedServiceReader(): PublishedServiceReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedServices;
+}
+
+let publishedStories: PublishedStoryReader | undefined;
+
+/** The community's published stories (anonymous, ADR-069). */
+export function publishedStoryReader(): PublishedStoryReader {
+  if (publishedStories) return publishedStories;
+  const { env } = platformSettings();
+  publishedStories = createSupabasePublishedStoryReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedStories;
 }
 
 let publishedIndex: PublishedContentIndexReader | undefined;

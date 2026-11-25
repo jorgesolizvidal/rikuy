@@ -205,6 +205,7 @@ describe("the assistant and services", () => {
     validity: null,
     placeTitle: null,
     service: { category: "cash" as const, phone: null, whatsapp: null, address: "Plaza 1" },
+    story: null,
     document: null,
   };
 

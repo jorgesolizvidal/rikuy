@@ -18,6 +18,7 @@ describe("the municipality's menu in the panel (ADR-066)", () => {
           "Agenda",
           "Avisos",
           "Servicios locales",
+          "Memoria de la comunidad",
           "Categorías",
           "Tours 360°",
           "Panoramas 360°",

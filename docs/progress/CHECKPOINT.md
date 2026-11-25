@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 1.2 — servicios locales; antes, A · Paso 1.1 ✅ y las correcciones `fix/next-upgrade` ✅ y `fix/hero-lcp` ✅
-- **Rama:** `feat/a-step1-services` → PR hacia `main`
+- **Último paso completado:** A · Paso 1.3 — memoria de la comunidad; antes, A · Pasos 1.1 y 1.2 ✅ (verificados en producción)
+- **Rama:** `feat/a-step1-memory` → PR hacia `main`
 
 ## Historial
 
@@ -2788,19 +2788,53 @@ Lo que encontró el CI del push, ya corregido:
 - Los avisos y las secciones que el asistente sugiere cuando no sabe todavía no incluyen «Servicios».
 - Los servicios no entran en los planes del asistente («qué hay cerca», «plan para hoy»): queda para el Paso 3, como dice el ADR.
 
+**Verificación en producción (2026-11-25):** tras el merge (PR #95), «Deploy database», «Lighthouse on production» y el CI de `main` en verde. El usuario creó en Ucureña el servicio «Restaurante Mérida» y Chaski lo responde.
+
+### A · Paso 1.3 — memoria de la comunidad ✅
+
+- Decisiones del usuario: las de [ADR-069](../adr/ADR-069-useful-knowledge.md) para el Paso 1 (2026-11-16): **la carga el equipo del municipio**, **siempre como relato atribuido**, en **página, ficha y asistente**; módulo **`community_memory`**. El ADR suma los detalles fijados al implementarlo.
+- Base de datos (`20261130000000_a1_story_enum.sql` y `20261130000100_a1_stories.sql`, solo expand):
+  - tipo de contenido `story` y módulo **«Memoria de la comunidad»** (`community_memory`), encendido en todos los municipios y en los dos paquetes; sin él, la base rechaza crear un relato (`PT403`);
+  - en la revisión: `story_author`, `story_anonymous`, `story_community`, `story_place_id` (un destino del mismo municipio, FK compuesta) y `story_consent`. Una restricción impide guardar un nombre en un relato anónimo;
+  - `save_content_draft` valida el documento (`private.is_valid_story_draft`: claves exactas, una línea, texto enriquecido permitido) y el lugar; `publish_content` exige el texto, quién lo cuenta (o «anónimo») y el permiso (`hint` `consent`), y deja el permiso en el `diff` de la auditoría; `retire_content` acepta relatos;
+  - `worker_api.knowledge_source` suma quién lo cuenta, su comunidad y el nombre publicado de su lugar;
+  - `portal_stories` (anónima, municipios activos): los publicados, los más nuevos primero, sin nombre si son anónimos, con su destino solo si está publicado.
+- `@rikuy/core`: contrato `contracts/story` (documento que borra el nombre de un anónimo, lo que falta para publicar, `storyTeller`, `PublishedStory`); casos de uso `listStories`, `createStory`, `loadStoryEditor` (con los destinos para elegir), `saveStoryDraft`, `publishStory`, `retireStory`, `restoreStoryRevision`, `discardStoryDraft` y `storiesOfPlace`; el texto indexado empieza con «Relato de {autor} ({comunidad}).» o «Relato anónimo de la comunidad.»; el modelo lo lee como «Relato de la comunidad» y la regla 3 le pide contarlo siempre atribuido y mencionar las dos versiones si no coincide con otra fuente; la cita es «Relato» y lleva a `/memoria#…`; el Copilot y el informe mensual conocen el tipo; `buildSitemap` suma `/memoria`.
+- `@rikuy/db`: `createStoryRepository` (los destinos para elegir salen del mismo listado que usan los avisos) y `createSupabasePublishedStoryReader` (antes de la migración: sin relatos).
+- Panel: **«Memoria de la comunidad»** en «Contenido» (`/o/{slug}/memoria`): lista con quién lo cuenta y su estado, «Nuevo relato» y el editor con título, resumen, el relato (con el formato de los destinos), «Prefiere que sea anónimo», nombre, comunidad o relación con el lugar, «¿Sobre qué lugar?», **«La persona aceptó que se publique su relato»**, vista previa, publicar, guardar borrador, «Retirar (la persona lo pidió)», descartar y el historial.
+- Portal:
+  - **`/memoria`**: cada relato con su ancla, «Relato de …» o «Relato anónimo», su comunidad, el texto, su lugar y la fecha. Estilos en su propia hoja (`memory.css`);
+  - **«Lo que cuenta la comunidad»** en la ficha del destino relacionado, con enlace al relato completo;
+  - «Memoria» en la cabecera y en el pie, y en el sitemap, cuando hay relatos publicados;
+  - privacidad: nueva sección «Memoria de la comunidad» (permiso registrado y cómo pedir que se retire).
+- CI: nuevo paso **«Community memory in a real browser»** (grupo «Lighthouse · visitas»); `/memoria` suma a las páginas de los contratos RC-09/10/11/12.
+- Tests:
+  - unitarios: core 776 (+16: el documento, el anónimo sin nombre, lo que falta para publicar, roles, el permiso rechazado antes y por la base, la lista, los relatos de un lugar, el texto indexado, el encabezado del pasaje, la cita, el módulo y el sitemap), db 233 (+7), web 60, worker 58, config 14;
+  - pgTAP `055_stories` (42) y `048_tenant_modules` con el módulo nuevo: el módulo; borradores válidos e inválidos (el lugar es un evento, permiso que no es sí o no, nombre de varias líneas, una clave de más, enlace no permitido); el anónimo no guarda el nombre ni en lo que lee el editor; editor sin publicar ni retirar, analista y otro municipio sin guardar; sin permiso, sin quién lo cuenta o sin texto no se publica; la revisión sellada y la auditoría guardan el permiso; la tabla no acepta un nombre en un anónimo; el portal con quién lo cuenta y su lugar, nada de otro municipio ni de uno suspendido; retirar con auditoría; la indexación con quién lo cuenta y su lugar; con el módulo apagado `PT403`; un relato no tiene tour ni es el lugar de un aviso; un destino no acepta los campos del relato;
+  - **e2e en un navegador real** (`memory.e2e.test.ts`): el propietario de Demo Sur crea un relato de una vecina sobre un destino; sin permiso no se publica; con permiso sí, y la revisión y la auditoría lo guardan; en `/memoria` con «Relato de …», su comunidad y su lugar; en la ficha del destino, «Lo que cuenta la comunidad» enlazando a su ancla; la cabecera, el pie y el sitemap; nada en Demo Norte; publicado otra vez como anónimo, la base no guarda el nombre y el portal dice «Relato anónimo»; retirarlo lo quita; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px.
+- Verificado en local: lint, tipos, unitarios y el build.
+- Lo que encontró el CI, ya corregido: la ficha del destino cargaba `memory.css` aunque no tuviera relatos (una hoja más antes de la primera pintura) y el LCP del mirador de Demo Norte llegó a 2,52 s (límite 2,5 s). Los estilos de «Lo que cuenta la comunidad» pasaron a `detail.css`, que la ficha ya carga: 2,44 s.
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Las visitas a `/memoria` todavía no se cuentan en «Estadísticas».
+- El asistente no tiene un caso del gold con el modelo real para los relatos: que los cuente atribuidos se revisa a mano en producción.
+- Un relato es solo texto; los audios llegan con las audioguías, como dice el ADR.
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
 - Después del merge y de «Deploy database», en Ucureña:
-  1. Panel → «Servicios locales» → «Nuevo servicio»: carga, por ejemplo, la gasolinera y el cajero más cercanos (categoría, dirección o ubicación, horario y teléfono si los tienes) y publícalos.
-  2. Portal → `/servicios`: las tarjetas por categoría con «Abierto ahora», «Llamar», «WhatsApp» y «Cómo llegar»; «Servicios» en la cabecera y en el pie.
-  3. `/mapa` → activa «Servicios»: los pines cuadrados con su ícono; desde una tarjeta, «Ver en el mapa del municipio» abre el mapa con la capa encendida.
-  4. En el portal, pregúntale a Chaski «¿dónde hay un cajero?» o «¿dónde cargo gasolina?»: responde con el servicio y la fuente lleva a su tarjeta.
-  5. Retira un servicio de prueba: desaparece de `/servicios` y del mapa.
+  1. Panel → «Memoria de la comunidad» → «Nuevo relato»: carga un relato de un vecino (con su nombre, su comunidad y un destino), intenta publicarlo sin marcar el permiso (no deja) y después márcalo y publícalo.
+  2. Portal → `/memoria`: el relato con «Relato de …» y su lugar; «Memoria» en la cabecera y en el pie; en la ficha de su destino, «Lo que cuenta la comunidad».
+  3. Pregúntale a Chaski por ese tema: tiene que contarlo como el relato de esa persona («Según el relato de…»), no como un dato oficial, con la fuente «Relato».
+  4. Márcalo como anónimo y publícalo otra vez: el portal dice «Relato anónimo».
+  5. Retíralo: desaparece de `/memoria`, de la ficha y del asistente.
 
 ## Siguiente paso
 
-1. **A · Paso 1.3 — memoria de la comunidad** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario: tipo `story` y módulo `community_memory`, autor y consentimiento obligatorio para publicar, `/memoria`, «Lo que cuenta la comunidad» en la ficha del destino y la regla del asistente de contarlo siempre atribuido.
+1. **A · Paso 2 — «Solo asistente»** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: un paquete sin portal público, el asistente insertable en la web propia del municipio (solo en los dominios que autoriza, con las respuestas enlazando a esa web) y un QR «Pregúntale a …» por lugar que abre el asistente con su contexto. Antes de empezar, sus decisiones y un ADR.
 
 ## Decisiones pendientes del usuario
 

@@ -33,6 +33,7 @@ const GROUPS: readonly { readonly title: string | null; readonly entries: readon
       { path: "agenda", label: "Agenda", module: "agenda" },
       { path: "avisos", label: "Avisos" },
       { path: "servicios", label: "Servicios locales", module: "services" },
+      { path: "memoria", label: "Memoria de la comunidad", module: "community_memory" },
       { path: "categorias", label: "Categorías" },
       { path: "tours", label: "Tours 360°", module: "tours" },
       { path: "panoramas", label: "Panoramas 360°", module: "tours" },

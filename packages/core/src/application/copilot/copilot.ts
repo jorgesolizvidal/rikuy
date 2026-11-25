@@ -273,7 +273,9 @@ function sourceLinks(
               ? COPILOT_PATHS.notice(org, passage.sourceId)
               : passage.kind === "service"
                 ? COPILOT_PATHS.service(org, passage.sourceId)
-                : COPILOT_PATHS.editor(org, passage.kind, passage.sourceId);
+                : passage.kind === "story"
+                  ? COPILOT_PATHS.story(org, passage.sourceId)
+                  : COPILOT_PATHS.editor(org, passage.kind, passage.sourceId);
       add({
         label:
           passage.source === "tour"
@@ -284,7 +286,9 @@ function sourceLinks(
                 ? "Aviso"
                 : passage.kind === "service"
                   ? "Servicio"
-                  : KIND_NAMES[passage.kind],
+                  : passage.kind === "story"
+                    ? "Relato"
+                    : KIND_NAMES[passage.kind],
         title: passage.heading ? `${passage.title} · ${passage.heading}` : passage.title,
         href,
       });
@@ -554,6 +558,7 @@ const PASSAGE_LABELS = {
   knowledge: "Documento",
   notice: "Aviso",
   service: "Servicio",
+  story: "Relato",
 } as const;
 
 /** V2: the model proposes the asked texts; the proposal is saved for the staff to decide. */

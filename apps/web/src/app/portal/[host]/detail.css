@@ -643,3 +643,34 @@
 .portal-place-notices li + li {
   margin-top: 0.5rem;
 }
+
+/* ── «Lo que cuenta la comunidad» (ADR-069) ─────────────────────────────── */
+
+.memory-place-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory-place-list li {
+  padding: 0.875rem 1rem;
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.memory-place-list h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.memory-place-list p {
+  margin: 0.25rem 0 0;
+}
+
+.memory-place-list .memory-teller {
+  color: var(--muted);
+  font-weight: 600;
+}

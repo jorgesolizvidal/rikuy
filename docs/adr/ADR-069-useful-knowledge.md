@@ -76,6 +76,13 @@ Decisiones del usuario (2026-11-16):
 3. **Quién lo escribe:** el equipo del municipio, en nombre del vecino. No hay formulario público.
 4. **Portal:** la página **`/memoria`** con los relatos y una sección **«Lo que cuenta la comunidad»** en la ficha del destino relacionado.
 5. **Asistente:** el pasaje de un relato llega al modelo como «Relato de {autor}», y una regla fija le pide contarlo **siempre atribuido** («Según el relato de…»), nunca como hecho oficial; si choca con la historia publicada, menciona las dos versiones, como ya hace con los textos que se contradicen (gold con el modelo real, P6 · Paso 3).
+6. **Detalles fijados al implementarlo (PR 1.3):**
+   - «Anónimo» **no guarda el nombre**: ni el borrador ni la versión publicada lo tienen (la base lo impide con una restricción), y el portal dice «Relato anónimo»;
+   - el relato se escribe con el mismo formato de texto que los destinos; para publicar hace falta el texto, quién lo cuenta (o «anónimo») y la casilla de permiso, que también queda en el `diff` de la auditoría de cada publicación;
+   - el destino relacionado es solo un destino (no un evento);
+   - cada pasaje indexado empieza con «Relato de {autor} ({comunidad}).» o «Relato anónimo de la comunidad.», así el modelo sabe de quién es aunque lea un fragmento del medio; la cita lleva a `/memoria#{dirección}`;
+   - `/memoria` se enlaza desde la cabecera y el pie, entra en el sitemap con relatos publicados, y la página de privacidad explica cómo pedir que se retire un relato;
+   - el paquete «Solo información» incluye el módulo.
 
 ### 4. Módulos
 

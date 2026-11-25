@@ -553,6 +553,17 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-services 2>&1 | tee ../../services.log
+      # A · Paso 1.3 (ADR-069): the owner of Demo Sur creates a neighbour's story about one of its
+      # destinations; without the person's consent it is not published, with it it is (and the
+      # revision and the audit keep it); visitors read it on /memoria and on the destination's
+      # page, always attributed, never in Demo Norte; told again as «anónimo» no name is kept;
+      # retiring it takes it off. It retires what it published.
+      - name: Community memory in a real browser
+        if: matrix.suite == 'lighthouse' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-memory 2>&1 | tee ../../memory.log
       # RC-01/07/08 (P4): the reference tours (a museum and a four-scene carnival) walked in a
       # real browser — entry, information and gallery, every scene forward and back, arrows,
       # the 3D model loaded only on demand, another tour, out; fast taps and late answers never
@@ -612,7 +623,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
-import { portalView } from "@/server/portal-view";
+import { portalHas, portalView } from "@/server/portal-view";
 
 import { LegalContact } from "../legal-contact";
 
@@ -223,6 +223,18 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
           quién eres.
         </li>
       </ul>
+
+      {portalHas(view, "community_memory") ? (
+        <>
+          <h2 id="memoria">Memoria de la comunidad</h2>
+          <p>
+            Los relatos de la página «Memoria» los cuentan vecinos de {siteName} y los publica el
+            municipio con su permiso, con su nombre o como anónimos si así lo pidieron. Ese permiso
+            queda registrado. Si contaste un relato y quieres que se retire, escribe al contacto del
+            municipio: se retira del portal y el asistente deja de usarlo.
+          </p>
+        </>
+      ) : null}
 
       <h2>Enlaces a otros servicios</h2>
       <p>
