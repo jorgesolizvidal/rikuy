@@ -1,10 +1,8 @@
 import { PORTAL_PATHS, storyTeller, type PublishedStory } from "@rikuy/core";
 
-import "./memory.css";
-
 /**
  * «Lo que cuenta la comunidad» on a destination's page (ADR-069): its stories, each always
- * attributed, with a link to read it whole on /memoria.
+ * attributed, with a link to read it whole on /memoria. Its styles are in detail.css.
  */
 export function PlaceStories({ stories }: { readonly stories: readonly PublishedStory[] }) {
   if (stories.length === 0) return null;
