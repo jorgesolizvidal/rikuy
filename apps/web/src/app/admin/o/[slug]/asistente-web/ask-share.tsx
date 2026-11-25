@@ -29,7 +29,7 @@ export async function AskShare({
   const title = assistantName ? `Pregúntale a ${assistantName}` : "Pregúntale al asistente";
 
   return (
-    <section className="portal-share" aria-label={title}>
+    <section className="portal-share ask-share" aria-label={title}>
       <h2>«{title}»</h2>
       <p className="field-hint">
         {about
@@ -41,7 +41,7 @@ export async function AskShare({
           Abrir el asistente<span className="visually-hidden"> (se abre en otra pestaña)</span>
         </a>
       </p>
-      <p className="cell-detail portal-share-url">{url}</p>
+      <p className="cell-detail ask-share-url">{url}</p>
       {online ? null : (
         <p className="field-hint">
           El municipio aún no está en línea: el enlace y el código funcionarán cuando lo esté.

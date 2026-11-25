@@ -279,7 +279,7 @@ describe("the modules of a municipality (ADR-060)", () => {
     expect(
       await owner
         .locator(".usage-modules")
-        .getByText(/^Asistente del visitante/u)
+        .getByText(/^Portal público, Asistente del visitante/u)
         .count(),
     ).toBe(1);
     for (const path of ["agenda", "tours", "panoramas", "modelos", "pasaporte"]) {

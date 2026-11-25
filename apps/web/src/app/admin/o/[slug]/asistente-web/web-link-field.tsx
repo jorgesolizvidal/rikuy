@@ -71,7 +71,7 @@ export function WebLinkField({
           <input type="hidden" name="org" value={org} />
           <input type="hidden" name="contentId" value={contentId} />
           <div className="field">
-            <label htmlFor={`${id}-url`}>Dirección de la página</label>
+            <label htmlFor={`${id}-url`}>Enlace a la página</label>
             <input
               id={`${id}-url`}
               name="url"

@@ -1183,7 +1183,8 @@ a.button-quiet {
   text-underline-offset: 0.2em;
 }
 
-.portal-share-url {
+.portal-share-url,
+.ask-share-url {
   overflow-wrap: anywhere;
 }
 

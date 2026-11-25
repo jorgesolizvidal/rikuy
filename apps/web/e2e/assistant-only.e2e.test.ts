@@ -332,7 +332,7 @@ describe("«Solo asistente» (ADR-071)", () => {
     await until(async () => (await get(`${SUR}/`)).status === 307, "the portal off");
 
     const home = await get(`${SUR}/`);
-    expect(home.headers.location).toBe(`${SUR}/preguntar`);
+    expect(new URL(home.headers.location ?? "", SUR).href).toBe(`${SUR}/preguntar`);
     for (const path of ["/destinos", `/destinos/${LAKE}`, "/agenda", "/sitemap.xml", "/avisos"]) {
       expect((await get(`${SUR}${path}`)).status, path).toBe(404);
     }
