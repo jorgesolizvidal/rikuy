@@ -225,7 +225,7 @@ describe("local services of the municipality (ADR-069)", () => {
     await expect(visitor.getByLabel(/^Servicios \(\d+\)$/u).isChecked()).resolves.toBe(true);
     const item = list.getByRole("link", { name: new RegExp(TITLE) });
     await item.waitFor({ timeout: 15_000 });
-    await expect(item.innerText()).resolves.toContain("Servicio");
+    await expect(item.innerText()).resolves.toMatch(/servicio/iu);
     await expect(item.getAttribute("href")).resolves.toBe(`/servicios#${String(slug)}`);
 
     // Demo Norte has its own services, never Demo Sur's.

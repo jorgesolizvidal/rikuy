@@ -41,14 +41,14 @@ set constraints all immediate;
 create temp table ids (name text primary key, id uuid);
 grant select, insert on ids to authenticated, anon;
 
-\set everything '{agenda,map,tours,models,passport,assistant,voice,copilot}'
+\set everything '{agenda,map,tours,models,passport,assistant,voice,copilot,services}'
 
 select plan(40);
 
 -- ── Everyone starts with everything ────────────────────────────────────────
 select is(private.tenant_module_keys(:'ta'), :'everything'::text[], 'a new municipality has every module, in order');
 select is((select count(*)::int from public.tenant_modules m join public.tenants t on t.id = m.tenant_id
-           where t.slug in ('demo-norte', 'demo-sur')), 16, 'the municipalities that already exist keep everything');
+           where t.slug in ('demo-norte', 'demo-sur')), 18, 'the municipalities that already exist keep everything');
 select throws_ok('set local role anon; select * from public.tenant_modules', '42501', null,
   'visitors do not read the modules table');
 select throws_ok('set local role authenticated; select * from public.platform_modules', '42501', null,

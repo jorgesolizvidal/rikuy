@@ -174,7 +174,7 @@ set local role authenticated;
 set local request.jwt.claims to :'a1c';
 select lives_ok(
   format('select * from public.restore_content_revision(%L, %L, %L)', :'ta', (select content_id from cash),
-    (select revision_id from public.content_revisions where content_id = (select content_id from cash) and state = 'sealed')),
+    (select id from public.content_revisions where content_id = (select content_id from cash) and state = 'sealed' order by revision_no desc limit 1)),
   '«Volver a esta versión» publishes it again'
 );
 reset role;
