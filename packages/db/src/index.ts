@@ -86,6 +86,11 @@ export {
   createSupabasePublishedServiceReader,
   mapPortalServiceRow,
 } from "./services";
+export {
+  createStoryRepository,
+  createSupabasePublishedStoryReader,
+  mapPortalStoryRow,
+} from "./stories";
 export { createCopilotRepository } from "./copilot";
 export { createMetricsRepository } from "./metrics";
 export { createEvalRepository } from "./evaluations";

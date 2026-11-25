@@ -1,0 +1,86 @@
+/* «Memoria de la comunidad» (A · Paso 1.3, ADR-069): the stories neighbours tell, each with its
+   anchor and who tells it. Colors, radii and fonts come from the theme. Loaded on /memoria and
+   on the destination pages that show «Lo que cuenta la comunidad». */
+
+.memory-head .portal-lead {
+  margin-top: 0.5rem;
+  max-width: 46rem;
+}
+
+.memory-list {
+  display: grid;
+  gap: 1.25rem;
+  margin: 1.75rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory-story {
+  max-width: 46rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  /* An anchor from the assistant lands here. */
+  scroll-margin-top: 1rem;
+}
+
+.memory-story:target {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.memory-story h2 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.3125rem;
+  line-height: 1.25;
+}
+
+.memory-teller {
+  margin: 0.375rem 0 0;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.memory-summary {
+  margin: 0.75rem 0 0;
+  font-style: italic;
+}
+
+.memory-story .portal-prose {
+  margin-top: 0.75rem;
+}
+
+.memory-meta {
+  margin: 1rem 0 0;
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+/* «Lo que cuenta la comunidad» on a destination's page. */
+
+.memory-place-list {
+  display: grid;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.memory-place-list li {
+  padding: 0.875rem 1rem;
+  border-left: 4px solid var(--brand);
+  border-radius: var(--radius-control);
+  background: var(--surface);
+}
+
+.memory-place-list h3 {
+  margin: 0;
+  font-size: 1.0625rem;
+}
+
+.memory-place-list p {
+  margin: 0.25rem 0 0;
+}

@@ -22,6 +22,7 @@ import {
   portalIsEmpty,
   portalNoticeView,
   portalServices,
+  portalStories,
   portalPassport,
   portalTourIndex,
 } from "@/server/portal-content";
@@ -112,11 +113,12 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
-  const [tours, circuits, notices, services] = await Promise.all([
+  const [tours, circuits, notices, services, stories] = await Promise.all([
     portalTourIndex(view),
     portalPassport(view),
     portalNoticeView(view),
     portalServices(view),
+    portalStories(view),
   ]);
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
@@ -202,6 +204,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
           {circuits.length > 0 ? <a href={PORTAL_PATHS.passport}>Pasaporte</a> : null}
           {services.length > 0 ? <a href={PORTAL_PATHS.services}>Servicios</a> : null}
+          {stories.length > 0 ? <a href={PORTAL_PATHS.memory}>Memoria</a> : null}
         </nav>
       </header>
 
@@ -251,10 +254,15 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
             <SocialLinks links={social} />
           </section>
         ) : null}
-        {services.length > 0 ? (
-          // On a phone the header's links are hidden and the bar has no room for this one.
+        {services.length > 0 || stories.length > 0 ? (
+          // On a phone the header's links are hidden and the bar has no room for these.
           <nav aria-label="Para tu visita" className="portal-legal-links">
-            <a href={PORTAL_PATHS.services}>Servicios: dónde comer, dormir, sacar dinero y más</a>
+            {services.length > 0 ? (
+              <a href={PORTAL_PATHS.services}>Servicios: dónde comer, dormir, sacar dinero y más</a>
+            ) : null}
+            {stories.length > 0 ? (
+              <a href={PORTAL_PATHS.memory}>Memoria de la comunidad: lo que cuentan los vecinos</a>
+            ) : null}
           </nav>
         ) : null}
         <nav aria-label="Información legal" className="portal-legal-links">

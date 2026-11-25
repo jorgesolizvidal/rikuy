@@ -43,6 +43,7 @@ export async function refreshPortal(
       PORTAL_PATHS.terms,
       PORTAL_PATHS.notices,
       PORTAL_PATHS.services,
+      PORTAL_PATHS.memory,
       ...destinations.map((destination) => PORTAL_PATHS.destination(destination.slug)),
       ...events.map((event) => PORTAL_PATHS.event(event.slug)),
       PORTAL_PATHS.generalTour,

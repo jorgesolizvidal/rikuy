@@ -62,6 +62,9 @@ export const PORTAL_PATHS = {
   /** The municipality's local services (ADR-069), each card with its anchor. */
   services: "/servicios",
   service: (slug: string) => `/servicios#${encodeURIComponent(slug)}`,
+  /** The community's stories (ADR-069), each with its anchor. */
+  memory: "/memoria",
+  story: (slug: string) => `/memoria#${encodeURIComponent(slug)}`,
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
@@ -221,6 +224,8 @@ export function buildSitemap(
     readonly map?: boolean;
     /** The «Servicios» page, when it has published services (ADR-069). */
     readonly services?: boolean;
+    /** The «Memoria de la comunidad» page, when it has published stories (ADR-069). */
+    readonly memory?: boolean;
   } = {},
 ): string {
   const withAgenda = sections.agenda ?? true;
@@ -268,6 +273,7 @@ export function buildSitemap(
       : []),
     ...circuits.map((c) => entry(PORTAL_PATHS.passportCircuit(c.slug), c.publishedAt)),
     ...(sections.services === true ? [entry(PORTAL_PATHS.services)] : []),
+    ...(sections.memory === true ? [entry(PORTAL_PATHS.memory)] : []),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),
     "</urlset>",

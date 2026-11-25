@@ -6,6 +6,7 @@ import { documentManifestSchema, type DocumentText } from "../../contracts/knowl
 import { noticeValiditySchema } from "../../contracts/notice";
 import { richTextSchema } from "../../contracts/rich-text";
 import { SERVICE_CATEGORIES } from "../../contracts/service";
+import { storyTeller } from "../../contracts/story";
 import { tourManifestSchema } from "../../contracts/tour";
 import { formatEventSchedule } from "../events/schedule";
 import { describeNoticeValidity } from "../notices/validity";
@@ -22,7 +23,7 @@ import { textBlocks } from "./text";
 
 export const contentIndexSourceSchema = z.object({
   source: z.literal("content"),
-  kind: z.enum(["destination", "event", "knowledge", "notice", "service"]),
+  kind: z.enum(["destination", "event", "knowledge", "notice", "service", "story"]),
   slug: z.string(),
   revisionNo: z.number().int().min(1),
   title: z.string().min(1),
@@ -43,6 +44,16 @@ export const contentIndexSourceSchema = z.object({
       phone: z.string().nullable(),
       whatsapp: z.string().nullable(),
       address: z.string().nullable(),
+    })
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** Who tells a story and their community (ADR-069); absent before A · Paso 1.3. */
+  story: z
+    .object({
+      author: z.string().nullable(),
+      anonymous: z.boolean(),
+      community: z.string().nullable(),
     })
     .nullable()
     .catch(null)
@@ -92,6 +103,16 @@ export function contentUnits(
     if (source.service.address) facts.push(`Dirección: ${source.service.address}.`);
     if (source.service.phone) facts.push(`Teléfono: ${source.service.phone}.`);
     if (source.service.whatsapp) facts.push(`WhatsApp: ${source.service.whatsapp}.`);
+  }
+  if (source.kind === "story" && source.story) {
+    // Whose story it is goes first, so every passage says it (ADR-069).
+    const teller = storyTeller(source.story);
+    facts.push(
+      teller === "Anónimo"
+        ? "Relato anónimo de la comunidad."
+        : `Relato de ${teller}${source.story.community ? ` (${source.story.community})` : ""}.`,
+    );
+    if (source.placeTitle) facts.push(`Lugar: ${source.placeTitle}.`);
   }
   if ((source.kind === "destination" || source.kind === "service") && source.hours) {
     facts.push(`Horario de atención: ${openingHoursText(source.hours)}.`);

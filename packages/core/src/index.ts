@@ -158,6 +158,10 @@ export * from "./contracts/service";
 export * from "./domain/services/categories";
 export * from "./application/services/ports";
 export * from "./application/services/services";
+// The community's memory (A · Paso 1.3, ADR-069).
+export * from "./contracts/story";
+export * from "./application/stories/ports";
+export * from "./application/stories/stories";
 export * from "./application/assistant/gold-set";
 export * from "./application/evaluation/fixtures-data";
 export * from "./application/evaluation/ports";

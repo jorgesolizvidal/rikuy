@@ -19,6 +19,7 @@ import {
   type PortalMapPlace,
   type PublishedNotice,
   type PublishedService,
+  type PublishedStory,
   type ServiceCategory,
   type PublishedEventSummary,
   type PublishedImage,
@@ -35,6 +36,7 @@ import {
   publishedNoticeReader,
   publishedPassportReader,
   publishedServiceReader,
+  publishedStoryReader,
   publishedRedirectReader,
   publishedTourReader,
   publishedTourRedirectReader,
@@ -107,6 +109,18 @@ export const portalServices = cache(
           .list(view.context.tenant.tenantId)
           .catch(() => [])
       : [],
+);
+
+/**
+ * The community's published stories (ADR-069), none when the municipality does not have the
+ * module. A failure means an empty list, never an error page.
+ */
+export const portalStories = cache(async (view: PortalView): Promise<readonly PublishedStory[]> =>
+  portalHas(view, "community_memory")
+    ? publishedStoryReader()
+        .list(view.context.tenant.tenantId)
+        .catch(() => [])
+    : [],
 );
 
 export function noticeDto(notice: PublishedNotice): NoticeDto {
