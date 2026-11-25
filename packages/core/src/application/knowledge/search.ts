@@ -71,6 +71,7 @@ const LABELS = {
   event: "Evento",
   knowledge: "Documento",
   notice: "Aviso",
+  service: "Servicio",
 } as const;
 
 function pageLabel(pages: KnowledgePassage["pages"]): string | null {
@@ -80,7 +81,7 @@ function pageLabel(pages: KnowledgePassage["pages"]): string | null {
 
 /**
  * The citation as the visitor sees it: title (and section), page, and a link inside the
- * portal — the destination, the event, the tour on its scene or the notice on `/avisos`.
+ * portal — the destination, the event, the tour on its scene, the notice on `/avisos` or the service's card on `/servicios`.
  * Documents are only for the assistant: no link (ADR-037). Never an internal id.
  */
 export function publicCitation(passage: KnowledgePassage): PublicCitation {
@@ -99,6 +100,8 @@ export function publicCitation(passage: KnowledgePassage): PublicCitation {
         ? PORTAL_PATHS.event(passage.slug)
         : passage.kind === "notice"
           ? PORTAL_PATHS.notice(passage.slug)
-          : null;
+          : passage.kind === "service"
+            ? PORTAL_PATHS.service(passage.slug)
+            : null;
   return { ...common, label: LABELS[passage.kind], href };
 }

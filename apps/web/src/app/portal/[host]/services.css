@@ -1,0 +1,178 @@
+/* «Servicios» (A · Paso 1.2, ADR-069): the municipality's local services grouped by
+   category, each card with its anchor, hours and call / WhatsApp / directions buttons.
+   Colors, radii and fonts come from the theme. Loaded only on /servicios. */
+
+.services-page .portal-lead {
+  margin-top: 0.5rem;
+}
+
+/* ── Jump to a category ─────────────────────────────────────────────────── */
+
+.services-jump ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 1.25rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.services-jump a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.875rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-control);
+  color: var(--fg);
+  font-size: 0.9375rem;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.services-jump a:hover {
+  border-color: var(--brand);
+  color: var(--brand);
+}
+
+/* ── Groups and cards ───────────────────────────────────────────────────── */
+
+.services-group {
+  margin-top: 2.25rem;
+  scroll-margin-top: 1rem;
+}
+
+.services-group h2 {
+  margin: 0 0 1rem;
+}
+
+.services-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 19rem), 1fr));
+  gap: 1rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.service-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  height: 100%;
+  padding: 1.125rem 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+  box-shadow: var(--shadow-card);
+  /* An anchor from the assistant lands here: it should not hide under a fixed bar. */
+  scroll-margin-top: 1rem;
+}
+
+.service-card:target {
+  outline: 3px solid var(--brand);
+  outline-offset: 2px;
+}
+
+.service-card h3 {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.1875rem;
+  line-height: 1.25;
+}
+
+.service-category {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+}
+
+.service-summary,
+.service-address,
+.service-no-hours {
+  margin: 0;
+}
+
+.service-address {
+  font-size: 0.9375rem;
+}
+
+.service-no-hours {
+  color: var(--muted);
+  font-size: 0.9375rem;
+}
+
+.service-hours .portal-open-now {
+  min-height: 1.5em;
+  margin: 0;
+  font-weight: 600;
+}
+
+.service-hours .portal-open-now[data-open="true"] {
+  color: var(--brand);
+}
+
+.service-hours details {
+  margin-top: 0.25rem;
+  font-size: 0.9375rem;
+}
+
+.service-hours summary {
+  color: var(--brand);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.service-hours .portal-hours-week {
+  display: grid;
+  gap: 0.25rem;
+  margin: 0.5rem 0 0;
+}
+
+.service-hours .portal-hours-week div {
+  display: grid;
+  grid-template-columns: minmax(6rem, 0.9fr) minmax(0, 1fr);
+  gap: 0 0.75rem;
+}
+
+.service-hours .portal-hours-week dt {
+  font-weight: 600;
+}
+
+.service-hours .portal-hours-week dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.service-hours .portal-hours-note {
+  margin: 0.5rem 0 0;
+  color: var(--muted);
+}
+
+.service-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: auto;
+  padding-top: 0.5rem;
+}
+
+.service-actions .portal-button {
+  gap: 0.375rem;
+  min-height: 2.5rem;
+  padding: 0.375rem 0.875rem;
+  white-space: nowrap;
+}
+
+.service-actions .portal-action-icon {
+  flex: none;
+}
+
+.service-map-link {
+  margin: 0;
+  font-size: 0.9375rem;
+}

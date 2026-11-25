@@ -88,7 +88,7 @@ export type DocumentPage = DocumentText["pages"][number];
 
 /** Where a passage comes from: a content item (destination, event, knowledge) or a tour. */
 export type KnowledgeSource = "content" | "tour";
-export type KnowledgeContentKind = "destination" | "event" | "knowledge" | "notice";
+export type KnowledgeContentKind = "destination" | "event" | "knowledge" | "notice" | "service";
 
 /** One passage a search found, from what the municipality has published now. */
 export interface KnowledgePassage {

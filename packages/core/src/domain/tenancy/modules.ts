@@ -15,6 +15,7 @@ export const MODULE_KEYS = [
   "assistant",
   "voice",
   "copilot",
+  "services",
 ] as const;
 
 export type ModuleKey = (typeof MODULE_KEYS)[number];
@@ -71,6 +72,11 @@ export const MODULES: readonly ModuleInfo[] = [
     name: "Copilot",
     description: "Revisa el contenido, propone textos y recomienda con las estadísticas.",
   },
+  {
+    key: "services",
+    name: "Servicios locales",
+    description: "Dónde comer, dormir, sacar dinero o tomar transporte, con horario y contacto.",
+  },
 ];
 
 export const MODULE_NAMES: Readonly<Record<ModuleKey, string>> = Object.fromEntries(
@@ -80,7 +86,7 @@ export const MODULE_NAMES: Readonly<Record<ModuleKey, string>> = Object.fromEntr
 /** Packages the operator chooses from when provisioning a municipality. */
 export const MODULE_PACKAGES = {
   complete: MODULE_KEYS,
-  information: ["agenda", "map"],
+  information: ["agenda", "map", "services"],
 } as const satisfies Record<string, readonly ModuleKey[]>;
 
 export type ModulePackage = keyof typeof MODULE_PACKAGES;
@@ -123,7 +129,7 @@ export function checkModuleSet(values: readonly unknown[]): ModuleSetResult {
 
 /**
  * Whether the assistant may read a passage of the knowledge base: never one of a tour when
- * the tours are off, nor one of an event without the agenda. Its text is published, so this
+ * the tours are off, nor one of an event without the agenda, nor a service without its module. Its text is published, so this
  * keeps the portal coherent rather than secret: what the portal does not show, the
  * assistant does not offer.
  */
@@ -133,6 +139,7 @@ export function passageVisibleWith(
 ): boolean {
   if (passage.source === "tour" && !hasModule(modules, "tours")) return false;
   if (passage.kind === "event" && !hasModule(modules, "agenda")) return false;
+  if (passage.kind === "service" && !hasModule(modules, "services")) return false;
   return true;
 }
 

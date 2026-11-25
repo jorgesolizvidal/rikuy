@@ -30,7 +30,14 @@ type Kind = MapPointDto["kind"];
 const LAYERS: readonly { kind: Kind; label: string }[] = [
   { kind: "destination", label: "Destinos" },
   { kind: "event", label: "Eventos próximos" },
+  { kind: "service", label: "Servicios" },
 ];
+
+const KIND_NAMES: Readonly<Record<Kind, string>> = {
+  destination: "Destino",
+  event: "Evento",
+  service: "Servicio",
+};
 
 /**
  * The /mapa experience: layers, the municipality's categories (C3 · Paso 4, ADR-063), the map
@@ -45,6 +52,8 @@ export function MapExplorer({
   complete,
   center,
   nearbyRadius,
+  services = [],
+  showServices = false,
 }: {
   readonly initialPoints: readonly MapPointDto[];
   readonly initialArea: BoundingBox;
@@ -52,9 +61,23 @@ export function MapExplorer({
   readonly complete: boolean;
   readonly center?: { readonly lat: number; readonly lng: number; readonly zoom: number };
   readonly nearbyRadius: number;
+  /**
+   * The municipality's local services with a location (ADR-069): all of them come with the
+   * page and are filtered here by the view (the area requests never return them). Their
+   * layer starts off so the map keeps to the places to visit.
+   */
+  readonly services?: readonly MapPointDto[];
+  /** Arrived from a service's card (`?servicios=1`): its layer starts on. */
+  readonly showServices?: boolean;
 }) {
   const [points, setPoints] = useState(initialPoints);
-  const [layers, setLayers] = useState<Record<Kind, boolean>>({ destination: true, event: true });
+  const [layers, setLayers] = useState<Record<Kind, boolean>>({
+    destination: true,
+    event: true,
+    service: showServices,
+  });
+  // The camera's current view, for the services (null until the map first moves: all).
+  const [view, setView] = useState<BoundingBox | null>(null);
   // The municipality's category (ADR-062) to show alone; null shows every place.
   const [category, setCategory] = useState<string | null>(null);
   const [area, setArea] = useState<BoundingBox>(initialArea);
@@ -106,6 +129,7 @@ export function MapExplorer({
 
   function moved(bounds: BoundingBox, fromVisitor: boolean) {
     window.clearTimeout(timer.current);
+    setView(bounds);
     // While following, the view is centered on the visitor even when they zoom out.
     if (fromVisitor || follow || (complete && containsBox(initialArea, bounds))) {
       pending.current?.abort();
@@ -141,12 +165,20 @@ export function MapExplorer({
     }
     return [...names].sort((a, b) => a.localeCompare(b, "es"));
   }, [initialPoints, points]);
+  const servicesInView = useMemo(
+    () => (view ? services.filter((point) => containsPoint(view, point)) : services),
+    [services, view],
+  );
   const visible = useMemo(() => {
-    const shown = points.filter(
-      (point) => layers[point.kind] && (category === null || point.category === category),
-    );
+    const shown = [
+      ...points.filter(
+        (point) => layers[point.kind] && (category === null || point.category === category),
+      ),
+      // Services have no municipality category: a chosen category hides them.
+      ...(layers.service && category === null ? servicesInView : []),
+    ];
     return fix ? sortByDistance(shown, fix, (point) => point) : shown;
-  }, [points, layers, category, fix]);
+  }, [points, servicesInView, layers, category, fix]);
   const targets = useMemo(
     () =>
       initialPoints
@@ -158,8 +190,9 @@ export function MapExplorer({
     () => ({
       destination: points.filter((p) => p.kind === "destination").length,
       event: points.filter((p) => p.kind === "event").length,
+      service: servicesInView.length,
     }),
-    [points],
+    [points, servicesInView],
   );
 
   return (
@@ -167,19 +200,21 @@ export function MapExplorer({
       <div className="portal-map-controls">
         <fieldset className="portal-map-layers">
           <legend>Mostrar</legend>
-          {LAYERS.map((layer) => (
-            <label key={layer.kind} className="portal-map-layer" data-kind={layer.kind}>
-              <input
-                type="checkbox"
-                checked={layers[layer.kind]}
-                onChange={(event) =>
-                  setLayers((current) => ({ ...current, [layer.kind]: event.target.checked }))
-                }
-              />
-              <span className="portal-map-swatch" aria-hidden="true" />
-              {layer.label} ({counts[layer.kind]})
-            </label>
-          ))}
+          {LAYERS.filter((layer) => layer.kind !== "service" || services.length > 0).map(
+            (layer) => (
+              <label key={layer.kind} className="portal-map-layer" data-kind={layer.kind}>
+                <input
+                  type="checkbox"
+                  checked={layers[layer.kind]}
+                  onChange={(event) =>
+                    setLayers((current) => ({ ...current, [layer.kind]: event.target.checked }))
+                  }
+                />
+                <span className="portal-map-swatch" aria-hidden="true" />
+                {layer.label} ({counts[layer.kind]})
+              </label>
+            ),
+          )}
         </fieldset>
 
         {categories.length > 0 ? (
@@ -281,7 +316,7 @@ export function MapExplorer({
                 </span>
                 <span className="portal-map-text">
                   <span className="portal-map-kind">
-                    {point.kind === "event" ? "Evento" : "Destino"}
+                    {KIND_NAMES[point.kind]}
                     {point.category ? ` · ${point.category}` : ""}
                   </span>
                   <span className="portal-map-title">{point.title}</span>

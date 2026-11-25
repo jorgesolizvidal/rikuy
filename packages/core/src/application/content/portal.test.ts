@@ -183,6 +183,13 @@ describe("portal links and metadata", () => {
     expect(without).not.toContain("/mapa</loc>");
     expect(without).toContain("/destinos</loc>");
   });
+  it("adds «Servicios» only when the portal has published services (ADR-069)", () => {
+    expect(buildSitemap("https://demo.example", [destination])).not.toContain("/servicios");
+    const xml = buildSitemap("https://demo.example", [destination], [], [], [], {
+      services: true,
+    });
+    expect(xml).toContain("<loc>https://demo.example/servicios</loc>");
+  });
 });
 
 describe("cached published destination reader", () => {

@@ -102,6 +102,7 @@ const KIND_LABEL = {
   event: "Evento",
   knowledge: "Documento",
   notice: "Aviso del municipio",
+  service: "Servicio local",
 } as const;
 
 /** A passage cut at a sentence (or a word) so it fits the model's budget. */

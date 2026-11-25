@@ -13,6 +13,7 @@ import {
   type PublishedRedirectReader,
   type PublishedPassportReader,
   type PublishedNoticeReader,
+  type PublishedServiceReader,
   type PublishedContentIndexReader,
   type PublishedRewardReader,
   type PublishedStampReader,
@@ -28,6 +29,7 @@ import {
   createSupabasePublishedRedirectReader,
   createSupabasePublishedPassportReader,
   createSupabasePublishedNoticeReader,
+  createSupabasePublishedServiceReader,
   createSupabasePublishedContentIndexReader,
   createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
@@ -183,6 +185,19 @@ export function publishedNoticeReader(): PublishedNoticeReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedNotices;
+}
+
+let publishedServices: PublishedServiceReader | undefined;
+
+/** The municipality's published local services (anonymous, ADR-069). */
+export function publishedServiceReader(): PublishedServiceReader {
+  if (publishedServices) return publishedServices;
+  const { env } = platformSettings();
+  publishedServices = createSupabasePublishedServiceReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedServices;
 }
 
 let publishedIndex: PublishedContentIndexReader | undefined;

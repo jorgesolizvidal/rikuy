@@ -220,6 +220,42 @@ function popupContent(point: MapPointDto): HTMLElement {
   return box;
 }
 
+const MARKER_KIND: Readonly<Record<MapPointDto["kind"], string>> = {
+  destination: "Destino",
+  event: "Evento",
+  service: "Servicio",
+};
+
+/** The icon of a service's pin, by its category (ADR-069): white strokes, decorative. */
+const SERVICE_GLYPHS: Readonly<Record<NonNullable<MapPointDto["service"]>, string>> = {
+  food: "M7 3v8M5 3v5a2 2 0 0 0 4 0V3M7 11v10M16 21V3c-2 1-3 4-3 8h3",
+  lodging: "M3 18V6M3 14h18v4M21 14v-2a3 3 0 0 0-3-3h-7v5M7 11.5a1.5 1.5 0 1 0 0-.01",
+  cash: "M3 7h18v10H3zM12 9.5a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5M6 12h.01M18 12h.01",
+  transport:
+    "M5 16V6a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v10ZM5 11h14M7 19v-3M17 19v-3M8 14h.01M16 14h.01",
+  fuel: "M5 21V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v16M4 21h11M5 10h9M14 8l3 3v6a1.5 1.5 0 0 0 3 0V9l-3-3",
+  health: "M10 4h4v6h6v4h-6v6h-4v-6H4v-4h6z",
+  tourist_info: "M12 8h.01M11 12h1v5h1M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18",
+  other: "M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6",
+};
+
+function serviceGlyph(category: NonNullable<MapPointDto["service"]>): SVGSVGElement {
+  const svg = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+  svg.setAttribute("class", "map-marker-glyph");
+  svg.setAttribute("viewBox", "0 0 24 24");
+  svg.setAttribute("aria-hidden", "true");
+  svg.setAttribute("focusable", "false");
+  const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+  path.setAttribute("d", SERVICE_GLYPHS[category]);
+  path.setAttribute("fill", "none");
+  path.setAttribute("stroke", "currentColor");
+  path.setAttribute("stroke-width", "2.2");
+  path.setAttribute("stroke-linecap", "round");
+  path.setAttribute("stroke-linejoin", "round");
+  svg.append(path);
+  return svg;
+}
+
 function markerElement(point: MapPointDto, interactive: boolean): HTMLElement {
   const element = document.createElement(interactive ? "button" : "span");
   element.className = "map-marker";
@@ -228,7 +264,7 @@ function markerElement(point: MapPointDto, interactive: boolean): HTMLElement {
     (element as HTMLButtonElement).type = "button";
     element.setAttribute(
       "aria-label",
-      `${point.order !== undefined ? `Parada ${point.order} · ` : ""}${point.kind === "event" ? "Evento" : "Destino"}: ${point.title}`,
+      `${point.order !== undefined ? `Parada ${point.order} · ` : ""}${MARKER_KIND[point.kind]}: ${point.title}`,
     );
   } else {
     element.setAttribute("aria-hidden", "true");
@@ -243,6 +279,7 @@ function markerElement(point: MapPointDto, interactive: boolean): HTMLElement {
     number.textContent = String(point.order);
     pin.append(number);
   }
+  if (point.service) pin.append(serviceGlyph(point.service));
   element.append(pin);
   return element;
 }

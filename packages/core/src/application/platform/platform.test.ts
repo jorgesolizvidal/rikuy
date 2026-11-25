@@ -166,7 +166,7 @@ describe("provisioning", () => {
     });
     expect(id.emails).toEqual(["duena@demo-este.example.test"]);
     expect(p.calls).toEqual([
-      "provision:demo-este:demo-este.localhost:user-for-duena@demo-este.example.test:agenda,map,tours,models,passport,assistant,voice,copilot",
+      "provision:demo-este:demo-este.localhost:user-for-duena@demo-este.example.test:agenda,map,tours,models,passport,assistant,voice,copilot,services",
     ]);
   });
 
@@ -176,7 +176,7 @@ describe("provisioning", () => {
       { ...valid, modulePackage: "information" },
       { platform: p.repo, identity: identity().admin, hosts: HOSTS },
     );
-    expect(p.calls[0]).toMatch(/:agenda,map$/u);
+    expect(p.calls[0]).toMatch(/:agenda,map,services$/u);
     expect(
       await provisionTenant(
         { ...valid, modulePackage: "todo" },

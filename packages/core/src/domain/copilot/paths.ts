@@ -13,6 +13,7 @@ export const COPILOT_PATHS = {
   tour: (org: string, tourId: string) => `/o/${org}/tours/${encodeURIComponent(tourId)}`,
   knowledge: (org: string, id: string) => `/o/${org}/conocimiento/${encodeURIComponent(id)}`,
   notice: (org: string, id: string) => `/o/${org}/avisos/${encodeURIComponent(id)}`,
+  service: (org: string, id: string) => `/o/${org}/servicios/${encodeURIComponent(id)}`,
   usage: (org: string) => `/o/${org}/uso`,
 } as const;
 

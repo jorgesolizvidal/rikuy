@@ -62,6 +62,12 @@ Decisiones del usuario (2026-11-16):
 3. **Qué tiene un servicio:** nombre, descripción corta, el **horario de atención** de los destinos (ADR-039), teléfono o WhatsApp, dirección escrita y ubicación opcional. Sin fotos obligatorias.
 4. **Portal:** la página **`/servicios`** con las tarjetas agrupadas por categoría, cada una con su ancla (`/servicios#{dirección}`), «Abierto ahora» calculado en el navegador, llamar y «Cómo llegar»; y una **capa «Servicios»** en `/mapa`, con un ícono por categoría.
 5. **Asistente:** el texto indexado lleva la categoría en palabras, el horario y el contacto, así «¿hay cajero?» lo encuentra. La cita lleva a la tarjeta. Los servicios no entran como paradas de los planes (eso queda para el Paso 3).
+6. **Detalles fijados al implementarlo (PR 1.2):**
+   - para publicar hace falta **la dirección o la ubicación**: sin ninguna de las dos, el visitante no lo encuentra;
+   - el WhatsApp se escribe **con el código del país** (`+591…`), porque el enlace `wa.me` lo necesita; el teléfono puede ser local;
+   - «Retirar» sirve para un servicio que cerró, como en los avisos y el conocimiento;
+   - la capa «Servicios» de `/mapa` **empieza apagada** (el mapa sigue centrado en lo que se visita) y se enciende sola al llegar desde una tarjeta (`?servicios=1`);
+   - `/servicios` se enlaza desde la cabecera y el pie (en el celular la barra inferior no tiene lugar) y entra en el sitemap cuando tiene servicios publicados.
 
 ### 3. Memoria de la comunidad (PR 1.3)
 

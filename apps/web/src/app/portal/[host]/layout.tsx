@@ -21,6 +21,7 @@ import { platformSettings } from "@/server/platform";
 import {
   portalIsEmpty,
   portalNoticeView,
+  portalServices,
   portalPassport,
   portalTourIndex,
 } from "@/server/portal-content";
@@ -111,10 +112,11 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
-  const [tours, circuits, notices] = await Promise.all([
+  const [tours, circuits, notices, services] = await Promise.all([
     portalTourIndex(view),
     portalPassport(view),
     portalNoticeView(view),
+    portalServices(view),
   ]);
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
@@ -199,6 +201,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           {portalHas(view, "map") ? <a href={PORTAL_PATHS.map}>Mapa</a> : null}
           {tours.length > 0 ? <a href={PORTAL_PATHS.generalTour}>Tours 360°</a> : null}
           {circuits.length > 0 ? <a href={PORTAL_PATHS.passport}>Pasaporte</a> : null}
+          {services.length > 0 ? <a href={PORTAL_PATHS.services}>Servicios</a> : null}
         </nav>
       </header>
 
@@ -247,6 +250,12 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
             <h2 id="redes">Síguenos</h2>
             <SocialLinks links={social} />
           </section>
+        ) : null}
+        {services.length > 0 ? (
+          // On a phone the header's links are hidden and the bar has no room for this one.
+          <nav aria-label="Para tu visita" className="portal-legal-links">
+            <a href={PORTAL_PATHS.services}>Servicios: dónde comer, dormir, sacar dinero y más</a>
+          </nav>
         ) : null}
         <nav aria-label="Información legal" className="portal-legal-links">
           <a href={PORTAL_PATHS.privacy}>Privacidad</a>
