@@ -187,6 +187,7 @@ describe("sources", () => {
     hours: null,
     validity: null,
     placeTitle: null,
+    service: null,
     document: null,
   };
 

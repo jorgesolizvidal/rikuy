@@ -30,7 +30,17 @@ const SUR_ID = "5eed1000-0000-4000-8000-000000000002";
 const OPERATOR = "operador@rikuy.example.test";
 const OPERATOR_ID = "5eed0000-0000-4000-8000-000000000005";
 const OWNER_SUR = "owner@demo-sur.example.test";
-const ALL = ["agenda", "map", "tours", "models", "passport", "assistant", "voice", "copilot"];
+const ALL = [
+  "agenda",
+  "map",
+  "tours",
+  "models",
+  "passport",
+  "assistant",
+  "voice",
+  "copilot",
+  "services",
+];
 
 const db = postgres(DB_URL, { max: 1, prepare: false, onnotice: () => undefined });
 let browser: Browser;
@@ -179,13 +189,13 @@ describe("the modules of a municipality (ADR-060)", () => {
     expect(await modulesOfSur()).toEqual(ALL);
     await operator.getByRole("button", { name: "Sí, guardar los módulos" }).click();
     await operator.getByText("Se guardaron los módulos.", { exact: false }).waitFor();
-    expect(await modulesOfSur()).toEqual(["assistant", "voice", "copilot"]);
+    expect(await modulesOfSur()).toEqual(["assistant", "voice", "copilot", "services"]);
 
     const [audit] = await db<{ diff: { from: string[]; to: string[] } }[]>`
       select diff from public.audit_events
       where tenant_id = ${SUR_ID} and action = 'platform.modules_changed'
       order by occurred_at desc limit 1`;
-    expect(audit?.diff).toEqual({ from: ALL, to: ["assistant", "voice", "copilot"] });
+    expect(audit?.diff).toEqual({ from: ALL, to: ["assistant", "voice", "copilot", "services"] });
   });
 
   it("the portal of Demo Sur no longer offers them; Demo Norte does", async () => {

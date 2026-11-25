@@ -59,6 +59,9 @@ export const PORTAL_PATHS = {
   /** The municipality's notices in force (ADR-069), each with its anchor. */
   notices: "/avisos",
   notice: (slug: string) => `/avisos#${encodeURIComponent(slug)}`,
+  /** The municipality's local services (ADR-069), each card with its anchor. */
+  services: "/servicios",
+  service: (slug: string) => `/servicios#${encodeURIComponent(slug)}`,
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
@@ -213,7 +216,12 @@ export function buildSitemap(
   }[] = [],
   circuits: readonly { readonly slug: string; readonly publishedAt: string }[] = [],
   /** Sections the portal has (ADR-060); all of them by default. */
-  sections: { readonly agenda?: boolean; readonly map?: boolean } = {},
+  sections: {
+    readonly agenda?: boolean;
+    readonly map?: boolean;
+    /** The «Servicios» page, when it has published services (ADR-069). */
+    readonly services?: boolean;
+  } = {},
 ): string {
   const withAgenda = sections.agenda ?? true;
   const withMap = sections.map ?? true;
@@ -259,6 +267,7 @@ export function buildSitemap(
         ]
       : []),
     ...circuits.map((c) => entry(PORTAL_PATHS.passportCircuit(c.slug), c.publishedAt)),
+    ...(sections.services === true ? [entry(PORTAL_PATHS.services)] : []),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),
     "</urlset>",

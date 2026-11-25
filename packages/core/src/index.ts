@@ -153,6 +153,11 @@ export * from "./domain/notices/in-force";
 export * from "./domain/notices/validity";
 export * from "./application/notices/ports";
 export * from "./application/notices/notices";
+// Local services (A · Paso 1.2, ADR-069).
+export * from "./contracts/service";
+export * from "./domain/services/categories";
+export * from "./application/services/ports";
+export * from "./application/services/services";
 export * from "./application/assistant/gold-set";
 export * from "./application/evaluation/fixtures-data";
 export * from "./application/evaluation/ports";

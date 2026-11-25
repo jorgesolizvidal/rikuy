@@ -5,10 +5,12 @@ import { eventScheduleSchema } from "../../contracts/event";
 import { documentManifestSchema, type DocumentText } from "../../contracts/knowledge";
 import { noticeValiditySchema } from "../../contracts/notice";
 import { richTextSchema } from "../../contracts/rich-text";
+import { SERVICE_CATEGORIES } from "../../contracts/service";
 import { tourManifestSchema } from "../../contracts/tour";
 import { formatEventSchedule } from "../events/schedule";
 import { describeNoticeValidity } from "../notices/validity";
 import { openingHoursText } from "../plan/hours";
+import { SERVICE_CATEGORY_INFO } from "../services/categories";
 import { paragraph, richTextBlocks, type ChunkUnit } from "./chunker";
 import { textBlocks } from "./text";
 
@@ -20,7 +22,7 @@ import { textBlocks } from "./text";
 
 export const contentIndexSourceSchema = z.object({
   source: z.literal("content"),
-  kind: z.enum(["destination", "event", "knowledge", "notice"]),
+  kind: z.enum(["destination", "event", "knowledge", "notice", "service"]),
   slug: z.string(),
   revisionNo: z.number().int().min(1),
   title: z.string().min(1),
@@ -34,6 +36,17 @@ export const contentIndexSourceSchema = z.object({
   /** A notice's validity and place (ADR-069); absent before A · Paso 1.1. */
   validity: noticeValiditySchema.nullable().catch(null).default(null),
   placeTitle: z.string().nullable().catch(null).default(null),
+  /** A service's category, contact and address (ADR-069); absent before A · Paso 1.2. */
+  service: z
+    .object({
+      category: z.enum(SERVICE_CATEGORIES).nullable(),
+      phone: z.string().nullable(),
+      whatsapp: z.string().nullable(),
+      address: z.string().nullable(),
+    })
+    .nullable()
+    .catch(null)
+    .default(null),
   document: z.object({ prefix: z.string(), manifest: documentManifestSchema }).nullable(),
 });
 
@@ -56,7 +69,7 @@ export type ContentIndexSource = z.infer<typeof contentIndexSourceSchema>;
 
 /**
  * The units of a content revision: summary, the event's date and place (or the notice's
- * validity and place), text, document.
+ * validity and place, or the service's category, address, contact and hours), text, document.
  */
 export function contentUnits(
   source: ContentIndexSource,
@@ -73,7 +86,14 @@ export function contentUnits(
       facts.push(`Aviso vigente ${validity.charAt(0).toLowerCase()}${validity.slice(1)}.`);
   }
   if (source.kind === "notice" && source.placeTitle) facts.push(`Lugar: ${source.placeTitle}.`);
-  if (source.kind === "destination" && source.hours) {
+  if (source.kind === "service" && source.service) {
+    // The category in words, so «¿hay un cajero?» finds the card (ADR-069).
+    facts.push(SERVICE_CATEGORY_INFO[source.service.category ?? "other"].words);
+    if (source.service.address) facts.push(`Dirección: ${source.service.address}.`);
+    if (source.service.phone) facts.push(`Teléfono: ${source.service.phone}.`);
+    if (source.service.whatsapp) facts.push(`WhatsApp: ${source.service.whatsapp}.`);
+  }
+  if ((source.kind === "destination" || source.kind === "service") && source.hours) {
     facts.push(`Horario de atención: ${openingHoursText(source.hours)}.`);
   }
   const blocks = [

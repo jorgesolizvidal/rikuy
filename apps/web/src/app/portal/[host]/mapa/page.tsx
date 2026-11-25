@@ -11,7 +11,14 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
 import { publishedMapReader } from "@/server/platform";
-import { categoriesByKey, portalIndex, portalMapExtent, toMapPoint } from "@/server/portal-content";
+import {
+  categoriesByKey,
+  portalIndex,
+  portalMapExtent,
+  portalServices,
+  serviceMapPoint,
+  toMapPoint,
+} from "@/server/portal-content";
 import { portalViewWith } from "@/server/portal-view";
 
 import { MapExplorer } from "../map-explorer";
@@ -40,6 +47,9 @@ export async function generateMetadata({
     openGraph: { title: `Mapa | ${siteName}`, description },
   };
 }
+
+/** `?servicios=1` (from a service's card): the «Servicios» layer starts on (ADR-069). */
+const SERVICES_QUERY = "servicios";
 
 /** `?lat=…&lng=…` (from a page's mini map) centers the map there. */
 function requestedCenter(query: Record<string, string | string[] | undefined>) {
@@ -78,11 +88,13 @@ function capped(box: BoundingBox): BoundingBox {
 export default async function MapPage({ params, searchParams }: MapPageProps) {
   const view = await portalViewWith((await params).host, "map");
   if (view === null) notFound();
-  const [extent, query, index] = await Promise.all([
+  const [extent, query, index, services] = await Promise.all([
     portalMapExtent(view),
     searchParams,
     portalIndex(view),
+    portalServices(view),
   ]);
+  const servicePoints = services.flatMap((service) => serviceMapPoint(service) ?? []);
   const extras = { tenantId: view.context.tenant.tenantId, categories: categoriesByKey(index) };
   const center = requestedCenter(query);
   const routeKeys = requestedRoute(query);
@@ -150,6 +162,8 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
           initialArea={area}
           complete={places.length >= extent.destinations + extent.events}
           nearbyRadius={nearbyRadiusOf(view.resolved.presentation)}
+          services={servicePoints}
+          showServices={query[SERVICES_QUERY] === "1"}
           {...(center ? { center } : {})}
         />
       )}

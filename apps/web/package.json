@@ -35,6 +35,7 @@
     "test:e2e-home": "vitest run --config vitest.e2e.config.ts e2e/home.e2e.test.ts",
     "test:e2e-detail": "vitest run --config vitest.e2e.config.ts e2e/detail.e2e.test.ts",
     "test:e2e-notices": "vitest run --config vitest.e2e.config.ts e2e/notices.e2e.test.ts",
+    "test:e2e-services": "vitest run --config vitest.e2e.config.ts e2e/services.e2e.test.ts",
     "test:e2e-passport-pages": "vitest run --config vitest.e2e.config.ts e2e/passport-pages.e2e.test.ts",
     "test:e2e-unanswered": "vitest run --config vitest.e2e.config.ts e2e/unanswered.e2e.test.ts"
   },

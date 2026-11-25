@@ -19,6 +19,8 @@ interface LocationFieldProps {
   readonly center: Point & { readonly zoom: number };
   readonly disabled: boolean;
   readonly error?: string | undefined;
+  /** Required to publish (destinations, events) or optional (services, ADR-069). */
+  readonly optional?: boolean;
   readonly onChange: (point: Point | null) => void;
 }
 
@@ -28,7 +30,14 @@ function numberOrNull(text: string, min: number, max: number): number | null {
   return Number.isFinite(value) && value >= min && value <= max ? value : null;
 }
 
-export function LocationField({ value, center, disabled, error, onChange }: LocationFieldProps) {
+export function LocationField({
+  value,
+  center,
+  disabled,
+  error,
+  optional = false,
+  onChange,
+}: LocationFieldProps) {
   const id = useId();
   const [lat, setLat] = useState(value ? String(value.lat) : "");
   const [lng, setLng] = useState(value ? String(value.lng) : "");
@@ -97,7 +106,10 @@ export function LocationField({ value, center, disabled, error, onChange }: Loca
       <legend>Ubicación</legend>
       <p id={`${id}-hint`} className="field-hint">
         Marca el punto en el mapa, pega las coordenadas copiadas de Google Maps (clic derecho sobre
-        el lugar) o escríbelas. Es obligatoria para publicar.
+        el lugar) o escríbelas.{" "}
+        {optional
+          ? "Opcional: con ella se ve en el mapa del portal y funciona «Cómo llegar»."
+          : "Es obligatoria para publicar."}
       </p>
       <div className="location-grid">
         <div className="field">

@@ -10,7 +10,7 @@ const passageRowSchema = z.object({
   source: z.enum(["content", "tour"]),
   source_id: z.uuid(),
   source_version: z.number().int(),
-  kind: z.enum(["destination", "event", "knowledge", "notice"]),
+  kind: z.enum(["destination", "event", "knowledge", "notice", "service"]),
   slug: z.string(),
   title: z.string(),
   heading: z.string().nullable(),

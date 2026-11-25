@@ -955,6 +955,26 @@
   background: var(--accent);
 }
 
+/* Local services (ADR-069): a square pin with its category's icon, in the text color. */
+[data-kind="service"] > .portal-map-swatch {
+  border-radius: 0.2rem;
+  background: var(--fg);
+}
+
+.map-marker[data-kind="service"] .map-marker-pin {
+  display: grid;
+  place-items: center;
+  border-radius: 0.45rem;
+  background: var(--fg);
+  color: var(--bg);
+  transform: none;
+}
+
+.map-marker-glyph {
+  width: 0.875rem;
+  height: 0.875rem;
+}
+
 .portal-map-frame {
   position: relative;
   border-radius: var(--radius-media);
@@ -1091,6 +1111,10 @@
 
 .portal-map-list li[data-kind="event"] a {
   border-left-color: var(--accent);
+}
+
+.portal-map-list li[data-kind="service"] a {
+  border-left-color: var(--fg);
 }
 
 .portal-map-list li a:hover .portal-map-title {

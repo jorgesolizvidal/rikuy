@@ -5,6 +5,7 @@ import {
   portalEvents,
   portalOrigin,
   portalPassport,
+  portalServices,
   portalTourIndex,
 } from "@/server/portal-content";
 import { portalHas, portalView } from "@/server/portal-view";
@@ -20,15 +21,17 @@ interface SitemapContext {
 export async function GET(_request: Request, { params }: SitemapContext) {
   const view = await portalView((await params).host);
   if (view === null) return new Response("Not found", { status: 404 });
-  const [destinations, events, tours, circuits] = await Promise.all([
+  const [destinations, events, tours, circuits, services] = await Promise.all([
     portalDestinations(view),
     portalEvents(view),
     portalTourIndex(view),
     portalPassport(view),
+    portalServices(view),
   ]);
   const xml = buildSitemap(portalOrigin(view), destinations, events, tours, circuits, {
     agenda: portalHas(view, "agenda"),
     map: portalHas(view, "map"),
+    services: services.length > 0,
   });
   return new Response(xml, {
     headers: {

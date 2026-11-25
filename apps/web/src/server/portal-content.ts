@@ -11,12 +11,15 @@ import {
   mapPlacePath,
   PORTAL_PATHS,
   portalMediaPath,
+  SERVICE_CATEGORY_INFO,
   tourPath,
   type GeoPoint,
   type PortalCircuit,
   type PortalIndexEntry,
   type PortalMapPlace,
   type PublishedNotice,
+  type PublishedService,
+  type ServiceCategory,
   type PublishedEventSummary,
   type PublishedImage,
 } from "@rikuy/core";
@@ -31,6 +34,7 @@ import {
   publishedMapReader,
   publishedNoticeReader,
   publishedPassportReader,
+  publishedServiceReader,
   publishedRedirectReader,
   publishedTourReader,
   publishedTourRedirectReader,
@@ -90,6 +94,19 @@ export const portalNotices = cache(async (view: PortalView): Promise<readonly Pu
   publishedNoticeReader()
     .list(view.context.tenant.tenantId)
     .catch(() => []),
+);
+
+/**
+ * The municipality's published local services (ADR-069), none when it does not have the
+ * module. A failure means an empty list, never an error page.
+ */
+export const portalServices = cache(
+  async (view: PortalView): Promise<readonly PublishedService[]> =>
+    portalHas(view, "services")
+      ? publishedServiceReader()
+          .list(view.context.tenant.tenantId)
+          .catch(() => [])
+      : [],
 );
 
 export function noticeDto(notice: PublishedNotice): NoticeDto {
@@ -207,7 +224,7 @@ export const portalEvent = cache(async (view: PortalView, slug: string) =>
 /** What the browser map and its list need for one place (no internal ids). */
 export interface MapPointDto {
   readonly key: string;
-  readonly kind: "destination" | "event";
+  readonly kind: "destination" | "event" | "service";
   readonly title: string;
   readonly href: string;
   /** Event date, or the destination's summary. */
@@ -220,6 +237,25 @@ export interface MapPointDto {
   readonly category?: string | null;
   /** The smallest derivative of its cover, for the list (decorative: the title is beside it). */
   readonly thumb?: string | null;
+  /** A local service's category (ADR-069): the icon of its pin. */
+  readonly service?: ServiceCategory;
+}
+
+/** A local service with a location as a point of the map's «Servicios» layer (ADR-069). */
+export function serviceMapPoint(service: PublishedService): MapPointDto | null {
+  if (!service.location) return null;
+  return {
+    key: `service:${service.slug}`,
+    kind: "service",
+    title: service.title,
+    href: PORTAL_PATHS.service(service.slug),
+    detail: SERVICE_CATEGORY_INFO[service.category].name,
+    lat: service.location.lat,
+    lng: service.location.lng,
+    category: null,
+    thumb: null,
+    service: service.category,
+  };
 }
 
 /** The categories of what is published, by `kind:slug` (for the map's points). */

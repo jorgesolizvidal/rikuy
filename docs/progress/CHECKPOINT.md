@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 1.1 — avisos del municipio ✅ (verificado en producción); correcciones `fix/next-upgrade` ✅ y `fix/hero-lcp`
-- **Rama:** `fix/hero-lcp` → PR hacia `main`
+- **Último paso completado:** A · Paso 1.2 — servicios locales; antes, A · Paso 1.1 ✅ y las correcciones `fix/next-upgrade` ✅ y `fix/hero-lcp` ✅
+- **Rama:** `feat/a-step1-services` → PR hacia `main`
 
 ## Historial
 
@@ -2754,14 +2754,53 @@ Lo que encontró el CI del push, ya corregido:
 - Entre el merge y el fin de los trabajos (unos minutos), la portada sigue con su versión de siempre; las páginas en caché se renuevan solas.
 - Las ~57 fotos suman unos 15–20 MB entre los dos buckets.
 
+**Verificación en producción (2026-11-25):** tras el merge (PR #94) y «Deploy database», los 57 trabajos «Versiones livianas de la portada de una foto» terminaron sin errores (consulta de solo lectura). En el navegador del usuario, la portada de Ucureña carga `hero-w1200.webp` (1,8 s); el `w960.webp` que también aparece es de una tarjeta, no de la portada. «Lighthouse on production» volvió a verde: el inicio de Ucureña con un LCP mediano de 2,40 s.
+
+### A · Paso 1.2 — servicios locales ✅
+
+- Decisiones del usuario: las de [ADR-069](../adr/ADR-069-useful-knowledge.md) para el Paso 1 (2026-11-16): **lista fija de categorías** de la plataforma; **página, mapa y asistente**; módulo **`services`**. El ADR suma los detalles fijados al implementarlo.
+- Base de datos (`20261129000000_a1_service_enum.sql` y `20261129000100_a1_services.sql`, solo expand):
+  - tipo de contenido `service` y módulo **«Servicios locales»** (`services`), encendido en todos los municipios; sin él, la base rechaza crear un servicio (`PT403`);
+  - en la revisión: `service_category` (comida, alojamiento, cajero o banco, transporte, combustible, salud, información turística, otro), `contact_phone`, `contact_whatsapp` (con el código del país) y `address_line`; el horario y la ubicación usan las columnas de los destinos;
+  - `save_content_draft` valida el documento del servicio (`private.is_valid_service_draft`: claves exactas, una línea, horario de ADR-039, números con su forma); `publish_content` exige la dirección o la ubicación; `retire_content` acepta servicios («cerró»);
+  - `worker_api.knowledge_source` suma la categoría, el teléfono, el WhatsApp y la dirección: el asistente los indexa con el horario;
+  - `portal_services` (anónima, municipios activos): los publicados, ordenados por categoría y nombre, hasta 300.
+- `@rikuy/core`: contrato `contracts/service` (documento, lo que falta para publicar, `PublishedService`); `domain/services/categories` (nombre, sección y palabras de búsqueda de cada categoría, `telHref`, `whatsappHref`); casos de uso `listServices`, `createService`, `loadServiceEditor`, `saveServiceDraft`, `publishService`, `retireService`, `restoreServiceRevision`, `discardServiceDraft`, `groupServices` y `servicesOnMap`; el texto indexado dice la categoría en palabras («Cajero automático o banco: sacar dinero, efectivo.»), la dirección y el contacto; la cita de un servicio es «Servicio» y lleva a `/servicios#…`; el Copilot y el informe mensual conocen el tipo; `buildSitemap` suma `/servicios` cuando hay servicios.
+- `@rikuy/db`: `createServiceRepository` y `createSupabasePublishedServiceReader` (antes de la migración: sin servicios).
+- Panel: **«Servicios locales»** en «Contenido» (`/o/{slug}/servicios`): lista con su categoría y estado (publicado, con cambios, borrador, retirado), «Nuevo servicio» y el editor con nombre, categoría, descripción corta, teléfono, WhatsApp, dirección, el horario de los destinos y la ubicación (opcional, con su texto), publicar, guardar borrador, «Retirar (cerró o ya no atiende)», descartar y el historial con «Volver a esta versión».
+- Portal:
+  - **`/servicios`**: las tarjetas agrupadas por categoría con saltos a cada una; cada tarjeta con su ancla, la categoría, la descripción, «Abierto ahora» calculado en el navegador y la semana en «Ver el horario» (o «Sin horario publicado: confírmalo antes de ir»), la dirección, **«Llamar»**, **«WhatsApp»** y **«Cómo llegar»**, y «Ver en el mapa del municipio». Estilos en su propia hoja (`services.css`);
+  - **capa «Servicios»** en `/mapa`: un pin cuadrado con el ícono de su categoría; empieza apagada y se enciende al llegar desde una tarjeta (`?servicios=1`); los servicios vienen con la página y se filtran por la vista, sin pedirle nada más al servidor;
+  - «Servicios» en la cabecera y en el pie (en el celular la barra inferior no tiene lugar), y en el sitemap, cuando hay servicios publicados;
+  - publicar, retirar o volver a una versión invalida la caché del municipio, `/servicios` incluida.
+- CI: nuevo paso **«Local services in a real browser»** (grupo «Lighthouse · visitas»); `/servicios` suma a las páginas de los contratos RC-09/10/11/12.
+- Tests:
+  - unitarios: core 760 (+18: el documento y lo que falta para publicar, roles, orden y grupos, enlaces, palabras del índice, la cita, los módulos y el sitemap), db 226 (+6), web 60, worker 58, config 14;
+  - pgTAP `054_services` (39): el módulo; borradores válidos e inválidos (categoría, WhatsApp sin código, teléfono, una clave de más, horario, ubicación, dirección de varias líneas); editor sin publicar ni retirar, analista y otro municipio sin guardar; publicar sin dirección ni ubicación rechazado y con dirección sola aceptado; el portal ordenado por categoría, nada de otro municipio ni de uno suspendido; retirar y volver a una versión; la auditoría; la indexación con la categoría, el contacto y el horario; con el módulo apagado `PT403`; un servicio no tiene tour ni es el lugar de un aviso; un destino no acepta los campos del servicio;
+  - **e2e en un navegador real** (`services.e2e.test.ts`): el propietario de Demo Sur crea un cajero desde el panel (el WhatsApp sin código y la falta de dirección o ubicación se rechazan con su mensaje) y lo publica; en `/servicios`, bajo «Cajeros y bancos», con su ancla, `tel:`, `wa.me` y «Cómo llegar»; los enlaces de la cabecera y el pie, y el sitemap; en `/mapa` la capa empieza apagada y desde la tarjeta se enciende con el cajero en la lista enlazando a su ancla; nada en Demo Norte; retirarlo lo quita; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px.
+- Verificado en local: lint, tipos, unitarios y el build.
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Las visitas a `/servicios` y los toques de «Llamar» y «WhatsApp» todavía no se cuentan en «Estadísticas».
+- «Cómo llegar» aparece solo con la ubicación; un servicio con solo la dirección la muestra en texto.
+- Los avisos y las secciones que el asistente sugiere cuando no sabe todavía no incluyen «Servicios».
+- Los servicios no entran en los planes del asistente («qué hay cerca», «plan para hoy»): queda para el Paso 3, como dice el ADR.
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
-- Después del merge y de «Deploy database»: en «Trabajos» de `/plataforma`, los trabajos «Versiones livianas de la portada de una foto» terminan en unos minutos; en el inicio de Ucureña, la portada lleva `hero-w800.webp` en su `srcset`; «Lighthouse on production» vuelve a verde en el inicio de Ucureña.
+- Después del merge y de «Deploy database», en Ucureña:
+  1. Panel → «Servicios locales» → «Nuevo servicio»: carga, por ejemplo, la gasolinera y el cajero más cercanos (categoría, dirección o ubicación, horario y teléfono si los tienes) y publícalos.
+  2. Portal → `/servicios`: las tarjetas por categoría con «Abierto ahora», «Llamar», «WhatsApp» y «Cómo llegar»; «Servicios» en la cabecera y en el pie.
+  3. `/mapa` → activa «Servicios»: los pines cuadrados con su ícono; desde una tarjeta, «Ver en el mapa del municipio» abre el mapa con la capa encendida.
+  4. En el portal, pregúntale a Chaski «¿dónde hay un cajero?» o «¿dónde cargo gasolina?»: responde con el servicio y la fuente lleva a su tarjeta.
+  5. Retira un servicio de prueba: desaparece de `/servicios` y del mapa.
 
 ## Siguiente paso
 
-1. **A · Paso 1.2 — servicios locales** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario: tipo `service` y módulo `services`, categorías fijas, horario y contacto, `/servicios` con anclas, capa del mapa y el asistente.
+1. **A · Paso 1.3 — memoria de la comunidad** ([ADR-069](../adr/ADR-069-useful-knowledge.md)), con la autorización del usuario: tipo `story` y módulo `community_memory`, autor y consentimiento obligatorio para publicar, `/memoria`, «Lo que cuenta la comunidad» en la ficha del destino y la regla del asistente de contarlo siempre atribuido.
 
 ## Decisiones pendientes del usuario
 

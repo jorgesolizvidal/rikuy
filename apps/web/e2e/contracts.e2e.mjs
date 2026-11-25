@@ -89,6 +89,7 @@ function portalPages(portal) {
     `/agenda/${portal.event}`,
     "/mapa",
     "/avisos",
+    "/servicios",
     "/privacidad",
     "/terminos",
     "/destinos/no-existe",
