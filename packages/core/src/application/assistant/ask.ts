@@ -23,8 +23,8 @@ import {
   unansweredText,
   type UnansweredQuestion,
 } from "../../domain/assistant/unanswered";
-import type { PlanIntent } from "../../domain/plan/engine";
-import { detectPlanIntent } from "../../domain/plan/intent";
+import type { PlanIntent, PlanVisit } from "../../domain/plan/engine";
+import { detectPlanIntent, detectPlanVisit } from "../../domain/plan/intent";
 import {
   AiStepFailed,
   estimateTokens,
@@ -162,7 +162,12 @@ export interface AssistantTrace {
     readonly hotspot: TourGuideContext["hotspotStatus"];
   };
   /** A plan's intent, outcome and stops (`kind:slug`), in order. */
-  readonly plan?: { readonly intent: PlanIntent; readonly stops: readonly string[] };
+  readonly plan?: {
+    readonly intent: PlanIntent;
+    readonly stops: readonly string[];
+    /** The kind of visit of a plan for today (ADR-072). */
+    readonly visit?: PlanVisit;
+  };
 }
 
 /** What the visitor reads when the model copied its own context instead of answering. */
@@ -257,10 +262,20 @@ export async function askAssistant(
   const persona = assistantPersona(tenant.presentation);
   const lang = detectLanguage(request.question);
 
-  // A plan: the engine decides, the model explains (ADR-039).
+  // A plan: the engine decides, the model explains (ADR-039). A kind of visit (chosen under
+  // «Plan para hoy» or written: «tengo 2 horas con los chicos») is a plan for today (ADR-072).
+  const typedVisit = request.intent === null ? detectPlanVisit(request.question) : null;
   const planIntent =
-    request.intent === "guide" ? null : (request.intent ?? detectPlanIntent(request.question));
-  if (planIntent) return askPlan(tenant, request, planIntent, lang, persona, visitor, deps);
+    request.intent === "guide"
+      ? null
+      : (request.intent ??
+        (typedVisit?.length
+          ? "today"
+          : (detectPlanIntent(request.question) ?? (typedVisit ? "today" : null))));
+  if (planIntent) {
+    const visit = planIntent === "today" ? (request.visit ?? typedVisit) : null;
+    return askPlan(tenant, request, planIntent, visit, lang, persona, visitor, deps);
+  }
 
   // Inside a tour: the scene and the point on screen, checked by the server (ADR-040).
   const tourItem =
@@ -513,6 +528,7 @@ async function askPlan(
   tenant: AssistantTenant,
   request: AssistantRequest,
   intent: PlanIntent,
+  visit: PlanVisit | null,
   lang: AssistantLanguage,
   persona: ReturnType<typeof assistantPersona>,
   visitor: string | null,
@@ -528,7 +544,7 @@ async function askPlan(
         siteName: tenant.presentation.identity.siteName,
         hasTours: tenant.hasTours,
       },
-      { request, intent, lang, persona, today: today(deps.now(), tenant.timezone), visitor },
+      { request, intent, visit, lang, persona, today: today(deps.now(), tenant.timezone), visitor },
       deps,
     );
   } catch {
@@ -564,7 +580,7 @@ async function askPlan(
       inputTokens: answer.inputTokens,
       outputTokens: answer.outputTokens,
       latencyMs: Date.now() - started,
-      plan: { intent, stops: answer.keys },
+      plan: { intent, stops: answer.keys, ...(visit ? { visit } : {}) },
     },
   };
 }

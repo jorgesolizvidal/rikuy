@@ -9,6 +9,7 @@ import { SERVICE_CATEGORIES } from "../../contracts/service";
 import { storyTeller } from "../../contracts/story";
 import { tourManifestSchema } from "../../contracts/tour";
 import { formatEventSchedule } from "../events/schedule";
+import { formatMinutes } from "../geo/proximity";
 import { describeNoticeValidity } from "../notices/validity";
 import { openingHoursText } from "../plan/hours";
 import { SERVICE_CATEGORY_INFO } from "../services/categories";
@@ -48,6 +49,9 @@ export const contentIndexSourceSchema = z.object({
     .nullable()
     .catch(null)
     .default(null),
+  /** A destination's visit time and «for children» (ADR-072); absent before A · Paso 3. */
+  visitMinutes: z.number().int().positive().nullable().catch(null).default(null),
+  kids: z.boolean().nullable().catch(null).default(null),
   /** Who tells a story and their community (ADR-069); absent before A · Paso 1.3. */
   story: z
     .object({
@@ -116,6 +120,14 @@ export function contentUnits(
   }
   if ((source.kind === "destination" || source.kind === "service") && source.hours) {
     facts.push(`Horario de atención: ${openingHoursText(source.hours)}.`);
+  }
+  // «¿Se puede ir con niños?», «¿cuánto tiempo se necesita?» (ADR-072).
+  if (source.kind === "destination" || source.kind === "event") {
+    if (source.kids === true) facts.push("Apto para ir con niños.");
+    if (source.kids === false) facts.push("No es recomendable para ir con niños.");
+  }
+  if (source.kind === "destination" && source.visitMinutes !== null) {
+    facts.push(`Tiempo de visita sugerido: ${formatMinutes(source.visitMinutes)}.`);
   }
   const blocks = [
     ...(source.summary.trim() !== "" ? [paragraph(source.summary)] : []),

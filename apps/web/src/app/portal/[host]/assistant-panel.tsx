@@ -11,6 +11,7 @@ import {
   type AssistantLink,
   type AssistantReply,
   type PlanIntent,
+  type VisitLengthChoice,
 } from "@rikuy/core/assistant-client";
 import { distanceMeters, type PositionFix } from "@rikuy/core/geo";
 import {
@@ -88,6 +89,32 @@ const PLANS: readonly {
   { intent: "today", label: "Plan para hoy", icon: "calendar" },
   { intent: "route", label: "Ruta sugerida", icon: "route" },
 ];
+
+/** «Plan para hoy» opens these (ADR-072); each is sent with «Con niños» when it is checked. */
+const VISITS: readonly { readonly length: VisitLengthChoice; readonly label: string }[] = [
+  { length: "1h", label: "1 hora" },
+  { length: "2h", label: "2 horas" },
+  { length: "half", label: "Medio día" },
+  { length: "full", label: "Día completo" },
+];
+
+/** The question a chosen kind of visit sends: «Plan de 2 horas con niños». */
+function visitQuestion(length: VisitLengthChoice, kids: boolean): string {
+  const text =
+    length === "1h"
+      ? "Plan de 1 hora"
+      : length === "2h"
+        ? "Plan de 2 horas"
+        : length === "half"
+          ? "Plan de medio día"
+          : "Plan de día completo";
+  return kids ? `${text} con niños` : text;
+}
+
+interface ChosenVisit {
+  readonly length: VisitLengthChoice;
+  readonly kids: boolean;
+}
 
 interface PlacePoint {
   readonly key: string;
@@ -327,6 +354,9 @@ export default function AssistantPanel({
   const [startedAt, setStartedAt] = useState(initial.startedAt);
   const [question, setQuestion] = useState("");
   const [busy, setBusy] = useState(false);
+  /** «Plan para hoy» shows the kinds of visit (ADR-072). */
+  const [choosing, setChoosing] = useState(false);
+  const [kids, setKids] = useState(false);
   const location = useVisitorLocation();
   const fix = location.fix;
   /** A plan that asked for the location: asked again once the phone knows where it is. */
@@ -414,6 +444,7 @@ export default function AssistantPanel({
       intent: PlanIntent | "guide" | null = null,
       again = false,
       tourContext: TourAssistantContext | null = null,
+      visit: ChosenVisit | null = null,
     ) => {
       const asked = text.replace(/\s+/gu, " ").trim();
       if (asked.length < 2 || busy) return;
@@ -442,6 +473,7 @@ export default function AssistantPanel({
             page: tour?.page ?? assistantPageFromPath(pagePath ?? window.location.pathname),
             ...(tour ? { tour: { sceneId: tour.sceneId, hotspotId: tour.hotspotId } } : {}),
             ...(intent ? { intent } : {}),
+            ...(visit ? { visit } : {}),
             ...(distances && Object.keys(distances).length > 0 ? { distances } : {}),
           }),
         });
@@ -621,18 +653,74 @@ export default function AssistantPanel({
         </div>
 
         <div className="assistant-plans" role="group" aria-label="Planes con lo publicado">
-          {PLANS.map((plan) => (
-            <button
-              key={plan.intent}
-              type="button"
-              className="assistant-chip"
-              disabled={busy}
-              onClick={() => void ask(plan.label, plan.intent)}
-            >
-              <ChipIcon icon={plan.icon} />
-              {plan.label}
-            </button>
-          ))}
+          {PLANS.map((plan) =>
+            plan.intent === "today" ? (
+              <button
+                key={plan.intent}
+                type="button"
+                className="assistant-chip"
+                disabled={busy}
+                aria-expanded={choosing}
+                aria-controls={`${ids}-visit`}
+                onClick={() => setChoosing((current) => !current)}
+              >
+                <ChipIcon icon={plan.icon} />
+                {plan.label}
+              </button>
+            ) : (
+              <button
+                key={plan.intent}
+                type="button"
+                className="assistant-chip"
+                disabled={busy}
+                onClick={() => {
+                  setChoosing(false);
+                  void ask(plan.label, plan.intent);
+                }}
+              >
+                <ChipIcon icon={plan.icon} />
+                {plan.label}
+              </button>
+            ),
+          )}
+        </div>
+        <div
+          id={`${ids}-visit`}
+          className="assistant-visit"
+          role="group"
+          aria-labelledby={`${ids}-visit-title`}
+          hidden={!choosing}
+        >
+          <p id={`${ids}-visit-title`} className="assistant-visit-title">
+            ¿Cuánto tiempo tienes?
+          </p>
+          <div className="assistant-visit-lengths">
+            {VISITS.map((visit) => (
+              <button
+                key={visit.length}
+                type="button"
+                className="assistant-chip"
+                disabled={busy}
+                onClick={() => {
+                  setChoosing(false);
+                  void ask(visitQuestion(visit.length, kids), "today", false, null, {
+                    length: visit.length,
+                    kids,
+                  });
+                }}
+              >
+                {visit.label}
+              </button>
+            ))}
+          </div>
+          <label className="assistant-visit-kids">
+            <input
+              type="checkbox"
+              checked={kids}
+              onChange={(event) => setKids(event.target.checked)}
+            />
+            Con niños
+          </label>
         </div>
 
         <form className="assistant-form" onSubmit={submit}>

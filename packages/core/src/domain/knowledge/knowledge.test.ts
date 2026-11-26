@@ -189,6 +189,8 @@ describe("sources", () => {
     placeTitle: null,
     service: null,
     story: null,
+    visitMinutes: null,
+    kids: null,
     document: null,
   };
 
@@ -264,6 +266,28 @@ describe("sources", () => {
     expect(units[0]?.blocks[1]?.text).toBe(
       "Horario de atención: Lunes: cerrado; martes a sábado: 9:00–17:00; domingo: 9:00–13:00. Entrada libre.",
     );
+  });
+
+  it("a destination says whether it suits children and how long a visit takes (ADR-072)", () => {
+    const destination = { ...base, kind: "destination" as const, schedule: null, venueTitle: null };
+    expect(
+      contentUnits({ ...destination, kids: true, visitMinutes: 90 }, null)[0]?.blocks[1]?.text,
+    ).toBe("Apto para ir con niños. Tiempo de visita sugerido: 1 h 30 min.");
+    expect(contentUnits({ ...destination, kids: false }, null)[0]?.blocks[1]?.text).toBe(
+      "No es recomendable para ir con niños.",
+    );
+    // An event: «for children», never a visit time.
+    expect(
+      JSON.stringify(
+        contentUnits(
+          { ...base, kind: "event", schedule: null, kids: true, visitMinutes: 60 },
+          null,
+        ),
+      ),
+    ).not.toContain("Tiempo de visita");
+    expect(
+      JSON.stringify(contentUnits({ ...base, kind: "event", schedule: null, kids: true }, null)),
+    ).toContain("Apto para ir con niños.");
   });
 
   it("a knowledge item adds its document's text with its pages", () => {

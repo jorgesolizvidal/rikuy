@@ -1198,3 +1198,207 @@ describe("grading the guide (RC-05)", () => {
     ).toContain("no reconoció el tour");
   });
 });
+
+describe("plans by kind of visit (ADR-072)", () => {
+  const comedor = {
+    slug: "comedor-dona-ana",
+    title: "Comedor Doña Ana",
+    location: { lat: -17.39, lng: -66.15 },
+    hours: { mode: "always" as const, note: "" },
+  };
+  const FAMILY: AssistantPlaces = {
+    ...PLACES,
+    destinations: PLACES.destinations.map((destination) =>
+      destination.slug === "mirador"
+        ? { ...destination, kids: false }
+        : destination.slug === "museo"
+          ? { ...destination, kids: true, visitMinutes: 90 }
+          : destination,
+    ),
+    services: [comedor],
+  };
+  /** Wednesday 4 November 2026, 09:00 in La Paz. */
+  const WEDNESDAY_9 = new Date("2026-11-04T13:00:00Z");
+
+  it("«tengo 1 hora» written: a plan that ends within the hour", async () => {
+    const { deps } = setup({ places: PLACES, now: WEDNESDAY_10 });
+    const { reply, trace } = await askAssistant(
+      tenant,
+      { question: "Tengo 1 hora, ¿qué hago?" },
+      "v",
+      deps,
+    );
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.plan.title).toBe("Plan de 1 hora");
+    expect(reply.plan.visit).toEqual({ length: { kind: "hours", minutes: 60 }, kids: false });
+    expect(trace?.plan?.visit).toEqual(reply.plan.visit);
+    expect(reply.plan.stops.length).toBeGreaterThan(0);
+    for (const stop of reply.plan.stops) {
+      expect((stop.time?.split("–")[1] ?? "99:99") <= "11:00").toBe(true);
+    }
+  });
+
+  it("chosen under «Plan para hoy»: a full day with children, its lunch and the suitable places", async () => {
+    const { deps, complete } = setup({ places: FAMILY, now: WEDNESDAY_9 });
+    const { reply } = await askAssistant(
+      tenant,
+      {
+        question: "Día completo con niños",
+        intent: "today",
+        visit: { length: "full", kids: true },
+      },
+      "v",
+      deps,
+    );
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.plan.title).toBe("Día completo con niños");
+    expect(reply.plan.stops.map((stop) => stop.title)).not.toContain("Mirador");
+    const museo = reply.plan.stops.find((stop) => stop.title === "Museo comunitario");
+    expect(museo).toMatchObject({ kids: true });
+    const lunch = reply.plan.stops.find((stop) => stop.lunch);
+    expect(lunch).toMatchObject({
+      kind: "service",
+      title: "Comedor Doña Ana",
+      href: "/servicios#comedor-dona-ana",
+      note: "Almuerzo",
+    });
+    expect(reply.plan.mapHref).toContain("service:comedor-dona-ana");
+    expect(reply.plan.summary?.endsAt).toBe("22:00");
+    // The summary counts the places, not the lunch.
+    expect(reply.plan.summary?.stops).toBe(reply.plan.stops.length - 1);
+    // The model reads the lunch and «apto para niños», never distances.
+    const sent = JSON.stringify(complete.mock.calls[0]?.[0].messages);
+    expect(sent).toContain("almuerzo");
+    expect(sent).toContain("apto para niños");
+    expect(sent).not.toMatch(/\d+ ?m\b|km|a pie/u);
+  });
+
+  it("without a place to eat, lunch is a pause that leads nowhere and is not on the map", async () => {
+    const { deps } = setup({ places: { ...FAMILY, services: [] }, now: WEDNESDAY_9 });
+    const { reply } = await askAssistant(
+      tenant,
+      { question: "Plan", intent: "today", visit: { length: "full" } },
+      "v",
+      deps,
+    );
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    const pause = reply.plan.stops.find((stop) => stop.kind === "pause");
+    expect(pause).toMatchObject({
+      title: "Pausa para almorzar",
+      href: "",
+      link: null,
+      lunch: true,
+    });
+    expect(reply.plan.mapHref).not.toContain("pause");
+  });
+
+  it("says so when nothing fits in the time asked", async () => {
+    const { deps } = setup({
+      places: { destinations: PLACES.destinations.slice(1, 2), events: [] },
+      now: new Date("2026-11-04T20:50:00Z"),
+    });
+    const { reply } = await askAssistant(
+      tenant,
+      { question: "Plan", intent: "today", visit: { length: "1h" } },
+      "v",
+      deps,
+    );
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.plan.stops).toEqual([]);
+    expect(JSON.stringify(reply.blocks)).toContain("no alcanza");
+  });
+
+  it("in English: «I have 2 hours with the kids»", async () => {
+    const { deps } = setup({ places: FAMILY, now: WEDNESDAY_10 });
+    const { reply } = await askAssistant(
+      tenant,
+      { question: "I have 2 hours with the kids, what can we do?" },
+      "v",
+      deps,
+    );
+    if (reply.status !== "answered" || !reply.plan) throw new Error("no plan");
+    expect(reply.plan.title).toBe("2-hour plan with kids");
+  });
+});
+
+describe("loadAssistantPlaces (ADR-072)", () => {
+  it("adds the visit time, «for children» and the places to eat; a failure leaves them out", async () => {
+    const { loadAssistantPlaces } = await import("./plan");
+    const destinations = {
+      list: vi.fn(async () => [
+        {
+          slug: "museo",
+          title: "Museo",
+          summary: "",
+          location: { lat: 1, lng: 1 },
+          cover: null,
+          publishedAt: "",
+          updatedAt: "",
+        },
+      ]),
+      openingHours: vi.fn(async () => new Map()),
+    };
+    const events = {
+      list: vi.fn(async () => [
+        {
+          slug: "feria",
+          title: "Feria",
+          location: { lat: 1, lng: 1 },
+          startsAt: "2026-11-04T15:00:00Z",
+          endsAt: "2026-11-04T20:00:00Z",
+        },
+      ]),
+    };
+    const service = (
+      slug: string,
+      category: string,
+      location: { lat: number; lng: number } | null,
+    ) => ({
+      slug,
+      title: slug,
+      summary: "",
+      category,
+      hours: null,
+      phone: null,
+      whatsapp: null,
+      address: null,
+      location,
+    });
+    const services = {
+      list: vi.fn(async () => [
+        service("comedor", "food", { lat: 1, lng: 1 }),
+        service("cajero", "atm", { lat: 1, lng: 1 }),
+        service("sin-lugar", "food", null),
+      ]),
+    };
+    const traits = {
+      planTraits: vi.fn(
+        async () =>
+          new Map([
+            ["destination:museo", { visitMinutes: 90, kids: true }],
+            ["event:feria", { visitMinutes: null, kids: false }],
+          ]),
+      ),
+    };
+    const places = await loadAssistantPlaces("t", {
+      destinations: destinations as never,
+      events: events as never,
+      traits,
+      services: services as never,
+    });
+    expect(places.destinations[0]).toMatchObject({ visitMinutes: 90, kids: true });
+    expect(places.events[0]).toMatchObject({ kids: false });
+    expect(places.services?.map((s) => s.slug)).toEqual(["comedor"]);
+
+    traits.planTraits.mockRejectedValueOnce(new Error("down"));
+    services.list.mockRejectedValueOnce(new Error("down"));
+    const without = await loadAssistantPlaces("t", {
+      destinations: destinations as never,
+      events: events as never,
+      traits,
+      services: services as never,
+    });
+    expect(without.destinations[0]).toMatchObject({ visitMinutes: null, kids: null });
+    expect(without.services).toEqual([]);
+  });
+});

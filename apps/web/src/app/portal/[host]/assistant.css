@@ -636,6 +636,65 @@ a.assistant-card:hover {
   border-top: 0;
 }
 
+/* «Plan para hoy» opens the kinds of visit (ADR-072): how long and «Con niños». */
+.assistant-plans .assistant-chip[aria-expanded="true"] {
+  background: var(--brand);
+  color: var(--on-brand);
+}
+
+.assistant-visit {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.625rem 1rem 0;
+}
+
+.assistant-visit[hidden] {
+  display: none;
+}
+
+.assistant-visit-title {
+  margin: 0;
+  font-size: 0.8125rem;
+  font-weight: 700;
+}
+
+.assistant-visit-lengths {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+}
+
+.assistant-visit-lengths .assistant-chip {
+  min-height: 2.5rem;
+  padding-inline: 0.625rem;
+  font-size: 0.8125rem;
+}
+
+.assistant-visit-lengths .assistant-chip:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.assistant-visit-kids {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.assistant-visit-kids input {
+  width: 1.25rem;
+  height: 1.25rem;
+  accent-color: var(--brand);
+}
+
+.assistant-visit + .assistant-form {
+  border-top: 0;
+}
+
 /* A plan as a card (ADR-065): its cover and title, the summary, the route and the stops. */
 .assistant-plan {
   display: grid;
@@ -792,8 +851,23 @@ a.assistant-card:hover {
 .assistant-plan-time,
 .assistant-plan-distance,
 .assistant-plan-note,
+.assistant-plan-kids,
 .assistant-plan-body .assistant-badges {
   flex-basis: 100%;
+}
+
+/* «Apto para niños» on a stop of a plan with children (ADR-072). */
+.assistant-plan-kids {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--brand);
+}
+
+/* The lunch of a full day: a softer number, so the places stay the plan's stops. */
+.assistant-plan-stop[data-kind="service"] .assistant-plan-number,
+.assistant-plan-stop[data-kind="pause"] .assistant-plan-number {
+  background: color-mix(in srgb, var(--fg) 10%, var(--surface));
+  color: var(--fg);
 }
 
 .assistant-plan-time {

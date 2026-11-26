@@ -124,7 +124,10 @@ export interface DestinationPayload {
   } | null;
   readonly venueId?: string | null;
   /** The municipality's category (ADR-062); absent: the editor did not offer one. */
-  readonly categoryId?: string | null;
+  readonly categoryId?:
+    string | null; /** How long a visit takes (destinations) and «for children» (ADR-072). */
+  readonly visitMinutes?: number | null;
+  readonly kids?: boolean | null;
 }
 
 export interface SaveDestinationState {
@@ -172,9 +175,15 @@ export async function saveDestinationAction(
       gallery: payload.gallery,
       // Without a category the key is left out (the document is the same as before).
       ...(payload.categoryId ? { categoryId: payload.categoryId } : {}),
+      // «For children» (ADR-072), only when said: otherwise the document is as before.
+      ...(typeof payload.kids === "boolean" ? { kids: payload.kids } : {}),
     };
-    // Without hours the key is left out: the document is the same as before this step.
-    const destination = payload.hours ? { ...base, hours: payload.hours } : base;
+    // Without hours or a visit time the key is left out: the document is the same as before.
+    const destination = {
+      ...base,
+      ...(payload.hours ? { hours: payload.hours } : {}),
+      ...(typeof payload.visitMinutes === "number" ? { visitMinutes: payload.visitMinutes } : {}),
+    };
     const { membership, session } = access;
     const publish = payload.intent === "publish";
 

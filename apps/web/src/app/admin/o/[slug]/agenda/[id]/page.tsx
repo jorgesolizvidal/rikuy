@@ -98,6 +98,7 @@ export default async function EventEditorPage({ params }: EditorPageProps) {
     categoryId: categories.some((category) => category.id === document.categoryId)
       ? (document.categoryId ?? null)
       : null,
+    kids: document.kids ?? null,
   };
   const live = record.history.find((entry) => entry.revisionId === record.published?.revisionId);
 

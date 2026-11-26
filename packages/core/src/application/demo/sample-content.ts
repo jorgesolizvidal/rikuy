@@ -200,6 +200,8 @@ export async function loadSampleContent(
           cover,
           gallery: [photo],
           ...(item.hours ? { hours: item.hours } : {}),
+          ...(item.visitMinutes ? { visitMinutes: item.visitMinutes } : {}),
+          ...(item.kids !== undefined ? { kids: item.kids } : {}),
         },
         draft?.draft?.editCount ?? null,
         deps.content,

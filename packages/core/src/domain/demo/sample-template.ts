@@ -25,6 +25,9 @@ export interface SampleDestination {
   readonly galleryAlt: string;
   /** Opening hours (ADR-039); without them, «sin horario publicado». */
   readonly hours?: OpeningHours;
+  /** How long a visit takes and «for children» (ADR-072), for «Tengo 2 horas» and «Con niños». */
+  readonly visitMinutes?: number;
+  readonly kids?: boolean;
 }
 
 export interface SampleEvent {
@@ -64,6 +67,8 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     alt: "Ilustración de muestra: plaza con edificios bajos y montañas al fondo",
     galleryAlt: "Ilustración de muestra: la plaza al atardecer",
     hours: { mode: "always", note: "Espacio público" },
+    visitMinutes: 30,
+    kids: true,
   },
   {
     slug: "mirador-del-valle",
@@ -81,6 +86,7 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     alt: "Ilustración de muestra: vista del valle desde un mirador",
     galleryAlt: "Ilustración de muestra: cerros y nubes desde el mirador",
     hours: { mode: "always", note: "Al aire libre" },
+    visitMinutes: 60,
   },
   {
     slug: "museo-comunitario",
@@ -109,6 +115,8 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
       ],
       note: "Horario de muestra",
     },
+    visitMinutes: 60,
+    kids: true,
   },
   {
     slug: "mercado-central",
@@ -146,6 +154,8 @@ export const SAMPLE_DESTINATIONS: readonly SampleDestination[] = [
     scene: "rio",
     alt: "Ilustración de muestra: río entre árboles y cerros",
     galleryAlt: "Ilustración de muestra: orilla del río",
+    visitMinutes: 90,
+    kids: true,
   },
 ];
 

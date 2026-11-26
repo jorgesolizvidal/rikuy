@@ -141,12 +141,12 @@ values
 
 insert into public.content_revisions
   (id, tenant_id, content_id, revision_no, state, title, summary, body, latitude, longitude, created_by, sealed_at, sealed_by,
-   opening_hours, category_id)
+   opening_hours, category_id, visit_minutes, kids_suitable)
 values
   ('5eed4200-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001',
    1, 'sealed', 'Mirador del Valle', 'Vista panorámica del valle al atardecer.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Un mirador de demostración."}]}]',
-   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '2 days', '5eed0000-0000-4000-8000-000000000001', null, '5eed4700-0000-4000-8000-000000000001'),
+   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '2 days', '5eed0000-0000-4000-8000-000000000001', null, '5eed4700-0000-4000-8000-000000000001', null, null),
   ('5eed4200-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000001',
    2, 'sealed', 'Mirador del Valle', 'El mejor punto para ver el valle al atardecer, a 15 minutos de la plaza.',
    '[{"type": "heading", "level": 2, "children": [{"type": "text", "text": "Cómo llegar"}]},
@@ -155,19 +155,19 @@ values
                                         {"type": "text", "text": "."}]},
      {"type": "list", "ordered": false, "items": [[{"type": "text", "text": "Mejor hora: atardecer"}],
                                                   [{"type": "text", "text": "Entrada libre"}]]}]',
-   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000001', '{"mode": "always", "note": "Al aire libre"}', '5eed4700-0000-4000-8000-000000000001'),
+   -17.3901, -66.1502, '5eed0000-0000-4000-8000-000000000001', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000001', '{"mode": "always", "note": "Al aire libre"}', '5eed4700-0000-4000-8000-000000000001', 60, true),
   ('5eed4200-0000-4000-8000-000000000003', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000002',
-   1, 'draft', 'Feria de los domingos', '', '[]', null, null, '5eed0000-0000-4000-8000-000000000003', null, null, null, null),
+   1, 'draft', 'Feria de los domingos', '', '[]', null, null, '5eed0000-0000-4000-8000-000000000003', null, null, null, null, null, null),
   ('5eed4200-0000-4000-8000-000000000004', '5eed1000-0000-4000-8000-000000000002', '5eed4100-0000-4000-8000-000000000003',
    1, 'sealed', 'Laguna Espejo', 'Una laguna de altura que refleja el cielo nocturno.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Laguna de demostración para el municipio Sur."}]}]',
    -21.5302, -64.7298, '5eed0000-0000-4000-8000-000000000002', now() - interval '1 day', '5eed0000-0000-4000-8000-000000000002', null,
-   '5eed4700-0000-4000-8000-000000000004'),
+   '5eed4700-0000-4000-8000-000000000004', null, null),
   ('5eed4200-0000-4000-8000-000000000005', '5eed1000-0000-4000-8000-000000000001', '5eed4100-0000-4000-8000-000000000004',
    1, 'sealed', 'Plaza principal', 'El punto de partida: iglesia, mercado y la salida al mirador.',
    '[{"type": "paragraph", "children": [{"type": "text", "text": "Plaza de demostración del municipio Norte."}]}]',
    -17.3953, -66.1556, '5eed0000-0000-4000-8000-000000000001', now() - interval '3 days', '5eed0000-0000-4000-8000-000000000001', null,
-   '5eed4700-0000-4000-8000-000000000002');
+   '5eed4700-0000-4000-8000-000000000002', null, true);
 
 update public.content_items i
 set published_revision_id = v.published, published_at = v.published_at, draft_revision_id = v.draft

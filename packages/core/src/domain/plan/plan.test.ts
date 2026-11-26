@@ -5,6 +5,7 @@ import {
   makePlan,
   orderPath,
   PLAN_RULES,
+  stopLimit,
   type PlanDestination,
   type PlanEvent,
   type PlanInput,
@@ -17,7 +18,7 @@ import {
   openStateAt,
   type OpeningHours,
 } from "./hours";
-import { detectPlanIntent } from "./intent";
+import { detectPlanIntent, detectPlanVisit } from "./intent";
 
 const TZ = "America/La_Paz"; // UTC−4, no daylight saving.
 /** A Wednesday, at a local time. */
@@ -394,6 +395,334 @@ describe("for any input", () => {
             ? PLAN_RULES.todayStops
             : PLAN_RULES.routeStops;
       expect(plan.stops.length).toBeLessThanOrEqual(limit);
+    }
+    expect(checked).toBeGreaterThan(300);
+  });
+});
+
+// ── Plans by kind of visit (ADR-072) ───────────────────────────────────────
+
+describe("typed kinds of visit", () => {
+  it("reads how long and «con niños»", () => {
+    expect(detectPlanVisit("Tengo 2 horas, ¿qué hago?")).toEqual({
+      length: { kind: "hours", minutes: 120 },
+      kids: false,
+    });
+    expect(detectPlanVisit("tenemos una hora y media")).toEqual({
+      length: { kind: "hours", minutes: 90 },
+      kids: false,
+    });
+    expect(detectPlanVisit("Solo tengo 3 horas con mis hijos")).toEqual({
+      length: { kind: "hours", minutes: 180 },
+      kids: true,
+    });
+    expect(detectPlanVisit("un par de horas")?.length).toEqual({ kind: "hours", minutes: 120 });
+    expect(detectPlanVisit("Armame un plan de medio día")?.length).toEqual({
+      kind: "hours",
+      minutes: 240,
+    });
+    expect(detectPlanVisit("Quiero recorrer todo el día")?.length).toEqual({ kind: "full_day" });
+    expect(detectPlanVisit("I have 2 hours with the kids")).toEqual({
+      length: { kind: "hours", minutes: 120 },
+      kids: true,
+    });
+    expect(detectPlanVisit("A full day plan")?.length).toEqual({ kind: "full_day" });
+    // More than 10 hours is the whole day.
+    expect(detectPlanVisit("tengo 12 horas")?.length).toEqual({ kind: "full_day" });
+    expect(detectPlanVisit("¿Qué podemos hacer con los chicos?")).toEqual({
+      length: null,
+      kids: true,
+    });
+  });
+
+  it("leaves questions about a place to the published texts", () => {
+    expect(detectPlanVisit("¿El museo es apto para niños?")).toBeNull();
+    expect(detectPlanVisit("¿Se puede ir con niños al mirador?")).toBeNull();
+    expect(detectPlanVisit("¿Cuántas horas dura la feria?")).toBeNull();
+    expect(detectPlanVisit("¿El museo abre en 2 horas?")).toBeNull();
+    expect(detectPlanVisit("¿Qué hay en la plaza?")).toBeNull();
+  });
+});
+
+describe("a plan with a time", () => {
+  it("never ends after the time asked", () => {
+    const plan = makePlan(base({ visit: { length: { kind: "hours", minutes: 60 }, kids: false } }));
+    expect(plan.endsAt).toBe(11 * 60);
+    expect(plan.stops.length).toBeGreaterThan(0);
+    expect(plan.stops.length).toBeLessThanOrEqual(stopLimit(plan.visit));
+    for (const stop of plan.stops) expect(stop.leaveAt).toBeLessThanOrEqual(11 * 60);
+  });
+
+  it("gives each place its own visit time, cut to fit but never too short", () => {
+    const long = { ...plaza, visitMinutes: 120 };
+    const plan = makePlan(
+      base({
+        destinations: [long],
+        events: [],
+        visit: { length: { kind: "hours", minutes: 60 }, kids: false },
+      }),
+    );
+    // A two-hour place in a one-hour plan: from 10:00 to 11:00, not 12:00.
+    expect(plan.stops.map((stop) => [stop.arriveAt, stop.leaveAt])).toEqual([[600, 660]]);
+    const short = makePlan(
+      base({
+        destinations: [
+          { ...plaza, visitMinutes: 15 },
+          { ...museo, visitMinutes: 90 },
+        ],
+        events: [],
+        now: at("17:20"),
+      }),
+    );
+    // The museum closes at 18:00: 40 minutes are enough for a visit of 90 (at least 30).
+    expect(short.stops.find((stop) => stop.slug === "museo")?.leaveAt).toBeLessThanOrEqual(18 * 60);
+    expect(short.stops.find((stop) => stop.slug === "plaza")?.leaveAt).toBe(
+      (short.stops.find((stop) => stop.slug === "plaza")?.arriveAt ?? 0) + 15,
+    );
+  });
+
+  it("says when nothing fits", () => {
+    const plan = makePlan(
+      base({
+        destinations: [museo],
+        events: [],
+        now: at("17:50"),
+        visit: { length: { kind: "hours", minutes: 60 }, kids: false },
+      }),
+    );
+    expect(plan.outcome).toBe("too_short");
+    expect(plan.stops).toEqual([]);
+  });
+
+  it("stops at its number of stops", () => {
+    expect(stopLimit({ length: { kind: "hours", minutes: 60 }, kids: false })).toBe(3);
+    expect(stopLimit({ length: { kind: "hours", minutes: 120 }, kids: false })).toBe(4);
+    expect(stopLimit({ length: { kind: "hours", minutes: 240 }, kids: false })).toBe(6);
+    expect(stopLimit({ length: { kind: "full_day" }, kids: false })).toBe(8);
+    expect(stopLimit(null)).toBe(PLAN_RULES.todayStops);
+  });
+});
+
+describe("a plan with children", () => {
+  it("never includes a place not recommended for them and prefers the suitable ones", () => {
+    const input = base({
+      destinations: [
+        { ...plaza, kids: false },
+        { ...museo, kids: true },
+        { ...mirador, kids: null },
+      ],
+      events: [{ ...feria, kids: false }],
+      visit: { length: null, kids: true },
+    });
+    const plan = makePlan(input);
+    const slugs = plan.stops.map((stop) => stop.slug);
+    expect(slugs).not.toContain("plaza");
+    expect(slugs).not.toContain("feria");
+    expect(slugs[0]).toBe("museo");
+    expect(plan.stops.find((stop) => stop.slug === "museo")?.kids).toBe(true);
+    // Without children the same places are all there.
+    const adults = makePlan({ ...input, visit: null });
+    expect(adults.stops.map((stop) => stop.slug)).toContain("plaza");
+  });
+
+  it("walks at most 1,5 km between stops", () => {
+    const far = { ...mirador, location: point(3000, 0) };
+    const plan = makePlan(
+      base({
+        destinations: [plaza, far],
+        events: [],
+        origin: { kind: "place", key: "destination:plaza", point: plaza.location as never },
+        visit: { length: null, kids: true },
+      }),
+    );
+    expect(plan.stops.map((stop) => stop.slug)).toEqual(["plaza"]);
+    for (const stop of plan.stops) {
+      expect(stop.legMeters ?? 0).toBeLessThanOrEqual(PLAN_RULES.kidsMaxLegMeters);
+    }
+  });
+});
+
+describe("a full day", () => {
+  const comedor = {
+    slug: "comedor",
+    title: "Comedor",
+    location: point(50, 50),
+    hours: {
+      mode: "weekly" as const,
+      days: Array.from({ length: 7 }, () => [["11:00", "16:00"]] as [string, string][]),
+      note: "",
+    },
+  };
+  const day = { length: { kind: "full_day" as const }, kids: false };
+
+  it("has lunch at the nearest place to eat open at noon", () => {
+    const plan = makePlan(base({ now: at("09:00"), services: [comedor], visit: day }));
+    const lunch = plan.stops.find((stop) => stop.kind === "service");
+    expect(lunch?.slug).toBe("comedor");
+    expect(lunch?.arriveAt).toBeGreaterThanOrEqual(PLAN_RULES.lunchEarliest);
+    expect(lunch?.arriveAt).toBeLessThanOrEqual(PLAN_RULES.lunchLatest);
+    expect((lunch?.leaveAt ?? 0) - (lunch?.arriveAt ?? 0)).toBe(PLAN_RULES.lunchMinutes);
+    // The day ends at 22:00 at the latest; lunch is not one of the stops it counts.
+    expect(plan.endsAt).toBe(PLAN_RULES.dayEnd);
+    for (const stop of plan.stops) expect(stop.leaveAt).toBeLessThanOrEqual(PLAN_RULES.dayEnd);
+  });
+
+  it("takes a pause where it is when there is nowhere to eat", () => {
+    const closed = {
+      ...comedor,
+      hours: { ...comedor.hours, days: comedor.hours.days.map(() => []) },
+    };
+    const plan = makePlan(base({ now: at("09:00"), services: [closed], visit: day }));
+    const lunch = plan.stops.find((stop) => stop.kind === "pause");
+    expect(lunch?.location).toBeNull();
+    expect(plan.stops.some((stop) => stop.kind === "service")).toBe(false);
+  });
+
+  it("starts with lunch at noon, and has none after 14:00", () => {
+    expect(
+      makePlan(base({ now: at("12:30"), services: [comedor], visit: day })).stops[0]?.kind,
+    ).toBe("service");
+    expect(
+      makePlan(base({ now: at("14:30"), services: [comedor], visit: day })).stops.some(
+        (stop) => stop.kind === "service" || stop.kind === "pause",
+      ),
+    ).toBe(false);
+  });
+});
+
+describe("for any kind of visit", () => {
+  it("respects the time, the hours, the children and lunch", () => {
+    const next = random(7);
+    const pick = <T>(list: readonly T[]) => list[Math.floor(next() * list.length)] as T;
+    const time = () =>
+      `${String(6 + Math.floor(next() * 16)).padStart(2, "0")}:${pick(["00", "15", "30", "45"])}`;
+    const hoursOf = (): OpeningHours | null => {
+      const open = 6 + Math.floor(next() * 8);
+      const close = Math.min(24, open + 2 + Math.floor(next() * 10));
+      const range = [
+        `${String(open).padStart(2, "0")}:00`,
+        `${String(close).padStart(2, "0")}:00`,
+      ] as [string, string];
+      return pick([
+        null,
+        { mode: "always", note: "" },
+        { mode: "weekly", days: Array.from({ length: 7 }, () => [range]), note: "" },
+      ]);
+    };
+    let checked = 0;
+    for (let run = 0; run < 400; run += 1) {
+      const destinations: PlanDestination[] = Array.from(
+        { length: 1 + Math.floor(next() * 8) },
+        (_, i) => ({
+          slug: `d${i}`,
+          title: `D${i}`,
+          location: point(next() * 2500, next() * 2500),
+          hours: hoursOf(),
+          visitMinutes: pick([null, 15, 30, 45, 60, 90, 120, 240]),
+          kids: pick([null, true, false]),
+        }),
+      );
+      const events: PlanEvent[] = Array.from({ length: Math.floor(next() * 4) }, (_, i) => {
+        const starts = at(time());
+        const ends = new Date(starts.getTime() + (1 + Math.floor(next() * 6)) * 3_600_000);
+        return {
+          slug: `e${i}`,
+          title: `E${i}`,
+          location: point(next() * 2500, next() * 2500),
+          startsAt: starts.toISOString(),
+          endsAt: ends.toISOString(),
+          kids: pick([null, true, false]),
+        };
+      });
+      const services = Array.from({ length: Math.floor(next() * 3) }, (_, i) => ({
+        slug: `s${i}`,
+        title: `S${i}`,
+        location: point(next() * 2500, next() * 2500),
+        hours: hoursOf(),
+      }));
+      const visit = {
+        length: pick([
+          null,
+          { kind: "hours" as const, minutes: 60 },
+          { kind: "hours" as const, minutes: 120 },
+          { kind: "hours" as const, minutes: 240 },
+          { kind: "hours" as const, minutes: 90 },
+          { kind: "full_day" as const },
+        ]),
+        kids: next() < 0.5,
+      };
+      const now = at(time());
+      const input: PlanInput = {
+        intent: "today",
+        now,
+        timezone: TZ,
+        destinations,
+        events,
+        services,
+        origin: null,
+        visit,
+      };
+      const plan = makePlan({
+        ...input,
+        origin: next() < 0.6 ? visitorAt(point(next() * 2500, next() * 2500), input) : null,
+      });
+      const clock = localClock(now, TZ);
+      const end =
+        visit.length?.kind === "hours"
+          ? Math.min(
+              Math.max(PLAN_RULES.dayEnd, clock.minutes + 30),
+              clock.minutes + visit.length.minutes,
+            )
+          : Number.POSITIVE_INFINITY;
+      let lunches = 0;
+      let previous = clock.minutes;
+      for (const stop of plan.stops) {
+        expect(stop.arriveAt).toBeGreaterThanOrEqual(previous);
+        previous = stop.leaveAt ?? previous;
+        // The time asked.
+        expect(stop.leaveAt).toBeLessThanOrEqual(end);
+        if (visit.length?.kind === "full_day") {
+          expect(stop.leaveAt).toBeLessThanOrEqual(Math.max(PLAN_RULES.dayEnd, clock.minutes + 30));
+        }
+        if (stop.kind === "service" || stop.kind === "pause") {
+          lunches += 1;
+          expect(visit.length?.kind).toBe("full_day");
+          expect(stop.arriveAt).toBeGreaterThanOrEqual(PLAN_RULES.lunchEarliest);
+          expect(stop.arriveAt).toBeLessThanOrEqual(PLAN_RULES.lunchLatest);
+          if (stop.kind === "service") {
+            const service = services.find((s) => s.slug === stop.slug);
+            expect(
+              isOpenThrough(service?.hours ?? null, clock, stop.arriveAt ?? 0, stop.leaveAt ?? 0),
+            ).toBe(true);
+          }
+          continue;
+        }
+        // Children: never a place not recommended for them.
+        if (visit.kids) expect(stop.kids).not.toBe(false);
+        if (stop.kind === "event") {
+          const event = events.find((e) => e.slug === stop.slug);
+          expect(Date.parse(event?.endsAt ?? "")).toBeGreaterThan(now.getTime());
+        } else {
+          const destination = destinations.find((d) => d.slug === stop.slug);
+          expect(
+            openStateAt(destination?.hours ?? null, { ...clock, minutes: stop.arriveAt ?? 0 })
+              .state,
+          ).not.toBe("closed");
+          // At least 30 minutes, or its own time when shorter.
+          expect((stop.leaveAt ?? 0) - (stop.arriveAt ?? 0)).toBeGreaterThanOrEqual(
+            Math.min(
+              destination?.visitMinutes ?? PLAN_RULES.visitMinutes,
+              PLAN_RULES.minVisitMinutes,
+            ),
+          );
+        }
+        if (visit.kids && stop.legMeters !== null && stop !== plan.stops[0]) {
+          expect(stop.legMeters).toBeLessThanOrEqual(PLAN_RULES.kidsMaxLegMeters);
+        }
+        checked += 1;
+      }
+      expect(lunches).toBeLessThanOrEqual(1);
+      expect(plan.stops.length - lunches).toBeLessThanOrEqual(stopLimit(visit));
     }
     expect(checked).toBeGreaterThan(300);
   });
