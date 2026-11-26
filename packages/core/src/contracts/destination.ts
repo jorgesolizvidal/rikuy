@@ -17,6 +17,19 @@ export const DESTINATION_LIMITS = {
   slug: 80,
 } as const;
 
+/** How long a visit takes (ADR-072): 15 minutes to 4 hours, in steps of 5. */
+export const VISIT_MINUTES = { min: 15, max: 240, step: 5, default: 45 } as const;
+
+/** The choices of the editor's «Tiempo de visita» (ADR-072). */
+export const VISIT_MINUTES_CHOICES = [15, 30, 45, 60, 90, 120, 180, 240] as const;
+
+export const visitMinutesSchema = z
+  .number()
+  .int()
+  .min(VISIT_MINUTES.min)
+  .max(VISIT_MINUTES.max)
+  .refine((minutes) => minutes % VISIT_MINUTES.step === 0, "step");
+
 /** Content identifiers: lowercase words joined by single hyphens. */
 export const CONTENT_SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/u;
 
@@ -92,6 +105,10 @@ export const destinationDocumentSchema = z.strictObject({
   hours: openingHoursSchema.nullable().optional(),
   /** Optional category of the municipality (ADR-062); without it (or null), none. */
   categoryId: z.string().regex(UUID).nullable().optional(),
+  /** How long a visit takes (ADR-072); without it, 45 minutes in the plans. */
+  visitMinutes: visitMinutesSchema.nullable().optional(),
+  /** For a visit with children (ADR-072): true suitable, false not recommended, null not said. */
+  kids: z.boolean().nullable().optional(),
 });
 export type DestinationDocument = z.infer<typeof destinationDocumentSchema>;
 

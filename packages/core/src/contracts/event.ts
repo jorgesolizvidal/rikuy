@@ -72,10 +72,12 @@ export const eventScheduleSchema = z
   });
 export type EventSchedule = z.infer<typeof eventScheduleSchema>;
 
-export const eventDocumentSchema = destinationDocumentSchema.omit({ hours: true }).extend({
-  schedule: eventScheduleSchema.nullable(),
-  venueId: z.string().regex(UUID).nullable(),
-});
+export const eventDocumentSchema = destinationDocumentSchema
+  .omit({ hours: true, visitMinutes: true })
+  .extend({
+    schedule: eventScheduleSchema.nullable(),
+    venueId: z.string().regex(UUID).nullable(),
+  });
 export type EventDocument = z.infer<typeof eventDocumentSchema>;
 
 export type EventValidation =

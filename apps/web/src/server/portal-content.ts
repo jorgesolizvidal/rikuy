@@ -35,6 +35,7 @@ import {
   publishedMapReader,
   publishedNoticeReader,
   publishedPassportReader,
+  planTraitReader,
   publishedServiceReader,
   publishedStoryReader,
   publishedRedirectReader,
@@ -193,6 +194,10 @@ export const portalPlanPlaces = cache(async (view: PortalView) => {
   const places = await loadAssistantPlaces(view.context.tenant.tenantId, {
     destinations: publishedContentReader(),
     events: publishedEventReader(),
+    // The visit time and «for children» (ADR-072), and the places to eat of a full day with
+    // the local services (ADR-069).
+    traits: planTraitReader(),
+    ...(portalHas(view, "services") ? { services: publishedServiceReader() } : {}),
   });
   // Without the agenda, no plan includes events (ADR-060).
   return portalHas(view, "agenda") ? places : { ...places, events: [] };

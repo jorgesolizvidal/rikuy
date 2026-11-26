@@ -92,6 +92,8 @@ export default async function DestinationEditorPage({ params }: EditorPageProps)
     categoryId: categories.some((category) => category.id === document.categoryId)
       ? (document.categoryId ?? null)
       : null,
+    visitMinutes: document.visitMinutes ?? null,
+    kids: document.kids ?? null,
   };
   const published = record.history.find(
     (entry) => entry.revisionId === record.published?.revisionId,

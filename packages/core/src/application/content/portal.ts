@@ -112,7 +112,8 @@ export function qrCodeUrl(url: string): string {
 
 /** The map's query for a plan's route: `?ruta=destination:plaza,event:feria` (ADR-039). */
 export const MAP_ROUTE_QUERY = "ruta";
-export const MAP_ROUTE_MAX = 6;
+/** A full day has up to 8 places and its lunch (ADR-072). */
+export const MAP_ROUTE_MAX = 9;
 
 export function mapRoutePath(keys: readonly string[]): string {
   return `${PORTAL_PATHS.map}?${MAP_ROUTE_QUERY}=${keys.slice(0, MAP_ROUTE_MAX).join(",")}`;

@@ -21,6 +21,10 @@ const WORDS = {
   es: {
     destination: "Destino",
     event: "Evento",
+    service: "Para comer",
+    pause: "Pausa",
+    kids: "Apto para niños",
+    ends: "Termina",
     tour: "Recorrido 360°",
     stamp: "Sello del pasaporte",
     stamped: "Sellado en tu pasaporte",
@@ -39,6 +43,10 @@ const WORDS = {
   en: {
     destination: "Place",
     event: "Event",
+    service: "To eat",
+    pause: "Break",
+    kids: "Suitable for kids",
+    ends: "Ends",
     tour: "360° tour",
     stamp: "Passport stamp",
     stamped: "In your passport",
@@ -277,6 +285,12 @@ export function PlanCard({
               <dd>~{summary.walk}</dd>
             </div>
           ) : null}
+          {summary.endsAt ? (
+            <div>
+              <dt>{words.ends}</dt>
+              <dd>{summary.endsAt}</dd>
+            </div>
+          ) : null}
           {withStamp.length > 0 ? (
             <div>
               <dt>{words.stamps}</dt>
@@ -295,7 +309,11 @@ export function PlanCard({
         {plan.stops.map((stop, index) => {
           const card = stopCards[index];
           return (
-            <li key={stop.href} className="assistant-plan-stop">
+            <li
+              key={stop.href || `${stop.kind}-${stop.position}`}
+              className="assistant-plan-stop"
+              data-kind={stop.kind}
+            >
               <span className="assistant-plan-number" aria-hidden="true">
                 {stop.position}
               </span>
@@ -307,7 +325,7 @@ export function PlanCard({
                   <span className="assistant-plan-name">{stop.title}</span>
                 )}
                 <span className="assistant-plan-kind">
-                  {stop.kind === "event" ? words.event : words.destination}
+                  {words[stop.kind]}
                   {card?.category ? ` · ${card.category}` : ""}
                 </span>
                 {stop.time ? <span className="assistant-plan-time">{stop.time}</span> : null}
@@ -315,6 +333,7 @@ export function PlanCard({
                   <span className="assistant-plan-distance">{stop.distance}</span>
                 ) : null}
                 {stop.note ? <span className="assistant-plan-note">{stop.note}</span> : null}
+                {stop.kids ? <span className="assistant-plan-kids">{words.kids}</span> : null}
                 {card ? <Badges card={card} stamped={stampedOf(card)} lang={lang} /> : null}
               </span>
             </li>

@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 2 — «Solo asistente»; antes, A · Paso 1 ✅ (avisos, servicios y memoria, verificados en producción)
-- **Rama:** `feat/a-step2-assistant-only` → PR hacia `main`
+- **Último paso completado:** A · Paso 3 — planes por tipo de visita; antes, A · Paso 2 ✅ («Solo asistente», verificado en producción)
+- **Rama:** `feat/a-step3-visit-plans` → PR hacia `main`
 
 ## Historial
 
@@ -2874,20 +2874,68 @@ Lo que encontró el CI del push, ya corregido:
 - Las preguntas desde la web y desde los QR todavía no se cuentan por separado: las métricas por canal llegan con el Paso 5.
 - Durante los minutos del despliegue, el panel puede no mostrar el enlace y el QR del portal (las membresías todavía no traen el módulo).
 
+**Verificación en producción (2026-11-25):** tras el merge (PR #97) y «Deploy database», con una consulta de solo lectura: los 5 municipios tienen «Portal público» encendido. El usuario autorizó `https://jorgesolizvidal.github.io` en los módulos de Ucureña y armamos una web de prueba en GitHub Pages (`jorgesolizvidal/rikuy-web-prueba`, una portada y una página del museo con `data-lugar`, marcadas «Página de prueba»).
+
+- En esa web aparece «Pregúntale a Chaski» y responde. Comprobado desde aquí: `/insertar/marca` responde con CORS solo a esa web (otra web, 403) y `/insertar` lleva `frame-ancestors 'self' https://jorgesolizvidal.github.io`.
+- Desde la página del museo, Chaski ya sabe de qué lugar se habla.
+- Con «Página en la web del municipio» del museo en la página de prueba (guardada, consulta de solo lectura), una respuesta que cita la ficha del museo lleva a esa página; una que cita solo el libro histórico no tiene enlace, como corresponde.
+
+### A · Paso 3 — planes por tipo de visita ✅
+
+- Decisiones del usuario ([ADR-072](../adr/ADR-072-visit-plans.md)), 2026-11-26:
+  - **«Con niños» es un dato que marca el municipio** en destinos y eventos (apto / no recomendado / sin indicar);
+  - **tiempo de visita por lugar**, opcional, de 15 min a 4 h (sin él, 45 min);
+  - **el almuerzo del día completo** es el servicio «Dónde comer» más cercano abierto a mediodía; si no hay, una pausa;
+  - **«Plan para hoy» abre opciones** (1 hora · 2 horas · Medio día · Día completo y «Con niños»); escribirlo también funciona.
+- Base de datos (`20261202000000_a3_visit_plans.sql`, solo expand):
+  - `content_revisions.visit_minutes` (15–240, de 5 en 5; solo destinos) y `kids_suitable`; se sellan con la revisión;
+  - `is_valid_destination_draft` acepta `visitMinutes` y `kids`; `is_valid_event_draft`, solo `kids`; `revision_document` los devuelve solo cuando tienen valor (el panel desplegado sigue igual); `save_content_draft` los guarda;
+  - `worker_api.knowledge_source` los da al indexador;
+  - `portal_plan_traits` (anónima, municipios activos): tiempo de visita y «para niños» de lo publicado;
+  - seed: el mirador de Demo Norte, 60 min y apto; la plaza, apta.
+- `@rikuy/core`:
+  - motor (`domain/plan/engine`): `PlanVisit` (tiempo en minutos o día completo, y niños), `stopLimit` (1 h: 3, 2 h: 4, más: 6, día completo: 8), cada destino con su tiempo (recortado al cierre o al fin del plan, nunca a menos de 30 min o su tiempo), ninguna parada después del tiempo pedido, con niños nunca los «no recomendados», los aptos valen 20 min más de camino y tramos de hasta 1,5 km; el día completo almuerza entre las 11:00 y las 14:00 en el servicio para comer más cercano (≤ 1,5 km) abierto toda la hora, o hace una pausa; resultado `too_short` cuando nada cabe;
+  - `detectPlanVisit`: «tengo 3 horas», «una hora y media», «un par de horas», «medio día», «todo el día», «con mis hijos» (con una palabra de plan) y en inglés; «¿el museo es apto para niños?» sigue siendo una pregunta;
+  - la pregunta acepta `visit: { length: "1h" | "2h" | "half" | "full", kids }`; las distancias del teléfono aceptan `service:…`;
+  - `answerPlan`: título («Plan de 2 horas con niños», «Día completo»), paradas `service` (con enlace a `/servicios#…`) y `pause` (sin enlace), «Apto para niños», «Termina a las …» en el resumen, el modelo lee el tipo de visita y el almuerzo (sin distancias), frase propia cuando nada cabe;
+  - `loadAssistantPlaces` suma los datos y los lugares para comer (una falla los deja fuera, nunca el plan);
+  - el indexador dice «Apto para ir con niños.», «No es recomendable para ir con niños.» y «Tiempo de visita sugerido: 1 h 30 min.»;
+  - la demo de muestra trae tiempos y niños en sus destinos; `MAP_ROUTE_MAX` pasa a 9.
+- `@rikuy/db`: `createSupabasePlanTraitReader` (antes de la migración, sin datos).
+- Web:
+  - **«Plan para hoy»** abre «¿Cuánto tiempo tienes?» con los cuatro tiempos y «Con niños»; la tarjeta del plan muestra «Para comer» y «Pausa», «Apto para niños» y «Termina»;
+  - `/asistente/lugares` suma los lugares para comer; `/mapa?ruta=` dibuja también el del almuerzo;
+  - editores: **«Para tu plan»** con «Tiempo de visita» (destinos) y «Para ir con niños» (destinos y eventos);
+  - privacidad: el tiempo elegido y «Con niños» no se guardan.
+- CI: nuevo paso **«Plans by kind of visit in a real browser»** (grupo de contratos).
+- Tests:
+  - 817 unitarios en core (+21: el detector, el motor con **400 entradas aleatorias** —tiempo, horarios, niños, almuerzo y tope de paradas—, la respuesta, la lectura de los datos, los documentos y el texto indexado), 242 en db (+2), web 64;
+  - pgTAP `057_visit_plans` (30): valores válidos e inválidos (menos de 15, más de 240, fuera de paso, decimales, texto), opcionales, el documento sin ellos igual que antes, el evento sin tiempo, analista y otro municipio sin permiso, sellados e inmutables, la tabla rechaza un tiempo fuera de paso, el indexador, lo que leen los visitantes (no el borrador), otro municipio y uno suspendido;
+  - integración: `plans.int.test.ts` lee los datos del seed por el lector real;
+  - **e2e en un navegador real** (`visit-plans.e2e.test.ts`, 3 casos): el editor guarda 1 h 30 min y «Apto» en un destino de Demo Sur; el del evento solo tiene «Para ir con niños»; en Demo Norte, «Plan para hoy» abre las opciones, «Con niños» + «2 horas» envía el tipo de visita sin coordenadas y la tarjeta dice el título, «Termina» y «Apto para niños», sin paradas después; escrito («Tengo 1 hora») también es un plan; axe y desbordes a 390 y 1280 px. Después de las 21:00 en La Paz comprueba el aviso de «Ya es tarde».
+- Verificado en local: `pnpm check` (formato, lint, tipos, unitarios y build).
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- No se suman casos al gold del asistente: las reglas se prueban con el motor y 400 entradas aleatorias; la redacción con el modelo real se revisa a mano en producción.
+- Los servicios no tienen el dato «para niños» y el almuerzo no se reserva.
+- Las demos ya creadas (Demo Valle) no reciben los tiempos de muestra hasta que se editen sus destinos.
+- La vuelta al punto de partida no se cuenta en el tiempo pedido.
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
 - Después del merge y de «Deploy database»:
-  1. **Nada cambia para los portales:** Ucureña y las demos se ven igual, y en `/plataforma` → «Módulos» aparece «Portal público» encendido en todos.
-  2. **Autorizar una web:** en `/plataforma` → «Módulos» de Demo Norte → «Webs donde se puede insertar el asistente», autoriza una web tuya (por ejemplo, la de tu portafolio en GitHub Pages: `https://{usuario}.github.io`).
-  3. **La línea:** en el panel de Demo Norte → «Asistente en tu web», copia la línea y pégala en una página de esa web; publica la página. Al abrirla aparece «Pregúntale a …»; pregunta algo y mira que responda. En otra web (o en un archivo abierto desde tu computadora) no aparece nada.
-  4. **Enlace a la web:** en un destino de Demo Norte, «Página en la web del municipio» con una dirección de esa web; pregunta por ese lugar desde tu web: la fuente lleva a tu página.
-  5. **QR «Pregúntale a …»:** en el editor de un destino publicado, abre el enlace del QR nuevo (o escanéalo con el celular): la página del asistente con el lugar, y la pregunta ya sabe de qué lugar se trata.
-  6. **Sin portal (opcional, en una demo):** apaga «Portal público» en una demo comercial; en un minuto su dirección lleva a `/preguntar` y `/destinos` da 404. Vuelve a encenderlo.
+  1. **El editor:** en el panel de Ucureña, abre un destino (por ejemplo, el museo); en «Para tu plan» elige un «Tiempo de visita» y «Para ir con niños: Apto»; publícalo. Abre un evento: tiene «Para ir con niños» y no tiempo de visita.
+  2. **«Plan para hoy»:** en el portal de Ucureña, abre Chaski y toca «Plan para hoy»: aparecen «1 hora», «2 horas», «Medio día», «Día completo» y «Con niños». Elige «2 horas»: el plan se llama «Plan de 2 horas», dice a qué hora termina y ninguna parada pasa de esa hora.
+  3. **Con niños:** marca «Con niños» y vuelve a elegir: el museo aparece con «Apto para niños». Si marcas otro lugar como «No recomendado», ya no aparece en los planes con niños.
+  4. **Día completo:** antes de las 14:00, elige «Día completo»: el plan incluye el almuerzo en «Restaurante Mérida» (si está abierto a esa hora) o una «Pausa para almorzar».
+  5. **Escrito:** pregunta «Tengo 1 hora, ¿qué hago?»: responde con un «Plan de 1 hora». Y «¿El museo es apto para niños?» responde con la ficha (después de que el indexador la lea).
 
 ## Siguiente paso
 
-1. **A · Paso 3 — planes por tipo de visita** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: «Tengo 2 horas», «Con niños», «Día completo» sobre el motor de planes (ADR-039), respetando el tiempo pedido y los horarios. Antes de empezar, sus decisiones y un ADR.
+1. **A · Paso 4 — pasar a una persona** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: «Hablar con la oficina de turismo» da el contacto del municipio y marca la pregunta como «pidió una persona» en «Lo que preguntan los visitantes». Antes de empezar, sus decisiones y un ADR.
 
 ## Decisiones pendientes del usuario
 

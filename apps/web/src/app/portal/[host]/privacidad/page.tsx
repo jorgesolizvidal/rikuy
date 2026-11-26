@@ -152,7 +152,8 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               recta a cada lugar del portal y envía solo esas distancias, redondeadas a 100 metros,
               nunca tus coordenadas. Con varias distancias se podría estimar dónde estás, con un
               margen de unos cien metros: por eso no se guardan ni se envían a Groq, que recibe solo
-              los lugares elegidos.
+              los lugares elegidos. En «Plan para hoy», el tiempo que eliges y «Con niños» se usan
+              para armar ese plan y no se guardan.
             </li>
             <li>
               Ni {siteName} ni la plataforma guardan las respuestas, ni las preguntas que el

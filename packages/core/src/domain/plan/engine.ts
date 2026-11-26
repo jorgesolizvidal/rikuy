@@ -4,11 +4,14 @@ import { localClock, MINUTES_PER_DAY, minutesFromDayStart, type LocalClock } fro
 import { closingAfter, isOpenThrough, openStateAt, type OpeningHours } from "./hours";
 
 /**
- * «Qué hay cerca», «plan para hoy» and «ruta sugerida» (ADR-039). Deterministic: the engine
- * decides every stop and every time from the published data and the server's clock; the
- * model only explains the result in words. Two rules hold for every plan, whatever the
- * input: an event that already ended is never a stop, and a destination with published
- * hours is never a stop while it is closed.
+ * «Qué hay cerca», «plan para hoy» and «ruta sugerida» (ADR-039), and a plan for today by
+ * kind of visit: a time («tengo 2 horas», «medio día», «día completo») and «con niños»
+ * (ADR-072). Deterministic: the engine decides every stop and every time from the published
+ * data and the server's clock; the model only explains the result in words. Two rules hold
+ * for every plan, whatever the input: an event that already ended is never a stop, and a
+ * destination with published hours is never a stop while it is closed. A plan with a time
+ * never ends after it, and a plan «con niños» never includes a place marked as not
+ * recommended for children.
  */
 
 export type PlanIntent = "nearby" | "today" | "route";
@@ -18,6 +21,10 @@ export interface PlanDestination {
   readonly title: string;
   readonly location: GeoPoint | null;
   readonly hours: OpeningHours | null;
+  /** How long a visit takes (ADR-072); null: `PLAN_RULES.visitMinutes`. */
+  readonly visitMinutes?: number | null;
+  /** For a visit with children (ADR-072): true suitable, false not recommended, null not said. */
+  readonly kids?: boolean | null;
 }
 
 export interface PlanEvent {
@@ -27,9 +34,31 @@ export interface PlanEvent {
   /** Instants (ISO 8601), from the municipality's time zone. */
   readonly startsAt: string;
   readonly endsAt: string;
+  readonly kids?: boolean | null;
 }
 
-export type PlanPlaceKey = `destination:${string}` | `event:${string}`;
+/** A place to eat (a local service «Dónde comer», ADR-069): the lunch of a full day. */
+export interface PlanService {
+  readonly slug: string;
+  readonly title: string;
+  readonly location: GeoPoint | null;
+  readonly hours: OpeningHours | null;
+}
+
+/**
+ * The kind of visit of a plan for today (ADR-072): how long the visitor has (minutes, or the
+ * whole day until `PLAN_RULES.dayEnd`) and whether they go with children.
+ */
+export type VisitLength =
+  { readonly kind: "hours"; readonly minutes: number } | { readonly kind: "full_day" };
+
+export interface PlanVisit {
+  readonly length: VisitLength | null;
+  readonly kids: boolean;
+}
+
+export type PlanPlaceKey =
+  `destination:${string}` | `event:${string}` | `service:${string}` | "pause:lunch";
 
 /**
  * Where the plan starts. `visitor`: straight-line distances the visitor's phone computed to
@@ -47,6 +76,10 @@ export interface PlanInput {
   readonly destinations: readonly PlanDestination[];
   readonly events: readonly PlanEvent[];
   readonly origin: PlanOrigin | null;
+  /** Places to eat, for the lunch of a full day (ADR-072). */
+  readonly services?: readonly PlanService[];
+  /** The kind of visit of a plan for today (ADR-072); without it, the plan of ADR-039. */
+  readonly visit?: PlanVisit | null;
 }
 
 export type PlanStopStatus =
@@ -60,10 +93,13 @@ export type PlanStopStatus =
 
 export interface PlanStop {
   readonly key: PlanPlaceKey;
-  readonly kind: "destination" | "event";
+  /** `service`: lunch at a place to eat; `pause`: lunch without a place (ADR-072). */
+  readonly kind: "destination" | "event" | "service" | "pause";
   readonly slug: string;
+  /** Empty for a pause (the words are the assistant's). */
   readonly title: string;
-  readonly location: GeoPoint;
+  /** Null only for a pause. */
+  readonly location: GeoPoint | null;
   readonly status: PlanStopStatus;
   /** Straight line from the previous stop (or the start); null for the start itself. */
   readonly legMeters: number | null;
@@ -76,6 +112,8 @@ export interface PlanStop {
   /** An event's local times today (minutes; negative or past 1440 when another day). */
   readonly eventStart: number | null;
   readonly eventEnd: number | null;
+  /** For a visit with children, as the municipality marked it (ADR-072). */
+  readonly kids: boolean | null;
 }
 
 export type PlanOutcome =
@@ -87,7 +125,9 @@ export type PlanOutcome =
   /** The visitor is far from every place (another city): no walking plan from there. */
   | "too_far"
   /** Too late for a plan of today. */
-  | "day_over";
+  | "day_over"
+  /** Nothing can be visited in the time asked (ADR-072). */
+  | "too_short";
 
 export interface PlanResult {
   readonly intent: PlanIntent;
@@ -98,6 +138,10 @@ export interface PlanResult {
   readonly stops: readonly PlanStop[];
   /** Local clock of the moment the plan was made. */
   readonly clock: LocalClock;
+  /** The kind of visit asked (a plan for today only). */
+  readonly visit: PlanVisit | null;
+  /** When a plan with a time must end, local minutes (ADR-072); null without a time. */
+  readonly endsAt: number | null;
 }
 
 export const PLAN_RULES = {
@@ -126,15 +170,45 @@ export const PLAN_RULES = {
   dayEnd: 22 * 60,
   /** Asked later than this, there is no plan for today. */
   lastStart: 21 * 60,
+  /** With children (ADR-072): the longest walk between two stops. */
+  kidsMaxLegMeters: 1_500,
+  /** With children, a suitable place is worth this many more minutes of walking. */
+  kidsBonusMinutes: 20,
+  /** The most stops of a plan with a time (lunch not counted), by its minutes. */
+  hourStops: [
+    [60, 3],
+    [120, 4],
+  ] as readonly (readonly [number, number])[],
+  longStops: 6,
+  fullDayStops: 8,
+  /** Lunch of a full day: it starts between these (local minutes) and lasts `lunchMinutes`. */
+  lunchFrom: 11 * 60 + 30,
+  lunchEarliest: 11 * 60,
+  lunchLatest: 14 * 60,
+  lunchMinutes: 60,
+  /** The farthest place to eat from where the visitor is. */
+  lunchMaxMeters: 1_500,
 } as const;
+
+/** The most stops of a plan for today (lunch not counted). */
+export function stopLimit(visit: PlanVisit | null | undefined): number {
+  const length = visit?.length ?? null;
+  if (length === null) return PLAN_RULES.todayStops;
+  if (length.kind === "full_day") return PLAN_RULES.fullDayStops;
+  for (const [minutes, stops] of PLAN_RULES.hourStops) if (length.minutes <= minutes) return stops;
+  return PLAN_RULES.longStops;
+}
 
 interface Candidate {
   readonly key: PlanPlaceKey;
-  readonly kind: "destination" | "event";
+  readonly kind: "destination" | "event" | "service";
   readonly slug: string;
   readonly title: string;
   readonly location: GeoPoint;
   readonly hours: OpeningHours | null;
+  /** A destination's visit time (ADR-072). */
+  readonly stay: number;
+  readonly kids: boolean | null;
   /** Events: local minutes from today's midnight. */
   readonly start: number;
   readonly end: number;
@@ -151,6 +225,8 @@ function candidates(input: PlanInput, clock: LocalClock): Candidate[] {
       title: destination.title,
       location: destination.location,
       hours: destination.hours,
+      stay: destination.visitMinutes ?? PLAN_RULES.visitMinutes,
+      kids: destination.kids ?? null,
       start: Number.NEGATIVE_INFINITY,
       end: Number.POSITIVE_INFINITY,
     });
@@ -168,6 +244,8 @@ function candidates(input: PlanInput, clock: LocalClock): Candidate[] {
       title: event.title,
       location: event.location,
       hours: null,
+      stay: PLAN_RULES.eventMinutes,
+      kids: event.kids ?? null,
       start: minutesFromDayStart(starts, clock, input.timezone),
       end: minutesFromDayStart(ends, clock, input.timezone),
     });
@@ -196,13 +274,18 @@ interface Visit {
   readonly closesAt: number | null;
 }
 
-/** Whether (and how) a candidate can be visited when arriving at `arrive`; null when not. */
+/**
+ * Whether (and how) a candidate can be visited when arriving at `arrive`; null when not.
+ * `planEnd`: a plan with a time ends there (ADR-072): the visit is cut to end by then, and
+ * left out when not even its shortest visit fits.
+ */
 function visitAt(
   candidate: Candidate,
   arrive: number,
   clock: LocalClock,
   stay: number,
   dayEnd: number,
+  planEnd: number = Number.POSITIVE_INFINITY,
 ): Visit | null {
   if (candidate.kind === "event") {
     // Rule 1 again, at the planned time: an event over by then is not a stop.
@@ -210,17 +293,22 @@ function visitAt(
     if (candidate.start - arrive > PLAN_RULES.maxWaitMinutes) return null;
     const start = Math.max(arrive, candidate.start);
     if (start >= dayEnd) return null;
+    const leave = Math.min(candidate.end, start + PLAN_RULES.eventMinutes, planEnd);
+    if (leave - start < PLAN_RULES.minEventMinutes) return null;
     return {
       status: start <= arrive && candidate.start <= arrive ? "ongoing" : "upcoming",
       arrive,
       start,
-      leave: Math.min(candidate.end, start + PLAN_RULES.eventMinutes),
+      leave,
       closesAt: null,
     };
   }
   if (arrive >= dayEnd) return null;
+  // The shortest visit: 30 minutes, or the place's own time when shorter (ADR-072).
+  const need = Math.min(stay, PLAN_RULES.minVisitMinutes);
+  if (arrive + need > planEnd) return null;
   // Rule 2: with published hours, it must be open on arrival and long enough to visit.
-  if (!isOpenThrough(candidate.hours, clock, arrive, arrive + PLAN_RULES.minVisitMinutes)) {
+  if (!isOpenThrough(candidate.hours, clock, arrive, arrive + need)) {
     return null;
   }
   const closes = closingAfter(candidate.hours, clock, arrive);
@@ -233,7 +321,7 @@ function visitAt(
           : "open",
     arrive,
     start: arrive,
-    leave: Math.min(arrive + stay, closes),
+    leave: Math.min(arrive + stay, closes, planEnd),
     closesAt: Number.isFinite(closes) ? closes : null,
   };
 }
@@ -261,6 +349,7 @@ function stopOf(candidate: Candidate, legMeters: number | null, visit: Visit | n
     closesAt: visit?.closesAt ?? null,
     eventStart: candidate.kind === "event" ? candidate.start : null,
     eventEnd: candidate.kind === "event" ? candidate.end : null,
+    kids: candidate.kids,
   };
 }
 
@@ -296,6 +385,8 @@ function result(
     originKey: input.origin?.kind === "place" ? input.origin.key : null,
     stops,
     clock,
+    visit: input.intent === "today" ? (input.visit ?? null) : null,
+    endsAt: null,
   };
 }
 
@@ -433,55 +524,205 @@ function startingPoint(input: PlanInput, all: Candidate[]): PlanOrigin | "too_fa
   return centre ? { kind: "place", key: centre.key, point: centre.point } : null;
 }
 
+/** The places to eat as candidates for the lunch of a full day. */
+function lunchPlaces(input: PlanInput): Candidate[] {
+  return (input.services ?? []).flatMap((service) =>
+    service.location
+      ? [
+          {
+            key: `service:${service.slug}` as const,
+            kind: "service" as const,
+            slug: service.slug,
+            title: service.title,
+            location: service.location,
+            hours: service.hours,
+            stay: PLAN_RULES.lunchMinutes,
+            kids: null,
+            start: Number.NEGATIVE_INFINITY,
+            end: Number.POSITIVE_INFINITY,
+          },
+        ]
+      : [],
+  );
+}
+
+/**
+ * Lunch at `time` (ADR-072): the nearest place to eat open for the whole hour (or without
+ * published hours: «confírmalo»), or a pause where the visitor is. Null when not even the
+ * pause fits before the plan ends.
+ */
+function lunchStop(
+  places: readonly Candidate[],
+  at: GeoPoint | null,
+  origin: PlanOrigin,
+  time: number,
+  clock: LocalClock,
+  planEnd: number,
+): { stop: PlanStop; leave: number; at: GeoPoint | null } | null {
+  let best: { candidate: Candidate; meters: number; arrive: number } | null = null;
+  for (const candidate of places) {
+    const meters = at ? distanceMeters(at, candidate.location) : fromOrigin(origin, candidate);
+    if (meters === null || meters > PLAN_RULES.lunchMaxMeters) continue;
+    const arrive = time + walk(meters);
+    if (arrive > PLAN_RULES.lunchLatest || arrive + PLAN_RULES.lunchMinutes > planEnd) continue;
+    if (!isOpenThrough(candidate.hours, clock, arrive, arrive + PLAN_RULES.lunchMinutes)) continue;
+    if (!best || meters < best.meters) best = { candidate, meters, arrive };
+  }
+  if (best) {
+    const leave = best.arrive + PLAN_RULES.lunchMinutes;
+    const closes = closingAfter(best.candidate.hours, clock, best.arrive);
+    return {
+      stop: {
+        ...stopOf(best.candidate, best.meters, {
+          status:
+            best.candidate.hours === null
+              ? "unknown_hours"
+              : best.candidate.hours.mode === "always"
+                ? "always"
+                : "open",
+          arrive: best.arrive,
+          start: best.arrive,
+          leave,
+          closesAt: Number.isFinite(closes) ? closes : null,
+        }),
+      },
+      leave,
+      at: best.candidate.location,
+    };
+  }
+  if (time + PLAN_RULES.lunchMinutes > planEnd) return null;
+  return {
+    stop: {
+      key: "pause:lunch",
+      kind: "pause",
+      slug: "lunch",
+      title: "",
+      location: null,
+      status: "always",
+      legMeters: null,
+      walkMinutes: null,
+      arriveAt: time,
+      leaveAt: time + PLAN_RULES.lunchMinutes,
+      closesAt: null,
+      eventStart: null,
+      eventEnd: null,
+      kids: null,
+    },
+    leave: time + PLAN_RULES.lunchMinutes,
+    at,
+  };
+}
+
 function today(input: PlanInput, clock: LocalClock, all: Candidate[]): PlanResult {
+  const visit = input.visit ?? null;
   if (clock.minutes >= PLAN_RULES.lastStart) return result(input, clock, "day_over", []);
   const origin = startingPoint(input, all);
   if (origin === "too_far") return result(input, clock, "too_far", []);
   if (!origin) return result(input, clock, "nothing", []);
   const planInput = { ...input, origin };
   const dayEnd = Math.max(PLAN_RULES.dayEnd, clock.minutes + PLAN_RULES.minVisitMinutes);
+  // A plan with a time never ends after it (ADR-072); the full day and the plan of ADR-039
+  // end with the day.
+  const length = visit?.length ?? null;
+  const planEnd =
+    length?.kind === "hours"
+      ? Math.min(dayEnd, clock.minutes + length.minutes)
+      : length?.kind === "full_day"
+        ? dayEnd
+        : Number.POSITIVE_INFINITY;
+  const kids = visit?.kids ?? false;
+  const maxLeg = kids ? PLAN_RULES.kidsMaxLegMeters : PLAN_RULES.maxLegMeters;
+  const limit = stopLimit(visit);
+  const eat = lunchPlaces(input);
+  let lunchPending = length?.kind === "full_day" && clock.minutes <= PLAN_RULES.lunchLatest;
 
-  // Today's events only: the plan never waits for tomorrow.
+  // Today's events only: the plan never waits for tomorrow. With children, never a place
+  // the municipality marked as not recommended for them.
   const left = all.filter(
-    (candidate) => candidate.kind === "destination" || candidate.start < MINUTES_PER_DAY,
+    (candidate) =>
+      (candidate.kind === "destination" || candidate.start < MINUTES_PER_DAY) &&
+      !(kids && candidate.kids === false),
   );
   const stops: PlanStop[] = [];
+  let visits = 0;
   let time = clock.minutes;
   let at: GeoPoint | null = null;
-  // The starting place, when it can be visited now, is the first stop.
-  if (origin.kind === "place") {
+  const pick = (beforeLunch: boolean) => {
+    let best: { candidate: Candidate; meters: number; visit: Visit; cost: number } | null = null;
+    for (const candidate of left) {
+      const meters = at ? distanceMeters(at, candidate.location) : fromOrigin(origin, candidate);
+      if (meters === null || meters > maxLeg) continue;
+      const found = visitAt(candidate, time + walk(meters), clock, candidate.stay, dayEnd, planEnd);
+      if (!found) continue;
+      // While lunch is pending, no visit ends after its latest start.
+      if (beforeLunch && found.leave > PLAN_RULES.lunchLatest) continue;
+      // Shortest walk plus waiting; an event is worth a little more walking (it happens once),
+      // and with children so is a place suitable for them.
+      const cost =
+        walk(meters) +
+        (found.start - found.arrive) -
+        (candidate.kind === "event" ? 15 : 0) -
+        (kids && candidate.kids === true ? PLAN_RULES.kidsBonusMinutes : 0);
+      if (!best || cost < best.cost || (cost === best.cost && meters < best.meters)) {
+        best = { candidate, meters, visit: found, cost };
+      }
+    }
+    return best;
+  };
+  const eatNow = () => {
+    lunchPending = false;
+    const lunch = lunchStop(eat, at, origin, time, clock, planEnd);
+    if (!lunch) return;
+    stops.push(lunch.stop);
+    time = lunch.leave;
+    at = lunch.at;
+  };
+  // The starting place, when it can be visited now, is the first stop (after lunch, when the
+  // full day starts at noon).
+  if (origin.kind === "place" && lunchPending && time >= PLAN_RULES.lunchFrom) {
+    at = origin.point;
+  } else if (origin.kind === "place") {
     const start = left.find((candidate) => candidate.key === origin.key);
-    const visit = start && visitAt(start, time, clock, PLAN_RULES.visitMinutes, dayEnd);
-    if (start && visit) {
-      stops.push(stopOf(start, null, visit));
+    const found = start && visitAt(start, time, clock, start.stay, dayEnd, planEnd);
+    if (start && found && !(lunchPending && found.leave > PLAN_RULES.lunchLatest)) {
+      stops.push(stopOf(start, null, found));
       left.splice(left.indexOf(start), 1);
-      time = visit.leave;
+      visits += 1;
+      time = found.leave;
       at = start.location;
     } else {
       at = origin.point;
     }
   }
-  while (stops.length < PLAN_RULES.todayStops) {
-    let best: { candidate: Candidate; meters: number; visit: Visit; cost: number } | null = null;
-    for (const candidate of left) {
-      const meters = at ? distanceMeters(at, candidate.location) : fromOrigin(origin, candidate);
-      if (meters === null || meters > PLAN_RULES.maxLegMeters) continue;
-      const visit = visitAt(candidate, time + walk(meters), clock, PLAN_RULES.visitMinutes, dayEnd);
-      if (!visit) continue;
-      // Shortest walk plus waiting; an event is worth a little more walking (it happens once).
-      const cost =
-        walk(meters) + (visit.start - visit.arrive) - (candidate.kind === "event" ? 15 : 0);
-      if (!best || cost < best.cost || (cost === best.cost && meters < best.meters)) {
-        best = { candidate, meters, visit, cost };
+  while (visits < limit) {
+    if (lunchPending && time > PLAN_RULES.lunchLatest) lunchPending = false;
+    if (lunchPending && time >= PLAN_RULES.lunchFrom) {
+      eatNow();
+      continue;
+    }
+    let best = pick(lunchPending);
+    if (!best && lunchPending) {
+      // Nothing ends before lunch: lunch now when it is close to noon, or plan the day
+      // without it.
+      if (time >= PLAN_RULES.lunchEarliest) {
+        eatNow();
+        continue;
       }
+      lunchPending = false;
+      best = pick(false);
     }
     if (!best) break;
     stops.push(stopOf(best.candidate, best.meters, best.visit));
     left.splice(left.indexOf(best.candidate), 1);
+    visits += 1;
     time = best.visit.leave;
     at = best.candidate.location;
   }
-  return result(planInput, clock, "ok", stops);
+  const outcome = stops.length === 0 && length?.kind === "hours" ? "too_short" : "ok";
+  return {
+    ...result(planInput, clock, outcome, stops),
+    endsAt: Number.isFinite(planEnd) ? planEnd : null,
+  };
 }
 
 function route(input: PlanInput, clock: LocalClock, all: Candidate[]): PlanResult {

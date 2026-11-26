@@ -15,6 +15,7 @@ import {
   type PublishedNoticeReader,
   type PublishedServiceReader,
   type PublishedStoryReader,
+  type PlanTraitReader,
   type PublishedContentIndexReader,
   type PublishedRewardReader,
   type PublishedStampReader,
@@ -35,6 +36,7 @@ import {
   createSupabasePublishedWebLinkReader,
   type PublishedWebLinkReader,
   createSupabasePublishedContentIndexReader,
+  createSupabasePlanTraitReader,
   createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
   createSupabasePublishedTourReader,
@@ -228,6 +230,19 @@ export function publishedWebLinkReader(): PublishedWebLinkReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedWebLinks;
+}
+
+let planTraits: PlanTraitReader | undefined;
+
+/** The visit time and «for children» of what is published, for the plans (ADR-072). */
+export function planTraitReader(): PlanTraitReader {
+  if (planTraits) return planTraits;
+  const { env } = platformSettings();
+  planTraits = createSupabasePlanTraitReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return planTraits;
 }
 
 let publishedIndex: PublishedContentIndexReader | undefined;

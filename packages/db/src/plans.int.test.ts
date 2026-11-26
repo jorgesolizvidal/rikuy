@@ -22,6 +22,7 @@ import {
   createSupabasePublishedEventReader,
 } from "./content";
 import { env, stackAvailable } from "./integration/local-stack";
+import { createSupabasePlanTraitReader } from "./plan-traits";
 
 const NORTE = "5eed1000-0000-4000-8000-000000000001";
 
@@ -45,6 +46,17 @@ describe.runIf(stackAvailable)("plans with the portal's published data", () => {
     expect(
       (await readers.destinations.openingHours("5eed1000-0000-4000-8000-000000000002")).size,
     ).toBe(0);
+  });
+
+  it("reads the visit time and «for children» of what is published (ADR-072)", async () => {
+    const traits = await createSupabasePlanTraitReader({
+      url: env.url,
+      publishableKey: env.publishableKey,
+    }).planTraits(NORTE);
+    expect(traits.get("destination:mirador-del-valle")).toEqual({ visitMinutes: 60, kids: true });
+    expect(traits.get("destination:plaza-principal")).toEqual({ visitMinutes: null, kids: true });
+    // The never-published draft has none.
+    expect(traits.has("destination:feria-de-los-domingos")).toBe(false);
   });
 
   it("never recommends the event that already ended, even as the nearest place", async () => {

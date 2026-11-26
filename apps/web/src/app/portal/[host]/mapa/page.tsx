@@ -63,13 +63,16 @@ function requestedCenter(query: Record<string, string | string[] | undefined>) {
   return lat === null || lng === null ? null : { lat, lng, zoom: 15 };
 }
 
-/** `?ruta=destination:plaza,event:feria` (a plan of the assistant): place keys, in order. */
+/**
+ * `?ruta=destination:plaza,event:feria,service:comedor` (a plan of the assistant): place keys,
+ * in order; a place to eat is the lunch of a full day (ADR-072).
+ */
 function requestedRoute(query: Record<string, string | string[] | undefined>): string[] {
   const value = query[MAP_ROUTE_QUERY];
   if (typeof value !== "string") return [];
   const keys = value
     .split(",")
-    .filter((key) => /^(?:destination|event):[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(key));
+    .filter((key) => /^(?:destination|event|service):[a-z0-9]+(?:-[a-z0-9]+)*$/u.test(key));
   return [...new Set(keys)].slice(0, MAP_ROUTE_MAX);
 }
 
@@ -114,10 +117,13 @@ export default async function MapPage({ params, searchParams }: MapPageProps) {
 
   // The stops that are still on the map (an event that ended meanwhile is not), in order.
   const byKey = new Map(places.map((place) => [`${place.kind}:${place.slug}`, place]));
+  const serviceByKey = new Map(servicePoints.map((point) => [point.key, point]));
   const route = routeKeys
     .flatMap((key) => {
       const place = byKey.get(key);
-      return place ? [{ ...toMapPoint(place, extras), order: 0 }] : [];
+      if (place) return [{ ...toMapPoint(place, extras), order: 0 }];
+      const service = serviceByKey.get(key);
+      return service ? [{ ...service, order: 0 }] : [];
     })
     .map((point, index) => ({ ...point, order: index + 1 }));
   const routeArea =

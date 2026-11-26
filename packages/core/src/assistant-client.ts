@@ -13,7 +13,8 @@ export type {
   AssistantPlanStop,
   AssistantPlanSummary,
 } from "./application/assistant/plan";
-export type { PlanIntent } from "./domain/plan/engine";
+export type { PlanIntent, PlanVisit } from "./domain/plan/engine";
+export type { VisitLengthChoice } from "./domain/assistant/request";
 export type { AiNotice } from "./application/ai/notices";
 export type { PublicCitation } from "./contracts/knowledge";
 export * from "./contracts/voice";

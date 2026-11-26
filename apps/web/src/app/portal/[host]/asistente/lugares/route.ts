@@ -14,13 +14,15 @@ interface PlacesContext {
 async function handle(_request: Request, { params }: PlacesContext) {
   const view = await portalViewWith((await params).host, "assistant");
   if (view === null) return Response.json({ error: "not_found" }, { status: 404 });
-  const { destinations, events } = await portalPlanPlaces(view);
+  const { destinations, events, services = [] } = await portalPlanPlaces(view);
   const places = [
     ...destinations.map((place) => ({
       key: `destination:${place.slug}`,
       location: place.location,
     })),
     ...events.map((place) => ({ key: `event:${place.slug}`, location: place.location })),
+    // The places to eat of a full day (ADR-072).
+    ...services.map((place) => ({ key: `service:${place.slug}`, location: place.location })),
   ].flatMap(({ key, location }) =>
     location ? [{ key, lat: location.lat, lng: location.lng }] : [],
   );

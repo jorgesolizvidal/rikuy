@@ -24,6 +24,7 @@ import {
   type SaveDestinationState,
 } from "../actions";
 import { HoursField } from "./hours-field";
+import { PlanFields } from "./plan-fields";
 import { fromHoursValues, type HoursValues } from "./hours-values";
 import { CoverField, GalleryField, type EditorImage } from "./image-fields";
 import { LocationField } from "./location-field";
@@ -44,6 +45,9 @@ export interface EditorValues {
   readonly venueId?: string | null;
   /** The municipality's category (ADR-062). */
   readonly categoryId?: string | null;
+  /** How long a visit takes (destinations) and «for children» (ADR-072). */
+  readonly visitMinutes?: number | null;
+  readonly kids?: boolean | null;
 }
 
 /** A category the editor offers (of this kind, in the municipality's order). */
@@ -102,6 +106,7 @@ const FIELD_MESSAGES = {
   schedule: "Revisa la fecha y la hora (un evento dura como máximo un año).",
   venue: "Ese destino ya no está disponible. Elige otro o ninguno.",
   category: "Esa categoría ya no existe. Elige otra o ninguna.",
+  plan: "Revisa el tiempo de visita y «Para ir con niños».",
   hours:
     "Revisa el horario: cada día abre antes de cerrar, el segundo horario empieza después de que cierra el primero, y al menos un día está abierto.",
 } as const;
@@ -118,6 +123,7 @@ function fieldErrors(issues: readonly DestinationIssue[] = []) {
       | "schedule"
       | "venue"
       | "category"
+      | "plan"
       | "hours",
       string
     >
@@ -143,6 +149,7 @@ function fieldErrors(issues: readonly DestinationIssue[] = []) {
             : FIELD_MESSAGES.schedule;
     else if (head === "venueId") errors.venue = FIELD_MESSAGES.venue;
     else if (head === "categoryId") errors.category = FIELD_MESSAGES.category;
+    else if (head === "visitMinutes" || head === "kids") errors.plan = FIELD_MESSAGES.plan;
     else if (head === "hours") errors.hours = FIELD_MESSAGES.hours;
     else if (head === "cover") errors.coverAlt = FIELD_MESSAGES.alt;
     else if (head === "gallery" && third === "alt") galleryAlts.add(Number(second));
@@ -249,6 +256,8 @@ export function DestinationEditor({
         : {}),
       ...(kind === "destination" && values.hours ? { hours: fromHoursValues(values.hours) } : {}),
       categoryId: values.categoryId ?? null,
+      ...(kind === "destination" ? { visitMinutes: values.visitMinutes ?? null } : {}),
+      kids: values.kids ?? null,
     };
     startTransition(() => dispatch({ payload, snapshot: JSON.stringify(values) }));
   }
@@ -459,6 +468,16 @@ export function DestinationEditor({
           onChange={(hours) => set("hours", hours)}
         />
       ) : null}
+
+      <PlanFields
+        kind={kind === "event" ? "event" : "destination"}
+        visitMinutes={values.visitMinutes ?? null}
+        kids={values.kids ?? null}
+        disabled={locked}
+        error={errors.plan}
+        onVisitMinutes={(minutes) => set("visitMinutes", minutes)}
+        onKids={(kids) => set("kids", kids)}
+      />
 
       <LocationField
         value={values.location}
