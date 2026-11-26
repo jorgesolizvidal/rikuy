@@ -95,3 +95,9 @@ export { createCopilotRepository } from "./copilot";
 export { createMetricsRepository } from "./metrics";
 export { createEvalRepository } from "./evaluations";
 export { createCategoryRepository, createSupabasePublishedContentIndexReader } from "./categories";
+export {
+  createEmbedRepository,
+  createPlatformEmbedRepository,
+  createSupabasePublishedWebLinkReader,
+  type PublishedWebLinkReader,
+} from "./embed";

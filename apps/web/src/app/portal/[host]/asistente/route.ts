@@ -1,7 +1,9 @@
 import { after } from "next/server";
 
 import { recordUnansweredQuestion } from "@/server/ai-gateway";
-import { askPortalAssistant, assistantPlaceCards } from "@/server/portal-assistant";
+import { parseAssistantChannel } from "@rikuy/core";
+
+import { askPortalAssistant, assistantPlaceCards, linkAnswer } from "@/server/portal-assistant";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalViewWith } from "@/server/portal-view";
 import { measured } from "@/server/measured-route";
@@ -49,9 +51,12 @@ async function handle(request: Request, { params }: AssistantContext) {
     const tenantId = view.context.tenant.tenantId;
     after(() => recordUnansweredQuestion(tenantId, unanswered));
   }
-  // What the places it names look like (ADR-065), from what is published.
-  const places = await assistantPlaceCards(view, reply);
-  return Response.json(places.length > 0 ? { ...reply, places } : reply, {
+  // What the places it names look like (ADR-065), from what is published; and where each
+  // item leads, given where it was asked (ADR-071).
+  const channel = parseAssistantChannel(new URL(request.url).searchParams.get("canal"));
+  const linked = await linkAnswer(view, channel, reply, await assistantPlaceCards(view, reply));
+  const places = linked.cards;
+  return Response.json(places.length > 0 ? { ...linked.reply, places } : linked.reply, {
     status: reply.status === "invalid" ? 400 : 200,
     headers: NO_STORE,
   });

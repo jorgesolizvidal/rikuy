@@ -1,0 +1,143 @@
+/* The assistant's own pages (ADR-071): «Pregúntale a …» and the website's frame. The
+   municipality's colors and fonts come from .portal (portal.css); nothing else of the portal. */
+
+.ask-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem var(--edge);
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.ask-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.625rem;
+  min-width: 0;
+  color: var(--fg);
+  text-decoration: none;
+}
+
+.portal .ask-brand {
+  color: var(--fg);
+}
+
+.ask-logo {
+  width: auto;
+  height: 2.5rem;
+  max-width: 6rem;
+  object-fit: contain;
+}
+
+.ask-brand-name {
+  overflow: hidden;
+  font-family: var(--font-display);
+  font-weight: var(--heading-weight);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ask-portal-link {
+  flex: none;
+  font-weight: 600;
+}
+
+.ask-main {
+  display: grid;
+  gap: 1rem;
+  width: 100%;
+  max-width: 44rem;
+  margin: 0 auto;
+  padding: 1.25rem var(--gutter) 2rem;
+  flex: 1;
+}
+
+.ask-intro {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.ask-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: clamp(1.5rem, 5vw, 2.25rem);
+  font-weight: var(--title-weight);
+  letter-spacing: var(--title-tracking);
+  line-height: 1.1;
+}
+
+.ask-lead {
+  margin: 0;
+  color: var(--muted);
+}
+
+.ask-place {
+  display: flex;
+  align-items: center;
+  gap: 0.875rem;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  background: var(--surface);
+}
+
+.ask-place p {
+  display: grid;
+  gap: 0.125rem;
+  min-width: 0;
+  margin: 0;
+}
+
+.ask-place-photo {
+  flex: none;
+  width: 5rem;
+  height: 5rem;
+  border-radius: var(--radius-media);
+  object-fit: cover;
+}
+
+.ask-place-kind {
+  color: var(--muted);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.ask-place-title {
+  overflow-wrap: anywhere;
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+}
+
+.ask-loading,
+.ask-unavailable {
+  margin: 0;
+  padding: 1rem;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius-card);
+  color: var(--muted);
+}
+
+.ask-footer {
+  display: grid;
+  gap: 0.25rem;
+  padding: 1rem var(--edge) 1.5rem;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 0.875rem;
+}
+
+.ask-footer nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem 1rem;
+}
+
+.ask-footer p {
+  margin: 0;
+}
+
+.ask-embed-unavailable {
+  margin: 1rem;
+}

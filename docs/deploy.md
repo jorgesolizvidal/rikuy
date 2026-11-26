@@ -118,7 +118,7 @@ Ningún dato del municipio entra al código ni a variables de entorno: todo se h
    - «Identificador» (se sugiere a partir del nombre);
    - «Dirección del portal», exactamente la del paso 1;
    - «Correo del propietario»: tu correo, para ser el propietario del municipio (debe poder recibir el código: con el correo incluido de Supabase, solo los miembros del equipo);
-   - «Módulos con los que empieza»: «Completo» (todo) o «Solo información» (destinos, agenda y mapa), según lo contratado ([ADR-060](adr/ADR-060-tenant-modules.md)).
+   - «Módulos con los que empieza»: «Completo» (todo), «Solo información» (portal con destinos, agenda y mapa) o «Solo asistente» (sin portal público, para un municipio con web propia: ver [«Asistente en la web del municipio»](#asistente-en-la-web-del-municipio-solo-asistente)), según lo contratado ([ADR-060](adr/ADR-060-tenant-modules.md), [ADR-071](adr/ADR-071-assistant-only.md)).
 
    La zona horaria es la de Bolivia (`America/La_Paz`).
 
@@ -133,6 +133,26 @@ Ningún dato del municipio entra al código ni a variables de entorno: todo se h
    - al publicar el primer destino o un evento próximo, la etiqueta desaparece sola en la siguiente visita.
 7. **Cuota:** cada municipio empieza con 300 MB de almacenamiento. Un panorama de 8K con sus teselas ocupa unos 17–20 MB. Antes de cargar muchos panoramas, súbela en `/plataforma` → «Cuotas por municipio». El total del plan gratuito de Supabase es de 1 GB para todos los municipios.
 8. **Equipo:** en el municipio → «Miembros», invita a administradores, editores y analistas cuando haga falta. Con SMTP configurado ([«Correo con SMTP gratuito»](#correo-con-smtp-gratuito-gmail)) les llega un correo con la invitación y pueden recibir su código; sin él, solo entran los miembros del equipo de la organización de Supabase.
+
+## Asistente en la web del municipio («Solo asistente»)
+
+Para un municipio que ya tiene su web y quiere el asistente en ella ([ADR-071](adr/ADR-071-assistant-only.md)). Sirve también para uno con portal que quiere además el asistente en su web.
+
+1. **Alta:** como en la sección anterior, con «Módulos con los que empieza» → «Solo asistente». Sin el módulo «Portal público», su dirección en Rikuy lleva a `/preguntar` y las demás páginas responden 404; los mapas, tours y pasaporte necesitan el portal. Se puede pasar a portal completo después encendiendo módulos en `/plataforma`.
+2. **Autorizar su web:** en `/plataforma` → «Módulos» del municipio → «Webs donde se puede insertar el asistente», escribe la dirección de su web (por ejemplo `https://www.municipio.gob.bo`, sin rutas) y «Autorizar la web». Hasta 10 webs. Llega en menos de un minuto.
+3. **La línea:** el equipo del municipio la copia en su panel → «Asistente en tu web» y la pega en la plantilla de su web (antes de `</body>`):
+
+   ```html
+   <script src="https://{dirección del municipio en Rikuy}/insertar.js" async></script>
+   ```
+
+   En una página de su web sobre un lugar, `data-lugar="destinos/{dirección}"` (o `agenda/{dirección}`) hace que el asistente responda ya sabiendo de qué lugar se trata.
+
+4. **Enlaces a su web:** en cada destino, evento, aviso, servicio y relato, «Página en la web del municipio» (propietarios y administradores). Las respuestas del asistente llevan ahí dentro de su web, y siempre si no tiene portal; sin ese enlace, la fuente se muestra sin enlace.
+5. **QR «Pregúntale a …»:** el general está en «Asistente en tu web»; el de cada lugar, en el editor de cada destino y evento publicado. Abren el asistente en una página de Rikuy con la marca del municipio.
+6. **Comprobar:** en la web del municipio aparece el botón «Pregúntale a …», abre el asistente y responde; en cualquier otra web no aparece nada.
+
+La web del municipio puede tener su propia `Permissions-Policy`: si bloquea el micrófono o la ubicación, el dictado y «¿Qué hay cerca?» no funcionan dentro de su web (en la página del QR, sí).
 
 ## Verificación en dos pasos de propietarios y administradores
 

@@ -19,13 +19,13 @@ const jakartaVersion = versionOf(
 const bricolageVersion = versionOf(require.resolve("@fontsource/bricolage-grotesque/package.json"));
 
 /**
- * Baseline security headers. A full Content-Security-Policy is introduced with the portal
+ * Baseline security headers. X-Frame-Options is set by the proxy on every page it serves, so
+ * the assistant's frame can carry its own frame-ancestors instead (ADR-071). A full Content-Security-Policy is introduced with the portal
  * (P3), once map tiles, Storage CDN and the 360°/3D viewers are known origins.
  */
 const securityHeaders = [
   { key: "X-Content-Type-Options", value: "nosniff" },
   { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
-  { key: "X-Frame-Options", value: "DENY" },
   // Camera: the passport's code scanner (ADR-064); microphone: the assistant's dictation
   // (ADR-041); location: the visitor's (ADR-021). Only this origin, and only when the visitor
   // allows it in the browser.
@@ -65,6 +65,11 @@ const nextConfig: NextConfig = {
       {
         source: "/vendor/:path*",
         headers: [{ key: "Cache-Control", value: "public, max-age=31536000, immutable" }],
+      },
+      // The line a municipality pastes into its website (ADR-071): not versioned, so short.
+      {
+        source: "/insertar.js",
+        headers: [{ key: "Cache-Control", value: "public, max-age=3600" }],
       },
     ];
   },

@@ -53,6 +53,11 @@ export interface AssistantTenant {
   readonly presentation: TenantPresentation;
   /** The municipality has visible tours (the general tour is a section). */
   readonly hasTours: boolean;
+  /**
+   * The municipality has its public portal (ADR-071). Without it the assistant names no
+   * section of a portal; absent means it has one.
+   */
+  readonly portal?: boolean;
 }
 
 export interface AssistantDeps {
@@ -204,7 +209,10 @@ function siteOf(tenant: AssistantTenant): AssistantSite {
     address: contact.address ?? null,
     phone: contact.phone ?? null,
     email: contact.email ?? null,
-    sections: portalSectionLinks("es", tenant.hasTours).map((link) => link.label),
+    sections:
+      tenant.portal === false
+        ? []
+        : portalSectionLinks("es", tenant.hasTours).map((link) => link.label),
   };
 }
 

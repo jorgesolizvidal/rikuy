@@ -129,6 +129,11 @@ export interface PublicCitation {
   readonly label: string;
   /** Portal path (destination, event, tour scene), or null for documents. */
   readonly href: string | null;
+  /**
+   * Where it actually leads, when not `href` (ADR-071): the municipality's own page about it,
+   * or null for no link (no portal and no page of its own).
+   */
+  readonly link?: string | null;
   /** "pág. 14" or "págs. 14–15". */
   readonly page: string | null;
   readonly ended: boolean;

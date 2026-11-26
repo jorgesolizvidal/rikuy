@@ -5,6 +5,7 @@ import type { AssistantPlan, PublicCitation } from "@rikuy/core/assistant-client
 import { usePassport } from "@/lib/passport-store";
 
 import { ASSISTANT_CARD_SIZES, type AssistantPlaceCard } from "./assistant-cards";
+import { targetOf, useLinkProps } from "./assistant-links";
 import { LocationButton } from "./visitor-location";
 
 /**
@@ -129,6 +130,7 @@ export function AnswerSources({
   readonly lang: Lang;
 }) {
   const stampedOf = useStamps();
+  const link = useLinkProps();
   if (sources.length === 0) return null;
   const words = WORDS[lang];
   const known = byHref(cards);
@@ -147,9 +149,10 @@ export function AnswerSources({
       <p className="assistant-sources-title">{words.sources}</p>
       {placeCards.length > 0 ? (
         <ul className="assistant-cards">
-          {placeCards.map((card) => (
-            <li key={card.href}>
-              <a className="assistant-card" href={card.href}>
+          {placeCards.map((card) => {
+            const target = targetOf(card);
+            const body = (
+              <>
                 <Thumb card={card} size="6rem" />
                 <span className="assistant-card-body">
                   <span className="assistant-card-kicker">
@@ -160,19 +163,33 @@ export function AnswerSources({
                   {card.date ? <span className="assistant-card-date">{card.date}</span> : null}
                   <Badges card={card} stamped={stampedOf(card)} lang={lang} />
                 </span>
-              </a>
-            </li>
-          ))}
+              </>
+            );
+            return (
+              <li key={card.href}>
+                {/* Without a page to open (no portal, no page on the website: ADR-071), the
+                    card is shown all the same. */}
+                {target ? (
+                  <a className="assistant-card" {...link(target)}>
+                    {body}
+                  </a>
+                ) : (
+                  <div className="assistant-card">{body}</div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {others.length > 0 ? (
         <ul className="assistant-source-list">
           {others.map((source) => {
             const text = `${source.title}${source.page ? ` · ${source.page}` : ""}${source.ended ? ` · ${words.ended}` : ""}`;
+            const target = targetOf(source);
             return (
               <li key={`${source.href ?? ""}${source.title}${source.page ?? ""}`}>
                 <span className="assistant-source-kind">{source.label}</span>{" "}
-                {source.href ? <a href={source.href}>{text}</a> : <span>{text}</span>}
+                {target ? <a {...link(target)}>{text}</a> : <span>{text}</span>}
               </li>
             );
           })}
@@ -197,6 +214,7 @@ export function PlanCard({
   readonly lang: Lang;
 }) {
   const stampedOf = useStamps();
+  const link = useLinkProps();
   const words = WORDS[lang];
   if (plan.needsLocation) {
     return (
@@ -213,7 +231,7 @@ export function PlanCard({
   const cover = stopCards.find((card) => card?.image)?.image ?? null;
   const summary = plan.summary;
   const mapLink = plan.mapHref ? (
-    <a className="assistant-plan-map" href={plan.mapHref}>
+    <a className="assistant-plan-map" {...link(plan.mapHref)}>
       <RouteIcon />
       {plan.intent === "nearby" ? words.nearby : words.route}
     </a>
@@ -283,7 +301,11 @@ export function PlanCard({
               </span>
               {card ? <Thumb card={card} size="4rem" /> : null}
               <span className="assistant-plan-body">
-                <a href={stop.href}>{stop.title}</a>
+                {targetOf(stop) ? (
+                  <a {...link(targetOf(stop) ?? stop.href)}>{stop.title}</a>
+                ) : (
+                  <span className="assistant-plan-name">{stop.title}</span>
+                )}
                 <span className="assistant-plan-kind">
                   {stop.kind === "event" ? words.event : words.destination}
                   {card?.category ? ` · ${card.category}` : ""}

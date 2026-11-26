@@ -1,6 +1,7 @@
 import { createClient } from "@supabase/supabase-js";
 import {
   TenantDirectoryUnavailableError,
+  type ModuleKey,
   type PortalTenant,
   type TenantDirectory,
 } from "@rikuy/core";
@@ -29,7 +30,19 @@ const rowSchema = z.object({
   is_demo: z.boolean().optional(),
   // Same for the modules (ADR-060): without them the portal has everything.
   modules: z.array(z.string()).nullable().optional(),
+  // The websites where the assistant may be embedded (ADR-071). Its absence means a database
+  // from before the «portal» module: every municipality there still has its portal.
+  embed_origins: z.array(z.string()).nullable().optional(),
 });
+
+/**
+ * The modules of a row. A database from before ADR-071 has no «portal» module, and the app is
+ * deployed minutes before the migration: there the portal is added, so no portal disappears.
+ */
+function modulesOf(keys: readonly string[], knowsPortal: boolean): ModuleKey[] {
+  const known = moduleKeysOf(keys) ?? [];
+  return knowsPortal || known.includes("portal") ? known : ["portal", ...known];
+}
 
 export function mapTenantRow(row: unknown): PortalTenant {
   const r = rowSchema.parse(row);
@@ -43,7 +56,10 @@ export function mapTenantRow(row: unknown): PortalTenant {
     isCanonical: r.is_canonical,
     activeConfigId: r.active_config_id,
     ...(r.is_demo ? { demo: true } : {}),
-    ...(r.modules ? { modules: moduleKeysOf(r.modules) ?? [] } : {}),
+    ...(r.modules ? { modules: modulesOf(r.modules, r.embed_origins !== undefined) } : {}),
+    ...(r.embed_origins && r.embed_origins.length > 0
+      ? { embedOrigins: r.embed_origins.slice(0, 10) }
+      : {}),
   };
 }
 

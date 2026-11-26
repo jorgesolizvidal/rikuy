@@ -166,7 +166,7 @@ describe("provisioning", () => {
     });
     expect(id.emails).toEqual(["duena@demo-este.example.test"]);
     expect(p.calls).toEqual([
-      "provision:demo-este:demo-este.localhost:user-for-duena@demo-este.example.test:agenda,map,tours,models,passport,assistant,voice,copilot,services,community_memory",
+      "provision:demo-este:demo-este.localhost:user-for-duena@demo-este.example.test:portal,agenda,map,tours,models,passport,assistant,voice,copilot,services,community_memory",
     ]);
   });
 
@@ -176,7 +176,14 @@ describe("provisioning", () => {
       { ...valid, modulePackage: "information" },
       { platform: p.repo, identity: identity().admin, hosts: HOSTS },
     );
-    expect(p.calls[0]).toMatch(/:agenda,map,services,community_memory$/u);
+    expect(p.calls[0]).toMatch(/:portal,agenda,map,services,community_memory$/u);
+    const only = platform("ok");
+    await provisionTenant(
+      { ...valid, modulePackage: "assistant_only" },
+      { platform: only.repo, identity: identity().admin, hosts: HOSTS },
+    );
+    // «Solo asistente» (ADR-071): no public portal.
+    expect(only.calls[0]).toMatch(/:agenda,assistant,voice,copilot,services,community_memory$/u);
     expect(
       await provisionTenant(
         { ...valid, modulePackage: "todo" },
@@ -223,9 +230,14 @@ describe("provisioning", () => {
       status: "forbidden",
     });
     const p = platform("ok");
-    expect(await changeTenantModules(p.repo, TENANT, ["passport", "map"])).toEqual({
+    expect(await changeTenantModules(p.repo, TENANT, ["passport", "map", "portal"])).toEqual({
       status: "updated",
-      modules: ["map", "passport"],
+      modules: ["portal", "map", "passport"],
+    });
+    expect(await changeTenantModules(p.repo, TENANT, ["passport"])).toEqual({
+      status: "requires",
+      module: "passport",
+      needs: "portal",
     });
     expect(await changeTenantModules(p.repo, TENANT, ["models"])).toEqual({
       status: "requires",
@@ -241,7 +253,7 @@ describe("provisioning", () => {
       status: "updated",
       modules: [],
     });
-    expect(p.calls).toEqual([`modules:${TENANT}:map,passport`, `modules:${TENANT}:`]);
+    expect(p.calls).toEqual([`modules:${TENANT}:portal,map,passport`, `modules:${TENANT}:`]);
   });
 
   it("only allows activation or suspension", async () => {

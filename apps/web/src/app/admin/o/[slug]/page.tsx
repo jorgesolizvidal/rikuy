@@ -1,4 +1,10 @@
-import { canEditContent, hasModule, loadPanelOverview, type PanelContentCounts } from "@rikuy/core";
+import {
+  canEditContent,
+  hasModule,
+  loadPanelOverview,
+  PORTAL_PATHS,
+  type PanelContentCounts,
+} from "@rikuy/core";
 import type { Metadata } from "next";
 import Link from "next/link";
 
@@ -45,6 +51,9 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
   const base = `/o/${membership.slug}`;
   const canEdit = canEditContent(membership.role);
   const { portal, visits, questions, review, content } = overview;
+  // «Solo asistente» (ADR-071): no public portal, the assistant's own page instead.
+  const hasPortal = hasModule(membership.modules, "portal");
+  const visitorPath = hasPortal ? "" : PORTAL_PATHS.ask;
 
   return (
     <main id="contenido" tabIndex={-1} className="shell shell-wide panel-home">
@@ -70,11 +79,12 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             <li>
               <a
                 className="button button-quiet"
-                href={platformSettings().portalOrigin(portal.hostname)}
+                href={`${platformSettings().portalOrigin(portal.hostname)}${visitorPath}`}
                 target="_blank"
                 rel="noopener"
               >
-                Ver el portal<span className="visually-hidden"> (se abre en otra pestaña)</span>
+                {hasPortal ? "Ver el portal" : "Ver el asistente"}
+                <span className="visually-hidden"> (se abre en otra pestaña)</span>
               </a>
             </li>
           ) : null}
@@ -85,7 +95,7 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
         <h2 id="resumen">Resumen</h2>
         <ul className="summary-grid">
           <li className="summary-tile">
-            <p className="summary-label">Portal</p>
+            <p className="summary-label">{hasPortal ? "Portal" : "Asistente"}</p>
             <p className="summary-value">
               <span className="status-pill" data-status={portal.online ? "active" : "pending"}>
                 {portal.online ? "En línea" : "En preparación"}
@@ -93,17 +103,20 @@ export default async function OrganizationPage({ params }: OrganizationPageProps
             </p>
             <p className="summary-detail">
               {portal.online
-                ? "Los visitantes lo ven en su dirección."
+                ? hasPortal
+                  ? "Los visitantes lo ven en su dirección."
+                  : "Los visitantes lo usan en la web del municipio y con los QR «Pregúntale a …»."
                 : "Todavía no está en línea: lo pone en línea el operador de la plataforma."}
             </p>
             {portal.hostname ? (
               <a
                 className="summary-link"
-                href={platformSettings().portalOrigin(portal.hostname)}
+                href={`${platformSettings().portalOrigin(portal.hostname)}${visitorPath}`}
                 target="_blank"
                 rel="noopener"
               >
                 {portal.hostname}
+                {visitorPath}
                 <span className="visually-hidden"> (se abre en otra pestaña)</span>
               </a>
             ) : null}

@@ -44,6 +44,7 @@ flowchart TD
 - Panel de administración solo en el host central; cookies host-only, sin `Domain=` compartido.
 - Resolución: normalizar host → buscar en `tenant_domains` (activo y verificado) → `TenantContext` inmutable por request. Desconocido → 404; base de datos caída → 503. Nunca adivinar.
 - Implementación (`apps/web/src/proxy.ts`): solo se lee la cabecera `Host`; `X-Forwarded-Host` y cualquier `X-Tenant-*`/`X-Rikuy-*` entrante se ignoran o eliminan. Cada petición se reescribe a una ruta interna según su superficie — `/admin`, `/platform` o `/portal/{host}` — de modo que esas rutas no pueden alcanzarse directamente. El contexto viaja a la página en una cabecera interna validada y se contrasta con el host de la ruta. Caché por instancia: 60 s para hosts conocidos, 10 s para desconocidos, nunca para errores.
+- «Solo asistente» ([ADR-071](adr/ADR-071-assistant-only.md)): `/preguntar` y `/insertar` se reescriben a `/assistant/{host}` (fuera del layout del portal). Sin el módulo «Portal público», el proxy lleva `/` a `/preguntar` y responde el 404 del municipio a todo lo que no sea del asistente. El proxy pone `X-Frame-Options: DENY` en todas las respuestas, salvo el marco `/insertar`, que lleva `frame-ancestors` con las webs autorizadas del municipio (devueltas por `resolve_tenant_by_host`).
 
 ### Marca por tenant (white-label)
 

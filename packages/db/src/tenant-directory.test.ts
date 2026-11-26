@@ -59,7 +59,32 @@ describe("createSupabaseTenantDirectory", () => {
     const tenant = await createSupabaseTenantDirectory({ ...base, fetch }).findByHost(
       "demo-norte.localhost",
     );
-    expect(tenant?.modules).toEqual(["agenda", "passport"]);
+    // A database from before ADR-071 (no websites column): the portal is kept.
+    expect(tenant?.modules).toEqual(["portal", "agenda", "passport"]);
+  });
+
+  it("reads a municipality without its portal and its websites (ADR-071)", async () => {
+    const fetch = fakeFetch(() =>
+      Response.json([
+        { ...row, modules: ["assistant", "agenda"], embed_origins: ["https://www.muni.gob.bo"] },
+      ]),
+    );
+    const tenant = await createSupabaseTenantDirectory({ ...base, fetch }).findByHost(
+      "demo-norte.localhost",
+    );
+    expect(tenant?.modules).toEqual(["assistant", "agenda"]);
+    expect(tenant?.embedOrigins).toEqual(["https://www.muni.gob.bo"]);
+  });
+
+  it("knows the portal module once the database returns the websites, even with none", async () => {
+    const fetch = fakeFetch(() =>
+      Response.json([{ ...row, modules: ["portal", "agenda"], embed_origins: [] }]),
+    );
+    const tenant = await createSupabaseTenantDirectory({ ...base, fetch }).findByHost(
+      "demo-norte.localhost",
+    );
+    expect(tenant?.modules).toEqual(["portal", "agenda"]);
+    expect(tenant?.embedOrigins).toBeUndefined();
   });
 
   it("returns null for an unknown host", async () => {

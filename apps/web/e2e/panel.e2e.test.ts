@@ -166,7 +166,10 @@ describe("the municipality's panel with the design system (ADR-066)", () => {
           "Copilot",
         ],
       ],
-      ["Para visitantes", ["Pasaporte turístico", "Conocimiento del asistente"]],
+      [
+        "Para visitantes",
+        ["Pasaporte turístico", "Conocimiento del asistente", "Asistente en tu web"],
+      ],
       ["Resultados", ["Estadísticas", "Lo que preguntan los visitantes", "Informe mensual"]],
       ["Ajustes", ["Marca del portal", "Miembros", "Uso del plan"]],
     ]);

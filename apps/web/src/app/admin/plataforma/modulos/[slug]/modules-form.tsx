@@ -50,8 +50,18 @@ export function ModulesForm({
       if (on) next.add(key);
       else {
         next.delete(key);
-        // What needs it goes with it.
-        for (const item of MODULES) if (item.requires === key) next.delete(item.key);
+        // What needs it goes with it, and what needs that (the 3D models go with the tours,
+        // which go with the portal).
+        let removed = true;
+        while (removed) {
+          removed = false;
+          for (const item of MODULES) {
+            if (item.requires && !next.has(item.requires) && next.has(item.key)) {
+              next.delete(item.key);
+              removed = true;
+            }
+          }
+        }
       }
       return next;
     });

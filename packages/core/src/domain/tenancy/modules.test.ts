@@ -7,6 +7,7 @@ import {
   MODULE_PACKAGES,
   MODULES,
   passageVisibleWith,
+  portalPathAccess,
 } from "./modules";
 
 describe("modules of a municipality (ADR-060)", () => {
@@ -42,7 +43,16 @@ describe("modules of a municipality (ADR-060)", () => {
     expect(checkModuleSet(["restaurantes"])).toEqual({ status: "invalid" });
   });
 
-  it("both packages are valid sets", () => {
+  it("the map, the tours and the passport need the public portal (ADR-071)", () => {
+    for (const key of ["map", "tours", "passport"] as const) {
+      expect(checkModuleSet([key])).toEqual({ status: "requires", module: key, needs: "portal" });
+    }
+    expect(MODULE_PACKAGES.assistant_only).not.toContain("portal");
+    expect(MODULE_PACKAGES.information).toContain("portal");
+    expect(MODULE_PACKAGES.complete).toContain("portal");
+  });
+
+  it("every package is a valid set", () => {
     for (const modules of Object.values(MODULE_PACKAGES)) {
       expect(checkModuleSet([...modules]).status).toBe("ok");
     }
@@ -59,5 +69,50 @@ describe("what the assistant may read (ADR-060)", () => {
     expect(passageVisibleWith(["tours"], event)).toBe(false);
     expect(passageVisibleWith(["agenda"], event)).toBe(true);
     expect(passageVisibleWith([], destination)).toBe(true);
+  });
+});
+
+describe("a municipality without its public portal (ADR-071)", () => {
+  it("serves everything while it has its portal (or an older registry)", () => {
+    expect(portalPathAccess(undefined, "/destinos")).toBe("open");
+    expect(portalPathAccess(["portal"], "/mapa")).toBe("open");
+    expect(portalPathAccess(["portal"], "/")).toBe("open");
+  });
+
+  it("without it, only the assistant's pages, the legal pages and what browsers ask for", () => {
+    const modules = ["assistant", "agenda"] as const;
+    expect(portalPathAccess(modules, "/")).toBe("home");
+    for (const path of [
+      "/preguntar",
+      "/preguntar/destinos/museo",
+      "/insertar",
+      "/insertar/marca",
+      "/asistente",
+      "/asistente/dictado",
+      "/asistente/lugares",
+      "/privacidad",
+      "/terminos",
+      "/robots.txt",
+      "/manifest.webmanifest",
+      "/icon/32",
+      "/visita",
+    ]) {
+      expect(portalPathAccess(modules, path), path).toBe("open");
+    }
+    for (const path of [
+      "/destinos",
+      "/destinos/museo",
+      "/agenda",
+      "/avisos",
+      "/servicios",
+      "/memoria",
+      "/sitemap.xml",
+      "/preguntarx",
+      "/insertarlo",
+      "/privacidad/otra",
+      "/canje",
+    ]) {
+      expect(portalPathAccess(modules, path), path).toBe("closed");
+    }
   });
 });

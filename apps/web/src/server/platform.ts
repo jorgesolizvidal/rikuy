@@ -32,6 +32,8 @@ import {
   createSupabasePublishedNoticeReader,
   createSupabasePublishedServiceReader,
   createSupabasePublishedStoryReader,
+  createSupabasePublishedWebLinkReader,
+  type PublishedWebLinkReader,
   createSupabasePublishedContentIndexReader,
   createSupabasePublishedRewardReader,
   createSupabasePublishedStampReader,
@@ -213,6 +215,19 @@ export function publishedStoryReader(): PublishedStoryReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedStories;
+}
+
+let publishedWebLinks: PublishedWebLinkReader | undefined;
+
+/** «Página en la web del municipio» of what is published (anonymous, ADR-071). */
+export function publishedWebLinkReader(): PublishedWebLinkReader {
+  if (publishedWebLinks) return publishedWebLinks;
+  const { env } = platformSettings();
+  publishedWebLinks = createSupabasePublishedWebLinkReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedWebLinks;
 }
 
 let publishedIndex: PublishedContentIndexReader | undefined;
