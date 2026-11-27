@@ -44,7 +44,7 @@ async function handle(request: Request, { params }: AssistantContext) {
     body = null;
   }
 
-  const { reply, unanswered } = await askPortalAssistant(view, body, visitorKey(request));
+  const { reply, unanswered, ref } = await askPortalAssistant(view, body, visitorKey(request));
   // A question nothing published could answer is kept for the municipality (ADR-053), after
   // the answer is on its way.
   if (unanswered) {
@@ -56,7 +56,13 @@ async function handle(request: Request, { params }: AssistantContext) {
   const channel = parseAssistantChannel(new URL(request.url).searchParams.get("canal"));
   const linked = await linkAnswer(view, channel, reply, await assistantPlaceCards(view, reply));
   const places = linked.cards;
-  return Response.json(places.length > 0 ? { ...linked.reply, places } : linked.reply, {
+  // The answer's reference (ADR-073): sent back if the visitor then takes it to a person.
+  const shown = {
+    ...linked.reply,
+    ...(places.length > 0 ? { places } : {}),
+    ...(ref && reply.status !== "invalid" ? { ref } : {}),
+  };
+  return Response.json(shown, {
     status: reply.status === "invalid" ? 400 : 200,
     headers: NO_STORE,
   });

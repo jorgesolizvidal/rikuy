@@ -61,6 +61,16 @@ export interface PostgresAiLedger extends AiLedger, DictationLedger {
     tenantId: string,
     question: UnansweredQuestion,
   ): Promise<"recorded" | "ignored" | "capped">;
+  /**
+   * ai_api.record_person_request (ADR-073): the visitor took this answer's question to a
+   * person. Kept (masked) only for a recent request of this assistant and of this visitor;
+   * «ignored» before the migration.
+   */
+  recordPersonRequest(
+    tenantId: string,
+    visitor: string | null,
+    question: UnansweredQuestion,
+  ): Promise<"recorded" | "ignored" | "capped">;
   close(): Promise<void>;
 }
 
@@ -193,6 +203,23 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
         ) as outcome
       `;
       return recordedSchema.parse(row?.outcome);
+    },
+
+    async recordPersonRequest(tenantId, visitor, question) {
+      try {
+        const [row] = await sql`
+          select ai_api.record_person_request(
+            ${tenantId}::uuid, ${question.requestId}::uuid, ${visitor}::text, ${question.question},
+            ${question.lang}, ${question.page.kind}, ${question.page.slug}::text,
+            ${question.sceneId}::uuid
+          ) as outcome
+        `;
+        return recordedSchema.parse(row?.outcome);
+      } catch (error) {
+        // The web app may be deployed a few minutes before the migration.
+        if ((error as { code?: string }).code === "42883") return "ignored";
+        throw error;
+      }
     },
 
     async close() {

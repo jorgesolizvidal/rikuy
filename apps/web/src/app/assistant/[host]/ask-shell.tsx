@@ -1,4 +1,4 @@
-import { assistantPersona, monogram, PORTAL_PATHS } from "@rikuy/core";
+import { assistantPersona, helpDeskOf, monogram, PORTAL_PATHS } from "@rikuy/core";
 
 import { aiGatewayStatus } from "@/server/ai-gateway";
 import type { ResponsiveImage } from "@/server/portal-content";
@@ -110,6 +110,8 @@ export function AskShell({
             logo={view.logo?.webp ?? null}
             mark={monogram(identity.shortName)}
             voice={portalHas(view, "voice")}
+            helpDesk={helpDeskOf(view.resolved.presentation)}
+            timezone={view.context.tenant.timezone}
             pagePath={place?.pagePath ?? null}
           />
         ) : (

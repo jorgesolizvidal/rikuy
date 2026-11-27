@@ -1,4 +1,4 @@
-import { assistantPersona, monogram } from "@rikuy/core";
+import { assistantPersona, helpDeskOf, monogram } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
@@ -39,6 +39,8 @@ export default async function EmbedPage({ params }: EmbedPageProps) {
       logo={view.logo?.webp ?? null}
       mark={monogram(presentation.identity.shortName)}
       voice={portalHas(view, "voice")}
+      helpDesk={helpDeskOf(presentation)}
+      timezone={view.context.tenant.timezone}
     />
   );
 }

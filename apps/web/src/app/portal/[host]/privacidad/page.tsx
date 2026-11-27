@@ -169,6 +169,14 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               escribas tu nombre ni otros datos personales en las preguntas.
             </li>
             <li>
+              «Hablar con una persona» te muestra el WhatsApp, el teléfono y el correo de {siteName}
+              , con tu última pregunta ya escrita en el mensaje. El mensaje lo envías tú desde tu
+              teléfono: no pasa por el portal. Si tocas uno de esos botones, se guarda esa última
+              pregunta de la misma forma (sin nada que te identifique y por 90 días), marcada «pidió
+              una persona», para que el equipo sepa qué consultas necesitaron a alguien. No se
+              guarda lo que escribes en WhatsApp ni a quién llamas.
+            </li>
+            <li>
               Si tocas el micrófono para dictar, el navegador te pide permiso y graba solo mientras
               lo tienes activado, hasta 30 segundos. La grabación se envía al portal y de ahí a
               Groq, que la pasa a texto; ese texto aparece en el campo de la pregunta para que lo

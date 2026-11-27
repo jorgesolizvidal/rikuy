@@ -55,6 +55,10 @@ export interface UnansweredGroup {
   readonly langs: readonly ("es" | "en")[];
   /** Up to three pages, the most frequent first. */
   readonly pages: readonly UnansweredPage[];
+  /** How many times it ended in «Hablar con una persona» (ADR-073); absent before it. */
+  readonly askedPerson?: number;
+  /** Among the questions taken to a person: how many the assistant had answered. */
+  readonly answered?: number;
 }
 
 export interface UnansweredQuestionsData {
@@ -64,6 +68,8 @@ export interface UnansweredQuestionsData {
   readonly since: string | null;
   readonly total: number;
   readonly people: number;
+  /** How many of them ended in «Hablar con una persona» (ADR-073); absent before it. */
+  readonly askedPerson?: number;
   /** The most asked first, at most 200. */
   readonly groups: readonly UnansweredGroup[];
 }
@@ -78,4 +84,20 @@ export async function loadUnansweredQuestions(
   period: UnansweredPeriod,
 ): Promise<UnansweredQuestionsData> {
   return repository.unansweredQuestions(membership.tenantId, DAYS[period]);
+}
+
+/**
+ * The questions visitors took to a person (ADR-073): the same groups, answered by the
+ * assistant or not. Read apart, so what already reads the unanswered ones does not change.
+ */
+export interface PersonRequestsRepository {
+  personRequests(tenantId: string, days: 7 | 30 | 90): Promise<UnansweredQuestionsData>;
+}
+
+export async function loadPersonRequests(
+  membership: OrganizationMembership,
+  repository: PersonRequestsRepository,
+  period: UnansweredPeriod,
+): Promise<UnansweredQuestionsData> {
+  return repository.personRequests(membership.tenantId, DAYS[period]);
 }

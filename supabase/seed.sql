@@ -78,7 +78,8 @@ values
 
 -- Published (sealed) white-label presentation: two clearly different brands on one build,
 -- one per theme (ADR-061): Demo Norte «editorial», Demo Sur «immersive». Demo Norte keeps
--- the platform's default home; Demo Sur arranges its own (ADR-062).
+-- the platform's default home; Demo Sur arranges its own (ADR-062). Demo Norte has
+-- «Atención al visitante» with a WhatsApp (ADR-073); Demo Sur, only its email.
 insert into public.tenant_config_versions (id, tenant_id, version, state, sealed_at, created_by, branding)
 values
   ('5eed3000-0000-4000-8000-000000000001', '5eed1000-0000-4000-8000-000000000001', 1, 'sealed', now(),
@@ -88,7 +89,11 @@ values
      "contact": {"email": "turismo@demo-norte.example.test", "phone": "+591 4 000 0001", "address": "Plaza principal s/n"},
      "social": [{"network": "facebook", "url": "https://facebook.example.test/demo-norte"},
                 {"network": "instagram", "url": "https://instagram.example.test/demo-norte"}],
-     "seo": {"description": "Destinos, ferias y recorridos 360° de un municipio de demostración del valle."}}'),
+     "seo": {"description": "Destinos, ferias y recorridos 360° de un municipio de demostración del valle."},
+     "helpDesk": {"name": "Oficina de turismo", "whatsapp": "+591 70000001",
+                  "hours": {"mode": "weekly", "note": "",
+                            "days": [[["08:00", "18:00"]], [["08:00", "18:00"]], [["08:00", "18:00"]],
+                                     [["08:00", "18:00"]], [["08:00", "18:00"]], [["09:00", "13:00"]], []]}}}'),
   ('5eed3000-0000-4000-8000-000000000002', '5eed1000-0000-4000-8000-000000000002', 1, 'sealed', now(),
    '5eed0000-0000-4000-8000-000000000002',
    '{"identity": {"siteName": "Municipio Demo Sur", "shortName": "Demo Sur", "tagline": "Lagunas, miradores y noches estrelladas"},

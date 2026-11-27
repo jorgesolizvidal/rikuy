@@ -1,6 +1,7 @@
 import {
   formatDateRange,
   formatShortDate,
+  loadPersonRequests,
   loadUnansweredQuestions,
   parseUnansweredPeriod,
   UNANSWERED_PERIOD_LABELS,
@@ -53,9 +54,13 @@ function times(count: number, one: string, many: string): string {
 interface QuestionProps {
   readonly group: UnansweredGroup;
   readonly org: string;
+  /** In «Pidieron hablar con una persona» (ADR-073): whether the assistant had answered it. */
+  readonly person?: boolean;
 }
 
-function Question({ group, org }: QuestionProps) {
+function Question({ group, org, person = false }: QuestionProps) {
+  const askedPerson = group.askedPerson ?? 0;
+  const answered = group.answered ?? 0;
   const editorOf = (page: UnansweredPage) =>
     page.contentId
       ? `/o/${org}/${page.kind === "event" ? "agenda" : "destinos"}/${page.contentId}`
@@ -64,6 +69,16 @@ function Question({ group, org }: QuestionProps) {
     <li className="question">
       <p className="question-text">
         <q>{group.text}</q>
+        {person && answered > 0 ? (
+          <span className="status-pill" data-status="published">
+            {answered === group.times ? "El asistente respondió" : "A veces respondió"}
+          </span>
+        ) : null}
+        {!person && askedPerson > 0 ? (
+          <span className="status-pill" data-status="pending">
+            Pidió una persona
+          </span>
+        ) : null}
         {group.langs.includes("en") ? (
           <span className="status-pill" data-status="draft">
             {group.langs.length === 1 ? "En inglés" : "También en inglés"}
@@ -73,6 +88,9 @@ function Question({ group, org }: QuestionProps) {
       <p className="field-hint">
         {times(group.times, "vez", "veces")} · {times(group.people, "persona", "personas")} · última
         vez el {formatShortDate(group.lastDay)}
+        {!person && askedPerson > 0 ? (
+          <> · {times(askedPerson, "vez terminó", "veces terminó")} en «Hablar con una persona»</>
+        ) : null}
       </p>
       {group.pages.length > 0 ? (
         <p className="question-pages">
@@ -109,7 +127,10 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
   const membership = await requireModule((await params).slug, "assistant");
   const period = parseUnansweredPeriod((await searchParams).periodo);
   const session = await adminSession();
-  const data = await loadUnansweredQuestions(membership, session.questions, period);
+  const [data, person] = await Promise.all([
+    loadUnansweredQuestions(membership, session.questions, period),
+    loadPersonRequests(membership, session.questions, period),
+  ]);
   const base = `/o/${membership.slug}/preguntas`;
   const shown = data.groups.slice(0, SHOWN);
   const rest = data.groups.slice(SHOWN);
@@ -200,6 +221,35 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
         )}
       </section>
 
+      <section aria-labelledby="persona" className="metrics-section">
+        <h2 id="persona">Pidieron hablar con una persona</h2>
+        <p className="field-hint">
+          Las preguntas con las que un visitante tocó WhatsApp, «Llamar» o el correo en «Hablar con
+          una persona», aunque el asistente las haya respondido. Sirven para ver qué necesitó a tu
+          equipo: si se repite, conviene publicarlo.
+        </p>
+        <ul className="stats-tiles">
+          <li className="stats-tile">
+            <span className="stats-tile-label">Veces</span>
+            <span className="stats-tile-value">{formatCount(person.total)}</span>
+          </li>
+          <li className="stats-tile">
+            <span className="stats-tile-label">Personas</span>
+            <span className="stats-tile-value">{formatCount(person.people)}</span>
+            <span className="field-hint">Distintas cada día, sumadas.</span>
+          </li>
+        </ul>
+        {person.groups.length === 0 ? (
+          <p className="field-hint">En este período nadie pidió hablar con una persona.</p>
+        ) : (
+          <ol className="questions">
+            {person.groups.slice(0, SHOWN).map((group) => (
+              <Question key={group.key} group={group} org={membership.slug} person />
+            ))}
+          </ol>
+        )}
+      </section>
+
       <section aria-labelledby="como-se-guardan" className="metrics-section">
         <h2 id="como-se-guardan">Cómo se guardan</h2>
         <ul className="metrics-list">
@@ -216,6 +266,11 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
           <li>
             Las preguntas que dicen lo mismo, sin contar mayúsculas, tildes ni signos, se juntan y
             se muestran con su redacción más reciente.
+          </li>
+          <li>
+            Cuando un visitante toca WhatsApp, «Llamar» o el correo en «Hablar con una persona», se
+            guarda su última pregunta de la misma forma, marcada «Pidió una persona». No se guarda
+            lo que escribe en WhatsApp ni a quién llamó.
           </li>
           <li>Se borran solas a los 90 días.</li>
         </ul>

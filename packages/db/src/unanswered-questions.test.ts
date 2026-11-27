@@ -58,6 +58,52 @@ describe("unanswered questions adapter", () => {
     expect(data.groups[0]).toMatchObject({ times: 3, people: 2, pages: [{ times: 2 }] });
   });
 
+  it("reads the questions taken to a person, with their counts (ADR-073)", async () => {
+    const { session, calls } = client({
+      data: {
+        from: "2026-11-21",
+        to: "2026-11-27",
+        since: "2026-11-27",
+        total: 2,
+        people: 1,
+        askedPerson: "2",
+        groups: [
+          {
+            key: "abre el domingo",
+            text: "¿Abre el domingo?",
+            times: 2,
+            people: 1,
+            askedPerson: 2,
+            answered: "1",
+            firstAsked: "a",
+            lastAsked: "a",
+            lastDay: "2026-11-27",
+            langs: ["es"],
+            pages: [],
+          },
+        ],
+      },
+    });
+    const data = await createUnansweredQuestionsRepository(session).personRequests("t", 7);
+    expect(calls).toEqual([
+      { fn: "tenant_person_requests", args: { p_tenant_id: "t", p_days: 7 } },
+    ]);
+    expect(data.askedPerson).toBe(2);
+    expect(data.groups[0]).toMatchObject({ askedPerson: 2, answered: 1 });
+    const before = await createUnansweredQuestionsRepository(
+      client({ error: { code: "PGRST202" } }).session,
+    ).personRequests("t", 30);
+    expect(before).toMatchObject({ total: 0, groups: [] });
+  });
+
+  it("counts nothing taken to a person before the migration says so", async () => {
+    const { session } = client({
+      data: { from: "2026-11-21", to: "2026-11-27", since: null, total: 0, people: 0, groups: [] },
+    });
+    const data = await createUnansweredQuestionsRepository(session).unansweredQuestions("t", 7);
+    expect(data.askedPerson).toBe(0);
+  });
+
   it("has nothing yet before the migration", async () => {
     const { session } = client({ error: { code: "PGRST202" } });
     const data = await createUnansweredQuestionsRepository(session).unansweredQuestions("t", 7);

@@ -3,6 +3,7 @@ import "./portal.css";
 import {
   PORTAL_PATHS,
   assistantPersona,
+  helpDeskOf,
   bottomBar,
   type BottomBarKey,
   monogram,
@@ -293,6 +294,8 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
           logo={view.logo?.webp ?? null}
           mark={monogram(identity.shortName)}
           voice={portalHas(view, "voice")}
+          helpDesk={helpDeskOf(presentation)}
+          timezone={view.context.tenant.timezone}
         />
       ) : null}
       {/* Anonymous visit counts (ADR-051): daily totals, no cookies. */}

@@ -25,8 +25,9 @@ import {
 
 import { SOCIAL_LABELS } from "@/lib/social-labels";
 
+import { HoursField } from "../destinos/[id]/hours-field";
 import { brandingAction, type BrandingFormState } from "./actions";
-import type { BrandingField, BrandingValues } from "./branding-fields";
+import { helpDeskHoursField, type BrandingField, type BrandingValues } from "./branding-fields";
 import { BrandingPreview } from "./branding-preview";
 import { HomeFields, type CoverOption } from "./home-fields";
 import { LogoField, type LogoSelection } from "./logo-field";
@@ -131,6 +132,11 @@ export function BrandingForm({
         <input type="hidden" name="logo.version" value={values.logoVersion} />
         <input type="hidden" name="crest.assetId" value={values.crestAssetId} />
         <input type="hidden" name="crest.version" value={values.crestVersion} />
+        <input
+          type="hidden"
+          name="helpDeskHours"
+          value={helpDeskHoursField(values.helpDeskHours)}
+        />
 
         <fieldset disabled={!canEdit || pending}>
           <legend>Identidad</legend>
@@ -427,6 +433,43 @@ export function BrandingForm({
               <span className="field-error">{errors.assistantTone}</span>
             ) : null}
           </div>
+        </fieldset>
+
+        <fieldset disabled={!canEdit || pending}>
+          <legend>Atención al visitante</legend>
+          <p className="field-hint">
+            Quién atiende a los visitantes que piden hablar con una persona. El asistente les da
+            este WhatsApp, el teléfono y el correo de «Contacto», con su consulta ya escrita en el
+            mensaje. Vacío: solo el teléfono y el correo.
+          </p>
+          <TextField
+            field="helpDeskName"
+            label="Quién atiende"
+            hint="Por ejemplo, «Oficina de turismo». Aparece en la tarjeta del asistente."
+            value={values.helpDeskName}
+            maxLength={PRESENTATION_LIMITS.helpDeskName}
+            onChange={(v) => set("helpDeskName", v)}
+            error={errors.helpDeskName}
+          />
+          <TextField
+            field="helpDeskWhatsapp"
+            label="WhatsApp"
+            hint="Con el código del país, por ejemplo +591 71234567."
+            type="tel"
+            value={values.helpDeskWhatsapp}
+            maxLength={30}
+            placeholder="+591 "
+            onChange={(v) => set("helpDeskWhatsapp", v)}
+            error={errors.helpDeskWhatsapp}
+          />
+          <HoursField
+            value={values.helpDeskHours}
+            disabled={!canEdit || pending}
+            error={errors.helpDeskHours}
+            onChange={(hours) => set("helpDeskHours", hours)}
+            hint="En la hora del municipio. El visitante ve si atienden ahora antes de escribir o llamar."
+            alwaysLabel="Atiende siempre"
+          />
         </fieldset>
 
         {canEdit ? (

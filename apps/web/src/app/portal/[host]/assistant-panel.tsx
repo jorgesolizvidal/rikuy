@@ -10,6 +10,7 @@ import {
   type AnswerBlock,
   type AssistantLink,
   type AssistantReply,
+  type HelpDeskContact,
   type PlanIntent,
   type VisitLengthChoice,
 } from "@rikuy/core/assistant-client";
@@ -35,6 +36,7 @@ import {
   useLinkProps,
   type AssistantMode,
 } from "./assistant-links";
+import { HandoffCard } from "./assistant-handoff";
 import { AnswerSources, PlanCard } from "./assistant-place";
 import {
   dictationSupported,
@@ -62,17 +64,52 @@ const CHANNEL: Readonly<Record<AssistantMode, string>> = {
 };
 /** Places a plan may include, with coordinates: the phone measures its distance to each. */
 const PLACES_ENDPOINT = "/asistente/lugares";
+/** The visitor tapped a way to reach a person under an answer (ADR-073). */
+const PERSON_ENDPOINT = "/asistente/persona";
 const WIDE = "(min-width: 48rem)";
 
 /** An answer and the cards of the places it names (ADR-065), as the portal sent them. */
 type Shown = Exclude<AssistantReply, { status: "invalid" }> & {
   readonly places?: readonly AssistantPlaceCard[];
+  /** The gateway's request (ADR-073): sent back if the visitor takes it to a person. */
+  readonly ref?: string;
 };
 
 type Message =
   | { readonly id: string; readonly role: "user"; readonly text: string }
   | { readonly id: string; readonly role: "assistant"; readonly reply: Shown }
-  | { readonly id: string; readonly role: "error"; readonly text: string };
+  | { readonly id: string; readonly role: "error"; readonly text: string }
+  /** «Hablar con una persona» pressed (ADR-073): the card, shown here without the server. */
+  | { readonly id: string; readonly role: "handoff"; readonly lang: "es" | "en" };
+
+/** The question a person would get, and the answer it came with (ADR-073). */
+interface Asked {
+  readonly question: string | null;
+  readonly ref: string | null;
+}
+
+/**
+ * For each message that offers a person: the visitor's last question before it (never the
+ * «quiero hablar con una persona» itself) and that answer's reference.
+ */
+function askedBefore(messages: readonly Message[]): ReadonlyMap<string, Asked> {
+  const asked = new Map<string, Asked>();
+  let question: string | null = null;
+  let last: Asked = { question: null, ref: null };
+  for (const message of messages) {
+    if (message.role === "user") question = message.text;
+    else if (message.role === "handoff") asked.set(message.id, last);
+    else if (message.role === "assistant") {
+      if (message.reply.status === "handoff") {
+        asked.set(message.id, last);
+      } else {
+        last = { question, ref: message.reply.ref ?? null };
+        asked.set(message.id, last);
+      }
+    }
+  }
+  return asked;
+}
 
 interface Saved {
   readonly startedAt: number;
@@ -163,7 +200,7 @@ const SUGGESTIONS: Readonly<
   ],
 };
 
-type Icon = "pin" | "calendar" | "route" | "spark" | "food";
+type Icon = "pin" | "calendar" | "route" | "spark" | "food" | "person";
 
 const ICON_PATHS: Readonly<Record<Icon, string>> = {
   pin: "M12 21s-6.5-6.6-6.5-11.2a6.5 6.5 0 0 1 13 0C18.5 14.4 12 21 12 21Zm0-8.7a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z",
@@ -173,6 +210,7 @@ const ICON_PATHS: Readonly<Record<Icon, string>> = {
     "M6 19a2 2 0 1 0 0-4 2 2 0 0 0 0 4Zm12-10a2 2 0 1 0 0-4 2 2 0 0 0 0 4ZM8 17h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7",
   spark: "M12 3v4m0 10v4M3 12h4m10 0h4M6 6l2.5 2.5m7 7L18 18M6 18l2.5-2.5m7-7L18 6",
   food: "M7 3v8m-2-8v5a2 2 0 0 0 4 0V3m-2 8v10m10-18c-2 0-3 2.5-3 6s1 4 3 4v8",
+  person: "M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm-7 8a7 7 0 0 1 14 0",
 };
 
 /** A chip's small icon (decorative: the chip's text names it). */
@@ -287,6 +325,11 @@ function history(messages: readonly Message[]) {
 /** What is read aloud: the answer and its plan's stops, never the sources or the links. */
 function spoken(reply: Shown): string {
   if (reply.status === "notice") return reply.notice.message;
+  if (reply.status === "handoff") {
+    return reply.lang === "en"
+      ? "You can write to or call the municipality: your question goes written in the message."
+      : "Puedes escribir o llamar al municipio: tu consulta va escrita en el mensaje.";
+  }
   const stops =
     reply.plan && !reply.plan.needsLocation
       ? reply.plan.stops.map(
@@ -327,6 +370,10 @@ export interface AssistantPanelProps {
   readonly mode?: AssistantMode;
   /** The portal page it is about, when not the browser's (a QR about a place: «/destinos/…»). */
   readonly pagePath?: string | null;
+  /** «Atención al visitante» and the portal's phone and email (ADR-073); null: none. */
+  readonly helpDesk: HelpDeskContact | null;
+  /** The municipality's time zone: whether the help desk attends now. */
+  readonly timezone: string;
 }
 
 export default function AssistantPanel({
@@ -342,6 +389,8 @@ export default function AssistantPanel({
   request = null,
   mode = "launcher",
   pagePath = null,
+  helpDesk,
+  timezone,
 }: AssistantPanelProps) {
   const close = useCallback(() => onClose?.(), [onClose]);
   const avatar = <Avatar logo={logo} mark={mark} />;
@@ -391,6 +440,29 @@ export default function AssistantPanel({
     stopSpeaking();
     setSpeaking(null);
   }, []);
+
+  // «Pidió una persona» (ADR-073): once per answer, when a way to reach them is tapped. The
+  // request survives the page opening WhatsApp or the phone app (keepalive).
+  const told = useRef(new Set<string>());
+  const tellPerson = useCallback(
+    (asked: Asked) => {
+      if (!asked.ref || !asked.question || told.current.has(asked.ref)) return;
+      told.current.add(asked.ref);
+      const tour = tourAssistantContext();
+      void fetch(PERSON_ENDPOINT, {
+        method: "POST",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          ref: asked.ref,
+          question: asked.question,
+          page: tour?.page ?? assistantPageFromPath(pagePath ?? window.location.pathname),
+          ...(tour ? { tour: { sceneId: tour.sceneId, hotspotId: tour.hotspotId } } : {}),
+        }),
+      }).catch(() => undefined);
+    },
+    [pagePath],
+  );
 
   // Open as a modal on a phone, as a panel beside the page on a wider screen. On its own page
   // and in the website's frame it is the page itself: always open, never modal.
@@ -541,6 +613,7 @@ export default function AssistantPanel({
       ? null
       : assistantPageFromPath(pagePath ?? window.location.pathname);
   const onItem = page !== null && page.slug !== null;
+  const askedOf = askedBefore(messages);
   const suggestions = SUGGESTIONS[onItem ? "item" : "any"] ?? [];
 
   return (
@@ -626,20 +699,34 @@ export default function AssistantPanel({
               ))}
             </div>
           ) : null}
-          {messages.map((message) => (
-            <MessageView
-              key={message.id}
-              message={message}
-              avatar={avatar}
-              name={name}
-              speaking={speaking === message.id}
-              onRead={
-                canSpeak && message.role === "assistant"
-                  ? () => (speaking === message.id ? quiet() : read(message.id, message.reply))
-                  : null
-              }
-            />
-          ))}
+          {messages.map((message) => {
+            const asked = askedOf.get(message.id) ?? { question: null, ref: null };
+            return (
+              <MessageView
+                key={message.id}
+                message={message}
+                avatar={avatar}
+                name={name}
+                speaking={speaking === message.id}
+                onRead={
+                  canSpeak && message.role === "assistant"
+                    ? () => (speaking === message.id ? quiet() : read(message.id, message.reply))
+                    : null
+                }
+                hasDesk={helpDesk !== null}
+                handoff={(lang) => (
+                  <HandoffCard
+                    desk={helpDesk}
+                    siteName={siteName}
+                    timezone={timezone}
+                    lang={lang}
+                    question={asked.question}
+                    onContact={() => tellPerson(asked)}
+                  />
+                )}
+              />
+            );
+          })}
           {busy ? (
             <p className="assistant-typing">
               <span aria-hidden="true" className="assistant-dots">
@@ -652,7 +739,7 @@ export default function AssistantPanel({
           ) : null}
         </div>
 
-        <div className="assistant-plans" role="group" aria-label="Planes con lo publicado">
+        <div className="assistant-plans" role="group" aria-label="Planes y ayuda">
           {PLANS.map((plan) =>
             plan.intent === "today" ? (
               <button
@@ -683,6 +770,28 @@ export default function AssistantPanel({
               </button>
             ),
           )}
+          {helpDesk ? (
+            <button
+              type="button"
+              className="assistant-chip assistant-chip-person"
+              disabled={busy}
+              onClick={() => {
+                setChoosing(false);
+                quiet();
+                const lang =
+                  [...messages]
+                    .reverse()
+                    .find(
+                      (message): message is Extract<Message, { role: "assistant" }> =>
+                        message.role === "assistant",
+                    )?.reply.lang ?? "es";
+                setMessages((current) => [...current, { id: nextId(), role: "handoff", lang }]);
+              }}
+            >
+              <ChipIcon icon="person" />
+              Hablar con una persona
+            </button>
+          ) : null}
         </div>
         <div
           id={`${ids}-visit`}
@@ -885,12 +994,18 @@ function MessageView({
   name,
   speaking,
   onRead,
+  hasDesk,
+  handoff,
 }: {
   readonly message: Message;
   readonly avatar: ReactNode;
   readonly name: string;
   readonly speaking: boolean;
   readonly onRead: (() => void) | null;
+  /** The municipality has someone to reach (ADR-073). */
+  readonly hasDesk: boolean;
+  /** «Hablar con una persona»: who to write or call, with the last question written. */
+  readonly handoff: (lang: "es" | "en") => ReactNode;
 }) {
   if (message.role === "user") {
     return (
@@ -912,7 +1027,35 @@ function MessageView({
       </div>
     );
   }
+  if (message.role === "handoff") {
+    return (
+      <div className="assistant-row">
+        {avatar}
+        <div className="assistant-message assistant-from-assistant" lang={message.lang}>
+          <span className="visually-hidden">{name}: </span>
+          {handoff(message.lang)}
+        </div>
+      </div>
+    );
+  }
   const { reply } = message;
+  if (reply.status === "handoff") {
+    return (
+      <div className="assistant-row">
+        {avatar}
+        <div className="assistant-message assistant-from-assistant" lang={reply.lang}>
+          <span className="visually-hidden">{reply.speaker}: </span>
+          <p>
+            {reply.lang === "en"
+              ? "Of course. This is how you can reach a person:"
+              : "Claro. Así puedes hablar con una persona:"}
+          </p>
+          {handoff(reply.lang)}
+          {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
+        </div>
+      </div>
+    );
+  }
   if (reply.status === "notice") {
     return (
       <div className="assistant-row">
@@ -929,7 +1072,11 @@ function MessageView({
             links={reply.notice.links}
             label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
           />
-          <Contact contact={reply.notice.contact} lang={reply.lang} />
+          {hasDesk ? (
+            handoff(reply.lang)
+          ) : (
+            <Contact contact={reply.notice.contact} lang={reply.lang} />
+          )}
           {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
         </div>
       </div>
@@ -952,7 +1099,11 @@ function MessageView({
           links={reply.links}
           label={reply.lang === "en" ? "Portal sections" : "Secciones del portal"}
         />
-        <Contact contact={reply.contact} lang={reply.lang} />
+        {reply.abstained && hasDesk ? (
+          handoff(reply.lang)
+        ) : (
+          <Contact contact={reply.contact} lang={reply.lang} />
+        )}
         {onRead ? <ReadButton speaking={speaking} lang={reply.lang} onRead={onRead} /> : null}
       </div>
     </div>

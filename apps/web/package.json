@@ -16,6 +16,7 @@
     "test:e2e-assistant-only": "vitest run --config vitest.e2e.config.ts e2e/assistant-only.e2e.test.ts",
     "test:e2e-assistant-cards": "vitest run --config vitest.e2e.config.ts e2e/assistant-cards.e2e.test.ts",
     "test:e2e-visit-plans": "vitest run --config vitest.e2e.config.ts e2e/visit-plans.e2e.test.ts",
+    "test:e2e-person-handoff": "vitest run --config vitest.e2e.config.ts e2e/person-handoff.e2e.test.ts",
     "test:e2e-panel": "vitest run --config vitest.e2e.config.ts e2e/panel.e2e.test.ts",
     "test:e2e-copilot": "vitest run --config vitest.e2e.config.ts e2e/copilot.e2e.test.ts",
     "test:e2e-second-factor": "vitest run --config vitest.e2e.config.ts e2e/second-factor.e2e.test.ts",

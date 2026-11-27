@@ -1,6 +1,6 @@
 "use client";
 
-import { parseEmbedPlace } from "@rikuy/core/assistant-client";
+import { parseEmbedPlace, type HelpDeskContact } from "@rikuy/core/assistant-client";
 import dynamic from "next/dynamic";
 import { useCallback, useSyncExternalStore } from "react";
 
@@ -21,6 +21,9 @@ export interface AssistantOnPageProps {
   readonly logo: string | null;
   readonly mark: string;
   readonly voice: boolean;
+  /** «Hablar con una persona» (ADR-073). */
+  readonly helpDesk: HelpDeskContact | null;
+  readonly timezone: string;
 }
 
 /** «Pregúntale a …»: open in the page, about the place its QR names (if any). */

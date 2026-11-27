@@ -93,6 +93,48 @@ function setup(
 }
 
 describe("askAssistant", () => {
+  it("gives a person without asking the model when the visitor writes it (ADR-073)", async () => {
+    const { deps, l, complete, search } = setup();
+    const { reply, trace } = await askAssistant(
+      tenant,
+      { question: "Quiero hablar con una persona, por favor", page: { kind: "home" } },
+      "203.0.113.7",
+      deps,
+    );
+    expect(reply).toEqual({ status: "handoff", lang: "es", speaker: "Guía" });
+    expect(trace).toBeNull();
+    expect(complete).not.toHaveBeenCalled();
+    expect(search).not.toHaveBeenCalled();
+    expect(l.begun).toEqual([]);
+    const english = await askAssistant(
+      tenant,
+      { question: "Can I talk to a real person?", page: { kind: "home" } },
+      null,
+      deps,
+    );
+    expect(english.reply).toMatchObject({ status: "handoff", lang: "en" });
+  });
+
+  it("returns the gateway's request as the answer's reference (ADR-073)", async () => {
+    const { deps } = setup({ found: [passage("museo-comunitario")] });
+    const result = await askAssistant(
+      tenant,
+      { question: "¿A qué hora abre el museo?", page: { kind: "home" } },
+      "203.0.113.7",
+      deps,
+    );
+    expect(result.ref).toBe("r1");
+    const refused = setup({ refuse: "visitor_limit" });
+    const notice = await askAssistant(
+      tenant,
+      { question: "¿A qué hora abre el museo?", page: { kind: "home" } },
+      "203.0.113.7",
+      refused.deps,
+    );
+    expect(notice.reply.status).toBe("notice");
+    expect(notice.ref).toBe("r2");
+  });
+
   it("answers a first question in Spanish with one call, and cites what it used", async () => {
     const museum = passage("museo-comunitario");
     const { deps, l, complete, search } = setup({ found: [museum] });
