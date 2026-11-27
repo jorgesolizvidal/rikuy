@@ -1,5 +1,6 @@
 "use client";
 
+import type { HelpDeskContact } from "@rikuy/core/assistant-client";
 import dynamic from "next/dynamic";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -30,6 +31,9 @@ export interface AssistantLauncherProps {
   readonly mark: string;
   /** The municipality has the assistant's voice (ADR-060): dictation and «Escuchar». */
   readonly voice: boolean;
+  /** «Atención al visitante» and the portal's phone and email (ADR-073); null: none. */
+  readonly helpDesk: HelpDeskContact | null;
+  readonly timezone: string;
 }
 
 export function AssistantLauncher(props: AssistantLauncherProps) {

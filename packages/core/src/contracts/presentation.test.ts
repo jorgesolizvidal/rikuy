@@ -32,6 +32,22 @@ describe("presentation contract", () => {
     expect(result.ok && nearbyRadiusOf(result.value)).toBe(300);
   });
 
+  it("accepts «Atención al visitante» with a WhatsApp and hours (ADR-073)", () => {
+    const result = validatePresentation({
+      ...samplePresentation(),
+      helpDesk: {
+        name: " Oficina de turismo ",
+        whatsapp: "+591 71234567",
+        hours: { mode: "always", note: "" },
+      },
+    });
+    expect(result.ok && result.value.helpDesk).toEqual({
+      name: "Oficina de turismo",
+      whatsapp: "+591 71234567",
+      hours: { mode: "always", note: "" },
+    });
+  });
+
   it("rejects unknown keys anywhere (no smuggled fields)", () => {
     const input = { ...samplePresentation(), css: "body{display:none}" };
     expect(issues(input)).toEqual([{ path: "", code: "invalid" }]);
@@ -70,6 +86,14 @@ describe("presentation contract", () => {
     ["visitors.nearbyRadius", { visitors: { nearbyRadius: 1001 } }],
     ["visitors.nearbyRadius", { visitors: { nearbyRadius: 150.5 } }],
     ["visitors", { visitors: { nearbyRadius: 150, track: true } }],
+    ["helpDesk.name", { helpDesk: { name: "" } }],
+    ["helpDesk.name", { helpDesk: { name: "Oficina\nde turismo" } }],
+    ["helpDesk.whatsapp", { helpDesk: { name: "Oficina", whatsapp: "71234567" } }],
+    [
+      "helpDesk.hours.days",
+      { helpDesk: { name: "Oficina", hours: { mode: "weekly", days: [], note: "" } } },
+    ],
+    ["helpDesk", { helpDesk: { name: "Oficina", email: "x@example.test" } }],
   ])("rejects an invalid %s", (path, patch) => {
     expect(issues({ ...samplePresentation(), ...patch }).map((i) => i.path)).toContain(path);
   });

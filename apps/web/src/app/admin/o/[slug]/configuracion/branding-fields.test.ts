@@ -1,7 +1,12 @@
 import { validatePresentation } from "@rikuy/core";
 import { describe, expect, it } from "vitest";
 
-import { fieldErrors, presentationInputFromForm, valuesFromPresentation } from "./branding-fields";
+import {
+  fieldErrors,
+  helpDeskHoursField,
+  presentationInputFromForm,
+  valuesFromPresentation,
+} from "./branding-fields";
 
 function form(entries: Record<string, string>) {
   const data = new FormData();
@@ -153,6 +158,40 @@ describe("branding form mapping", () => {
       expect(result.ok).toBe(false);
       if (!result.ok)
         expect(fieldErrors(result.issues, []).nearbyRadius).toMatch(/entre 50 y 1000/u);
+    }
+  });
+
+  it("carries «Atención al visitante» and explains a missing name (ADR-073)", () => {
+    expect("helpDesk" in presentationInputFromForm(form(filled))).toBe(false);
+    const hours = { mode: "always", note: "" };
+    const input = presentationInputFromForm(
+      form({
+        ...filled,
+        helpDeskName: " Oficina de turismo ",
+        helpDeskWhatsapp: "+591 71234567",
+        helpDeskHours: JSON.stringify(hours),
+      }),
+    );
+    const result = validatePresentation(input);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.helpDesk).toEqual({
+        name: "Oficina de turismo",
+        whatsapp: "+591 71234567",
+        hours,
+      });
+      const values = valuesFromPresentation(result.value);
+      expect(values).toMatchObject({ helpDeskName: "Oficina de turismo" });
+      expect(JSON.parse(helpDeskHoursField(values.helpDeskHours))).toEqual(hours);
+    }
+    const orphan = validatePresentation(
+      presentationInputFromForm(form({ ...filled, helpDeskWhatsapp: "71234567" })),
+    );
+    expect(orphan.ok).toBe(false);
+    if (!orphan.ok) {
+      const errors = fieldErrors(orphan.issues, []);
+      expect(errors.helpDeskName).toMatch(/quién atiende/u);
+      expect(errors.helpDeskWhatsapp).toMatch(/código del país/u);
     }
   });
 

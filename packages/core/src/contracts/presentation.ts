@@ -17,6 +17,8 @@ import {
   themeStyleOf,
   type ContrastCheck,
 } from "../domain/branding/theme";
+import { openingHoursSchema } from "./destination";
+import { WHATSAPP_PATTERN } from "./service";
 
 /**
  * White-label presentation of a tenant portal (stored in `tenant_config_versions.branding`).
@@ -42,6 +44,7 @@ export const PRESENTATION_LIMITS = {
   description: 160,
   assistantName: 40,
   assistantGreeting: 240,
+  helpDeskName: 60,
 } as const;
 
 /** How the assistant speaks (ADR-038): fixed options, never free text sent to the model. */
@@ -177,6 +180,17 @@ export const tenantPresentationSchema = z.strictObject({
     .optional(),
   /** Optional home of the portal (ADR-062); absent: the platform's default. */
   home: homeLayoutSchema.optional(),
+  /**
+   * Optional «Atención al visitante» (ADR-073): who answers a visitor who asks for a person.
+   * Its WhatsApp is international; the phone and the email stay the portal's (`contact`).
+   */
+  helpDesk: z
+    .strictObject({
+      name: line(1, PRESENTATION_LIMITS.helpDeskName),
+      whatsapp: z.string().trim().regex(WHATSAPP_PATTERN).optional(),
+      hours: openingHoursSchema.optional(),
+    })
+    .optional(),
 });
 
 export type TenantPresentation = z.infer<typeof tenantPresentationSchema>;

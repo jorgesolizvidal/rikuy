@@ -175,6 +175,8 @@ export interface PlanAnswer {
   /** The stops as `kind:slug`, in order (for the evaluation). */
   readonly keys: readonly string[];
   readonly inputTokens: number;
+  /** The gateway's request that explained it, when there was one (ADR-073: «pidió una persona»). */
+  readonly requestId?: string;
   readonly outputTokens: number;
 }
 
@@ -590,5 +592,6 @@ export async function answerPlan(
     keys: plan.stops.map((stop) => stop.key),
     inputTokens: session.outcome === "answered" ? session.usage.inputTokens : 0,
     outputTokens: session.outcome === "answered" ? session.usage.outputTokens : 0,
+    ...(session.requestId ? { requestId: session.requestId } : {}),
   };
 }

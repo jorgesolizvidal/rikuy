@@ -3,6 +3,7 @@ import type { KnowledgePassage, PublicCitation } from "../../contracts/knowledge
 import type { TenantPresentation } from "../../contracts/presentation";
 import { parseAnswer, parsePlan, type AnswerBlock } from "../../domain/assistant/answer";
 import { detectLanguage, type AssistantLanguage } from "../../domain/assistant/language";
+import { detectHandoff } from "../../domain/assistant/handoff";
 import { ASSISTANT_LIMITS } from "../../domain/assistant/limits";
 import { pageHasItem, type AssistantPage } from "../../domain/assistant/page";
 import { assistantPersona } from "../../domain/assistant/persona";
@@ -137,6 +138,11 @@ export type AssistantReply =
       readonly plan?: AssistantPlan;
     }
   | { readonly status: "notice"; readonly lang: AssistantLanguage; readonly notice: AiNotice }
+  /**
+   * «Quiero hablar con una persona» (ADR-073): no model call; the panel shows who to write
+   * or call, with the visitor's last question written in the message.
+   */
+  | { readonly status: "handoff"; readonly lang: AssistantLanguage; readonly speaker: string }
   | { readonly status: "invalid" };
 
 /** What happened inside, for the evaluation (never sent to the visitor). */
@@ -179,6 +185,11 @@ export const ECHO_REFUSAL = {
 export interface AssistantResult {
   readonly reply: AssistantReply;
   readonly trace: AssistantTrace | null;
+  /**
+   * The gateway's request for this answer (ADR-036): the panel sends it back if the visitor
+   * then takes the question to a person (ADR-073). Absent when there was none.
+   */
+  readonly ref?: string;
   /**
    * The question, masked, when nothing published could answer it (C1 · Paso 3, ADR-053): the
    * portal keeps it for the municipality after answering. Never for a plan, a notice (quota,
@@ -261,6 +272,11 @@ export async function askAssistant(
 
   const persona = assistantPersona(tenant.presentation);
   const lang = detectLanguage(request.question);
+
+  // «Quiero hablar con una persona» (ADR-073): the contact, without asking the model.
+  if (request.intent === null && detectHandoff(request.question)) {
+    return { reply: { status: "handoff", lang, speaker: persona.name }, trace: null };
+  }
 
   // A plan: the engine decides, the model explains (ADR-039). A kind of visit (chosen under
   // «Plan para hoy» or written: «tengo 2 horas con los chicos») is a plan for today (ADR-072).
@@ -423,10 +439,12 @@ export async function askAssistant(
     hasTours: tenant.hasTours,
     lang,
   };
+  const ref = session.requestId ? { ref: session.requestId } : {};
   if (session.outcome !== "answered") {
     return {
       reply: { status: "notice", lang, notice: aiNotice(session.outcome, noticeContext) },
       trace: null,
+      ...ref,
     };
   }
   const { passages, query, rephrased } = session.value;
@@ -463,6 +481,7 @@ export async function askAssistant(
     return {
       reply: { status: "notice", lang, notice: aiNotice("provider_error", noticeContext) },
       trace,
+      ...ref,
     };
   }
 
@@ -510,6 +529,7 @@ export async function askAssistant(
           : null,
     },
     trace,
+    ...ref,
     ...(kept
       ? {
           unanswered: {
@@ -582,5 +602,6 @@ async function askPlan(
       latencyMs: Date.now() - started,
       plan: { intent, stops: answer.keys, ...(visit ? { visit } : {}) },
     },
+    ...(answer.requestId ? { ref: answer.requestId } : {}),
   };
 }

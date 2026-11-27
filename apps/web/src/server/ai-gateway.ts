@@ -216,6 +216,28 @@ export async function recordUnansweredQuestion(
   }
 }
 
+/**
+ * ai_api.record_person_request (ADR-073): the visitor took an answer's question to a person.
+ * Never fails the visitor: an error only leaves a log line, without the question.
+ */
+export async function recordPersonRequest(
+  tenantId: string,
+  visitor: string | null,
+  question: UnansweredQuestion,
+): Promise<void> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return;
+  try {
+    const outcome = await deps.ledger.recordPersonRequest(tenantId, visitor, question);
+    jsonAiLogger.event("ai.person_request_recorded", { outcome });
+  } catch (error) {
+    jsonAiLogger.event("ai.person_request_failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    });
+  }
+}
+
 /** ai_api.tour_context (ADR-040): the tour's scene and point, checked against what is published. */
 /**
  * ai_api.place_notices (ADR-069): the notices in force that name the destination or event the

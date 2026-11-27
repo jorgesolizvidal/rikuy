@@ -116,6 +116,8 @@ export * from "./domain/assistant/prompts";
 export * from "./domain/assistant/request";
 export * from "./domain/assistant/unanswered";
 export * from "./application/assistant/unanswered";
+export * from "./domain/assistant/handoff";
+export * from "./application/assistant/handoff";
 export * from "./domain/assistant/embed";
 export * from "./application/assistant/embed";
 export * from "./application/assistant/links";

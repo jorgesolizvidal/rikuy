@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 3 — planes por tipo de visita; antes, A · Paso 2 ✅ («Solo asistente», verificado en producción)
-- **Rama:** `feat/a-step3-visit-plans` → PR hacia `main`
+- **Último paso completado:** A · Paso 4 — pasar a una persona; antes, A · Paso 3 ✅ (planes por tipo de visita, verificado en producción)
+- **Rama:** `feat/a-step4-person-handoff` → PR hacia `main`
 
 ## Historial
 
@@ -2923,19 +2923,66 @@ Lo que encontró el CI del push, ya corregido:
 - Las demos ya creadas (Demo Valle) no reciben los tiempos de muestra hasta que se editen sus destinos.
 - La vuelta al punto de partida no se cuenta en el tiempo pedido.
 
+**Verificación en producción (2026-11-27):** tras el merge (PR #98), el usuario hizo las pruebas en Ucureña. Con una consulta de solo lectura: el museo publicado tiene «Tiempo de visita» 15 min y «Apto» para niños. Le sugerí poner un tiempo más realista (por ejemplo, 45 min o 1 h) desde el panel.
+
+### A · Paso 4 — pasar a una persona ✅
+
+- Decisiones del usuario ([ADR-073](../adr/ADR-073-person-handoff.md)), 2026-11-27:
+  - **«Atención al visitante» en «Marca del portal»:** nombre, WhatsApp y horario; sin él, el teléfono y el correo del portal;
+  - **siempre a la vista y cuando no sabe:** un botón «Hablar con una persona», y la tarjeta sola cuando el asistente no sabe o el visitante escribe «quiero hablar con una persona»;
+  - **el mensaje va escrito:** WhatsApp se abre con «Hola, vi el portal de… Mi consulta: …»; lo envía el visitante;
+  - **se guarda la pregunta, marcada «pidió una persona»,** enmascarada y por 90 días, aunque el asistente la haya respondido.
+- Base de datos (`20261203000000_a4_person_handoff.sql`, solo expand):
+  - la marca acepta `helpDesk` (`private.is_valid_presentation`): nombre de una línea (1–60), WhatsApp internacional (como el de los servicios) y el horario de ADR-039, todo revalidado;
+  - `unanswered_questions` suma `answered` y `asked_person_at` (una respondida solo se guarda si se llevó a una persona);
+  - `private.question_groups_between`: los grupos de siempre, de las sin respuesta o de las llevadas a una persona, con cuántas terminaron en una persona y cuántas había respondido el asistente. `private.unanswered_questions_between` la usa con «solo sin respuesta», así el informe mensual, las recomendaciones del Copilot y el resumen del panel no cambian;
+  - `public.tenant_person_requests` (cualquier miembro; propietarios y administradores con segundo factor): los últimos 7, 30 o 90 días;
+  - `ai_api.record_person_request` (solo `rikuy_ai`): un pedido del asistente de este municipio, de la última hora y **del mismo visitante** (la huella diaria de ADR-036 con la sal del día del pedido). Si la pregunta ya estaba como sin respuesta, solo la marca; si no, la guarda enmascarada como respondida. Mismo tope diario;
+  - `ai_api.record_unanswered_question` (redefinida): si la pregunta ya se había llevado a una persona (una carrera de segundos), pasa a «sin respuesta» y conserva su marca.
+  - Seed: Demo Norte con «Oficina de turismo», un WhatsApp y su horario; Demo Sur solo con su correo.
+- `@rikuy/core`:
+  - contrato `helpDesk` en la marca;
+  - `domain/assistant/handoff` (también en `@rikuy/core/assistant-client`): `helpDeskOf`, `helpDeskName`, `handoffMessage`, los enlaces de WhatsApp (`wa.me/…?text=`), teléfono y correo, y `detectHandoff` («quiero hablar con una persona», «¿puedo hablar con alguien?», «pásame con un humano», «talk to a real person»…; «¿qué personas famosas…?» sigue siendo una pregunta);
+  - `askAssistant` responde `handoff` sin llamar al modelo ni gastar cuota, y devuelve `ref` (el pedido del gateway) en respuestas, avisos y planes;
+  - `parsePersonRequest` (las reglas de una pregunta, enmascarada, sin saludos) y `loadPersonRequests`.
+- `@rikuy/db`: `recordPersonRequest` en la conexión de la IA y `personRequests` en el repositorio de preguntas (antes de la migración: nada).
+- Web:
+  - **`POST /asistente/persona`** en el host del portal: mismo control de origen, hasta 8 KB, siempre 204; guarda después de responder;
+  - `POST /asistente` envía `ref` con cada respuesta;
+  - panel del asistente (portal, «Pregúntale a…» y la web del municipio): botón **«Hablar con una persona»** junto a los planes y la tarjeta (`assistant-handoff.tsx`) con quién atiende, «Abierto ahora · cierra a las 18:00» calculado en el navegador, **«Escribir por WhatsApp»**, **«Llamar»** y **«Escribir un correo»**, con la última pregunta escrita. Al tocar uno, avisa una vez por respuesta (`keepalive`);
+  - **«Marca del portal»:** bloque «Atención al visitante» (quién atiende, WhatsApp y el editor de horario de los destinos);
+  - **«Lo que preguntan los visitantes»:** «Pidieron hablar con una persona» (veces, personas y las preguntas, con «El asistente respondió») y, en las sin respuesta, «Pidió una persona»;
+  - privacidad: qué se muestra, que el mensaje lo envía el visitante y qué se guarda al tocar.
+- CI: nuevo paso **«Person handoff in a real browser»** (grupo de contratos).
+- Tests:
+  - 1.229 unitarios (core 848, db 244, web 65, worker 58, config 14): el contrato (válido y lo que rechaza), el detector (9 frases que piden una persona y 6 que no), el mensaje y los enlaces, `helpDeskOf`, `parsePersonRequest`, `askAssistant` (sin modelo, sin búsqueda y sin reserva; `ref` en respuestas y avisos), el adaptador y el formulario de la marca;
+  - pgTAP `058_person_handoff` (39): la marca (válida con nombre, WhatsApp y horario; sin nombre, vacío, largo, de varias líneas, WhatsApp sin código o que no es texto, horario inválido y otra clave rechazados; guardada y rechazada por la RPC); nadie fuera de `rikuy_ai` marca; otro visitante, sin visitante, otro municipio, un pedido desconocido, que no es del asistente o de hace más de una hora no guardan nada; uno de 50 minutos sí; enmascarado, con su página; una sin respuesta solo se marca y sigue «sin respuesta»; dos veces conserva la primera marca; la carrera; la tabla no acepta una respondida sin marca; lectura de analista, sin segundo factor, otro municipio y período inválido; las sin respuesta no incluyen las respondidas y las llevadas a una persona sí, con sus cuentas;
+  - integración (`ai.int.test.ts`): con el rol `rikuy_ai` real, otro visitante no guarda y el mismo sí, enmascarada y respondida;
+  - **e2e en un navegador real** (`person-handoff.e2e.test.ts`, 3 casos): en Demo Norte, una respuesta que no sabe trae la tarjeta con «Oficina de turismo», el WhatsApp con la pregunta escrita, «Llamar» y el correo; tocar WhatsApp la guarda «sin respuesta» y marcada; en la ficha del mirador, el botón lleva la pregunta respondida y queda con su lugar; «Quiero hablar con una persona» trae la tarjeta sin un pedido más al gateway; el panel la lista con «El asistente respondió» y marca la sin respuesta; la marca muestra «Atención al visitante»; Demo Sur ofrece solo el correo; axe sin hallazgos críticos ni graves y sin desbordes a 390 y 1280 px.
+- Verificado en local: `pnpm check` (formato, lint, tipos, unitarios y build).
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Solo se sabe que el visitante tocó el botón, no si envió el mensaje.
+- La pregunta se guarda solo si el teléfono sigue con la misma dirección de internet que cuando preguntó (la huella del visitante); si cambió de red, no se guarda.
+- Una pregunta de hace más de una hora no se guarda; un plan sin IA configurada no tiene referencia.
+- El informe mensual y las recomendaciones del Copilot todavía no cuentan «pidió una persona» (quedan para el Paso 5, con las métricas por canal).
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
 - Después del merge y de «Deploy database»:
-  1. **El editor:** en el panel de Ucureña, abre un destino (por ejemplo, el museo); en «Para tu plan» elige un «Tiempo de visita» y «Para ir con niños: Apto»; publícalo. Abre un evento: tiene «Para ir con niños» y no tiempo de visita.
-  2. **«Plan para hoy»:** en el portal de Ucureña, abre Chaski y toca «Plan para hoy»: aparecen «1 hora», «2 horas», «Medio día», «Día completo» y «Con niños». Elige «2 horas»: el plan se llama «Plan de 2 horas», dice a qué hora termina y ninguna parada pasa de esa hora.
-  3. **Con niños:** marca «Con niños» y vuelve a elegir: el museo aparece con «Apto para niños». Si marcas otro lugar como «No recomendado», ya no aparece en los planes con niños.
-  4. **Día completo:** antes de las 14:00, elige «Día completo»: el plan incluye el almuerzo en «Restaurante Mérida» (si está abierto a esa hora) o una «Pausa para almorzar».
-  5. **Escrito:** pregunta «Tengo 1 hora, ¿qué hago?»: responde con un «Plan de 1 hora». Y «¿El museo es apto para niños?» responde con la ficha (después de que el indexador la lea).
+  1. **La marca:** en el panel de Ucureña, «Marca del portal» → «Atención al visitante»: escribe quién atiende (por ejemplo, «Oficina de turismo»), el WhatsApp con +591 y el horario; publica.
+  2. **El botón:** en el portal de Ucureña, abre Chaski: junto a los planes aparece «Hablar con una persona». Tócalo: la tarjeta muestra quién atiende, si atiende ahora, y «Escribir por WhatsApp», «Llamar» y «Escribir un correo».
+  3. **Con tu pregunta:** pregunta algo (por ejemplo, «¿Abre el museo el domingo?») y después toca «Hablar con una persona» y «Escribir por WhatsApp»: WhatsApp se abre con «Hola, vi el portal de… Mi consulta: ¿Abre el museo el domingo?». No hace falta enviarlo.
+  4. **Cuando no sabe:** pregunta algo que no está publicado: la tarjeta aparece sola debajo de la respuesta.
+  5. **Escrito:** escribe «Quiero hablar con una persona»: responde con la tarjeta, con tu pregunta anterior en el mensaje.
+  6. **En el panel:** «Lo que preguntan los visitantes» → «Pidieron hablar con una persona» lista las preguntas con las que tocaste WhatsApp; la respondida dice «El asistente respondió».
 
 ## Siguiente paso
 
-1. **A · Paso 4 — pasar a una persona** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: «Hablar con la oficina de turismo» da el contacto del municipio y marca la pregunta como «pidió una persona» en «Lo que preguntan los visitantes». Antes de empezar, sus decisiones y un ADR.
+1. **A · Paso 5 — métricas por canal y preguntas frecuentes** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: portal, asistente insertado, QR y WhatsApp por separado; los temas más preguntados; qué hizo el visitante después. Antes de empezar, sus decisiones y un ADR.
 
 ## Decisiones pendientes del usuario
 

@@ -24,11 +24,16 @@ export function HoursField({
   disabled,
   error,
   onChange,
+  hint = "En la hora del municipio. Los visitantes ven si está abierto ahora, y el asistente no recomienda ir mientras esté cerrado. Sin horario, avisa que hay que confirmarlo.",
+  alwaysLabel = MODES[1].label,
 }: {
   readonly value: HoursValues;
   readonly disabled: boolean;
   readonly error?: string | undefined;
   readonly onChange: (value: HoursValues) => void;
+  /** What the hours are for (a destination's, by default; the help desk's, ADR-073). */
+  readonly hint?: string;
+  readonly alwaysLabel?: string;
 }) {
   const id = useId();
   const set = (patch: Partial<HoursValues>) => onChange({ ...value, ...patch });
@@ -56,8 +61,7 @@ export function HoursField({
     <fieldset disabled={disabled} className="hours-field" aria-describedby={`${id}-hint`}>
       <legend>Horario de atención</legend>
       <p id={`${id}-hint`} className="field-hint">
-        En la hora del municipio. Los visitantes ven si está abierto ahora, y el asistente no
-        recomienda ir mientras esté cerrado. Sin horario, avisa que hay que confirmarlo.
+        {hint}
       </p>
       <div className="hours-modes" role="radiogroup" aria-label="Tipo de horario">
         {MODES.map((option) => (
@@ -69,7 +73,7 @@ export function HoursField({
               checked={value.mode === option.mode}
               onChange={() => set({ mode: option.mode })}
             />
-            {option.label}
+            {option.mode === "always" ? alwaysLabel : option.label}
           </label>
         ))}
       </div>

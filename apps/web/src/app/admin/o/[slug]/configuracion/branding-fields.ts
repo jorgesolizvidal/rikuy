@@ -19,6 +19,8 @@ import {
   type ThemeStyle,
 } from "@rikuy/core";
 
+import { fromHoursValues, toHoursValues, type HoursValues } from "../destinos/[id]/hours-values";
+
 /**
  * Flat form model of a TenantPresentation. Field names double as FormData keys, so the
  * browser form, the live preview and the Server Action all speak the same shape.
@@ -42,6 +44,10 @@ export interface BrandingValues {
   assistantName: string;
   assistantGreeting: string;
   assistantTone: AssistantTone;
+  /** «Atención al visitante» (ADR-073): empty name, WhatsApp and hours: none. */
+  helpDeskName: string;
+  helpDeskWhatsapp: string;
+  helpDeskHours: HoursValues;
   social: Record<SocialNetwork, string>;
   /** Logo reference (hidden fields `logo.assetId` / `logo.version`); empty: no logo. */
   logoAssetId: string;
@@ -132,6 +138,9 @@ export function valuesFromPresentation(presentation: TenantPresentation): Brandi
     assistantName: presentation.assistant?.name ?? "",
     assistantGreeting: presentation.assistant?.greeting ?? "",
     assistantTone: presentation.assistant?.tone ?? "warm",
+    helpDeskName: presentation.helpDesk?.name ?? "",
+    helpDeskWhatsapp: presentation.helpDesk?.whatsapp ?? "",
+    helpDeskHours: toHoursValues(presentation.helpDesk?.hours ?? null),
     social,
     logoAssetId: presentation.logo?.assetId ?? "",
     logoVersion: presentation.logo ? String(presentation.logo.version) : "",
@@ -177,6 +186,7 @@ export function presentationInputFromForm(formData: FormData) {
     ...imageFromForm(formData, "crest"),
     ...visitorsFromForm(formData),
     ...assistantFromForm(formData),
+    ...helpDeskFromForm(formData),
     ...homeFromForm(formData),
   };
 }
@@ -241,6 +251,39 @@ function assistantFromForm(formData: FormData) {
   };
 }
 
+/**
+ * «Atención al visitante» (ADR-073): the name, the WhatsApp and the hours (sent as JSON by the
+ * form's hours editor). All empty: none. A WhatsApp or hours without a name fail validation on
+ * the name (never a silent default).
+ */
+function helpDeskFromForm(formData: FormData) {
+  const name = text(formData, "helpDeskName");
+  const whatsapp = text(formData, "helpDeskWhatsapp");
+  let hours: unknown = null;
+  const rawHours = text(formData, "helpDeskHours");
+  if (rawHours !== "") {
+    try {
+      hours = JSON.parse(rawHours) as unknown;
+    } catch {
+      hours = "invalid";
+    }
+  }
+  if (name === "" && whatsapp === "" && hours === null) return {};
+  return {
+    helpDesk: {
+      name,
+      ...(whatsapp === "" ? {} : { whatsapp }),
+      ...(hours === null ? {} : { hours }),
+    },
+  };
+}
+
+/** What the form's hidden field carries for the help desk's hours: null without them. */
+export function helpDeskHoursField(values: HoursValues): string {
+  const hours = fromHoursValues(values);
+  return hours === null ? "" : JSON.stringify(hours);
+}
+
 function visitorsFromForm(formData: FormData) {
   const radius = text(formData, "nearbyRadius");
   if (radius === "") return {};
@@ -276,6 +319,10 @@ const PATH_TO_FIELD: Readonly<Record<string, BrandingField>> = {
   "assistant.name": "assistantName",
   "assistant.greeting": "assistantGreeting",
   "assistant.tone": "assistantTone",
+  helpDesk: "helpDeskName",
+  "helpDesk.name": "helpDeskName",
+  "helpDesk.whatsapp": "helpDeskWhatsapp",
+  "helpDesk.hours": "helpDeskHours",
   visitors: "nearbyRadius",
   "visitors.nearbyRadius": "nearbyRadius",
   logo: "logo",
@@ -315,6 +362,9 @@ const MESSAGES: Readonly<Record<string, string>> = {
   assistantName: `Escribe el nombre del asistente en una línea, hasta ${PRESENTATION_LIMITS.assistantName} caracteres (también si escribiste un saludo).`,
   assistantGreeting: `El saludo admite una línea de hasta ${PRESENTATION_LIMITS.assistantGreeting} caracteres.`,
   assistantTone: "Elige «Cercano» o «Formal».",
+  helpDeskName: `Escribe quién atiende a los visitantes (por ejemplo, «Oficina de turismo»), en una línea de hasta ${PRESENTATION_LIMITS.helpDeskName} caracteres. Hace falta también si escribiste el WhatsApp o el horario.`,
+  helpDeskWhatsapp: "Escribe el WhatsApp con el código del país, por ejemplo +591 71234567.",
+  helpDeskHours: "Revisa el horario: en cada día, la hora de cierre va después de la de apertura.",
   social: "Pega el enlace completo de la página, empezando por https://.",
   logo: "Este logo ya no se puede usar. Sube otro o quítalo para publicar sin logo.",
   crest: "Este escudo ya no se puede usar. Sube otro o quítalo para publicar sin escudo.",
@@ -342,6 +392,7 @@ export function fieldErrors(
   for (const issue of issues) {
     let field: BrandingField | undefined = PATH_TO_FIELD[issue.path];
     if (field === undefined && issue.path.startsWith("home.sections")) field = "homeSections";
+    if (field === undefined && issue.path.startsWith("helpDesk.hours")) field = "helpDeskHours";
     const social = /^social\.(\d+)/.exec(issue.path);
     if (social) {
       const network = submittedSocial[Number(social[1])]?.network;

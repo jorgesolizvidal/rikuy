@@ -1,5 +1,6 @@
 import {
   ASSISTANT_PAGE_KINDS,
+  type PersonRequestsRepository,
   type UnansweredQuestionsData,
   type UnansweredQuestionsRepository,
 } from "@rikuy/core";
@@ -16,6 +17,11 @@ import type { SessionClient } from "./session-client";
 
 const count = z.union([z.number(), z.string()]).transform(Number);
 const day = z.string().regex(/^\d{4}-\d{2}-\d{2}$/u);
+/** A count added by a later migration (ADR-073): 0 until the database has it. */
+const laterCount = z
+  .union([z.number(), z.string()])
+  .optional()
+  .transform((value) => (value === undefined ? 0 : Number(value)));
 
 export const unansweredSchema = z.object({
   from: day,
@@ -23,12 +29,15 @@ export const unansweredSchema = z.object({
   since: day.nullable(),
   total: count,
   people: count,
+  askedPerson: laterCount,
   groups: z.array(
     z.object({
       key: z.string(),
       text: z.string(),
       times: count,
       people: count,
+      askedPerson: laterCount,
+      answered: laterCount,
       firstAsked: z.string(),
       lastAsked: z.string(),
       lastDay: day,
@@ -48,9 +57,14 @@ export const unansweredSchema = z.object({
   ),
 });
 
+function nothingYet(): UnansweredQuestionsData {
+  const today = new Date().toISOString().slice(0, 10);
+  return { from: today, to: today, since: null, total: 0, people: 0, groups: [] };
+}
+
 export function createUnansweredQuestionsRepository(
   client: SessionClient,
-): UnansweredQuestionsRepository {
+): UnansweredQuestionsRepository & PersonRequestsRepository {
   return {
     async unansweredQuestions(tenantId, days): Promise<UnansweredQuestionsData> {
       const { data, error } = await client.rpc("tenant_unanswered_questions", {
@@ -58,12 +72,23 @@ export function createUnansweredQuestionsRepository(
         p_days: days,
       });
       // The web app may be deployed a few minutes before the migration: nothing kept yet.
-      if (isMissingFunction(error)) {
-        const today = new Date().toISOString().slice(0, 10);
-        return { from: today, to: today, since: null, total: 0, people: 0, groups: [] };
-      }
+      if (isMissingFunction(error)) return nothingYet();
       if (error)
         throw new Error(`Reading the unanswered questions failed (${error.code || "unknown"})`);
+      return unansweredSchema.parse(data);
+    },
+
+    /** «Pidieron hablar con una persona» (migration 20261203000000, ADR-073). */
+    async personRequests(tenantId, days): Promise<UnansweredQuestionsData> {
+      const { data, error } = await client.rpc("tenant_person_requests", {
+        p_tenant_id: tenantId,
+        p_days: days,
+      });
+      if (isMissingFunction(error)) return nothingYet();
+      if (error)
+        throw new Error(
+          `Reading the questions taken to a person failed (${error.code || "unknown"})`,
+        );
       return unansweredSchema.parse(data);
     },
   };

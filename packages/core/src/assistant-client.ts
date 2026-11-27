@@ -4,6 +4,7 @@
  */
 export * from "./domain/assistant/limits";
 export * from "./domain/assistant/page";
+export * from "./domain/assistant/handoff";
 export * from "./domain/plan/intent";
 export type { AnswerBlock } from "./domain/assistant/answer";
 export type { AssistantLanguage } from "./domain/assistant/language";

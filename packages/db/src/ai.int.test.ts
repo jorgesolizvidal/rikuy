@@ -146,6 +146,40 @@ describe.runIf(reachable)("the AI gateway (real PostgreSQL, role rikuy_ai)", () 
     }
   });
 
+  it("keeps a question taken to a person only for the same visitor (ADR-073)", async () => {
+    const ledger = ledgerOf();
+    try {
+      const visitor = "198.51.100.41";
+      const answered = await runAiRequest(
+        { tenantId: SUR, profile: "assistant", messages: PROBE_MESSAGES, visitor },
+        { ledger, provider: createSimulatedAiProvider() },
+      );
+      if (answered.outcome !== "answered") throw new Error("the simulated model did not answer");
+      const question = {
+        requestId: answered.requestId,
+        question: "¿Abre el domingo? Escríbanme a ana@example.com",
+        lang: "es" as const,
+        page: { kind: "home" as const, slug: null },
+        sceneId: null,
+      };
+      expect(await ledger.recordPersonRequest(SUR, "203.0.113.99", question)).toBe("ignored");
+      expect(await ledger.recordPersonRequest(SUR, visitor, question)).toBe("recorded");
+      const rows = await admin`
+        select question_text, answered, asked_person_at is not null as asked_person
+        from public.unanswered_questions where request_id = ${answered.requestId}::uuid
+      `;
+      expect(rows.map((row) => ({ ...row }))).toEqual([
+        {
+          question_text: "¿Abre el domingo? Escríbanme a [correo]",
+          answered: true,
+          asked_person: true,
+        },
+      ]);
+    } finally {
+      await ledger.close();
+    }
+  });
+
   it("never lets eight requests at once pass the municipality's quota", async () => {
     const now = await aiBucket();
     await setAiLimit(now.consumed + now.reserved + 3 * RESERVE + Math.floor(RESERVE / 2));
