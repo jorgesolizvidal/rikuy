@@ -13,6 +13,7 @@ import {
   type RecommendationPeriod,
   type RecommendationTarget,
 } from "../../domain/copilot/recommendations";
+import type { AssistantSummary } from "../../domain/assistant/statistics";
 import type { PassportSummary } from "../../domain/passport/statistics";
 import type { StatisticsSummary } from "../../domain/visits/statistics";
 import { reservationFor } from "../ai/gateway";
@@ -139,6 +140,8 @@ export interface RecommendationRun {
   readonly statistics: StatisticsSummary;
   /** The tourist passport of the same period (null: not counted yet). */
   readonly passport?: PassportSummary | null;
+  /** The visitor's assistant by channel, same period (ADR-074). */
+  readonly assistant?: AssistantSummary | null;
   readonly period?: RecommendationPeriod;
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
@@ -171,6 +174,7 @@ export async function runRecommendations(
   const facts = recommendationFacts({
     statistics: run.statistics,
     passport: hasModule(modules, "passport") ? (run.passport ?? null) : null,
+    assistant: hasModule(modules, "assistant") ? (run.assistant ?? null) : null,
     ...(run.period ? { period: run.period } : {}),
     questions: recommendationQuestions(questions),
     review: reviewForModules(run.review, modules),
@@ -224,6 +228,7 @@ export async function generateRecommendations(
     actorId,
     statistics: stats.summary,
     passport: stats.passport,
+    assistant: stats.assistant,
     questions,
     review,
     snapshot: snapshot.items,

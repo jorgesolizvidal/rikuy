@@ -5,7 +5,12 @@ import { parseAnswer, parsePlan, type AnswerBlock } from "../../domain/assistant
 import { detectLanguage, type AssistantLanguage } from "../../domain/assistant/language";
 import { detectHandoff } from "../../domain/assistant/handoff";
 import { ASSISTANT_LIMITS } from "../../domain/assistant/limits";
-import { pageHasItem, type AssistantPage } from "../../domain/assistant/page";
+import {
+  pageHasItem,
+  type AssistantPage,
+  type AssistantPageKind,
+} from "../../domain/assistant/page";
+import type { AssistantTurnKind } from "../../domain/assistant/turns";
 import { assistantPersona } from "../../domain/assistant/persona";
 import {
   answerMessages,
@@ -196,6 +201,42 @@ export interface AssistantResult {
    * provider) or a refusal to copy the model's context.
    */
   readonly unanswered?: UnansweredQuestion;
+  /**
+   * The answer as «Estadísticas» counts it (ADR-074): kept with its channel after answering.
+   * Absent without a gateway request (a typed «hablar con una persona», an invalid question).
+   */
+  readonly turn?: AssistantTurnRecord;
+}
+
+/** An answer of the assistant as the database keeps it (ADR-074): no text, nothing of the visitor. */
+export interface AssistantTurnRecord {
+  readonly requestId: string;
+  readonly kind: AssistantTurnKind;
+  readonly pageKind: AssistantPageKind;
+  /** What it cited, as `kind:slug` (a tour as `destination_tour:slug`), up to 12. */
+  readonly cited: readonly string[];
+}
+
+const TURN_CITATIONS = 12;
+
+/** The answer's kind and citations, from what the visitor got. */
+export function assistantTurnOf(
+  result: Omit<AssistantResult, "turn">,
+  pageKind: AssistantPageKind,
+): AssistantTurnRecord | null {
+  if (!result.ref) return null;
+  const { reply } = result;
+  if (reply.status === "notice")
+    return { requestId: result.ref, kind: "notice", pageKind, cited: [] };
+  if (reply.status !== "answered") return null;
+  if (reply.plan) return { requestId: result.ref, kind: "plan", pageKind, cited: [] };
+  const abstained = reply.abstained || result.unanswered !== undefined;
+  return {
+    requestId: result.ref,
+    kind: abstained ? "abstained" : "answered",
+    pageKind,
+    cited: (result.trace?.cited ?? []).slice(0, TURN_CITATIONS),
+  };
 }
 
 function today(now: Date, timezone: string): string {
@@ -269,7 +310,18 @@ export async function askAssistant(
 ): Promise<AssistantResult> {
   const request: AssistantRequest | null = parseAssistantRequest(raw);
   if (request === null) return { reply: { status: "invalid" }, trace: null };
+  const result = await answerRequest(tenant, request, visitor, deps);
+  // Each answer the gateway counted, with its kind and what it cited (ADR-074).
+  const turn = assistantTurnOf(result, request.page.kind);
+  return turn ? { ...result, turn } : result;
+}
 
+async function answerRequest(
+  tenant: AssistantTenant,
+  request: AssistantRequest,
+  visitor: string | null,
+  deps: AssistantDeps,
+): Promise<AssistantResult> {
   const persona = assistantPersona(tenant.presentation);
   const lang = detectLanguage(request.question);
 

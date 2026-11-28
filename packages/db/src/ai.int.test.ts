@@ -180,6 +180,52 @@ describe.runIf(reachable)("the AI gateway (real PostgreSQL, role rikuy_ai)", () 
     }
   });
 
+  it("keeps each answer with its channel, what it cited and what was tapped (ADR-074)", async () => {
+    const ledger = ledgerOf();
+    try {
+      const visitor = "198.51.100.42";
+      const answered = await runAiRequest(
+        { tenantId: SUR, profile: "assistant", messages: PROBE_MESSAGES, visitor },
+        { ledger, provider: createSimulatedAiProvider() },
+      );
+      if (answered.outcome !== "answered") throw new Error("the simulated model did not answer");
+      const turn = {
+        requestId: answered.requestId,
+        kind: "answered" as const,
+        pageKind: "home" as const,
+        cited: ["destination:laguna-espejo", "destination_tour:laguna-espejo", "event:no-existe"],
+      };
+      expect(await ledger.recordAssistantTurn(SUR, "qr", turn)).toBe("recorded");
+      expect(await ledger.recordAssistantTurn(SUR, "qr", turn)).toBe("ignored");
+      // Another municipality's request is never counted here.
+      expect(
+        await ledger.recordAssistantTurn("5eed1000-0000-4000-8000-000000000001", "portal", turn),
+      ).toBe("ignored");
+      const place = {
+        requestId: answered.requestId,
+        action: "place" as const,
+        key: "destination:laguna-espejo",
+      };
+      expect(await ledger.recordAssistantAction(SUR, "203.0.113.98", place)).toBe("ignored");
+      expect(await ledger.recordAssistantAction(SUR, visitor, place)).toBe("recorded");
+      expect(await ledger.recordAssistantAction(SUR, visitor, place)).toBe("recorded");
+      const rows = await admin`
+        select t.channel, t.kind,
+               (select count(*)::int from public.assistant_turn_citations c
+                where c.request_id = t.request_id) as citations,
+               (select count(*)::int from public.assistant_turn_actions a
+                where a.request_id = t.request_id) as actions
+        from public.assistant_turns t where t.request_id = ${answered.requestId}::uuid
+      `;
+      // The lake and its tour are one place; an unknown address is left out; tapped once.
+      expect(rows.map((row) => ({ ...row }))).toEqual([
+        { channel: "qr", kind: "answered", citations: 1, actions: 1 },
+      ]);
+    } finally {
+      await ledger.close();
+    }
+  });
+
   it("never lets eight requests at once pass the municipality's quota", async () => {
     const now = await aiBucket();
     await setAiLimit(now.consumed + now.reserved + 3 * RESERVE + Math.floor(RESERVE / 2));

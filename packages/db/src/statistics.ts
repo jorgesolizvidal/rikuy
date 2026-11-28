@@ -1,6 +1,9 @@
 import {
+  ASSISTANT_ACTION_KEYS,
+  ASSISTANT_CHANNEL_KEYS,
   VISIT_EVENTS,
   VISIT_TARGETS,
+  type AssistantStatisticsData,
   type PassportStatisticsData,
   type StatisticsRepository,
   type VisitStatisticsData,
@@ -78,6 +81,40 @@ export const passportStatisticsSchema = z.object({
   ),
 });
 
+/** The visitor's assistant of a period, by channel (migration 20261204000000, ADR-074). */
+export const assistantStatisticsSchema = z.object({
+  from: day,
+  to: day,
+  since: day.nullable(),
+  channels: z.array(
+    z.object({
+      channel: z.enum(ASSISTANT_CHANNEL_KEYS),
+      conversations: count,
+      people: count,
+      answered: count,
+      abstained: count,
+      plans: count,
+      notices: count,
+      askedPerson: count,
+      withAction: count,
+    }),
+  ),
+  topics: z.array(
+    z.object({
+      contentId: z.uuid(),
+      kind: z.enum(["destination", "event", "knowledge", "notice", "service", "story"]),
+      slug: z.string(),
+      title: z.string(),
+      published: z.boolean(),
+      times: count,
+      channels: z.object({ portal: count, embed: count, qr: count, whatsapp: count }),
+    }),
+  ),
+  actions: z.array(
+    z.object({ action: z.enum(ASSISTANT_ACTION_KEYS), times: count, answers: count }),
+  ),
+});
+
 const calendarSchema = z.array(z.object({ timezone: z.string(), first_day: day.nullable() }));
 
 export function createStatisticsRepository(client: SessionClient): StatisticsRepository {
@@ -115,6 +152,18 @@ export function createStatisticsRepository(client: SessionClient): StatisticsRep
       if (error)
         throw new Error(`Reading the passport statistics failed (${error.code || "unknown"})`);
       return passportStatisticsSchema.parse(data);
+    },
+    async assistant(tenantId, range): Promise<AssistantStatisticsData | null> {
+      const { data, error } = await client.rpc("tenant_assistant_statistics", {
+        p_tenant_id: tenantId,
+        p_from: range.from,
+        p_to: range.to,
+      });
+      // The web app may be deployed a few minutes before the migration.
+      if (isMissingFunction(error)) return null;
+      if (error)
+        throw new Error(`Reading the assistant statistics failed (${error.code || "unknown"})`);
+      return assistantStatisticsSchema.parse(data);
     },
   };
 }

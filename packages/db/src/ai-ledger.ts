@@ -1,6 +1,9 @@
 import type {
   AiBeginOutcome,
   AiLedger,
+  AssistantActionReport,
+  AssistantChannelKey,
+  AssistantTurnRecord,
   DictationLedger,
   KnowledgePassage,
   TourGuideContext,
@@ -71,10 +74,29 @@ export interface PostgresAiLedger extends AiLedger, DictationLedger {
     visitor: string | null,
     question: UnansweredQuestion,
   ): Promise<"recorded" | "ignored" | "capped">;
+  /**
+   * ai_api.record_assistant_turn (ADR-074): an answer of the visitor's assistant with its
+   * channel, its kind and what it cited. «ignored» before the migration.
+   */
+  recordAssistantTurn(
+    tenantId: string,
+    channel: AssistantChannelKey,
+    turn: AssistantTurnRecord,
+  ): Promise<"recorded" | "ignored">;
+  /**
+   * ai_api.record_assistant_action (ADR-074): what the visitor tapped in an answer; only for
+   * that visitor's recent answer. «ignored» before the migration.
+   */
+  recordAssistantAction(
+    tenantId: string,
+    visitor: string | null,
+    action: AssistantActionReport,
+  ): Promise<"recorded" | "ignored" | "capped">;
   close(): Promise<void>;
 }
 
 const recordedSchema = z.enum(["recorded", "ignored", "capped"]);
+const turnSchema = z.enum(["recorded", "ignored"]);
 
 const tourContextSchema = z.discriminatedUnion("status", [
   z.object({
@@ -217,6 +239,37 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
         return recordedSchema.parse(row?.outcome);
       } catch (error) {
         // The web app may be deployed a few minutes before the migration.
+        if ((error as { code?: string }).code === "42883") return "ignored";
+        throw error;
+      }
+    },
+
+    async recordAssistantTurn(tenantId, channel, turn) {
+      try {
+        const [row] = await sql`
+          select ai_api.record_assistant_turn(
+            ${tenantId}::uuid, ${turn.requestId}::uuid, ${channel}, ${turn.kind},
+            ${turn.pageKind}, ${sql.array([...turn.cited])}::text[]
+          ) as outcome
+        `;
+        return turnSchema.parse(row?.outcome);
+      } catch (error) {
+        // The web app may be deployed a few minutes before the migration.
+        if ((error as { code?: string }).code === "42883") return "ignored";
+        throw error;
+      }
+    },
+
+    async recordAssistantAction(tenantId, visitor, action) {
+      try {
+        const [row] = await sql`
+          select ai_api.record_assistant_action(
+            ${tenantId}::uuid, ${action.requestId}::uuid, ${visitor}::text, ${action.action},
+            ${action.key}::text
+          ) as outcome
+        `;
+        return recordedSchema.parse(row?.outcome);
+      } catch (error) {
         if ((error as { code?: string }).code === "42883") return "ignored";
         throw error;
       }

@@ -121,6 +121,8 @@ export * from "./application/assistant/handoff";
 export * from "./domain/assistant/embed";
 export * from "./application/assistant/embed";
 export * from "./application/assistant/links";
+export * from "./domain/assistant/statistics";
+export * from "./domain/assistant/turns";
 export * from "./contracts/copilot";
 export * from "./application/copilot/copilot";
 export * from "./application/copilot/ports";

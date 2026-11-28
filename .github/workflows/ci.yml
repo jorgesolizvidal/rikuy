@@ -422,6 +422,15 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-person-handoff 2>&1 | tee ../../person-handoff.log
+      # A · Paso 5.1 (ADR-074): each answer of Demo Norte's assistant is kept with its channel
+      # (the portal, «Pregúntale a…»), its kind and what it cited; a link tapped inside it, once;
+      # «Estadísticas» and the monthly report show «El asistente por canal».
+      - name: Channel metrics in a real browser
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-channel-metrics 2>&1 | tee ../../channel-metrics.log
       # A · Paso 2 (ADR-071): the line on the municipality's website (a page served at
       # localhost:4599, authorized in the seed) shows «Pregúntale a …», opens the assistant in
       # Rikuy's frame about the page's place and links to the website's own page; on a website
@@ -655,7 +664,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log visit-plans.log person-handoff.log assistant-only.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log visit-plans.log person-handoff.log channel-metrics.log assistant-only.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

@@ -17,6 +17,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { DailyChart } from "@/components/statistics/daily-chart";
+import { AssistantSection } from "@/components/statistics/assistant-section";
 import { PassportSection } from "@/components/statistics/passport-section";
 import { Change } from "@/components/statistics/change";
 import { countryName, formatCount } from "@/components/statistics/format";
@@ -80,7 +81,7 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
   const has = (key: ModuleKey) => hasModule(membership.modules, key);
   const period = parseStatisticsPeriod((await searchParams).periodo);
   const session = await adminSession();
-  const [{ summary, passport, firstDay }, saved, calendar] = await Promise.all([
+  const [{ summary, passport, assistant, firstDay }, saved, calendar] = await Promise.all([
     loadStatistics(membership, session.statistics, period),
     loadRecommendations(membership, session.recommendations),
     session.statistics.calendar(membership.tenantId),
@@ -288,6 +289,15 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
         />
       ) : null}
 
+      {assistant ? (
+        <AssistantSection
+          org={membership.slug}
+          assistant={assistant}
+          headingId="asistente"
+          period="en este período"
+        />
+      ) : null}
+
       <section aria-labelledby="paginas" className="metrics-section">
         <h2 id="paginas">Páginas del portal</h2>
         <div className="table-wrap" role="region" aria-label="Páginas del portal" tabIndex={0}>
@@ -485,6 +495,14 @@ export default async function StatisticsPage({ params, searchParams }: Statistic
             la ubicación del teléfono dentro del lugar; un sello sin ubicación vale igual para el
             circuito.
           </li>
+          {assistant ? (
+            <li>
+              El asistente: cada respuesta cuenta en el canal por el que llegó la pregunta (el
+              portal, la web del municipio o un QR «Pregúntale a…»). Los temas son lo que citó cada
+              respuesta. «Tocaron algo» cuenta solo lo que se tocó dentro de la respuesta, no las
+              páginas que se abren después.
+            </li>
+          ) : null}
           <li>Los días son los del municipio, en su hora.</li>
         </ul>
       </section>

@@ -16,6 +16,7 @@ import Link from "next/link";
 
 import { Change } from "@/components/statistics/change";
 import { DailyChart } from "@/components/statistics/daily-chart";
+import { AssistantSection } from "@/components/statistics/assistant-section";
 import { PassportSection } from "@/components/statistics/passport-section";
 import { countryName, formatCount } from "@/components/statistics/format";
 import { RecommendationList } from "@/components/statistics/recommendation-list";
@@ -226,6 +227,15 @@ export default async function MonthlyReportPage({ params, searchParams }: Report
           org={membership.slug}
           passport={view.passport}
           headingId="pasaporte"
+          period="en el mes"
+        />
+      ) : null}
+
+      {view.assistant ? (
+        <AssistantSection
+          org={membership.slug}
+          assistant={view.assistant}
+          headingId="asistente"
           period="en el mes"
         />
       ) : null}

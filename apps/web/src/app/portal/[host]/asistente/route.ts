@@ -1,6 +1,6 @@
 import { after } from "next/server";
 
-import { recordUnansweredQuestion } from "@/server/ai-gateway";
+import { recordAssistantTurn, recordUnansweredQuestion } from "@/server/ai-gateway";
 import { parseAssistantChannel } from "@rikuy/core";
 
 import { askPortalAssistant, assistantPlaceCards, linkAnswer } from "@/server/portal-assistant";
@@ -44,16 +44,20 @@ async function handle(request: Request, { params }: AssistantContext) {
     body = null;
   }
 
-  const { reply, unanswered, ref } = await askPortalAssistant(view, body, visitorKey(request));
+  const { reply, unanswered, ref, turn } = await askPortalAssistant(
+    view,
+    body,
+    visitorKey(request),
+  );
+  const tenantId = view.context.tenant.tenantId;
+  const channel = parseAssistantChannel(new URL(request.url).searchParams.get("canal"));
   // A question nothing published could answer is kept for the municipality (ADR-053), after
   // the answer is on its way.
-  if (unanswered) {
-    const tenantId = view.context.tenant.tenantId;
-    after(() => recordUnansweredQuestion(tenantId, unanswered));
-  }
+  if (unanswered) after(() => recordUnansweredQuestion(tenantId, unanswered));
+  // Each answer, with the channel it came through and what it cited (ADR-074).
+  if (turn) after(() => recordAssistantTurn(tenantId, channel, turn));
   // What the places it names look like (ADR-065), from what is published; and where each
   // item leads, given where it was asked (ADR-071).
-  const channel = parseAssistantChannel(new URL(request.url).searchParams.get("canal"));
   const linked = await linkAnswer(view, channel, reply, await assistantPlaceCards(view, reply));
   const places = linked.cards;
   // The answer's reference (ADR-073): sent back if the visitor then takes it to a person.

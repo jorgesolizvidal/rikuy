@@ -5,6 +5,7 @@ import type {
   CopilotSnapshotRow,
 } from "../../contracts/copilot";
 import { formatDateRange, formatShortDate, type StatisticsSummary } from "../visits/statistics";
+import type { AssistantChannelKey, AssistantSummary } from "../assistant/statistics";
 import type { PassportSummary } from "../passport/statistics";
 import { formatEventSchedule } from "../events/schedule";
 import { COPILOT_ISSUE_LABELS, proposableFields } from "./issues";
@@ -40,6 +41,7 @@ export const RECOMMENDATION_LIMITS = {
   events: 5,
   passportCircuits: 2,
   passportPlaces: 4,
+  assistantTopics: 3,
 } as const;
 
 export const RECOMMENDATION_SOURCES = [
@@ -108,6 +110,13 @@ const STATE_NAMES = {
 } as const;
 
 const COUNT = new Intl.NumberFormat("es-BO");
+
+const ASSISTANT_CHANNEL_WORDS: Readonly<Record<AssistantChannelKey, string>> = {
+  portal: "en el portal",
+  embed: "en la web del municipio",
+  qr: "desde un QR «Pregúntale a…»",
+  whatsapp: "por WhatsApp",
+};
 
 function n(value: number): string {
   return COUNT.format(value);
@@ -183,6 +192,8 @@ export interface RecommendationInput {
   readonly snapshot: readonly CopilotSnapshotRow[];
   /** The tourist passport of the same period; null or absent: no facts about it. */
   readonly passport?: PassportSummary | null;
+  /** The visitor's assistant by channel, same period (ADR-074); null or absent: none. */
+  readonly assistant?: AssistantSummary | null;
 }
 
 function changeWords(value: number, previous: number | null, unit: string, before: string): string {
@@ -334,6 +345,31 @@ export function recommendationFacts(input: RecommendationInput): RecommendationF
         source: "questions",
         text: `Pregunta sin respuesta ${quoted(group.text, 160)}: ${plural(group.times, "vez", "veces")}, ${plural(group.people, "persona", "personas")}, la última el ${formatShortDate(group.lastDay)}${group.place ? `, en la ficha de ${quoted(group.place, 80)}` : ""}.`,
         target: { type: "question", question: line(group.text, 500) },
+      });
+    }
+  }
+
+  // The visitor's assistant by channel and its most asked topics (ADR-074). Source
+  // «questions»: they are the visitors' questions, without a new kind of source.
+  const assistant = input.assistant;
+  if (assistant && !assistant.empty) {
+    const t = assistant.totals;
+    const channels = assistant.channels
+      .map((row) => `${n(row.conversations)} ${ASSISTANT_CHANNEL_WORDS[row.channel]}`)
+      .join(", ");
+    add({
+      source: "questions",
+      text: `Asistente del visitante, ${period}: ${plural(t.conversations.value, "pregunta", "preguntas")} (${channels}), ${n(t.abstained.value)} sin respuesta, ${plural(t.askedPerson.value, "llevada a una persona", "llevadas a una persona")}; en ${plural(t.withAction.value, "respuesta", "respuestas")} el visitante tocó algo${assistant.compared ? changeWords(t.conversations.value, t.conversations.previous, "preguntas", named.previous) : ""}.`,
+      target: null,
+    });
+    for (const topic of assistant.topics.slice(0, RECOMMENDATION_LIMITS.assistantTopics)) {
+      const kind = topic.kind === "destination" || topic.kind === "event" ? topic.kind : null;
+      add({
+        source: "questions",
+        text: `Tema preguntado al asistente, ${period}: ${topic.kindName} ${quoted(topic.title)}, citado en ${plural(topic.times, "respuesta", "respuestas")}.`,
+        target: kind
+          ? { type: "content", kind, contentId: topic.contentId, proposable: true }
+          : null,
       });
     }
   }

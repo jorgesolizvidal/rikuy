@@ -376,6 +376,76 @@ describe("produceMonthlyReport", () => {
     expect(other.sent[0]?.text).not.toContain("PASAPORTE");
   });
 
+  it("adds the assistant by channel: facts for the Copilot and its section in the email", async () => {
+    const assistant = (conversations: number) => ({
+      from: "2026-10-01",
+      to: "2026-10-31",
+      since: "2026-09-01",
+      channels: [
+        {
+          channel: "portal" as const,
+          conversations,
+          people: 3,
+          answered: conversations - 1,
+          abstained: 1,
+          plans: 0,
+          notices: 0,
+          askedPerson: 1,
+          withAction: 2,
+        },
+      ],
+      topics: [
+        {
+          contentId: "5eed4100-0000-4000-8000-000000000004",
+          kind: "destination" as const,
+          slug: "plaza",
+          title: "Plaza",
+          published: true,
+          times: 3,
+          channels: { portal: 3, embed: 0, qr: 0, whatsapp: 0 },
+        },
+      ],
+      actions: [{ action: "place" as const, times: 2, answers: 2 }],
+    });
+    const { store, calls } = fakeStore(source(), {
+      ...DATA,
+      assistant: assistant(5),
+      assistantPrevious: { ...assistant(4), from: "2026-09-01", to: "2026-09-30" },
+    });
+    const { mailer, sent } = fakeMailer();
+    await produceMonthlyReport(LEASE, {
+      store,
+      ai: simulatedAi().ai,
+      mailer,
+      adminOrigin: "https://panel.example.test",
+      sent: 0,
+      saveProgress: async () => undefined,
+      now: NOW,
+    });
+    expect(
+      calls.saved[0]?.facts?.some((fact) => fact.text.startsWith("Asistente del visitante")),
+    ).toBe(true);
+    const text = sent[0]?.text ?? "";
+    expect(text).toContain("EL ASISTENTE POR CANAL");
+    expect(text).toContain(
+      "5 preguntas al asistente de 3 personas (▲ 25 %; el mes anterior: 4): 5 en el portal.",
+    );
+    expect(text).toContain("Los temas más preguntados: Plaza (3).");
+    // Without the assistant's numbers, no section.
+    const plain = fakeStore(source());
+    const other = fakeMailer();
+    await produceMonthlyReport(LEASE, {
+      store: plain.store,
+      ai: simulatedAi().ai,
+      mailer: other.mailer,
+      adminOrigin: "https://panel.example.test",
+      sent: 0,
+      saveProgress: async () => undefined,
+      now: NOW,
+    });
+    expect(other.sent[0]?.text).not.toContain("ASISTENTE POR CANAL");
+  });
+
   it("without AI quota the report goes without recommendations and says why", async () => {
     const { store, calls } = fakeStore(source());
     const { mailer, sent } = fakeMailer();

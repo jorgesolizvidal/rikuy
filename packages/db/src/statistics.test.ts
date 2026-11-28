@@ -142,4 +142,52 @@ describe("statistics adapter", () => {
     const denied = createStatisticsRepository(client({ error: { code: "42501" } }).session);
     await expect(denied.passport("t", range, false)).rejects.toThrow("42501");
   });
+
+  it("reads the assistant by channel, and nothing before the migration", async () => {
+    const { session, calls } = client({
+      data: {
+        from: "2026-11-01",
+        to: "2026-11-02",
+        since: "2026-10-30",
+        channels: [
+          {
+            channel: "qr",
+            conversations: "3",
+            people: 2,
+            answered: 2,
+            abstained: 1,
+            plans: 0,
+            notices: 0,
+            askedPerson: 1,
+            withAction: "2",
+          },
+        ],
+        topics: [
+          {
+            contentId: MUSEO,
+            kind: "destination",
+            slug: "museo",
+            title: "Museo",
+            published: true,
+            times: "2",
+            channels: { portal: 0, embed: 0, qr: "2", whatsapp: 0 },
+          },
+        ],
+        actions: [{ action: "place", times: "2", answers: 1 }],
+      },
+    });
+    const range = { from: "2026-11-01", to: "2026-11-02" };
+    const data = await createStatisticsRepository(session).assistant?.("t", range);
+    expect(data?.channels[0]).toMatchObject({ channel: "qr", conversations: 3, withAction: 2 });
+    expect(data?.topics[0]).toMatchObject({ times: 2, channels: { qr: 2, portal: 0 } });
+    expect(data?.actions[0]).toEqual({ action: "place", times: 2, answers: 1 });
+    expect(calls[0]).toEqual({
+      fn: "tenant_assistant_statistics",
+      args: { p_tenant_id: "t", p_from: "2026-11-01", p_to: "2026-11-02" },
+    });
+    const missing = createStatisticsRepository(client({ error: { code: "PGRST202" } }).session);
+    expect(await missing.assistant?.("t", range)).toBeNull();
+    const denied = createStatisticsRepository(client({ error: { code: "42501" } }).session);
+    await expect(denied.assistant?.("t", range)).rejects.toThrow("42501");
+  });
 });

@@ -15,7 +15,10 @@ export type AssistantMode = "launcher" | "page" | "embed";
 
 export const AssistantModeContext = createContext<AssistantMode>("launcher");
 
-type LinkProps = Pick<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "target" | "rel">;
+type LinkProps = Pick<AnchorHTMLAttributes<HTMLAnchorElement>, "href" | "target" | "rel"> & {
+  /** The portal path it is about, when the link leads elsewhere (ADR-074). */
+  readonly "data-assistant-path"?: string;
+};
 
 export function linkProps(href: string, mode: AssistantMode): LinkProps {
   if (mode === "launcher" || typeof window === "undefined") return { href };
@@ -35,10 +38,19 @@ export function linkProps(href: string, mode: AssistantMode): LinkProps {
   return own ? { href } : { href: url.href, target: "_blank", rel: "noopener noreferrer" };
 }
 
-/** The attributes of one of the assistant's links where it is shown. */
-export function useLinkProps(): (href: string) => LinkProps {
+/**
+ * The attributes of one of the assistant's links where it is shown. `portalPath` is the
+ * portal page the item is about, when the link leads elsewhere (the municipality's website):
+ * what the visitor tapped is counted by it (ADR-074).
+ */
+export function useLinkProps(): (href: string, portalPath?: string | null) => LinkProps {
   const mode = useContext(AssistantModeContext);
-  return (href) => linkProps(href, mode);
+  return (href, portalPath) => {
+    const props = linkProps(href, mode);
+    return portalPath && portalPath !== href
+      ? { ...props, "data-assistant-path": portalPath }
+      : props;
+  };
 }
 
 /** Where an item of an answer leads (ADR-071): its own `link` when the server set one. */

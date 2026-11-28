@@ -15,6 +15,12 @@ import {
   type ReportMonth,
 } from "../../domain/reports/monthly";
 import {
+  summarizeAssistant,
+  type AssistantChannelKey,
+  type AssistantStatisticsData,
+  type AssistantSummary,
+} from "../../domain/assistant/statistics";
+import {
   summarizePassport,
   type PassportStatisticsData,
   type PassportSummary,
@@ -142,6 +148,8 @@ export interface MonthlyReportView {
   readonly summary: StatisticsSummary;
   /** The tourist passport of the month (null: not counted yet). */
   readonly passport: PassportSummary | null;
+  /** The visitor's assistant by channel (null: without it, or not counted yet). */
+  readonly assistant: AssistantSummary | null;
   readonly firstDay: string | null;
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
@@ -177,18 +185,32 @@ export async function loadMonthlyReport(
   const tenant = membership.tenantId;
   const copilot = copilotForModules(deps.copilot, membership.modules);
   const withPassport = hasModule(membership.modules, "passport");
-  const [current, previous, questions, activity, review, snapshot, status, passport, before] =
-    await Promise.all([
-      deps.statistics.statistics(tenant, days, false),
-      comparable ? deps.statistics.statistics(tenant, range.previous, false) : null,
-      deps.reports.questions(tenant, days),
-      deps.reports.activity(tenant, days),
-      copilot.review(tenant),
-      copilot.snapshot(tenant),
-      deps.reports.status(tenant, month),
-      withPassport ? deps.statistics.passport(tenant, days, false) : null,
-      withPassport ? deps.statistics.passport(tenant, range.previous, false) : null,
-    ]);
+  const withAssistant = hasModule(membership.modules, "assistant");
+  const [
+    current,
+    previous,
+    questions,
+    activity,
+    review,
+    snapshot,
+    status,
+    passport,
+    before,
+    assistant,
+    assistantBefore,
+  ] = await Promise.all([
+    deps.statistics.statistics(tenant, days, false),
+    comparable ? deps.statistics.statistics(tenant, range.previous, false) : null,
+    deps.reports.questions(tenant, days),
+    deps.reports.activity(tenant, days),
+    copilot.review(tenant),
+    copilot.snapshot(tenant),
+    deps.reports.status(tenant, month),
+    withPassport ? deps.statistics.passport(tenant, days, false) : null,
+    withPassport ? deps.statistics.passport(tenant, range.previous, false) : null,
+    withAssistant ? (deps.statistics.assistant?.(tenant, days) ?? null) : null,
+    withAssistant ? (deps.statistics.assistant?.(tenant, range.previous) ?? null) : null,
+  ]);
   const summary = summarizeStatistics(range, current, previous, calendar.firstDay);
   return {
     month,
@@ -197,6 +219,7 @@ export async function loadMonthlyReport(
     current: isCurrentMonth(month, today),
     summary,
     passport: passport ? summarizePassport(range, passport, before, viewsOf(summary)) : null,
+    assistant: assistant ? summarizeAssistant(range, assistant, assistantBefore) : null,
     firstDay: calendar.firstDay,
     questions,
     review,
@@ -255,6 +278,9 @@ export interface MonthlyReportData {
   /** The tourist passport of the month and of the one compared (null: not counted yet). */
   readonly passport: PassportStatisticsData | null;
   readonly passportPrevious: PassportStatisticsData | null;
+  /** The visitor's assistant of the month and of the one compared (ADR-074); absent before. */
+  readonly assistant?: AssistantStatisticsData | null;
+  readonly assistantPrevious?: AssistantStatisticsData | null;
   /** The municipality's modules (ADR-060); absent: read before that migration (all). */
   readonly modules?: readonly ModuleKey[];
 }
@@ -348,6 +374,10 @@ export async function produceMonthlyReport(
     data.passport && hasModule(modules, "passport")
       ? summarizePassport(range, data.passport, data.passportPrevious, viewsOf(summary))
       : null;
+  const assistant =
+    data.assistant && hasModule(modules, "assistant")
+      ? summarizeAssistant(range, data.assistant, data.assistantPrevious ?? null)
+      : null;
   const review = reviewForModules(data.review, modules);
 
   let items: readonly Recommendation[] | null = source.items;
@@ -373,6 +403,7 @@ export async function produceMonthlyReport(
       actorId: null,
       statistics: summary,
       passport,
+      assistant,
       period: monthlyRecommendationPeriod(month, source.today),
       questions: data.questions,
       review: data.review,
@@ -423,6 +454,7 @@ export async function produceMonthlyReport(
           current: isCurrentMonth(month, source.today),
           summary,
           passport,
+          assistant,
           questions: data.questions,
           review,
           activity: data.activity,
@@ -494,6 +526,13 @@ export function changeLine(value: number, previous: number | null, before: strin
   return `${percent > 0 ? "▲" : "▼"} ${n(Math.abs(percent))} %; ${before}: ${n(previous)}`;
 }
 
+const EMAIL_CHANNEL_WORDS: Readonly<Record<AssistantChannelKey, string>> = {
+  portal: "en el portal",
+  embed: "en la web del municipio",
+  qr: "desde un QR «Pregúntale a…»",
+  whatsapp: "por WhatsApp",
+};
+
 export interface MonthlyEmailInput {
   readonly to: string;
   readonly tenantName: string;
@@ -503,6 +542,8 @@ export interface MonthlyEmailInput {
   readonly summary: StatisticsSummary;
   /** The tourist passport of the month (null or inactive: no section). */
   readonly passport?: PassportSummary | null;
+  /** The visitor's assistant by channel (null or empty: no section). */
+  readonly assistant?: AssistantSummary | null;
   readonly questions: UnansweredQuestionsData;
   readonly review: readonly CopilotReviewRow[];
   readonly activity: ContentActivity;
@@ -580,6 +621,30 @@ export function monthlyEmailSections(input: MonthlyEmailInput): EmailSection[] {
     }
   }
 
+  const assistant = input.assistant && !input.assistant.empty ? input.assistant : null;
+  const assistantLines: string[] = [];
+  if (assistant) {
+    const a = assistant.totals;
+    const compareAssistant = (value: number, previous: number | null) => {
+      const words = assistant.compared ? changeLine(value, previous, before) : "";
+      return words ? ` (${words})` : "";
+    };
+    assistantLines.push(
+      `${plural(a.conversations.value, "pregunta", "preguntas")} al asistente de ${plural(a.people.value, "persona", "personas")}${compareAssistant(a.conversations.value, a.conversations.previous)}: ${assistant.channels
+        .map((row) => `${n(row.conversations)} ${EMAIL_CHANNEL_WORDS[row.channel]}`)
+        .join(", ")}.`,
+      `${n(a.abstained.value)} sin respuesta, ${plural(a.askedPerson.value, "llevada a una persona", "llevadas a una persona")}; en ${plural(a.withAction.value, "respuesta", "respuestas")} el visitante tocó algo (una ficha, un tour, el mapa…).`,
+    );
+    if (assistant.topics.length > 0) {
+      assistantLines.push(
+        `Los temas más preguntados: ${assistant.topics
+          .slice(0, 5)
+          .map((topic) => `${plain(topic.title, 60)} (${n(topic.times)})`)
+          .join(", ")}.`,
+      );
+    }
+  }
+
   const q = input.questions;
   const questions =
     q.total === 0
@@ -618,6 +683,9 @@ export function monthlyEmailSections(input: MonthlyEmailInput): EmailSection[] {
     { title: "Visitas", lines: visits },
     ...(places.length > 0 ? [{ title: "Lo más visto", lines: places }] : []),
     ...(passportLines.length > 0 ? [{ title: "Pasaporte turístico", lines: passportLines }] : []),
+    ...(assistantLines.length > 0
+      ? [{ title: "El asistente por canal", lines: assistantLines }]
+      : []),
     { title: "Preguntas sin respuesta", lines: questions },
     { title: "Estado del contenido", lines: content },
     { title: "Recomendaciones del Copilot", lines: recommendations },

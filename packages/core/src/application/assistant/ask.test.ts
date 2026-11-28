@@ -135,6 +135,44 @@ describe("askAssistant", () => {
     expect(notice.ref).toBe("r2");
   });
 
+  it("keeps each answer's kind and what it cited, for «Estadísticas» (ADR-074)", async () => {
+    const { deps } = setup({ found: [passage("museo-comunitario")] });
+    const answered = await askAssistant(
+      tenant,
+      { question: "¿A qué hora abre el museo?", page: { kind: "destination", slug: "museo" } },
+      "203.0.113.7",
+      deps,
+    );
+    expect(answered.turn).toEqual({
+      requestId: "r1",
+      kind: "answered",
+      pageKind: "destination",
+      cited: ["destination:museo-comunitario"],
+    });
+    const nothing = await askAssistant(
+      tenant,
+      { question: "¿Cuál es el horario del teleférico?" },
+      null,
+      setup({ found: [] }).deps,
+    );
+    expect(nothing.turn).toMatchObject({ kind: "abstained", pageKind: "other", cited: [] });
+    const notice = await askAssistant(
+      tenant,
+      { question: "¿A qué hora abre el museo?", page: { kind: "home" } },
+      null,
+      setup({ refuse: "visitor_limit" }).deps,
+    );
+    expect(notice.turn).toEqual({ requestId: "r2", kind: "notice", pageKind: "home", cited: [] });
+    // A typed «hablar con una persona» is not an answer of the model: nothing to count.
+    const handoff = await askAssistant(
+      tenant,
+      { question: "Quiero hablar con una persona" },
+      null,
+      setup().deps,
+    );
+    expect(handoff.turn).toBeUndefined();
+  });
+
   it("answers a first question in Spanish with one call, and cites what it used", async () => {
     const museum = passage("museo-comunitario");
     const { deps, l, complete, search } = setup({ found: [museum] });

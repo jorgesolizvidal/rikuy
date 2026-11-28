@@ -123,7 +123,11 @@ select pg_temp.req(:'ta', '203.0.113.7', 'probe') as probe \gset
 select pg_temp.req(:'ta', '203.0.113.7') as old \gset
 update public.ai_requests set created_at = now() - interval '61 minutes' where id = :'old';
 select pg_temp.req(:'ta', '203.0.113.7') as recent \gset
-update public.ai_requests set created_at = now() - interval '50 minutes' where id = :'recent';
+-- 50 minutes ago, but never before today's platform day: its visitor print uses today's salt.
+update public.ai_requests
+set created_at = greatest(now() - interval '50 minutes',
+                          (private.ai_platform_day()::timestamp at time zone 'UTC') + interval '1 second')
+where id = :'recent';
 select pg_temp.req(:'ta', '203.0.113.7') as blank \gset
 set local role rikuy_ai;
 select is(ai_api.record_person_request(:'ta', :'other', '198.51.100.9', '¿Hay wifi?', 'es', 'home'), 'ignored',

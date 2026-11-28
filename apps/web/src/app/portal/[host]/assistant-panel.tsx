@@ -66,6 +66,8 @@ const CHANNEL: Readonly<Record<AssistantMode, string>> = {
 const PLACES_ENDPOINT = "/asistente/lugares";
 /** The visitor tapped a way to reach a person under an answer (ADR-073). */
 const PERSON_ENDPOINT = "/asistente/persona";
+/** The visitor tapped a link inside an answer (ADR-074). */
+const ACTION_ENDPOINT = "/asistente/accion";
 const WIDE = "(min-width: 48rem)";
 
 /** An answer and the cards of the places it names (ADR-065), as the portal sent them. */
@@ -109,6 +111,19 @@ function askedBefore(messages: readonly Message[]): ReadonlyMap<string, Asked> {
     }
   }
   return asked;
+}
+
+/** The portal page a link inside an answer is about: its own path, or the one it carries. */
+function portalPathOf(anchor: HTMLAnchorElement): string | null {
+  const carried = anchor.dataset.assistantPath;
+  if (carried) return carried.startsWith("/") ? carried : null;
+  let url: URL;
+  try {
+    url = new URL(anchor.href, window.location.origin);
+  } catch {
+    return null;
+  }
+  return url.origin === window.location.origin ? `${url.pathname}${url.hash}` : null;
 }
 
 interface Saved {
@@ -463,6 +478,36 @@ export default function AssistantPanel({
     },
     [pagePath],
   );
+
+  // What the visitor tapped inside an answer (ADR-074): the answer's reference and the portal
+  // path the link is about, once per answer and path. Nothing about where they go next.
+  const tapped = useRef(new Set<string>());
+  useEffect(() => {
+    const element = log.current;
+    if (!element) return;
+    const onTap = (event: MouseEvent) => {
+      const target = event.target instanceof Element ? event.target : null;
+      const anchor = target?.closest("a[href]");
+      const answer = anchor?.closest<HTMLElement>("[data-assistant-ref]");
+      const ref = answer?.dataset.assistantRef;
+      if (!anchor || !ref) return;
+      const path = portalPathOf(anchor as HTMLAnchorElement);
+      if (!path || tapped.current.has(`${ref} ${path}`)) return;
+      tapped.current.add(`${ref} ${path}`);
+      void fetch(ACTION_ENDPOINT, {
+        method: "POST",
+        keepalive: true,
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ ref, path }),
+      }).catch(() => undefined);
+    };
+    element.addEventListener("click", onTap);
+    element.addEventListener("auxclick", onTap);
+    return () => {
+      element.removeEventListener("click", onTap);
+      element.removeEventListener("auxclick", onTap);
+    };
+  }, []);
 
   // Open as a modal on a phone, as a panel beside the page on a wider screen. On its own page
   // and in the website's frame it is the page itself: always open, never modal.
@@ -1063,6 +1108,7 @@ function MessageView({
         <div
           className="assistant-message assistant-from-assistant assistant-problem"
           lang={reply.lang}
+          data-assistant-ref={reply.ref}
         >
           <p>
             <span className="visually-hidden">{reply.notice.speaker}: </span>
@@ -1085,7 +1131,11 @@ function MessageView({
   return (
     <div className="assistant-row">
       {avatar}
-      <div className="assistant-message assistant-from-assistant" lang={reply.lang}>
+      <div
+        className="assistant-message assistant-from-assistant"
+        lang={reply.lang}
+        data-assistant-ref={reply.ref}
+      >
         <span className="visually-hidden">{name}: </span>
         <Blocks blocks={reply.blocks} />
         {reply.abstained ? (
