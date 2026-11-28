@@ -73,6 +73,7 @@ const LABELS = {
   notice: "Aviso",
   service: "Servicio",
   story: "Relato",
+  faq: "Pregunta frecuente",
 } as const;
 
 function pageLabel(pages: KnowledgePassage["pages"]): string | null {
@@ -106,6 +107,8 @@ export function publicCitation(passage: KnowledgePassage): PublicCitation {
             ? PORTAL_PATHS.service(passage.slug)
             : passage.kind === "story"
               ? PORTAL_PATHS.story(passage.slug)
-              : null;
+              : passage.kind === "faq"
+                ? PORTAL_PATHS.faq(passage.slug)
+                : null;
   return { ...common, label: LABELS[passage.kind], href };
 }

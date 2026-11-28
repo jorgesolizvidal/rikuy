@@ -14,6 +14,7 @@ import {
   type PublishedPassportReader,
   type PublishedNoticeReader,
   type PublishedServiceReader,
+  type PublishedFaqReader,
   type PublishedStoryReader,
   type PlanTraitReader,
   type PublishedContentIndexReader,
@@ -32,6 +33,7 @@ import {
   createSupabasePublishedPassportReader,
   createSupabasePublishedNoticeReader,
   createSupabasePublishedServiceReader,
+  createSupabasePublishedFaqReader,
   createSupabasePublishedStoryReader,
   createSupabasePublishedWebLinkReader,
   type PublishedWebLinkReader,
@@ -217,6 +219,19 @@ export function publishedStoryReader(): PublishedStoryReader {
     publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
   });
   return publishedStories;
+}
+
+let publishedFaqs: PublishedFaqReader | undefined;
+
+/** The municipality's published frequently asked questions (anonymous, ADR-074). */
+export function publishedFaqReader(): PublishedFaqReader {
+  if (publishedFaqs) return publishedFaqs;
+  const { env } = platformSettings();
+  publishedFaqs = createSupabasePublishedFaqReader({
+    url: env.NEXT_PUBLIC_SUPABASE_URL,
+    publishableKey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+  });
+  return publishedFaqs;
 }
 
 let publishedWebLinks: PublishedWebLinkReader | undefined;

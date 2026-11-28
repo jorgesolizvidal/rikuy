@@ -91,6 +91,7 @@ function portalPages(portal) {
     "/avisos",
     "/servicios",
     "/memoria",
+    "/preguntas-frecuentes",
     "/privacidad",
     "/terminos",
     "/destinos/no-existe",

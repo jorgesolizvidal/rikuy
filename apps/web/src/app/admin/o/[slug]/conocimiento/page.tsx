@@ -23,6 +23,7 @@ const KIND = {
   notice: "Aviso",
   service: "Servicio",
   story: "Relato",
+  faq: "Pregunta frecuente",
 } as const;
 
 const DATE = new Intl.DateTimeFormat("es-BO", {

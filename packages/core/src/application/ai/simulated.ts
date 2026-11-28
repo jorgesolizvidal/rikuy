@@ -1,6 +1,10 @@
 import type { AiMessage } from "../../contracts/ai";
 import { ANSWER_TAG, EXPLAIN_TAG, PLAN_TAG } from "../../domain/assistant/prompts";
-import { COPILOT_ASK_TAG, COPILOT_PROPOSE_TAG } from "../../domain/copilot/prompts";
+import {
+  COPILOT_ASK_TAG,
+  COPILOT_FAQ_TAG,
+  COPILOT_PROPOSE_TAG,
+} from "../../domain/copilot/prompts";
 import { RECOMMEND_TAG } from "../../domain/copilot/recommendations";
 import type { SpeechTranscriber } from "./dictation";
 import { AiProviderError, estimateTokens, type AiProvider } from "./gateway";
@@ -44,15 +48,17 @@ export function createSimulatedAiProvider(options: { readonly delayMs?: number }
         ? simulatedCopilotAnswer(text)
         : system.startsWith(COPILOT_PROPOSE_TAG)
           ? simulatedProposal(system, text)
-          : system.startsWith(RECOMMEND_TAG)
-            ? simulatedRecommendations(text)
-            : system.startsWith(PLAN_TAG)
-              ? simulatedPlan(text)
-              : system.startsWith(ANSWER_TAG)
-                ? simulatedAssistantAnswer(text)
-                : system.startsWith(EXPLAIN_TAG)
-                  ? simulatedExplanation(text)
-                  : simulatedAnswer(text);
+          : system.startsWith(COPILOT_FAQ_TAG)
+            ? simulatedFaq(text)
+            : system.startsWith(RECOMMEND_TAG)
+              ? simulatedRecommendations(text)
+              : system.startsWith(PLAN_TAG)
+                ? simulatedPlan(text)
+                : system.startsWith(ANSWER_TAG)
+                  ? simulatedAssistantAnswer(text)
+                  : system.startsWith(EXPLAIN_TAG)
+                    ? simulatedExplanation(text)
+                    : simulatedAnswer(text);
       return {
         text: answer,
         inputTokens: estimateTokens(request.messages),
@@ -122,6 +128,27 @@ function simulatedProposal(system: string, text: string): string {
   }
   lines.push(`FUENTES: A${text.includes("[F1]") ? ", F1" : ""}`);
   return lines.join("\n");
+}
+
+/**
+ * A frequently asked question: the visitors' question with a question mark and an answer from
+ * the first passage, citing it. «[simular:no-sabe]» in the question says the passages do not
+ * answer it; «[simular:cita-inventada]» cites a passage that does not exist.
+ */
+function simulatedFaq(text: string): string {
+  const asked = /^Pregunta de los visitantes: (.+)$/mu.exec(text)?.[1]?.trim() ?? "";
+  const first = /^\[F1\] (.+)$/mu.exec(text)?.[1] ?? "el municipio";
+  const question = asked.replace(/^¿?(.*?)\??$/u, "¿$1?");
+  if (text.includes("[simular:no-sabe]")) {
+    return `PREGUNTA: ${question}\nRESPUESTA: NO_SE\nTEMA: otras\nFUENTES:`;
+  }
+  const label = text.includes("[simular:cita-inventada]") ? "F9" : "F1";
+  return [
+    `PREGUNTA: ${question}`,
+    `RESPUESTA: Respuesta simulada del Copilot con lo publicado en ${first}.`,
+    "TEMA: servicios",
+    `FUENTES: ${label}`,
+  ].join("\n");
 }
 
 /**

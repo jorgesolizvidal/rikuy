@@ -10,11 +10,12 @@ export type AssistantTurnKind = "answered" | "abstained" | "plan" | "notice";
 const SLUG = "[a-z0-9]+(?:-[a-z0-9]+)*";
 const PLACE = new RegExp(`^/(destinos|agenda)/(${SLUG})$`, "u");
 const TOUR = new RegExp(`^/(destinos|agenda)/(${SLUG})/tour$`, "u");
-const ANCHORED = new RegExp(`^/(avisos|servicios|memoria)$`, "u");
+const ANCHORED = new RegExp(`^/(avisos|servicios|memoria|preguntas-frecuentes)$`, "u");
 const ANCHOR_KIND: Readonly<Record<string, string>> = {
   avisos: "notice",
   servicios: "service",
   memoria: "story",
+  "preguntas-frecuentes": "faq",
 };
 const KEY = new RegExp(`^${SLUG}$`, "u");
 

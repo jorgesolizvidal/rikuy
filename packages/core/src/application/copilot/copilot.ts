@@ -233,6 +233,42 @@ function parseTurns(value: unknown): CopilotTurn[] {
   return trimTurns(turns);
 }
 
+/** Where a published passage is edited in the panel, with its kind's name (ADR-042). */
+export function passageSourceLink(org: string, passage: KnowledgePassage): CopilotSourceLink {
+  const href =
+    passage.source === "tour"
+      ? COPILOT_PATHS.tour(org, passage.sourceId)
+      : passage.kind === "knowledge"
+        ? COPILOT_PATHS.knowledge(org, passage.sourceId)
+        : passage.kind === "notice"
+          ? COPILOT_PATHS.notice(org, passage.sourceId)
+          : passage.kind === "service"
+            ? COPILOT_PATHS.service(org, passage.sourceId)
+            : passage.kind === "story"
+              ? COPILOT_PATHS.story(org, passage.sourceId)
+              : passage.kind === "faq"
+                ? COPILOT_PATHS.faq(org, passage.sourceId)
+                : COPILOT_PATHS.editor(org, passage.kind, passage.sourceId);
+  return {
+    label:
+      passage.source === "tour"
+        ? "Tour 360°"
+        : passage.kind === "knowledge"
+          ? "Documento"
+          : passage.kind === "notice"
+            ? "Aviso"
+            : passage.kind === "service"
+              ? "Servicio"
+              : passage.kind === "story"
+                ? "Relato"
+                : passage.kind === "faq"
+                  ? "Pregunta frecuente"
+                  : KIND_NAMES[passage.kind],
+    title: passage.heading ? `${passage.title} · ${passage.heading}` : passage.title,
+    href,
+  };
+}
+
 function sourceLinks(
   org: string,
   labels: readonly string[],
@@ -263,35 +299,7 @@ function sourceLinks(
     }
     if (label.startsWith("F")) {
       const passage = passages[Number(label.slice(1)) - 1];
-      if (!passage) continue;
-      const href =
-        passage.source === "tour"
-          ? COPILOT_PATHS.tour(org, passage.sourceId)
-          : passage.kind === "knowledge"
-            ? COPILOT_PATHS.knowledge(org, passage.sourceId)
-            : passage.kind === "notice"
-              ? COPILOT_PATHS.notice(org, passage.sourceId)
-              : passage.kind === "service"
-                ? COPILOT_PATHS.service(org, passage.sourceId)
-                : passage.kind === "story"
-                  ? COPILOT_PATHS.story(org, passage.sourceId)
-                  : COPILOT_PATHS.editor(org, passage.kind, passage.sourceId);
-      add({
-        label:
-          passage.source === "tour"
-            ? "Tour 360°"
-            : passage.kind === "knowledge"
-              ? "Documento"
-              : passage.kind === "notice"
-                ? "Aviso"
-                : passage.kind === "service"
-                  ? "Servicio"
-                  : passage.kind === "story"
-                    ? "Relato"
-                    : KIND_NAMES[passage.kind],
-        title: passage.heading ? `${passage.title} · ${passage.heading}` : passage.title,
-        href,
-      });
+      if (passage) add(passageSourceLink(org, passage));
     }
     // Any other label points nowhere: dropped (an invented source).
   }
@@ -559,6 +567,7 @@ const PASSAGE_LABELS = {
   notice: "Aviso",
   service: "Servicio",
   story: "Relato",
+  faq: "Pregunta frecuente",
 } as const;
 
 /** V2: the model proposes the asked texts; the proposal is saved for the staff to decide. */

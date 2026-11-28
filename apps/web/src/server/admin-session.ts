@@ -18,6 +18,7 @@ import {
   createNoticeRepository,
   createServiceRepository,
   createStoryRepository,
+  createFaqRepository,
   createEmbedRepository,
   createPlatformEmbedRepository,
   createMemberRepository,
@@ -94,6 +95,7 @@ export const adminSession = cache(async () => {
     notices: createNoticeRepository(client),
     services: createServiceRepository(client),
     stories: createStoryRepository(client),
+    faqs: createFaqRepository(client),
     /** «Solo asistente» (ADR-071): the websites and «Página en la web del municipio». */
     embed: createEmbedRepository(client),
     platformEmbed: createPlatformEmbedRepository(client),

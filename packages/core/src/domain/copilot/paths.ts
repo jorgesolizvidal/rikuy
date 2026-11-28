@@ -15,6 +15,7 @@ export const COPILOT_PATHS = {
   notice: (org: string, id: string) => `/o/${org}/avisos/${encodeURIComponent(id)}`,
   service: (org: string, id: string) => `/o/${org}/servicios/${encodeURIComponent(id)}`,
   story: (org: string, id: string) => `/o/${org}/memoria/${encodeURIComponent(id)}`,
+  faq: (org: string, id: string) => `/o/${org}/preguntas-frecuentes/${encodeURIComponent(id)}`,
   usage: (org: string) => `/o/${org}/uso`,
 } as const;
 

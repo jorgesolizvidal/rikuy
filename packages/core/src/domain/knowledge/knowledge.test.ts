@@ -191,6 +191,7 @@ describe("sources", () => {
     story: null,
     visitMinutes: null,
     kids: null,
+    faq: null,
     document: null,
   };
 

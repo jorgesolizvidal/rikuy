@@ -19,6 +19,7 @@ import {
   type PortalMapPlace,
   type PublishedNotice,
   type PublishedService,
+  type PublishedFaq,
   type PublishedStory,
   type ServiceCategory,
   type PublishedEventSummary,
@@ -37,6 +38,7 @@ import {
   publishedPassportReader,
   planTraitReader,
   publishedServiceReader,
+  publishedFaqReader,
   publishedStoryReader,
   publishedRedirectReader,
   publishedTourReader,
@@ -119,6 +121,19 @@ export const portalServices = cache(
 export const portalStories = cache(async (view: PortalView): Promise<readonly PublishedStory[]> =>
   portalHas(view, "community_memory")
     ? publishedStoryReader()
+        .list(view.context.tenant.tenantId)
+        .catch(() => [])
+    : [],
+);
+
+/**
+ * The municipality's published frequently asked questions (ADR-074). Every municipality has
+ * them (no module); the page and the links need its public portal. A failure means an empty
+ * list, never an error page.
+ */
+export const portalFaqs = cache(async (view: PortalView): Promise<readonly PublishedFaq[]> =>
+  portalHas(view, "portal")
+    ? publishedFaqReader()
         .list(view.context.tenant.tenantId)
         .catch(() => [])
     : [],

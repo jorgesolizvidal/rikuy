@@ -5,6 +5,7 @@ import {
   directionsUrl,
   openingHoursLines,
   serializeJsonLd,
+  faqsOfPlace,
   storiesOfPlace,
   tourPath,
 } from "@rikuy/core";
@@ -21,6 +22,7 @@ import {
   portalPlaceExtras,
   responsiveImage,
   placeNoticeView,
+  portalFaqs,
   portalStories,
 } from "@/server/portal-content";
 import { portalHas, portalView } from "@/server/portal-view";
@@ -34,6 +36,7 @@ import { ActionIcon } from "../../action-icon";
 import { ShareButton } from "../../share-button";
 import { PlaceNotices } from "../../notice-strip";
 import { NearbyNotice } from "../../visitor-location";
+import { PlaceFaqs } from "../../place-faqs";
 import { PlaceStories } from "../../place-stories";
 
 interface DestinationPageProps {
@@ -89,7 +92,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
   const loaded = await load(params);
   if (loaded === null) return movedOrNotFound(params, "destination", PORTAL_PATHS.destination);
   const { view, destination } = loaded;
-  const [targets, tour, allHours, extras, notices, stories] = await Promise.all([
+  const [targets, tour, allHours, extras, notices, stories, faqs] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "destination", destination.slug),
     // Without the hours the page still shows: they are one more part of the visit card.
@@ -101,6 +104,7 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
     }),
     placeNoticeView(view, "destination", destination.slug),
     portalStories(view),
+    portalFaqs(view),
   ]);
   const hours = allHours.get(destination.slug) ?? null;
   const withMap = portalHas(view, "map");
@@ -228,6 +232,8 @@ export default async function DestinationPage({ params }: DestinationPageProps) 
           <EventsHere events={extras.eventsHere} />
 
           <PlaceStories stories={storiesOfPlace(stories, destination.slug)} />
+
+          <PlaceFaqs faqs={faqsOfPlace(faqs, { kind: "destination", slug: destination.slug })} />
 
           {destination.location ? (
             <PlaceLocation

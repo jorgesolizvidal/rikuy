@@ -64,7 +64,7 @@ function statusOf(item: z.infer<typeof itemRowSchema>): ContentStatus {
   return item.draft_revision_id === null ? "published" : "changed";
 }
 
-type Kind = "destination" | "event" | "knowledge" | "notice" | "service" | "story";
+type Kind = "destination" | "event" | "knowledge" | "notice" | "service" | "story" | "faq";
 
 function eventStatus(published: boolean, draft: boolean): ContentStatus {
   if (!published) return "draft";
