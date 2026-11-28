@@ -8,6 +8,7 @@ import type {
   KnowledgePassage,
   TourGuideContext,
   UnansweredQuestion,
+  WhatsAppBegin,
 } from "@rikuy/core";
 import postgres from "postgres";
 import { z } from "zod";
@@ -92,8 +93,32 @@ export interface PostgresAiLedger extends AiLedger, DictationLedger {
     visitor: string | null,
     action: AssistantActionReport,
   ): Promise<"recorded" | "ignored" | "capped">;
+  /**
+   * ai_api.whatsapp_begin (ADR-075): the municipality a WhatsApp message is for (by the
+   * number it was sent to), once per message, with the sender as a keyed hash and the last
+   * messages of their conversation. Before the migration, no number is known.
+   */
+  whatsappBegin(phoneNumberId: string, messageId: string, waId: string): Promise<WhatsAppBegin>;
+  /** ai_api.whatsapp_remember: the question and its answer, masked, the last six kept. */
+  whatsappRemember(
+    tenantId: string,
+    contactKey: string,
+    question: string,
+    answer: string,
+  ): Promise<void>;
   close(): Promise<void>;
 }
+
+const whatsappBeginSchema = z.union([
+  z.object({
+    status: z.literal("new"),
+    tenantId: z.string().uuid(),
+    host: z.string().min(1),
+    contactKey: z.string().regex(/^[0-9a-f]{64}$/u),
+    history: z.array(z.object({ role: z.enum(["user", "assistant"]), text: z.string() })).max(6),
+  }),
+  z.object({ status: z.enum(["duplicate", "unknown_number", "unavailable", "capped"]) }),
+]);
 
 const recordedSchema = z.enum(["recorded", "ignored", "capped"]);
 const turnSchema = z.enum(["recorded", "ignored"]);
@@ -273,6 +298,27 @@ export function createPostgresAiLedger(options: PostgresAiLedgerOptions): Postgr
         if ((error as { code?: string }).code === "42883") return "ignored";
         throw error;
       }
+    },
+
+    async whatsappBegin(phoneNumberId, messageId, waId) {
+      try {
+        const [row] = await sql`
+          select ai_api.whatsapp_begin(${phoneNumberId}, ${messageId}, ${waId}) as outcome
+        `;
+        return whatsappBeginSchema.parse(row?.outcome);
+      } catch (error) {
+        // The web app may be deployed a few minutes before the migration.
+        if ((error as { code?: string }).code === "42883") return { status: "unknown_number" };
+        throw error;
+      }
+    },
+
+    async whatsappRemember(tenantId, contactKey, question, answer) {
+      await sql`
+        select ai_api.whatsapp_remember(
+          ${tenantId}::uuid, ${contactKey}, ${question}, ${answer}
+        )
+      `;
     },
 
     async close() {

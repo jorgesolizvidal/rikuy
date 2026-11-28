@@ -2,7 +2,7 @@ import { PORTAL_PATHS, assistantPersona } from "@rikuy/core";
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 
-import { aiGatewayStatus } from "@/server/ai-gateway";
+import { aiGatewayStatus, whatsappStatus } from "@/server/ai-gateway";
 import { portalHas, portalView } from "@/server/portal-view";
 
 import { LegalContact } from "../legal-contact";
@@ -31,6 +31,8 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
   const { presentation } = view.resolved;
   const { siteName } = presentation.identity;
   const assistant = aiGatewayStatus().configured ? assistantPersona(presentation).name : null;
+  const whatsapp =
+    assistant !== null && whatsappStatus().configured && portalHas(view, "assistant");
 
   return (
     <article className="portal-page portal-prose portal-legal">
@@ -202,6 +204,36 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               municipio.
             </li>
           </ul>
+          {whatsapp ? (
+            <>
+              <h3 id="whatsapp">Si le escribes por WhatsApp</h3>
+              <ul>
+                <li>
+                  Si {siteName} tiene un número de WhatsApp con el asistente, tus mensajes llegan a
+                  través de Meta (WhatsApp) a la plataforma, que los responde con lo publicado en
+                  este portal y con el mismo modelo de Groq. Meta conoce tu número y los mensajes,
+                  como en cualquier chat de WhatsApp.
+                </li>
+                <li>
+                  Para seguir la conversación se guardan tus últimos 6 mensajes y sus respuestas
+                  durante 24 horas, sin tu número: con una huella de él que solo sirve para esta
+                  plataforma. Los correos, teléfonos y números de documento se reemplazan antes de
+                  guardarlos. Pasadas 24 horas se borran.
+                </li>
+                <li>
+                  Una nota de voz se pasa a texto con Groq y no se guarda; la respuesta empieza con
+                  lo que el asistente entendió. Si compartes tu ubicación, se usa una sola vez para
+                  medir la distancia a los lugares publicados («¿Qué hay cerca?») y no se guarda ni
+                  se envía a Groq.
+                </li>
+                <li>
+                  Como en el portal, se cuenta que la respuesta llegó por WhatsApp y, si nada
+                  publicado la responde, se guarda la pregunta sin nada que te identifique por 90
+                  días.
+                </li>
+              </ul>
+            </>
+          ) : null}
         </>
       ) : null}
 

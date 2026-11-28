@@ -84,9 +84,10 @@ select is_empty(
       and column_name ~* '(question|answer|prompt|message|conversation)'
       -- Error messages of jobs and of server errors (cut at «?», ADR-044), and the operator's
       -- evaluation answers about the demos' sample content (ADR-045); and, since C1 · Paso 3
-      -- (ADR-053), the unanswered questions alone, masked and without the visitor.
+      -- (ADR-053), the unanswered questions alone, masked and without the visitor; and Meta's
+      -- ids of WhatsApp messages already taken (ADR-075), without their text.
       and table_name not in ('job_attempts', 'background_jobs', 'request_errors', 'eval_results',
-                             'unanswered_questions')$$,
+                             'unanswered_questions', 'whatsapp_inbound')$$,
   'no column stores answers or conversations; only unanswered questions are kept'
 );
 

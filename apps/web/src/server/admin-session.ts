@@ -21,6 +21,8 @@ import {
   createFaqRepository,
   createEmbedRepository,
   createPlatformEmbedRepository,
+  createPlatformWhatsAppRepository,
+  createWhatsAppNumberRepository,
   createMemberRepository,
   createMfaGateway,
   createModelRepository,
@@ -99,6 +101,8 @@ export const adminSession = cache(async () => {
     /** «Solo asistente» (ADR-071): the websites and «Página en la web del municipio». */
     embed: createEmbedRepository(client),
     platformEmbed: createPlatformEmbedRepository(client),
+    whatsapp: createWhatsAppNumberRepository(client),
+    platformWhatsApp: createPlatformWhatsAppRepository(client),
     panoramas: createPanoramaRepository(client),
     models: createModelRepository(client),
     library: createMediaLibraryRepository(client),

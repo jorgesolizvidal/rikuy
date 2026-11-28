@@ -12,3 +12,5 @@ export {
   GROQ_TRANSCRIPTIONS,
 } from "./groq-transcriber";
 export type { GroqTranscriberOptions } from "./groq-transcriber";
+export { createWhatsAppCloud, WhatsAppCloudError, WHATSAPP_GRAPH } from "./whatsapp-cloud";
+export type { WhatsAppCloud, WhatsAppCloudOptions } from "./whatsapp-cloud";

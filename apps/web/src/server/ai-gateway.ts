@@ -1,6 +1,14 @@
 import "server-only";
 
-import { EnvValidationError, parseAiEnv, type AiEnv } from "@rikuy/config/env";
+import { createHmac, timingSafeEqual } from "node:crypto";
+
+import {
+  EnvValidationError,
+  parseAiEnv,
+  parseWhatsAppEnv,
+  type AiEnv,
+  type WhatsAppEnv,
+} from "@rikuy/config/env";
 import {
   createSimulatedAiProvider,
   createSimulatedTranscriber,
@@ -23,12 +31,15 @@ import {
   type TourGuideContext,
   transcribeDictation,
   type UnansweredQuestion,
+  type WhatsAppBegin,
 } from "@rikuy/core";
 import {
   createGroqProvider,
   createGroqTranscriber,
   createPostgresAiLedger,
+  createWhatsAppCloud,
   type PostgresAiLedger,
+  type WhatsAppCloud,
 } from "@rikuy/db/ai";
 
 /**
@@ -39,6 +50,10 @@ import {
  *
  * Without its settings there is no AI and nothing else changes: the result says so and the
  * portal shows its notice.
+ *
+ * WhatsApp (ADR-075) lives here too: its messages are answered by the same assistant through
+ * the same connection, and its access token and app secret are as sensitive as the provider
+ * key. They reach no other module.
  */
 
 /** One structured line per event (Vercel logs). Never questions, answers or keys. */
@@ -308,3 +323,123 @@ export async function aiTourContext(
   if (deps === null) return null;
   return deps.ledger.tourContext(tenantId, item, sceneId, hotspotId);
 }
+
+// ── WhatsApp (A · Paso 6, ADR-075) ──────────────────────────────────────────────────────
+
+type WhatsAppSettings =
+  | { readonly env: WhatsAppEnv; readonly invalidKeys: null }
+  | { readonly env: null; readonly invalidKeys: readonly string[] | null };
+
+function whatsappSettings(): WhatsAppSettings {
+  try {
+    const env = parseWhatsAppEnv();
+    return env === null ? { env: null, invalidKeys: null } : { env, invalidKeys: null };
+  } catch (error) {
+    if (error instanceof EnvValidationError) {
+      console.log(
+        JSON.stringify({ level: "warn", event: "whatsapp.misconfigured", keys: error.invalidKeys }),
+      );
+      return { env: null, invalidKeys: error.invalidKeys };
+    }
+    throw error;
+  }
+}
+
+export interface WhatsAppStatus {
+  /** Meta's token, app secret and verify token are set, and the AI is too. */
+  readonly configured: boolean;
+  readonly invalidKeys: readonly string[];
+}
+
+export function whatsappStatus(): WhatsAppStatus {
+  const { env, invalidKeys } = whatsappSettings();
+  return { configured: env !== null && settings().env !== null, invalidKeys: invalidKeys ?? [] };
+}
+
+function sameSecret(a: string, b: string): boolean {
+  const left = Buffer.from(a);
+  const right = Buffer.from(b);
+  return left.length === right.length && timingSafeEqual(left, right);
+}
+
+/**
+ * Meta's subscription check (GET hub.mode=subscribe&hub.verify_token=…&hub.challenge=…): the
+ * challenge to echo when the token is ours, otherwise null.
+ */
+export function whatsappChallenge(
+  mode: string | null,
+  token: string | null,
+  challenge: string | null,
+): string | null {
+  const { env } = whatsappSettings();
+  if (env === null || mode !== "subscribe" || token === null || challenge === null) return null;
+  if (!/^[0-9A-Za-z_-]{1,200}$/u.test(challenge)) return null;
+  return sameSecret(token, env.WHATSAPP_VERIFY_TOKEN) ? challenge : null;
+}
+
+/** X-Hub-Signature-256: HMAC-SHA256 of the raw body with the app secret. */
+export function whatsappSignatureValid(body: Uint8Array, header: string | null): boolean {
+  const { env } = whatsappSettings();
+  if (env === null || header === null || !/^sha256=[0-9a-f]{64}$/u.test(header)) return false;
+  const expected = `sha256=${createHmac("sha256", env.WHATSAPP_APP_SECRET).update(body).digest("hex")}`;
+  return sameSecret(header, expected);
+}
+
+let cloud: WhatsAppCloud | null = null;
+let cloudToken: string | null = null;
+
+function cloudFor(env: WhatsAppEnv): WhatsAppCloud {
+  if (cloud === null || cloudToken !== env.WHATSAPP_ACCESS_TOKEN) {
+    cloud = createWhatsAppCloud({
+      accessToken: env.WHATSAPP_ACCESS_TOKEN,
+      ...(env.WHATSAPP_GRAPH_URL ? { graphUrl: env.WHATSAPP_GRAPH_URL } : {}),
+    });
+    cloudToken = env.WHATSAPP_ACCESS_TOKEN;
+  }
+  return cloud;
+}
+
+/** ai_api.whatsapp_begin: the municipality of the number, once per message. */
+export async function whatsappBegin(
+  phoneNumberId: string,
+  messageId: string,
+  waId: string,
+): Promise<WhatsAppBegin> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return { status: "unavailable" };
+  return deps.ledger.whatsappBegin(phoneNumberId, messageId, waId);
+}
+
+/** ai_api.whatsapp_remember: the conversation's last messages, masked. */
+export async function whatsappRemember(
+  tenantId: string,
+  contactKey: string,
+  question: string,
+  answer: string,
+): Promise<void> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return;
+  await deps.ledger.whatsappRemember(tenantId, contactKey, question, answer);
+}
+
+export async function sendWhatsAppText(
+  phoneNumberId: string,
+  to: string,
+  text: string,
+): Promise<void> {
+  const { env } = whatsappSettings();
+  if (env === null) throw new Error("WhatsApp is not configured");
+  await cloudFor(env).sendText(phoneNumberId, to, text);
+}
+
+/** A voice note's bytes; null when it is larger than a dictation may be. */
+export async function downloadWhatsAppAudio(mediaId: string): Promise<Uint8Array | null> {
+  const { env } = whatsappSettings();
+  if (env === null) throw new Error("WhatsApp is not configured");
+  const media = await cloudFor(env).downloadMedia(mediaId);
+  return media?.bytes ?? null;
+}
+
+export const whatsappLogger = jsonAiLogger;
