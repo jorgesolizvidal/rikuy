@@ -76,6 +76,9 @@ export const PORTAL_PATHS = {
   /** The community's stories (ADR-069), each with its anchor. */
   memory: "/memoria",
   story: (slug: string) => `/memoria#${encodeURIComponent(slug)}`,
+  /** The municipality's frequently asked questions (ADR-074), each with its anchor. */
+  faqs: "/preguntas-frecuentes",
+  faq: (slug: string) => `/preguntas-frecuentes#${encodeURIComponent(slug)}`,
   privacy: "/privacidad",
   terms: "/terminos",
 } as const;
@@ -238,6 +241,8 @@ export function buildSitemap(
     readonly services?: boolean;
     /** The «Memoria de la comunidad» page, when it has published stories (ADR-069). */
     readonly memory?: boolean;
+    /** The «Preguntas frecuentes» page, when it has published questions (ADR-074). */
+    readonly faqs?: boolean;
   } = {},
 ): string {
   const withAgenda = sections.agenda ?? true;
@@ -286,6 +291,7 @@ export function buildSitemap(
     ...circuits.map((c) => entry(PORTAL_PATHS.passportCircuit(c.slug), c.publishedAt)),
     ...(sections.services === true ? [entry(PORTAL_PATHS.services)] : []),
     ...(sections.memory === true ? [entry(PORTAL_PATHS.memory)] : []),
+    ...(sections.faqs === true ? [entry(PORTAL_PATHS.faqs)] : []),
     entry(PORTAL_PATHS.privacy),
     entry(PORTAL_PATHS.terms),
     "</urlset>",

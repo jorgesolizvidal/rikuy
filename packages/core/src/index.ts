@@ -169,6 +169,11 @@ export * from "./application/services/services";
 export * from "./contracts/story";
 export * from "./application/stories/ports";
 export * from "./application/stories/stories";
+// The municipality's frequently asked questions (A · Paso 5.2, ADR-074).
+export * from "./contracts/faq";
+export * from "./application/faqs/ports";
+export * from "./application/faqs/faqs";
+export * from "./application/faqs/copilot";
 export * from "./application/assistant/gold-set";
 export * from "./application/evaluation/fixtures-data";
 export * from "./application/evaluation/ports";

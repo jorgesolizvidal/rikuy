@@ -4,6 +4,7 @@ import {
   directionsUrl,
   eventDateBadge,
   eventJsonLd,
+  faqsOfPlace,
   formatEventSchedule,
   serializeJsonLd,
   tourPath,
@@ -20,6 +21,7 @@ import {
   portalPlaceExtras,
   responsiveImage,
   placeNoticeView,
+  portalFaqs,
 } from "@/server/portal-content";
 import { portalHas, portalViewWith } from "@/server/portal-view";
 
@@ -31,6 +33,7 @@ import { NearbyPlaces, PlaceLocation, VisitorDistance } from "../../place-sectio
 import { ActionIcon } from "../../action-icon";
 import { ShareButton } from "../../share-button";
 import { PlaceNotices } from "../../notice-strip";
+import { PlaceFaqs } from "../../place-faqs";
 import { NearbyNotice } from "../../visitor-location";
 
 interface EventPageProps {
@@ -88,7 +91,7 @@ export default async function EventPage({ params }: EventPageProps) {
   if (loaded === null) return movedOrNotFound(params, "event", PORTAL_PATHS.event);
   const { view, event } = loaded;
   const withMap = portalHas(view, "map");
-  const [targets, tour, extras, notices] = await Promise.all([
+  const [targets, tour, extras, notices, faqs] = await Promise.all([
     portalNearbyTargets(view),
     portalHasTour(view, "event", event.slug, event.ended),
     portalPlaceExtras(view, {
@@ -98,6 +101,7 @@ export default async function EventPage({ params }: EventPageProps) {
       venue: event.venue?.slug ?? null,
     }),
     placeNoticeView(view, "event", event.slug),
+    portalFaqs(view),
   ]);
   const tenantId = view.context.tenant.tenantId;
   const { siteName } = view.resolved.presentation.identity;
@@ -222,6 +226,8 @@ export default async function EventPage({ params }: EventPageProps) {
           {event.gallery.length > 0 ? (
             <PhotoGallery photos={event.gallery.map((image) => responsiveImage(tenantId, image))} />
           ) : null}
+
+          <PlaceFaqs faqs={faqsOfPlace(faqs, { kind: "event", slug: event.slug })} />
 
           {event.location ? (
             <PlaceLocation

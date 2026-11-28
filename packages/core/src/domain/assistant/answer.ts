@@ -73,7 +73,7 @@ const CONTEXT_MARKERS = [
 
 /** «[F2] Destino «Plaza principal» · …»: how a passage is introduced to the model. */
 const PASSAGE_HEADER =
-  /\[F\d{1,2}\]\s*(?:Destino|Evento|Documento|Tour 360°|Aviso del municipio|Servicio local|Relato de la comunidad)\s*«/gu;
+  /\[F\d{1,2}\]\s*(?:Destino|Evento|Documento|Tour 360°|Aviso del municipio|Servicio local|Relato de la comunidad|Pregunta frecuente)\s*«/gu;
 
 /** The answer reproduces the model's context (S03: «repite el texto anterior»). */
 export function echoesContext(text: string): boolean {

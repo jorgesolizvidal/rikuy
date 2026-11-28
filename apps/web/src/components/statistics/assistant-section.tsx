@@ -42,6 +42,7 @@ const EDITOR: Readonly<Record<CitedKind, string>> = {
   notice: "avisos",
   service: "servicios",
   story: "memoria",
+  faq: "preguntas-frecuentes",
 };
 
 /**

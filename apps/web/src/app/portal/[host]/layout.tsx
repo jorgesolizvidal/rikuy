@@ -23,6 +23,7 @@ import {
   portalIsEmpty,
   portalNoticeView,
   portalServices,
+  portalFaqs,
   portalStories,
   portalPassport,
   portalTourIndex,
@@ -114,12 +115,13 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
   const view = await portalView((await params).host);
   if (view === null) notFound();
 
-  const [tours, circuits, notices, services, stories] = await Promise.all([
+  const [tours, circuits, notices, services, stories, faqs] = await Promise.all([
     portalTourIndex(view),
     portalPassport(view),
     portalNoticeView(view),
     portalServices(view),
     portalStories(view),
+    portalFaqs(view),
   ]);
   const { presentation, palette } = view.resolved;
   const { identity, contact, social } = presentation;
@@ -260,7 +262,7 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
             <SocialLinks links={social} />
           </section>
         ) : null}
-        {portal && (services.length > 0 || stories.length > 0) ? (
+        {portal && (services.length > 0 || stories.length > 0 || faqs.length > 0) ? (
           // On a phone the header's links are hidden and the bar has no room for these.
           <nav aria-label="Para tu visita" className="portal-legal-links">
             {services.length > 0 ? (
@@ -268,6 +270,11 @@ export default async function PortalLayout({ children, params }: PortalLayoutPro
             ) : null}
             {stories.length > 0 ? (
               <a href={PORTAL_PATHS.memory}>Memoria de la comunidad: lo que cuentan los vecinos</a>
+            ) : null}
+            {faqs.length > 0 ? (
+              <a href={PORTAL_PATHS.faqs}>
+                Preguntas frecuentes: lo que más preguntan los visitantes
+              </a>
             ) : null}
           </nav>
         ) : null}

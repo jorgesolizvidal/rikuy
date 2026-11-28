@@ -27,7 +27,8 @@ export const ASSISTANT_ACTION_NAMES: Readonly<Record<AssistantActionKey, string>
 };
 
 /** The kinds of content an answer can cite (ADR-069). */
-export type CitedKind = "destination" | "event" | "knowledge" | "notice" | "service" | "story";
+export type CitedKind =
+  "destination" | "event" | "knowledge" | "notice" | "service" | "story" | "faq";
 
 export const CITED_KIND_NAMES: Readonly<Record<CitedKind, string>> = {
   destination: "Destino",
@@ -36,6 +37,7 @@ export const CITED_KIND_NAMES: Readonly<Record<CitedKind, string>> = {
   notice: "Aviso",
   service: "Servicio",
   story: "Relato",
+  faq: "Pregunta frecuente",
 };
 
 export interface AssistantChannelRow {

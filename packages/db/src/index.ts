@@ -86,6 +86,7 @@ export {
   createSupabasePublishedServiceReader,
   mapPortalServiceRow,
 } from "./services";
+export { createFaqRepository, createSupabasePublishedFaqReader, mapPortalFaqRow } from "./faqs";
 export {
   createStoryRepository,
   createSupabasePublishedStoryReader,

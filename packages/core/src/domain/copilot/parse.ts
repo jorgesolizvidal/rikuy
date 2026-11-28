@@ -1,8 +1,9 @@
 import type { CopilotAnswerBlock, ProposalField } from "../../contracts/copilot";
+import type { FaqTopic } from "../../contracts/faq";
 import { richTextSchema, type RichText, type RichTextInline } from "../../contracts/rich-text";
 import { answerBlocks, cleanAnswerText } from "../assistant/answer";
 import { parseMarkup } from "../content/markup";
-import { PROPOSAL_LABELS } from "./prompts";
+import { FAQ_TOPIC_WORDS, PROPOSAL_LABELS } from "./prompts";
 
 /**
  * Reading what the Copilot's model wrote (ADR-042). Nothing reaches the staff unchecked:
@@ -158,4 +159,44 @@ export function parseProposal(
     else values[field] = value;
   }
   return { values, dropped, labels };
+}
+
+// ── «Preguntas frecuentes» (ADR-074) ───────────────────────────────────────
+
+export interface ParsedFaqProposal {
+  /** The question as the model wrote it, or null (the caller keeps the visitors' one). */
+  readonly question: string | null;
+  /** Null when the passages do not answer it (NO_SE), or the answer is unusable. */
+  readonly answer: string | null;
+  readonly topic: FaqTopic | null;
+  readonly labels: readonly string[];
+}
+
+function faqLine(label: string, text: string): string {
+  const raw = new RegExp(`^[\\s>*_#-]*${label}[*_]*\\s*:[*_]*[ \\t]*(.*)$`, "mu").exec(text)?.[1];
+  return raw === undefined ? "" : oneLine(raw);
+}
+
+const URL_LIKE = /\bhttps?:\/\/\S+|\bwww\.\S+/giu;
+
+export function parseFaqProposal(text: string): ParsedFaqProposal {
+  const { body, labels } = splitSources(text);
+  const question = faqLine("PREGUNTA", body);
+  const answer = faqLine("RESPUESTA", body).replace(URL_LIKE, "").replace(/\s+/gu, " ").trim();
+  const topicWord = faqLine("TEMA", body)
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/\p{M}/gu, "")
+    .replace(/[^a-z]/gu, "");
+  const topic =
+    (FAQ_TOPIC_WORDS as Readonly<Record<string, FaqTopic>>)[topicWord] ??
+    Object.entries(FAQ_TOPIC_WORDS).find(([word]) => topicWord.includes(word))?.[1] ??
+    null;
+  const unknown = /^no[\s_-]*s[eé]\.?$/iu.test(answer) || PLACEHOLDER.test(answer);
+  return {
+    question: question && !PLACEHOLDER.test(question) ? fit(question, 120, 3) : null,
+    answer: unknown || answer === "" ? null : fit(answer, 300, 10),
+    topic,
+    labels,
+  };
 }

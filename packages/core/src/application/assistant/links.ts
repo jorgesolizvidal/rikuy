@@ -31,11 +31,12 @@ export interface AssistantLinkPolicy {
 }
 
 const PAGE = /^\/(destinos|agenda)\/([a-z0-9]+(?:-[a-z0-9]+)*)$/u;
-const ANCHORED = /^\/(avisos|servicios|memoria)#([a-z0-9]+(?:-[a-z0-9]+)*)$/u;
+const ANCHORED = /^\/(avisos|servicios|memoria|preguntas-frecuentes)#([a-z0-9]+(?:-[a-z0-9]+)*)$/u;
 const ANCHOR_KIND: Readonly<Record<string, string>> = {
   avisos: "notice",
   servicios: "service",
   memoria: "story",
+  "preguntas-frecuentes": "faq",
 };
 
 /** The published item a portal path is about (`kind:slug`), or null (a tour, a section). */

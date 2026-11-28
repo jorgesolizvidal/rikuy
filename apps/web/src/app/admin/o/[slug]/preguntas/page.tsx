@@ -1,5 +1,8 @@
 import {
+  canEditContent,
+  canPropose,
   formatDateRange,
+  hasModule,
   formatShortDate,
   loadPersonRequests,
   loadUnansweredQuestions,
@@ -15,6 +18,7 @@ import Link from "next/link";
 
 import { formatCount } from "@/components/statistics/format";
 import { adminSession } from "@/server/admin-session";
+import { aiGatewayStatus } from "@/server/ai-gateway";
 import { requireModule } from "@/server/organization";
 
 import "../estadisticas/statistics.css";
@@ -56,9 +60,17 @@ interface QuestionProps {
   readonly org: string;
   /** In «Pidieron hablar con una persona» (ADR-073): whether the assistant had answered it. */
   readonly person?: boolean;
+  /** «Crear pregunta frecuente…» (ADR-074): where it goes, for editors and above. */
+  readonly faq: FaqLink | null;
 }
 
-function Question({ group, org, person = false }: QuestionProps) {
+interface FaqLink {
+  /** The address, to which the question is appended. */
+  readonly href: string;
+  readonly label: string;
+}
+
+function Question({ group, org, person = false, faq }: QuestionProps) {
   const askedPerson = group.askedPerson ?? 0;
   const answered = group.answered ?? 0;
   const editorOf = (page: UnansweredPage) =>
@@ -112,6 +124,9 @@ function Question({ group, org, person = false }: QuestionProps) {
         <Link href={`/o/${org}/conocimiento?pregunta=${encodeURIComponent(group.text)}#probar`}>
           Probar esta pregunta en «Conocimiento del asistente»
         </Link>
+        {faq ? (
+          <Link href={`${faq.href}${encodeURIComponent(group.text)}`}>{faq.label}</Link>
+        ) : null}
       </p>
     </li>
   );
@@ -132,6 +147,21 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
     loadPersonRequests(membership, session.questions, period),
   ]);
   const base = `/o/${membership.slug}/preguntas`;
+  const withCopilot =
+    canPropose(membership) &&
+    hasModule(membership.modules, "copilot") &&
+    aiGatewayStatus().configured;
+  const faq: FaqLink | null = !canEditContent(membership.role)
+    ? null
+    : withCopilot
+      ? {
+          href: `/o/${membership.slug}/preguntas-frecuentes/copilot?pregunta=`,
+          label: "Crear pregunta frecuente con el Copilot",
+        }
+      : {
+          href: `/o/${membership.slug}/preguntas-frecuentes?pregunta=`,
+          label: "Crear pregunta frecuente",
+        };
   const shown = data.groups.slice(0, SHOWN);
   const rest = data.groups.slice(SHOWN);
 
@@ -204,7 +234,7 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
           <>
             <ol className="questions">
               {shown.map((group) => (
-                <Question key={group.key} group={group} org={membership.slug} />
+                <Question key={group.key} group={group} org={membership.slug} faq={faq} />
               ))}
             </ol>
             {rest.length > 0 ? (
@@ -212,7 +242,7 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
                 <summary>Ver {formatCount(rest.length)} preguntas más</summary>
                 <ol className="questions" start={SHOWN + 1}>
                   {rest.map((group) => (
-                    <Question key={group.key} group={group} org={membership.slug} />
+                    <Question key={group.key} group={group} org={membership.slug} faq={faq} />
                   ))}
                 </ol>
               </details>
@@ -244,7 +274,7 @@ export default async function QuestionsPage({ params, searchParams }: QuestionsP
         ) : (
           <ol className="questions">
             {person.groups.slice(0, SHOWN).map((group) => (
-              <Question key={group.key} group={group} org={membership.slug} person />
+              <Question key={group.key} group={group} org={membership.slug} person faq={faq} />
             ))}
           </ol>
         )}

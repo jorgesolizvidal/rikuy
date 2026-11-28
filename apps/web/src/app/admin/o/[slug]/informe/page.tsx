@@ -46,6 +46,7 @@ const KIND_NAMES = {
   notice: "Aviso",
   service: "Servicio",
   story: "Relato",
+  faq: "Pregunta frecuente",
 } as const;
 
 /** «12 nov 2026, 19:40», in the municipality's time. */

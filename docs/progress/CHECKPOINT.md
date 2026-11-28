@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 5.1 — métricas por canal; antes, A · Paso 4 ✅ (pasar a una persona, verificado en producción)
-- **Rama:** `feat/a-step5-channel-metrics` → PR hacia `main`
+- **Último paso completado:** A · Paso 5.2 — preguntas frecuentes (con él, A · Paso 5 ✅); antes, A · Paso 5.1 ✅ (métricas por canal, verificado en producción)
+- **Rama:** `feat/a-step5-faq` → PR hacia `main`
 
 ## Historial
 
@@ -3015,19 +3015,64 @@ Lo que encontró el CI del push, ya corregido:
 - Un enlace copiado o abierto sin tocarlo no avisa; el «Llamar» y el correo de «Hablar con una persona» cuentan como «persona».
 - Las preguntas frecuentes (5.2) llegan en el próximo PR.
 
+**Verificación en producción (2026-11-27):** tras el merge (PR #100), el usuario hizo las pruebas en Ucureña. Con una consulta de solo lectura: una respuesta guardada en cada canal (portal, web del municipio y QR), cada una con sus dos citas, y una acción «Abrieron una ficha» desde el QR. Desde el portal y la web no hay acciones: se registran solo si se toca una tarjeta o fuente dentro de la respuesta.
+
+### A · Paso 5.2 — preguntas frecuentes ✅
+
+- Decisiones del usuario ([ADR-074 §5](../adr/ADR-074-channel-metrics-faq.md)), 2026-11-27:
+  - **página propia y en la ficha:** `/preguntas-frecuentes` con todas, agrupadas por tema, y las de un lugar también en su ficha;
+  - **se publican como los destinos:** los editores preparan borradores; propietarios y administradores publican y retiran;
+  - **el Copilot propone un borrador solo con lo publicado**, con sus fuentes; si nada publicado responde la pregunta, propone solo la pregunta y el equipo escribe la respuesta;
+  - **sin módulo, como los avisos:** todo municipio las tiene; sin portal, el asistente igual las usa.
+- Base de datos (`20261205000000_a5_faq_enum.sql` y `20261205000100_a5_faq.sql`, solo expand):
+  - tipo de contenido `faq`, con el flujo de revisiones de siempre y «Retirar»;
+  - en la revisión, `faq_topic` (lista fija: cómo llegar, horarios y precios, servicios, historia y cultura, la visita, otras) y `faq_place_id` (un destino o evento del mismo municipio, FK compuesta);
+  - `private.is_valid_faq_draft` (claves exactas, la pregunta de una línea hasta 120 caracteres, la respuesta hasta 300, texto enriquecido permitido); `save_content_draft` exige un lugar del municipio y del tipo correcto (`hint` `place`); `publish_content` exige la respuesta (`hint` `incomplete`);
+  - `worker_api.knowledge_source` suma el tema y el nombre publicado del lugar; `private.assistant_content_of` acepta `faq` (las métricas por canal las cuentan como tema);
+  - `portal_faqs` (anónima, municipios activos): las publicadas en el orden de los temas, con su lugar solo si está publicado, hasta 200.
+- `@rikuy/core`:
+  - contrato `contracts/faq` (límites, temas con su nombre, documento, lo que falta para publicar, `PublishedFaq`);
+  - casos de uso `listFaqs`, `createFaq`, `loadFaqEditor`, `saveFaqDraft`, `publishFaq`, `retireFaq`, `restoreFaqRevision`, `discardFaqDraft`, `groupFaqs`, `faqsOfPlace` y `faqPageJsonLd` (schema.org `FAQPage`);
+  - **«Crear pregunta frecuente con el Copilot»** (`application/faqs/copilot`): `proposeFaq` busca en lo publicado (4 pasajes) y, sin pasajes, propone solo la pregunta **sin llamar al modelo**; con pasajes, una tarea fija (`[tarea:copilot-faq]`) pide `PREGUNTA`, `RESPUESTA`, `TEMA` y `FUENTES`, y `parseFaqProposal` descarta «NO_SE», los marcadores y los enlaces; una respuesta sin una fuente que exista no cuenta. `createFaqDraft` crea la pregunta y guarda la respuesta como borrador; nunca publica. `passageSourceLink` sale del Copilot para compartirlo;
+  - el indexador dice «Pregunta frecuente del municipio (tema).» y su lugar; la cita es «Pregunta frecuente» y lleva a `/preguntas-frecuentes#…`; el Copilot, el informe mensual y las métricas por canal conocen el tipo; el sitemap suma la página;
+  - el modelo simulado responde la tarea nueva (`[simular:no-sabe]`, `[simular:cita-inventada]`).
+- `@rikuy/db`: `createFaqRepository` y `createSupabasePublishedFaqReader` (antes de la migración: sin preguntas).
+- Panel:
+  - **«Preguntas frecuentes»** en «Contenido» (`/o/{slug}/preguntas-frecuentes`): lista con su tema y estado, «Nueva pregunta» (también con `?pregunta=` escrita) y el editor con pregunta, respuesta, «Más detalles», tema, «¿Sobre qué lugar?» (destinos y eventos), vista previa, publicar, guardar borrador, «Retirar (ya no aplica)», descartar y el historial;
+  - **`/preguntas-frecuentes/copilot`** (editores o más, con el Copilot y la IA configurada; si no, 404): la pregunta, «Proponer con el Copilot», la respuesta y el tema para revisar, «De dónde la sacó» con enlaces al panel, y «Crear el borrador»;
+  - **«Lo que preguntan los visitantes»:** cada pregunta suma «Crear pregunta frecuente con el Copilot» (o «Crear pregunta frecuente» sin el Copilot) para editores o más.
+- Portal:
+  - **`/preguntas-frecuentes`**: los temas como saltos, cada tema con sus preguntas y **todas las respuestas a la vista**, cada pregunta con su ancla, sus detalles y su lugar, y los datos `FAQPage`; se indexa. Estilos en su propia hoja (`faq.css`);
+  - **«Preguntas frecuentes»** en la ficha del destino y del evento (estilos en `detail.css`, como los relatos);
+  - el pie la enlaza cuando hay preguntas publicadas; publicar o retirar invalida la caché del municipio.
+- CI: nuevo paso **«Frequently asked questions in a real browser»** (grupo «Lighthouse · visitas»); `/preguntas-frecuentes` suma a las páginas de los contratos RC-09/10/11/12.
+- Tests:
+  - unitarios: core 879 (+20: el documento, roles, orden, grupos, `FAQPage`, el sitemap, el indexador, la cita, la propuesta con y sin pasajes, «NO_SE» y una fuente inventada, el borrador, las instrucciones y el lector), db 252 (+7), web 65;
+  - pgTAP `060_faq` (42): borradores válidos e inválidos (tema, respuesta de varias líneas o larga, otras claves, enlace no permitido), lugar de destino o evento y no un relato ni algo que no existe, editor sin publicar ni retirar, analista y otro municipio sin guardar, sin respuesta no se publica, auditoría, lo que leen los visitantes (el lugar solo publicado, nunca el borrador, otro municipio ni uno suspendido), retirar, el indexador, la cita en las métricas y que los otros tipos siguen igual;
+  - **e2e en un navegador real** (`faq.e2e.test.ts`, 3 casos): el propietario de Demo Sur crea una pregunta sobre un destino; sin respuesta no se publica; con ella sí, auditada; el portal la muestra bajo «Servicios» con su ancla, sus detalles, su lugar y `FAQPage`; el pie y el sitemap; la ficha del destino con «Más detalles» hacia su ancla; nada en Demo Norte; retirarla la quita; el Copilot propone con lo publicado (modelo simulado) y nada se guarda hasta «Crear el borrador», que queda sin publicar; una pregunta que nada responde no llama al modelo; el analista no crea y la página del Copilot le da 404; axe y desbordes a 390 y 1280 px.
+- Verificado en local: `pnpm check` (formato, lint, tipos, unitarios y build).
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- La propuesta del Copilot no tiene un caso en el gold con el modelo real: se revisa a mano en producción.
+- El Copilot busca con las palabras de la pregunta: si lo publicado usa otras («cajero» y «banco»), puede no encontrarlo y proponer solo la pregunta.
+- Las visitas a `/preguntas-frecuentes` todavía no se cuentan en «Estadísticas».
+- Una pregunta frecuente no se sugiere sola: el equipo decide cuáles escribir desde «Lo que preguntan los visitantes».
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
-- Después del merge y de «Deploy database»:
-  1. **El portal:** en el portal de Ucureña, abre Chaski desde una ficha (por ejemplo, el museo) y pregunta algo; toca la tarjeta o la fuente de la respuesta.
-  2. **El QR:** abre `https://rikuy-ucurena.vercel.app/preguntar` y pregunta otra cosa.
-  3. **La web:** en la web de prueba (`https://jorgesolizvidal.github.io/rikuy-web-prueba/`), pregúntale a Chaski.
-  4. **En el panel:** «Estadísticas» de Ucureña → «El asistente por canal»: «En el portal», «Desde un QR «Pregúntale a…»» y «En la web del municipio» con sus preguntas; los temas más preguntados (el museo); y «Abrieron una ficha» en «Qué tocaron después».
-  5. **El informe:** «Informe mensual» → noviembre (en curso): la misma sección.
+- Después del merge y de «Deploy database», en el panel de Ucureña:
+  1. **Escribirla:** «Contenido» → «Preguntas frecuentes» → «Nueva pregunta»: «¿Hay cajero automático?». Sin respuesta, «Publicar» avisa; escribe la respuesta, elige «Servicios» y, si quieres, un lugar, y publica.
+  2. **El portal:** `https://rikuy-ucurena.vercel.app/preguntas-frecuentes` la muestra bajo «Servicios», y la ficha del lugar elegido también; el pie tiene «Preguntas frecuentes».
+  3. **Con el Copilot:** «Lo que preguntan los visitantes» → en una pregunta (por ejemplo, la del teleférico), «Crear pregunta frecuente con el Copilot» → «Proponer con el Copilot». Si nada publicado la responde, solo propone la pregunta; con una que sí (por ejemplo, «¿Qué es la ch'ampa guerra?»), propone la respuesta con sus fuentes. «Crear el borrador» la deja como borrador.
+  4. **El asistente:** pasados unos segundos de publicar, pregúntale a Chaski lo mismo: responde y la fuente dice «Pregunta frecuente».
+  5. **Buscadores:** en la [prueba de resultados enriquecidos de Google](https://search.google.com/test/rich-results), la página tiene «Preguntas frecuentes» válidas.
 
 ## Siguiente paso
 
-1. **A · Paso 5.2 — preguntas frecuentes** ([roadmap](../roadmap.md#a--el-asistente-del-municipio), [ADR-074 §5](../adr/ADR-074-channel-metrics-faq.md)), con la autorización del usuario: el tipo de contenido `faq`, su página pública con datos estructurados `FAQPage`, el asistente que las lee y «Proponer con el Copilot» desde «Lo que preguntan los visitantes». Antes de empezar, sus detalles con el usuario, anotados en ADR-074.
+1. **A · Paso 6 — WhatsApp** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), cuando una alcaldía interesada tenga su cuenta de Meta: el mismo asistente en el número del municipio con la API oficial. Antes de empezar, revisar con el usuario los requisitos y costos (por confirmar con Meta) y anotar sus decisiones en un ADR nuevo. Mientras tanto, con su autorización, puede seguir **C4 — portal en español e inglés** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)).
 
 ## Decisiones pendientes del usuario
 

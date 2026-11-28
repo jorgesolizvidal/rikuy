@@ -104,6 +104,7 @@ const KIND_LABEL = {
   notice: "Aviso del municipio",
   service: "Servicio local",
   story: "Relato de la comunidad",
+  faq: "Pregunta frecuente",
 } as const;
 
 /** A passage cut at a sentence (or a word) so it fits the model's budget. */

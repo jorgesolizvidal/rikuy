@@ -102,7 +102,7 @@ export const assistantStatisticsSchema = z.object({
   topics: z.array(
     z.object({
       contentId: z.uuid(),
-      kind: z.enum(["destination", "event", "knowledge", "notice", "service", "story"]),
+      kind: z.enum(["destination", "event", "knowledge", "notice", "service", "story", "faq"]),
       slug: z.string(),
       title: z.string(),
       published: z.boolean(),

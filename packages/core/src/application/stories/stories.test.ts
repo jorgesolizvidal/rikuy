@@ -201,6 +201,7 @@ describe("what visitors and the assistant get", () => {
     story: { author: "Doña Rosa Vargas", anonymous: false, community: "Vecina de la plaza" },
     visitMinutes: null,
     kids: null,
+    faq: null,
     document: null,
   };
 

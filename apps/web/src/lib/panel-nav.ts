@@ -34,6 +34,7 @@ const GROUPS: readonly { readonly title: string | null; readonly entries: readon
       { path: "avisos", label: "Avisos" },
       { path: "servicios", label: "Servicios locales", module: "services" },
       { path: "memoria", label: "Memoria de la comunidad", module: "community_memory" },
+      { path: "preguntas-frecuentes", label: "Preguntas frecuentes" },
       { path: "categorias", label: "Categorías" },
       { path: "tours", label: "Tours 360°", module: "tours" },
       { path: "panoramas", label: "Panoramas 360°", module: "tours" },

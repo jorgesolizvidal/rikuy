@@ -125,7 +125,8 @@ const config = [
     // Browser checks with the real pipelines: the GLB color check and RC-08 run the real
     // optimizer (no database, no secrets), RC-07 renders its panoramas with the real tiler
     // and the assistant's check indexes the seed with the real indexer (as rikuy_worker); the
-    // monthly report's check runs its job with the real processor (rikuy_worker, rikuy_ai).
+    // monthly report's check runs its job with the real processor (rikuy_worker, rikuy_ai);
+    // the frequently asked questions' check indexes Demo Sur for the Copilot (rikuy_worker).
     // Test code.
     files: [
       "e2e/model-colors.e2e.test.ts",
@@ -134,6 +135,7 @@ const config = [
       "e2e/assistant-cards.e2e.test.ts",
       "e2e/assistant-only.e2e.test.ts",
       "e2e/monthly-report.e2e.test.ts",
+      "e2e/faq.e2e.test.ts",
       "e2e/support/*.ts",
     ],
     rules: {

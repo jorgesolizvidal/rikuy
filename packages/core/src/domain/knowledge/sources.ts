@@ -3,6 +3,7 @@ import { z } from "zod";
 import { openingHoursSchema } from "../../contracts/destination";
 import { eventScheduleSchema } from "../../contracts/event";
 import { documentManifestSchema, type DocumentText } from "../../contracts/knowledge";
+import { FAQ_TOPIC_NAMES, FAQ_TOPICS } from "../../contracts/faq";
 import { noticeValiditySchema } from "../../contracts/notice";
 import { richTextSchema } from "../../contracts/rich-text";
 import { SERVICE_CATEGORIES } from "../../contracts/service";
@@ -24,7 +25,7 @@ import { textBlocks } from "./text";
 
 export const contentIndexSourceSchema = z.object({
   source: z.literal("content"),
-  kind: z.enum(["destination", "event", "knowledge", "notice", "service", "story"]),
+  kind: z.enum(["destination", "event", "knowledge", "notice", "service", "story", "faq"]),
   slug: z.string(),
   revisionNo: z.number().int().min(1),
   title: z.string().min(1),
@@ -59,6 +60,12 @@ export const contentIndexSourceSchema = z.object({
       anonymous: z.boolean(),
       community: z.string().nullable(),
     })
+    .nullable()
+    .catch(null)
+    .default(null),
+  /** A question's topic (ADR-074); absent before A · Paso 5.2. */
+  faq: z
+    .object({ topic: z.enum(FAQ_TOPICS).nullable() })
     .nullable()
     .catch(null)
     .default(null),
@@ -116,6 +123,12 @@ export function contentUnits(
         ? "Relato anónimo de la comunidad."
         : `Relato de ${teller}${source.story.community ? ` (${source.story.community})` : ""}.`,
     );
+    if (source.placeTitle) facts.push(`Lugar: ${source.placeTitle}.`);
+  }
+  if (source.kind === "faq") {
+    // The question is the title and the answer the summary: say what it is (ADR-074).
+    const topic = FAQ_TOPIC_NAMES[source.faq?.topic ?? "other"];
+    facts.push(`Pregunta frecuente del municipio (${topic.toLowerCase()}).`);
     if (source.placeTitle) facts.push(`Lugar: ${source.placeTitle}.`);
   }
   if ((source.kind === "destination" || source.kind === "service") && source.hours) {

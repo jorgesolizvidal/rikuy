@@ -44,10 +44,28 @@ Decisiones del usuario (2026-11-27):
 
 ### 5. Preguntas frecuentes (5.2)
 
-Un tipo de contenido `faq` (pregunta y respuesta con el formato de los destinos), con el flujo de revisiones de siempre; una página pública con datos estructurados `FAQPage`; el asistente las lee como conocimiento; y «Proponer con el Copilot» desde «Lo que preguntan los visitantes». Sus detalles se fijan en el PR 5.2 y se anotan aquí.
+Un tipo de contenido `faq` (pregunta y respuesta con el formato de los destinos), con el flujo de revisiones de siempre; una página pública con datos estructurados `FAQPage`; el asistente las lee como conocimiento; y «Proponer con el Copilot» desde «Lo que preguntan los visitantes».
+
+Decisiones del usuario (2026-11-27):
+
+- **página propia y en la ficha:** `/preguntas-frecuentes` con todas, agrupadas por tema, y las de un lugar también en su ficha;
+- **se publican como los destinos:** los editores preparan borradores; propietarios y administradores publican y retiran;
+- **el Copilot propone un borrador solo con lo publicado:** desde «Lo que preguntan los visitantes» propone la pregunta y una respuesta sacada solo de lo publicado, con sus fuentes. Si nada publicado la responde, propone solo la pregunta y el equipo escribe la respuesta;
+- **sin módulo, como los avisos:** todo municipio las tiene. Sin portal, el asistente igual las usa.
+
+Detalles fijados al implementarlo:
+
+- **la pregunta** es el título (hasta 120 caracteres) y **la respuesta** el resumen (una línea de hasta 300, obligatoria para publicar): es lo que leen primero los visitantes y lo que va en `FAQPage`. **«Más detalles»** es opcional, con el formato de los destinos;
+- **el tema** es de una lista fija de la plataforma: Cómo llegar, Horarios y precios, Servicios, Historia y cultura, La visita y Otras preguntas. La página los muestra en ese orden; un tema sin preguntas no aparece;
+- **el lugar** es opcional: un destino o un evento del mismo municipio. Se muestra solo si está publicado;
+- **todas las respuestas están en la página**, sin desplegables: los buscadores solo toman lo que el visitante puede leer. Cada pregunta tiene su ancla, y las citas del asistente llevan a ella (`/preguntas-frecuentes#…`). La página se indexa y está en el sitemap;
+- **el asistente** las indexa como cualquier contenido publicado, con «Pregunta frecuente del municipio (tema).» y su lugar. Las métricas por canal (5.1) las cuentan como un tema más;
+- **el Copilot** busca en lo publicado como el miembro (4 pasajes). Sin pasajes, propone solo la pregunta **sin llamar al modelo** (no gasta cuota). Con pasajes, pide `PREGUNTA`, `RESPUESTA`, `TEMA` y `FUENTES`; una respuesta sin una fuente que exista, o con «NO_SE», se descarta. Los enlaces se quitan de la respuesta. Nada se guarda hasta «Crear el borrador», y entonces solo como borrador; solo editores o más, con el módulo del Copilot y la IA configurada. Sin el Copilot, el enlace abre «Nueva pregunta» con la pregunta escrita;
+- **no tienen «Página en la web del municipio»** (ADR-071): en un municipio sin portal, la cita del asistente se muestra sin enlace.
 
 ## Consecuencias
 
 - **Gana:** el municipio ve qué canal le trae conversaciones, de qué preguntan y si la respuesta sirvió para algo, sin guardar nada del visitante.
 - **Costo:** tres tablas, tres funciones, una ruta y un aviso más desde el navegador; nada se agrega a la página al abrirse (el panel del asistente se descarga al abrirlo).
+- **Preguntas frecuentes:** el municipio responde una vez lo que más preguntan, y la respuesta llega a la página, a la ficha, a los buscadores y al asistente. Una migración con un tipo nuevo, dos columnas y una lectura anónima.
 - **Límites:** solo se cuenta desde que se despliega; la huella cambia si el teléfono cambia de red (como en ADR-073); un enlace abierto con el botón del medio o copiado no siempre avisa; se cuentan respuestas, no personas que leyeron la respuesta.
