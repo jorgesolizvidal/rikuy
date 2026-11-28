@@ -13,6 +13,9 @@ import {
   type AiResult,
   type AiSessionInput,
   type AiSessionResult,
+  type AssistantActionReport,
+  type AssistantChannelKey,
+  type AssistantTurnRecord,
   type DictationInput,
   type DictationResult,
   type KnowledgePassage,
@@ -233,6 +236,47 @@ export async function recordPersonRequest(
     jsonAiLogger.event("ai.person_request_recorded", { outcome });
   } catch (error) {
     jsonAiLogger.event("ai.person_request_failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    });
+  }
+}
+
+/**
+ * ai_api.record_assistant_turn (ADR-074): an answer with its channel, kind and citations,
+ * after it is on its way. A failure only leaves a log line.
+ */
+export async function recordAssistantTurn(
+  tenantId: string,
+  channel: AssistantChannelKey,
+  turn: AssistantTurnRecord,
+): Promise<void> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return;
+  try {
+    const outcome = await deps.ledger.recordAssistantTurn(tenantId, channel, turn);
+    jsonAiLogger.event("ai.turn_recorded", { outcome, kind: turn.kind, channel });
+  } catch (error) {
+    jsonAiLogger.event("ai.turn_failed", {
+      error: error instanceof Error ? error.name : "unknown",
+    });
+  }
+}
+
+/** ai_api.record_assistant_action (ADR-074): what the visitor tapped in an answer. */
+export async function recordAssistantAction(
+  tenantId: string,
+  visitor: string | null,
+  action: AssistantActionReport,
+): Promise<void> {
+  const { env } = settings();
+  const deps = env === null ? null : depsFor(env);
+  if (deps === null) return;
+  try {
+    const outcome = await deps.ledger.recordAssistantAction(tenantId, visitor, action);
+    jsonAiLogger.event("ai.action_recorded", { outcome, action: action.action });
+  } catch (error) {
+    jsonAiLogger.event("ai.action_failed", {
       error: error instanceof Error ? error.name : "unknown",
     });
   }

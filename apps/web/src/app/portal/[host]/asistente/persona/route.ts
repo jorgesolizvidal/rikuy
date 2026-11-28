@@ -2,7 +2,7 @@ import { after } from "next/server";
 
 import { parsePersonRequest } from "@rikuy/core";
 
-import { recordPersonRequest } from "@/server/ai-gateway";
+import { recordAssistantAction, recordPersonRequest } from "@/server/ai-gateway";
 import { fromSamePortal, visitorKey } from "@/server/portal-request";
 import { portalViewWith } from "@/server/portal-view";
 
@@ -38,6 +38,14 @@ export async function POST(request: Request, { params }: PersonContext) {
   if (question === null) return new Response(null, { status: 400, headers: NO_STORE });
   const tenantId = view.context.tenant.tenantId;
   const visitor = visitorKey(request);
-  after(() => recordPersonRequest(tenantId, visitor, question));
+  after(async () => {
+    await recordPersonRequest(tenantId, visitor, question);
+    // Also what the visitor did after that answer (ADR-074).
+    await recordAssistantAction(tenantId, visitor, {
+      requestId: question.requestId,
+      action: "person",
+      key: null,
+    });
+  });
   return new Response(null, { status: 204, headers: NO_STORE });
 }

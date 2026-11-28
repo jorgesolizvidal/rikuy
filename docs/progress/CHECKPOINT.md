@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 4 — pasar a una persona; antes, A · Paso 3 ✅ (planes por tipo de visita, verificado en producción)
-- **Rama:** `feat/a-step4-person-handoff` → PR hacia `main`
+- **Último paso completado:** A · Paso 5.1 — métricas por canal; antes, A · Paso 4 ✅ (pasar a una persona, verificado en producción)
+- **Rama:** `feat/a-step5-channel-metrics` → PR hacia `main`
 
 ## Historial
 
@@ -2969,20 +2969,65 @@ Lo que encontró el CI del push, ya corregido:
 - Una pregunta de hace más de una hora no se guarda; un plan sin IA configurada no tiene referencia.
 - El informe mensual y las recomendaciones del Copilot todavía no cuentan «pidió una persona» (quedan para el Paso 5, con las métricas por canal).
 
+**Verificación en producción (2026-11-27):** tras el merge (PR #99), el usuario hizo las pruebas en Ucureña: «Atención al visitante» en la marca, el botón «Hablar con una persona», WhatsApp con la pregunta escrita y la lista «Pidieron hablar con una persona» en el panel.
+
+### A · Paso 5.1 — métricas por canal ✅
+
+- Decisiones del usuario ([ADR-074](../adr/ADR-074-channel-metrics-faq.md)), 2026-11-27:
+  - **dos PR con un solo ADR:** 5.1 métricas por canal (este), 5.2 preguntas frecuentes;
+  - **«qué hizo después» es solo lo que toca desde el asistente** (fuentes y tarjetas, la ruta en el mapa, un tour, una sección, «Hablar con una persona»), sin seguir al visitante por las páginas que abre;
+  - **los temas más preguntados salen de lo que citó cada respuesta**, sin IA;
+  - **las preguntas frecuentes las escribe el equipo, con ayuda del Copilot** (5.2).
+- Base de datos (`20261204000000_a5_channel_metrics.sql`, solo expand):
+  - `assistant_turns`: una fila por respuesta del asistente del visitante, ligada a su pedido del gateway (FK compuesta; se borra con él a los 90 días): día del municipio, **canal** (`portal`, `embed`, `qr`; `whatsapp` reservado para el Paso 6), **tipo** (respondida, sin respuesta, plan, aviso) y tipo de página. Sin texto ni nada del visitante;
+  - `assistant_turn_citations`: los contenidos que citó (hasta 12; un tour cuenta para su lugar), resueltos por la base desde su tipo y dirección en ese municipio (`private.assistant_content_of`);
+  - `assistant_turn_actions`: lugar, tour, mapa, sección o persona, una vez por respuesta, acción y contenido, hasta 20 por respuesta;
+  - RLS sin permisos para nadie en las tres tablas;
+  - `ai_api.record_assistant_turn` (solo `rikuy_ai`): un pedido del asistente de este municipio de los últimos 15 minutos, una vez;
+  - `ai_api.record_assistant_action` (solo `rikuy_ai`): una respuesta guardada, de la última hora y del **mismo visitante** (la huella diaria de ADR-036);
+  - `private.assistant_statistics` y `public.tenant_assistant_statistics` (cualquier miembro, hasta 400 días): por canal (conversaciones, personas distintas por día, respondidas, sin respuesta, planes, avisos, pidieron una persona, tocaron algo), los 20 temas más citados con su reparto por canal y qué tocaron;
+  - `worker_api.monthly_report_data` suma `assistant` y `assistantPrevious`.
+- `@rikuy/core`:
+  - `domain/assistant/statistics`: canales y acciones con sus nombres, `summarizeAssistant` (totales con su comparación, como el pasaporte);
+  - `domain/assistant/turns`: `assistantActionOf` (qué es una dirección del portal: ficha, servicio, relato, aviso, tour, recorrido general, mapa o sección; nunca otro sitio) y `parseAssistantAction`;
+  - `askAssistant` devuelve `turn` (tipo, página y lo citado) con cada respuesta que pasó por el gateway; «quiero hablar con una persona» escrito no cuenta;
+  - `loadStatistics`, el informe mensual (página, correo y hechos) y las recomendaciones del Copilot (fuente «preguntas», hasta 3 temas) leen el asistente cuando el municipio lo tiene.
+- `@rikuy/db`: `recordAssistantTurn` y `recordAssistantAction` en la conexión de la IA y `assistant` en el repositorio de estadísticas (antes de la migración: nada).
+- Web:
+  - `POST /asistente` guarda la respuesta con su canal (el mismo `?canal=` de ADR-071) después de responder;
+  - **`POST /asistente/accion`** en el host del portal: mismo control de origen, hasta 2 KB, siempre 204;
+  - el panel del asistente marca cada respuesta con su referencia y, al tocar un enlace dentro de ella, avisa una vez por respuesta y dirección (`keepalive`); un enlace a la web del municipio lleva la dirección del portal de la que salió (`data-assistant-path`). `/asistente/persona` suma la acción «persona»;
+  - **«El asistente por canal»** en «Estadísticas» y en el informe mensual (`components/statistics/assistant-section.tsx`): cinco totales, la tabla por canal, los temas más preguntados con enlace a su editor y qué tocaron;
+  - privacidad: qué se cuenta de cada respuesta y que no se siguen las páginas que se abren después.
+- CI: nuevo paso **«Channel metrics in a real browser»** (grupo de contratos).
+- Tests:
+  - 1.241 unitarios (core 859, db 245, web 65, worker 58, config 14): qué es cada dirección (también otro sitio y rutas raras), lo que manda el navegador, el resumen por canal (comparación y período sin contar entero), `turn` en respuestas, sin respuesta, avisos y sin él en «hablar con una persona», los hechos del Copilot, el correo del informe y el adaptador;
+  - pgTAP `059_channel_metrics` (36) y `043` con las claves nuevas: nadie fuera de `rikuy_ai` guarda y nadie lee las tablas; sin columnas del visitante ni de texto; una respuesta una vez; otro municipio, la prueba del operador, una vieja o desconocida, ignoradas; canal o tipo inválidos; el día del municipio; el museo y su tour como un solo tema; la misma dirección en otro municipio nunca; acciones del mismo visitante una vez, otro visitante o una respuesta sin guardar ignorados; lectura de analista, sin segundo factor y otro municipio; las cifras por canal y los temas; todo se va con el pedido;
+  - integración (`ai.int.test.ts`): con el rol `rikuy_ai` real, una respuesta por QR con el lago y su tour como una cita, otro municipio ignorado, y la acción de otro visitante ignorada y la del mismo una vez;
+  - **e2e en un navegador real** (`channel-metrics.e2e.test.ts`, 2 casos): en Demo Norte, una respuesta en una ficha queda «portal / respondida / destino» con su cita; tocar un enlace de la respuesta manda solo la referencia y la dirección, y cuenta una vez; desde «Pregúntale a…» queda «qr», y una sin respuesta, «sin respuesta»; «Estadísticas» muestra los dos canales, el tema citado y lo tocado; el informe del mes tiene la sección; axe y desbordes a 390 y 1280 px.
+- Verificado en local: `pnpm check` (formato, lint, tipos, unitarios y build).
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Se cuenta desde el despliegue; las respuestas de antes no tienen canal.
+- Un plan no cuenta sus paradas como temas (no son citas).
+- Un enlace copiado o abierto sin tocarlo no avisa; el «Llamar» y el correo de «Hablar con una persona» cuentan como «persona».
+- Las preguntas frecuentes (5.2) llegan en el próximo PR.
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
 - Después del merge y de «Deploy database»:
-  1. **La marca:** en el panel de Ucureña, «Marca del portal» → «Atención al visitante»: escribe quién atiende (por ejemplo, «Oficina de turismo»), el WhatsApp con +591 y el horario; publica.
-  2. **El botón:** en el portal de Ucureña, abre Chaski: junto a los planes aparece «Hablar con una persona». Tócalo: la tarjeta muestra quién atiende, si atiende ahora, y «Escribir por WhatsApp», «Llamar» y «Escribir un correo».
-  3. **Con tu pregunta:** pregunta algo (por ejemplo, «¿Abre el museo el domingo?») y después toca «Hablar con una persona» y «Escribir por WhatsApp»: WhatsApp se abre con «Hola, vi el portal de… Mi consulta: ¿Abre el museo el domingo?». No hace falta enviarlo.
-  4. **Cuando no sabe:** pregunta algo que no está publicado: la tarjeta aparece sola debajo de la respuesta.
-  5. **Escrito:** escribe «Quiero hablar con una persona»: responde con la tarjeta, con tu pregunta anterior en el mensaje.
-  6. **En el panel:** «Lo que preguntan los visitantes» → «Pidieron hablar con una persona» lista las preguntas con las que tocaste WhatsApp; la respondida dice «El asistente respondió».
+  1. **El portal:** en el portal de Ucureña, abre Chaski desde una ficha (por ejemplo, el museo) y pregunta algo; toca la tarjeta o la fuente de la respuesta.
+  2. **El QR:** abre `https://rikuy-ucurena.vercel.app/preguntar` y pregunta otra cosa.
+  3. **La web:** en la web de prueba (`https://jorgesolizvidal.github.io/rikuy-web-prueba/`), pregúntale a Chaski.
+  4. **En el panel:** «Estadísticas» de Ucureña → «El asistente por canal»: «En el portal», «Desde un QR «Pregúntale a…»» y «En la web del municipio» con sus preguntas; los temas más preguntados (el museo); y «Abrieron una ficha» en «Qué tocaron después».
+  5. **El informe:** «Informe mensual» → noviembre (en curso): la misma sección.
 
 ## Siguiente paso
 
-1. **A · Paso 5 — métricas por canal y preguntas frecuentes** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), con la autorización del usuario: portal, asistente insertado, QR y WhatsApp por separado; los temas más preguntados; qué hizo el visitante después. Antes de empezar, sus decisiones y un ADR.
+1. **A · Paso 5.2 — preguntas frecuentes** ([roadmap](../roadmap.md#a--el-asistente-del-municipio), [ADR-074 §5](../adr/ADR-074-channel-metrics-faq.md)), con la autorización del usuario: el tipo de contenido `faq`, su página pública con datos estructurados `FAQPage`, el asistente que las lee y «Proponer con el Copilot» desde «Lo que preguntan los visitantes». Antes de empezar, sus detalles con el usuario, anotados en ADR-074.
 
 ## Decisiones pendientes del usuario
 

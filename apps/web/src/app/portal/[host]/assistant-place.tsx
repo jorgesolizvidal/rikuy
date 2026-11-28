@@ -178,7 +178,7 @@ export function AnswerSources({
                 {/* Without a page to open (no portal, no page on the website: ADR-071), the
                     card is shown all the same. */}
                 {target ? (
-                  <a className="assistant-card" {...link(target)}>
+                  <a className="assistant-card" {...link(target, card.href)}>
                     {body}
                   </a>
                 ) : (
@@ -197,7 +197,7 @@ export function AnswerSources({
             return (
               <li key={`${source.href ?? ""}${source.title}${source.page ?? ""}`}>
                 <span className="assistant-source-kind">{source.label}</span>{" "}
-                {target ? <a {...link(target)}>{text}</a> : <span>{text}</span>}
+                {target ? <a {...link(target, source.href)}>{text}</a> : <span>{text}</span>}
               </li>
             );
           })}
@@ -320,7 +320,7 @@ export function PlanCard({
               {card ? <Thumb card={card} size="4rem" /> : null}
               <span className="assistant-plan-body">
                 {targetOf(stop) ? (
-                  <a {...link(targetOf(stop) ?? stop.href)}>{stop.title}</a>
+                  <a {...link(targetOf(stop) ?? stop.href, stop.href)}>{stop.title}</a>
                 ) : (
                   <span className="assistant-plan-name">{stop.title}</span>
                 )}

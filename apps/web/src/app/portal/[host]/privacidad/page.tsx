@@ -177,6 +177,14 @@ export default async function PrivacyPage({ params }: LegalPageProps) {
               guarda lo que escribes en WhatsApp ni a quién llamas.
             </li>
             <li>
+              Para que {siteName} sepa por dónde le llegan las preguntas, de cada respuesta se
+              cuenta por qué camino llegó (este portal, la web del municipio o un código QR), si se
+              respondió y qué páginas publicadas citó. Si tocas un enlace dentro de una respuesta,
+              se cuenta a qué tipo de página lleva (una ficha, un tour, el mapa). No se guarda el
+              texto de la pregunta ni nada que te identifique, ni se siguen las páginas que abres
+              después. Se borra a los 90 días.
+            </li>
+            <li>
               Si tocas el micrófono para dictar, el navegador te pide permiso y graba solo mientras
               lo tienes activado, hasta 30 segundos. La grabación se envía al portal y de ahí a
               Groq, que la pasa a texto; ese texto aparece en el campo de la pregunta para que lo

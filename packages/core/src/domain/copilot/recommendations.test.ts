@@ -8,6 +8,7 @@ import {
   type VisitStatisticsData,
   type VisitStatisticsItem,
 } from "../visits/statistics";
+import { summarizeAssistant } from "../assistant/statistics";
 import { summarizePassport, type PassportStatisticsData } from "../passport/statistics";
 import {
   numbersBacked,
@@ -394,6 +395,84 @@ describe("the passport's facts", () => {
     expect(user?.content).toContain(
       "Pasaporte turístico (sellos con QR en los lugares y premios):\n[H",
     );
+  });
+});
+
+describe("the assistant's facts (ADR-074)", () => {
+  const MUSEO = "66666666-0000-4000-8000-000000000001";
+  const LIBRO = "66666666-0000-4000-8000-000000000002";
+  const channel = (name: "portal" | "qr", conversations: number) => ({
+    channel: name,
+    conversations,
+    people: conversations,
+    answered: conversations - 1,
+    abstained: 1,
+    plans: 0,
+    notices: 0,
+    askedPerson: 1,
+    withAction: 2,
+  });
+  const summary = summarizeAssistant(
+    RANGE,
+    {
+      from: RANGE.from,
+      to: RANGE.to,
+      since: "2026-09-01",
+      channels: [channel("portal", 12), channel("qr", 3)],
+      topics: [
+        {
+          contentId: MUSEO,
+          kind: "destination",
+          slug: "museo",
+          title: "Museo",
+          published: true,
+          times: 9,
+          channels: { portal: 8, embed: 0, qr: 1, whatsapp: 0 },
+        },
+        {
+          contentId: LIBRO,
+          kind: "knowledge",
+          slug: "libro",
+          title: "Libro histórico",
+          published: true,
+          times: 4,
+          channels: { portal: 4, embed: 0, qr: 0, whatsapp: 0 },
+        },
+      ],
+      actions: [{ action: "place", times: 4, answers: 4 }],
+    },
+    null,
+  );
+
+  it("say how many asked through each channel and the most asked topics", () => {
+    const facts = recommendationFacts(input({ assistant: summary }));
+    const assistant = facts.filter(
+      (fact) =>
+        fact.text.startsWith("Asistente del visitante") || fact.text.startsWith("Tema preguntado"),
+    );
+    expect(assistant[0]).toMatchObject({ source: "questions", target: null });
+    expect(assistant[0]?.text).toContain(
+      "15 preguntas (12 en el portal, 3 desde un QR «Pregúntale a…»), 2 sin respuesta, 2 llevadas a una persona; en 4 respuestas el visitante tocó algo",
+    );
+    expect(assistant[1]).toMatchObject({
+      text: expect.stringContaining("Destino «Museo», citado en 9 respuestas"),
+      target: { type: "content", kind: "destination", contentId: MUSEO },
+    });
+    // Only destinations and events have a page in the panel the facts can lead to.
+    expect(assistant[2]).toMatchObject({
+      text: expect.stringContaining("Conocimiento «Libro histórico»"),
+      target: null,
+    });
+  });
+
+  it("are left out when nobody asked", () => {
+    const empty = summarizeAssistant(
+      RANGE,
+      { from: RANGE.from, to: RANGE.to, since: null, channels: [], topics: [], actions: [] },
+      null,
+    );
+    const facts = recommendationFacts(input({ assistant: empty }));
+    expect(facts.some((fact) => fact.text.startsWith("Asistente del visitante"))).toBe(false);
   });
 });
 

@@ -16,7 +16,11 @@ import { parseReviewRows, snapshotSchema } from "./copilot";
 import { isMissingFunction } from "./missing-function";
 import type { SessionClient } from "./session-client";
 import { moduleKeysOf } from "./module-keys";
-import { passportStatisticsSchema, statisticsSchema } from "./statistics";
+import {
+  assistantStatisticsSchema,
+  passportStatisticsSchema,
+  statisticsSchema,
+} from "./statistics";
 import { unansweredSchema } from "./unanswered-questions";
 
 /**
@@ -172,6 +176,8 @@ const dataSchema = z.object({
   // Absent before migration 20261122000000 (the worker may run a few minutes earlier).
   passport: passportStatisticsSchema.nullable().optional(),
   passportPrevious: passportStatisticsSchema.nullable().optional(),
+  assistant: assistantStatisticsSchema.nullable().optional(),
+  assistantPrevious: assistantStatisticsSchema.nullable().optional(),
   // Absent before migration 20261123000000 (ADR-060): everything.
   modules: z.array(z.string()).optional(),
 });
@@ -216,6 +222,8 @@ export function createPostgresMonthlyReportStore(
           review: parseReviewRows(parsed.review),
           passport: parsed.passport ?? null,
           passportPrevious: parsed.passportPrevious ?? null,
+          assistant: parsed.assistant ?? null,
+          assistantPrevious: parsed.assistantPrevious ?? null,
           ...(modules ? { modules: moduleKeysOf(modules) ?? [] } : {}),
         };
       }),

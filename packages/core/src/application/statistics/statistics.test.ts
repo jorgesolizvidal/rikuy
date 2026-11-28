@@ -114,6 +114,34 @@ describe("statistics use cases", () => {
     expect(before.passport).toBeNull();
   });
 
+  it("adds the assistant by channel when the municipality has it (ADR-074)", async () => {
+    const { repo } = repository("2026-10-01");
+    const asked: DateRange[] = [];
+    const withAssistant: StatisticsRepository = {
+      ...repo,
+      assistant: async (_tenant, range) => {
+        asked.push(range);
+        return { ...range, since: "2026-10-01", channels: [], topics: [], actions: [] };
+      },
+    };
+    const view = await loadStatistics(ANALYST, withAssistant, "7-dias", NOW);
+    expect(asked).toEqual([
+      { from: "2026-11-06", to: "2026-11-12" },
+      { from: "2026-10-30", to: "2026-11-05" },
+    ]);
+    expect(view.assistant).toMatchObject({ empty: true, compared: true });
+    // Without the assistant (ADR-060), nothing is read.
+    asked.length = 0;
+    const off = await loadStatistics(
+      { ...ANALYST, modules: ["portal"] },
+      withAssistant,
+      "7-dias",
+      NOW,
+    );
+    expect(off.assistant).toBeNull();
+    expect(asked).toEqual([]);
+  });
+
   it("downloads the passport per day", async () => {
     const { repo, passportCalls } = repository(null, {
       since: "2026-10-31",

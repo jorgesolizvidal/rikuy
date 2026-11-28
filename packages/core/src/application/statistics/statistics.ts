@@ -1,4 +1,9 @@
 import type { OrganizationMembership } from "../../contracts/organization";
+import {
+  summarizeAssistant,
+  type AssistantStatisticsData,
+  type AssistantSummary,
+} from "../../domain/assistant/statistics";
 import { localClock } from "../../domain/plan/clock";
 import {
   passportCsv,
@@ -40,12 +45,19 @@ export interface StatisticsRepository {
     range: DateRange,
     daily: boolean,
   ): Promise<PassportStatisticsData | null>;
+  /**
+   * The visitor's assistant of a period, by channel (A · Paso 5.1, ADR-074). Null before the
+   * database has it.
+   */
+  assistant?(tenantId: string, range: DateRange): Promise<AssistantStatisticsData | null>;
 }
 
 export interface StatisticsView {
   readonly summary: StatisticsSummary;
   /** Null before the database counts the passport. */
   readonly passport: PassportSummary | null;
+  /** Null without the assistant, or before the database counts it. */
+  readonly assistant: AssistantSummary | null;
   readonly firstDay: string | null;
   /** The municipality's date today. */
   readonly today: string;
@@ -74,18 +86,23 @@ export async function loadStatistics(
   const days = { from: range.from, to: range.to };
   // Without the passport (ADR-060), no section: its numbers are kept, not shown.
   const withPassport = hasModule(membership.modules, "passport");
-  const [current, previous, passport, passportBefore] = await Promise.all([
-    repository.statistics(membership.tenantId, days, false),
-    comparable ? repository.statistics(membership.tenantId, range.previous, false) : null,
-    withPassport ? repository.passport(membership.tenantId, days, false) : null,
-    withPassport ? repository.passport(membership.tenantId, range.previous, false) : null,
-  ]);
+  const withAssistant = hasModule(membership.modules, "assistant") && repository.assistant;
+  const [current, previous, passport, passportBefore, assistant, assistantBefore] =
+    await Promise.all([
+      repository.statistics(membership.tenantId, days, false),
+      comparable ? repository.statistics(membership.tenantId, range.previous, false) : null,
+      withPassport ? repository.passport(membership.tenantId, days, false) : null,
+      withPassport ? repository.passport(membership.tenantId, range.previous, false) : null,
+      withAssistant ? (repository.assistant?.(membership.tenantId, days) ?? null) : null,
+      withAssistant ? (repository.assistant?.(membership.tenantId, range.previous) ?? null) : null,
+    ]);
   const summary = summarizeStatistics(range, current, previous, firstDay);
   return {
     summary,
     passport: passport
       ? summarizePassport(range, passport, passportBefore, viewsOf(summary))
       : null,
+    assistant: assistant ? summarizeAssistant(range, assistant, assistantBefore) : null,
     firstDay,
     today,
   };
