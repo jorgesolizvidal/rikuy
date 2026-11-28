@@ -9,6 +9,7 @@ import {
   parsePlatformEnv,
   parsePublicEnv,
   parseServerEnv,
+  parseWhatsAppEnv,
 } from "./env";
 
 const valid = {
@@ -188,5 +189,51 @@ describe("environment contract", () => {
       parseAiEnv({ AI_DATABASE_URL: url, GROQ_API_KEY: `gsk_${"x".repeat(32)}` }),
     ).toMatchObject({ AI_DATABASE_URL: url });
     expect(isReadablePostgresUrl("postgresql://postgres@127.0.0.1:55432/rikuy")).toBe(true);
+  });
+});
+
+describe("WhatsApp settings (ADR-075)", () => {
+  const whatsapp = {
+    WHATSAPP_ACCESS_TOKEN: `EAAG${"x".repeat(40)}`,
+    WHATSAPP_APP_SECRET: "s".repeat(24),
+    WHATSAPP_VERIFY_TOKEN: "v".repeat(24),
+  };
+
+  it("is optional: nothing set is no WhatsApp", () => {
+    expect(parseWhatsAppEnv({})).toBeNull();
+  });
+
+  it("takes all three", () => {
+    expect(parseWhatsAppEnv(whatsapp)).toEqual(whatsapp);
+  });
+
+  it("refuses some without the others, without showing any value", () => {
+    try {
+      parseWhatsAppEnv({ WHATSAPP_ACCESS_TOKEN: whatsapp.WHATSAPP_ACCESS_TOKEN });
+      expect.unreachable();
+    } catch (error) {
+      expect(error).toBeInstanceOf(EnvValidationError);
+      expect((error as EnvValidationError).invalidKeys).toEqual(
+        expect.arrayContaining(["WHATSAPP_APP_SECRET", "WHATSAPP_VERIFY_TOKEN"]),
+      );
+      expect(String((error as Error).message)).not.toContain("xxxx");
+    }
+  });
+
+  it("accepts a local Graph stand-in only outside production", () => {
+    const local = { ...whatsapp, WHATSAPP_GRAPH_URL: "http://127.0.0.1:4610" };
+    expect(parseWhatsAppEnv(local)).toEqual(local);
+    expect(() => parseWhatsAppEnv({ ...local, VERCEL_ENV: "production" })).toThrow(
+      EnvValidationError,
+    );
+    expect(() =>
+      parseWhatsAppEnv({ ...whatsapp, WHATSAPP_GRAPH_URL: "https://graph.example.test" }),
+    ).toThrow(EnvValidationError);
+  });
+
+  it("refuses a short verify token", () => {
+    expect(() => parseWhatsAppEnv({ ...whatsapp, WHATSAPP_VERIFY_TOKEN: "corto" })).toThrow(
+      EnvValidationError,
+    );
   });
 });

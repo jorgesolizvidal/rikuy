@@ -3,11 +3,14 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
+import { whatsappStatus } from "@/server/ai-gateway";
 import { operatorContext } from "@/server/operator";
+import { platformSettings } from "@/server/platform";
 
 import { SignOutButton } from "../../../sign-out-button";
 import { EmbedOriginsForm } from "./embed-origins-form";
 import { ModulesForm } from "./modules-form";
+import { WhatsAppNumbersForm } from "./whatsapp-numbers-form";
 
 export const metadata: Metadata = { title: "Módulos del municipio" };
 
@@ -27,6 +30,7 @@ export default async function ModulesPage({ params }: ModulesPageProps) {
   // Read before the migration of ADR-060: everything.
   const current = tenant.modules ?? [...MODULE_KEYS];
   const origins = (await session.platformEmbed.list(tenant.tenantId).catch(() => [])) ?? [];
+  const numbers = (await session.platformWhatsApp.list(tenant.tenantId).catch(() => [])) ?? [];
 
   return (
     <main id="contenido" tabIndex={-1} className="shell">
@@ -55,6 +59,13 @@ export default async function ModulesPage({ params }: ModulesPageProps) {
         tenantId={tenant.tenantId}
         displayName={tenant.displayName}
         origins={origins}
+      />
+      <WhatsAppNumbersForm
+        tenantId={tenant.tenantId}
+        displayName={tenant.displayName}
+        numbers={numbers}
+        configured={whatsappStatus().configured}
+        webhookUrl={`${platformSettings().portalOrigin(platformSettings().env.PLATFORM_ROOT_DOMAIN)}/api/whatsapp`}
       />
     </main>
   );

@@ -293,6 +293,12 @@ jobs:
           AI_DATABASE_ROLE: rikuy_ai
           # The workload's connection also writes the telemetry of errors and latency (ADR-044).
           WORKER_DATABASE_ROLE: rikuy_worker
+          # WhatsApp (ADR-075) against a stand-in for Meta's Graph API that the e2e starts.
+          # Test values, not secrets: nothing here reaches Meta.
+          WHATSAPP_ACCESS_TOKEN: rikuy-ci-access-token-not-real
+          WHATSAPP_APP_SECRET: rikuy-ci-app-secret-not-real
+          WHATSAPP_VERIFY_TOKEN: rikuy-ci-verify-token-not-real
+          WHATSAPP_GRAPH_URL: http://127.0.0.1:4610
         run: |
           export NEXT_PUBLIC_SUPABASE_URL="$SUPABASE_URL"
           export NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY="$SUPABASE_PUBLISHABLE_KEY"
@@ -431,6 +437,16 @@ jobs:
         run: |
           set -o pipefail
           CHROME_PATH="$(command -v google-chrome)" pnpm test:e2e-channel-metrics 2>&1 | tee ../../channel-metrics.log
+      # A · Paso 6 (ADR-075): Meta's webhook with a stand-in for its Graph API — the verify
+      # token, the signature, a text answered from Demo Norte's number with the portal's links
+      # and the channel «whatsapp», a message relayed twice answered once, a voice note, a shared
+      # location (never sent on) and a number no municipality has.
+      - name: WhatsApp webhook against a stand-in for Meta
+        if: matrix.suite == 'contracts' && (success() || failure())
+        working-directory: apps/web
+        run: |
+          set -o pipefail
+          pnpm test:e2e-whatsapp 2>&1 | tee ../../whatsapp.log
       # A · Paso 2 (ADR-071): the line on the municipality's website (a page served at
       # localhost:4599, authorized in the seed) shows «Pregúntale a …», opens the assistant in
       # Rikuy's frame about the page's place and links to the website's own page; on a website
@@ -674,7 +690,7 @@ jobs:
       - name: Report failures
         if: failure()
         run: |
-          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log visit-plans.log person-handoff.log channel-metrics.log assistant-only.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log faq.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
+          cat contracts.log lighthouse.log tour.log lighthouse-tours.log assistant.log assistant-cards.log panel.log copilot.log second-factor.log slug.log media.log tour-removal.log unanswered.log recommendations.log visit-plans.log person-handoff.log channel-metrics.log whatsapp.log assistant-only.log metrics.log visits.log statistics.log monthly-report.log passport.log stamps.log rewards.log passport-metrics.log modules.log themes.log home.log passport-pages.log detail.log notices.log services.log memory.log faq.log evaluation.log model-colors.log 2>/dev/null | grep -E "^✗|Over budget|^  [a-z-]+\.localhost|Error|FAIL|AssertionError" | head -40 | while IFS= read -r line; do
             echo "::error title=contracts or budget::${line//%/%25}"
           done
           tail -15 next.log 2>/dev/null | while IFS= read -r line; do

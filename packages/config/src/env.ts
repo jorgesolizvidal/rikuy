@@ -235,3 +235,51 @@ export function parseAiEnv(source: Record<string, string | undefined> = process.
   if (Object.values(present).every((value) => value === undefined)) return null;
   return parseWith(aiEnvSchema, { ...present, VERCEL_ENV: source.VERCEL_ENV || undefined });
 }
+
+/**
+ * The assistant on WhatsApp (ADR-075). All three or none: with none, there is no WhatsApp and
+ * nothing else changes; with some set, it is a mistake.
+ * - WHATSAPP_ACCESS_TOKEN: the token of the platform's Meta app (a system user's, no expiry).
+ * - WHATSAPP_APP_SECRET: the app's secret, to check that Meta signed each webhook.
+ * - WHATSAPP_VERIFY_TOKEN: the text Meta sends back when the webhook is connected.
+ * - WHATSAPP_GRAPH_URL: tests only, a local stand-in for Meta's Graph API; never in production.
+ */
+export const whatsappEnvSchema = z
+  .object({
+    WHATSAPP_ACCESS_TOKEN: z.string().min(20, "looks too short").regex(/^\S+$/u, "has spaces"),
+    WHATSAPP_APP_SECRET: z.string().min(16, "looks too short").regex(/^\S+$/u, "has spaces"),
+    WHATSAPP_VERIFY_TOKEN: z
+      .string()
+      .min(20, "must be at least 20 characters")
+      .regex(/^[A-Za-z0-9._~-]+$/u, "letters, numbers and . _ ~ - only"),
+    WHATSAPP_GRAPH_URL: z
+      .url()
+      .regex(/^http:\/\/(localhost|127\.0\.0\.1)(:[0-9]{1,5})?$/u, "must be a local address")
+      .optional(),
+    VERCEL_ENV: z.string().optional(),
+  })
+  .refine((env) => env.WHATSAPP_GRAPH_URL === undefined || env.VERCEL_ENV !== "production", {
+    path: ["WHATSAPP_GRAPH_URL"],
+    message: "is not allowed in production",
+  })
+  .transform(({ VERCEL_ENV: _environment, ...env }) => env);
+
+export type WhatsAppEnv = z.infer<typeof whatsappEnvSchema>;
+
+const WHATSAPP_KEYS = [
+  "WHATSAPP_ACCESS_TOKEN",
+  "WHATSAPP_APP_SECRET",
+  "WHATSAPP_VERIFY_TOKEN",
+  "WHATSAPP_GRAPH_URL",
+] as const;
+
+/** The WhatsApp settings, or null when none is set (WhatsApp is optional). */
+export function parseWhatsAppEnv(
+  source: Record<string, string | undefined> = process.env,
+): WhatsAppEnv | null {
+  const present = Object.fromEntries(
+    WHATSAPP_KEYS.map((key) => [key, source[key] || undefined] as const),
+  );
+  if (Object.values(present).every((value) => value === undefined)) return null;
+  return parseWith(whatsappEnvSchema, { ...present, VERCEL_ENV: source.VERCEL_ENV || undefined });
+}

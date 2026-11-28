@@ -103,3 +103,7 @@ export {
   createSupabasePublishedWebLinkReader,
   type PublishedWebLinkReader,
 } from "./embed";
+export {
+  createPlatformWhatsAppRepository,
+  createWhatsAppNumberRepository,
+} from "./whatsapp-numbers";

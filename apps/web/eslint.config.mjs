@@ -49,8 +49,8 @@ const aiGatewayPaths = [
   },
   {
     name: "@rikuy/config/env",
-    importNames: ["parseAiEnv"],
-    message: `The AI gateway's settings are read only in ${aiGatewayModule}.`,
+    importNames: ["parseAiEnv", "parseWhatsAppEnv"],
+    message: `The AI gateway's and WhatsApp's settings are read only in ${aiGatewayModule}.`,
   },
 ];
 

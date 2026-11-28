@@ -7,6 +7,7 @@ import { requireModule } from "@/server/organization";
 import { platformSettings } from "@/server/platform";
 
 import { AskShare } from "./ask-share";
+import { WhatsAppShare } from "./whatsapp-share";
 
 export const metadata: Metadata = { title: "Asistente en tu web" };
 
@@ -22,9 +23,10 @@ interface EmbedPageProps {
 export default async function AssistantOnWebsitePage({ params }: EmbedPageProps) {
   const membership = await requireModule((await params).slug, "assistant");
   const session = await adminSession();
-  const [origins, hostname] = await Promise.all([
+  const [origins, hostname, numbers] = await Promise.all([
     session.embed.origins(membership.tenantId).catch(() => []),
     session.content.portalHostname(membership.tenantId).catch(() => null),
+    session.whatsapp.numbers(membership.tenantId).catch(() => []),
   ]);
   const portalOrigin = hostname ? platformSettings().portalOrigin(hostname) : null;
   const line = portalOrigin
@@ -41,7 +43,8 @@ export default async function AssistantOnWebsitePage({ params }: EmbedPageProps)
         <h1 className="title title-sm">Asistente en tu web</h1>
         <p className="lead">
           El asistente de {membership.displayName} también puede estar en la web propia del
-          municipio, con un botón que abre la conversación, y en carteles con un código QR.
+          municipio, con un botón que abre la conversación, en carteles con un código QR y en
+          WhatsApp.
           {hasModule(membership.modules, "portal")
             ? null
             : " Este municipio no tiene portal en Rikuy: las respuestas llevan a las páginas de su web."}
@@ -106,6 +109,7 @@ export default async function AssistantOnWebsitePage({ params }: EmbedPageProps)
           online={membership.tenantStatus === "active"}
         />
       ) : null}
+      <WhatsAppShare numbers={numbers} fileName={`whatsapp-${membership.slug}`} />
       {configured ? null : (
         <p className="notice" role="status">
           La plataforma todavía no tiene la inteligencia artificial configurada: el asistente no

@@ -154,6 +154,32 @@ Para un municipio que ya tiene su web y quiere el asistente en ella ([ADR-071](a
 
 La web del municipio puede tener su propia `Permissions-Policy`: si bloquea el micrófono o la ubicación, el dictado y «¿Qué hay cerca?» no funcionan dentro de su web (en la página del QR, sí).
 
+## El asistente en WhatsApp
+
+El mismo asistente responde los mensajes que llegan al número de WhatsApp de un municipio ([ADR-075](adr/ADR-075-whatsapp-assistant.md)). Necesita la IA configurada ([«Activar la IA»](#activar-la-ia-groq)). Hay **una sola app de Meta para toda la plataforma**; cada municipio tiene su número.
+
+### Para probar (número de prueba de Meta)
+
+1. **La app:** en [developers.facebook.com](https://developers.facebook.com) → «Mis apps» → «Crear app» → tipo «Empresa» → agrega el producto **WhatsApp**. Meta crea un número de prueba.
+2. **Destinatario:** en WhatsApp → «Configuración de la API», en «Para», agrega tu celular (hasta 5) y confírmalo con el código que llega por WhatsApp. El número de prueba solo responde a esos destinatarios.
+3. **Los tres valores**, en Vercel → Settings → Environment Variables (solo Production, marcados como sensibles; **nunca los pegues en un chat**):
+   - `WHATSAPP_ACCESS_TOKEN`: la «Clave de acceso temporal» de «Configuración de la API» (dura 24 horas; para algo permanente, ver abajo);
+   - `WHATSAPP_APP_SECRET`: «Configuración de la app» → «Básica» → «Clave secreta de la app»;
+   - `WHATSAPP_VERIFY_TOKEN`: una que inventes (20 o más letras y números; por ejemplo, salida de `openssl rand -hex 16`).
+
+   Después, **Redeploy** de producción.
+
+4. **El webhook:** en WhatsApp → «Configuración» → «Webhook» → «Editar»: URL `https://{dominio de la plataforma}/api/whatsapp` (la muestra el panel en «Módulos» del municipio) y el mismo token de verificación → «Verificar y guardar». En «Campos del webhook», **suscribe `messages`**.
+5. **El número del municipio:** en «Configuración de la API» copia el **«Identificador del número de teléfono»** (no el número). En el panel → `/plataforma` → «Módulos» del municipio → «Números de WhatsApp», pégalo y, si quieres, el número para los visitantes con `+` y el código del país → «Registrar el número».
+6. **Comprobar:** desde tu celular, escríbele al número de prueba «¿Qué lugares puedo visitar?». Responde con lo publicado y sus enlaces. Prueba también una nota de voz y compartir tu ubicación.
+
+### Para un municipio real
+
+- La **cuenta de empresa** (de la alcaldía o de la plataforma como proveedor) verificada en Meta, un **número dedicado** que no esté en el WhatsApp normal y su **nombre visible** aprobado.
+- Una **clave permanente**: en «Configuración del negocio» → «Usuarios del sistema», crea uno con acceso a la app y a la cuenta de WhatsApp, genera una clave con los permisos `whatsapp_business_messaging` y `whatsapp_business_management`, y reemplaza `WHATSAPP_ACCESS_TOKEN` en Vercel.
+- En «Módulos» del municipio, **quita el número de prueba y registra el real**. No toca código.
+- Los costos de Meta y del modelo se confirman antes de cotizar ([requisitos en el roadmap](roadmap.md#a--el-asistente-del-municipio)).
+
 ## Verificación en dos pasos de propietarios y administradores
 
 Desde [ADR-043](adr/ADR-043-staff-second-factor.md), un propietario o administrador entra a su municipio solo con un segundo factor: una app de autenticación (Google Authenticator, Microsoft Authenticator, 1Password…) además del código del correo. Editores y analistas no lo necesitan.

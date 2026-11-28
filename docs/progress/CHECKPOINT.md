@@ -5,8 +5,8 @@
 ## Estado actual
 
 - **Fase:** A — El asistente del municipio (en curso). C0, C1, C2 y C3 ✅; P1–P6 y el Hito Demo / Portafolio ✅ (gate aprobado el 2026-11-10).
-- **Último paso completado:** A · Paso 5.2 — preguntas frecuentes (con él, A · Paso 5 ✅); antes, A · Paso 5.1 ✅ (métricas por canal, verificado en producción)
-- **Rama:** `feat/a-step5-faq` → PR hacia `main`
+- **Último paso completado:** A · Paso 6 — el asistente en WhatsApp, como prototipo con el número de prueba de Meta (con él, la fase A ✅); antes, A · Paso 5 ✅ (verificado en producción)
+- **Rama:** `feat/a-step6-whatsapp` → PR hacia `main`
 
 ## Historial
 
@@ -3060,19 +3060,68 @@ Lo que encontró el CI del push, ya corregido:
 - Las visitas a `/preguntas-frecuentes` todavía no se cuentan en «Estadísticas».
 - Una pregunta frecuente no se sugiere sola: el equipo decide cuáles escribir desde «Lo que preguntan los visitantes».
 
+**Verificación en producción (2026-11-27):** tras el merge (PR #101), el usuario creó en Ucureña la pregunta frecuente «¿Hay restaurantes?» sobre el servicio «Restaurante Merida», la publicó y la vio en `/preguntas-frecuentes`.
+
+### A · Paso 6 — el asistente en WhatsApp (prototipo) ✅
+
+- Decisiones del usuario ([ADR-075](../adr/ADR-075-whatsapp-assistant.md)), 2026-11-28:
+  - **probar ya con su cuenta de Meta y el número de prueba** que Meta da a cada app; el número real llega cuando una alcaldía lo contrate (se cambia en el panel, sin tocar código);
+  - **memoria:** los últimos 6 mensajes durante 24 horas;
+  - **notas de voz** (con la cuota de dictado) y **ubicación compartida** («¿Qué hay cerca?», la posición no se guarda);
+  - **el operador registra el número** en «Módulos»; una sola app de Meta para la plataforma, con su clave en Vercel;
+  - **enlaces al final** del mensaje.
+- Base de datos (`20261206000000_a6_whatsapp.sql`, solo expand):
+  - `whatsapp_numbers` (el «identificador del número de teléfono» de Meta, su municipio y el número para visitantes; hasta 3 por municipio, uno es de un solo municipio; RLS sin permisos);
+  - `platform_whatsapp_numbers`, `platform_add_whatsapp_number` y `platform_remove_whatsapp_number` (operador con segundo factor, auditados `platform.whatsapp_number_added` / `…_removed`) y `tenant_whatsapp_numbers` (cualquier miembro);
+  - `private.whatsapp_secret` y `private.whatsapp_contact_key`: la huella del remitente es un HMAC-SHA256 del municipio y su número, nunca el número;
+  - `whatsapp_inbound` (cada mensaje de Meta se toma una vez) y `whatsapp_messages` (los últimos 6, enmascarados, 24 horas); RLS sin permisos;
+  - `ai_api.whatsapp_begin` (solo `rikuy_ai`): el municipio del número, su dominio, la huella y la conversación; `duplicate`, `unknown_number`, `unavailable` (no en línea) y `capped` (5.000 mensajes al día por municipio). `ai_api.whatsapp_remember` vuelve a enmascarar y deja los últimos 6;
+  - tarea `rikuy-forget-whatsapp` (cada hora): conversaciones de más de 24 h y mensajes tomados de más de 2 días.
+- `@rikuy/core`:
+  - `domain/whatsapp/webhook`: lee lo que reenvía Meta (texto, audio, ubicación u otro), sin los estados de entrega y con un tope de 20 mensajes por entrega;
+  - `application/whatsapp/format`: la respuesta como mensaje de WhatsApp (texto, listas con «•», el plan numerado, «Fuentes:» con enlaces absolutos; los avisos con sus enlaces y contacto; «Hablar con una persona» con «Atención al visitante»), cortada en una línea a 4.096 caracteres; lo que guarda la conversación (sin enlaces);
+  - `application/whatsapp/conversation`: `answerWhatsApp` (un mensaje: el municipio, el mismo asistente con la huella como visitante, nota de voz con «Entendí: «…»», ubicación como distancias en memoria, otro tipo de mensaje, y después la conversación, el canal y la pregunta sin respuesta) y `distancesFrom`;
+  - `application/whatsapp/numbers`: el número para visitantes, el enlace `wa.me` y los casos de uso del operador.
+- `@rikuy/config`: `parseWhatsAppEnv` (todas o ninguna; `WHATSAPP_GRAPH_URL` solo local y nunca en producción).
+- `@rikuy/db`: `createWhatsAppCloud` en `@rikuy/db/ai` (enviar un texto y descargar una nota de voz, la clave solo en la cabecera, nada de Meta en los errores, hasta 2 MB), `whatsappBegin` y `whatsappRemember` en la conexión de la IA (antes de la migración: ningún número), y los repositorios del operador y de los miembros.
+- Web:
+  - **`/api/whatsapp`** en el dominio de la plataforma: `GET` responde el desafío de Meta solo con el token de verificación; `POST` verifica `X-Hub-Signature-256` sobre los bytes, responde 200 y procesa después (`after()`);
+  - `server/whatsapp.ts` arma la respuesta con el asistente del portal (`askPortalAssistant`, `linkAnswer`, el dictado, los lugares del plan) y la cuenta con el canal `whatsapp`;
+  - la clave de Meta, el secreto de la app y el token viven en `ai-gateway.ts` con la clave de Groq (ESLint impide `parseWhatsAppEnv` en cualquier otro);
+  - panel del operador, «Módulos» del municipio: **«Números de WhatsApp»** (registrar con el identificador de Meta y el número para visitantes, quitar), con la URL del webhook;
+  - panel del municipio, «Asistente en tu web»: **«El asistente en WhatsApp»** con el número, su enlace `wa.me` y un código QR;
+  - privacidad: «Si le escribes por WhatsApp».
+- CI: el servidor de producción arranca con valores de prueba de WhatsApp y un sustituto de la API de Meta; nuevo paso **«WhatsApp webhook against a stand-in for Meta»** (grupo de contratos).
+- Tests:
+  - 1.302 unitarios (core 900, db 260, web 65, worker 58, config 19): el lector del webhook (texto, audio, ubicación, otro, estados, campos y formas inesperadas, tope de 20), el mensaje (fuentes con enlaces, sin portal, el plan, avisos, «Hablar con una persona», el corte a 4.096), la conversación (respondida, una vez, sin el asistente, nota de voz, sin voz o con falla, ubicación sin la posición, otro tipo, sin fallarle al visitante), las distancias, el número para visitantes, el cliente de Meta (la clave solo en la cabecera, nada de Meta en los errores, ids inválidos, nota de voz grande) y la configuración;
+  - pgTAP `061_whatsapp` (41): nadie lee las tablas y ninguna columna guarda el número; el propietario, un operador sin segundo factor o un municipio desconocido no registran; identificador y número inválidos; un número de otro municipio; hasta 3; quitar y auditoría; un analista lee, otro municipio y un visitante no, ni el webhook; número desconocido, remitente inválido, nuevo con su municipio y dominio, la huella (nunca el número), una sola vez, la conversación enmascarada, los últimos 6, nada de más de 24 h, otra huella para otro remitente, no en línea, el tope diario y el olvido; `027` exceptúa `whatsapp_inbound` (solo los ids de Meta) de «ninguna columna guarda preguntas»;
+  - **e2e contra un sustituto de Meta** (`whatsapp.e2e.test.ts`, 6 casos): el desafío con el token correcto y no con otro; sin firma o con otro secreto, 401 y nada enviado; un texto a Demo Norte respondido desde su número con los enlaces del portal, contado con el canal `whatsapp` y guardado sin el número; el mismo mensaje reenviado no se responde dos veces; la nota de voz descargada con la clave y respondida con «Entendí»; la ubicación junto al Mirador da su lista y la posición no sale; una foto recibe lo que entiende el asistente y un número desconocido nada.
+- Verificado en local: `pnpm check` (formato, lint, tipos, unitarios y build).
+
+**Desviaciones:**
+
+- La base local no levanta en mi entorno: pgTAP, integración y e2e corren en el CI del PR.
+- Es un prototipo con el número de prueba de Meta: solo responde a los destinatarios verificados en la app (hasta 5) y la clave temporal dura 24 horas. Para un municipio real hacen falta su número, la cuenta de empresa verificada y una clave permanente ([despliegue](../deploy.md#el-asistente-en-whatsapp)).
+- Sin plantillas ni mensajes que inicie el municipio: solo se responde a quien escribe, dentro de las 24 horas.
+- La ubicación se calcula en el servidor (en memoria, sin guardarla): es la excepción de WhatsApp a ADR-021.
+- Las notas de voz de más de 2 MB (unos 2 minutos) no se transcriben: la respuesta lo dice.
+- Una respuesta del modelo que tarda puede llegar unos segundos después; si Meta no recibe el 200 a tiempo, reintenta y el mensaje no se responde dos veces.
+
 ## Cómo verificarlo
 
 - `pnpm check` en local y el CI del PR completo.
-- Después del merge y de «Deploy database», en el panel de Ucureña:
-  1. **Escribirla:** «Contenido» → «Preguntas frecuentes» → «Nueva pregunta»: «¿Hay cajero automático?». Sin respuesta, «Publicar» avisa; escribe la respuesta, elige «Servicios» y, si quieres, un lugar, y publica.
-  2. **El portal:** `https://rikuy-ucurena.vercel.app/preguntas-frecuentes` la muestra bajo «Servicios», y la ficha del lugar elegido también; el pie tiene «Preguntas frecuentes».
-  3. **Con el Copilot:** «Lo que preguntan los visitantes» → en una pregunta (por ejemplo, la del teleférico), «Crear pregunta frecuente con el Copilot» → «Proponer con el Copilot». Si nada publicado la responde, solo propone la pregunta; con una que sí (por ejemplo, «¿Qué es la ch'ampa guerra?»), propone la respuesta con sus fuentes. «Crear el borrador» la deja como borrador.
-  4. **El asistente:** pasados unos segundos de publicar, pregúntale a Chaski lo mismo: responde y la fuente dice «Pregunta frecuente».
-  5. **Buscadores:** en la [prueba de resultados enriquecidos de Google](https://search.google.com/test/rich-results), la página tiene «Preguntas frecuentes» válidas.
+- Después del merge y de «Deploy database», con tu app de Meta (los valores van directo a Vercel, **nunca en el chat**):
+  1. **Vercel:** en Production, `WHATSAPP_ACCESS_TOKEN` (la clave temporal de «Configuración de la API»), `WHATSAPP_APP_SECRET` («Configuración de la app» → «Básica») y `WHATSAPP_VERIFY_TOKEN` (una que inventes, 20 o más letras y números), sensibles; después, Redeploy.
+  2. **Webhook en Meta:** WhatsApp → «Configuración» → «Webhook»: URL `https://rikuy-app.vercel.app/api/whatsapp` y el mismo token → «Verificar y guardar»; suscribe el campo `messages`.
+  3. **El número en el panel:** `/plataforma` → «Módulos» de Ucureña → «Números de WhatsApp»: el «Identificador del número de teléfono» de Meta (no el número) → «Registrar el número».
+  4. **Destinatario:** en «Configuración de la API» → «Para», tu celular +591 67680091, confirmado.
+  5. **Probar desde tu celular** al número de prueba: «¿Qué lugares puedo visitar?» (responde con lo publicado y «Fuentes:» con enlaces), una nota de voz («Entendí: …»), tu ubicación (📎 → Ubicación: «¿Qué hay cerca?») y «quiero hablar con una persona».
+  6. **Panel de Ucureña:** «Estadísticas» → «El asistente por canal» muestra «Por WhatsApp».
 
 ## Siguiente paso
 
-1. **A · Paso 6 — WhatsApp** ([roadmap](../roadmap.md#a--el-asistente-del-municipio)), cuando una alcaldía interesada tenga su cuenta de Meta: el mismo asistente en el número del municipio con la API oficial. Antes de empezar, revisar con el usuario los requisitos y costos (por confirmar con Meta) y anotar sus decisiones en un ADR nuevo. Mientras tanto, con su autorización, puede seguir **C4 — portal en español e inglés** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)).
+1. Con la fase A terminada, **C4 — portal en español e inglés** ([roadmap](../roadmap.md#después-del-gate--crecimiento-c0c8)), con la autorización del usuario. Antes de empezar, confirmar con él los pasos de C4 y anotar sus decisiones en un ADR nuevo.
+2. WhatsApp con el número real llega cuando una alcaldía lo contrate: su número, la cuenta de empresa verificada y una clave permanente, siguiendo [despliegue](../deploy.md#el-asistente-en-whatsapp).
 
 ## Decisiones pendientes del usuario
 
