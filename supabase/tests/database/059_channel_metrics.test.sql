@@ -28,6 +28,10 @@ insert into public.memberships (tenant_id, user_id, role, status, accepted_at) v
 update public.tenants set status = 'active' where id in (:'ta', :'tb');
 set constraints all immediate;
 
+-- The AI role runs the assertions of its own calls.
+grant usage on schema extensions to rikuy_ai;
+do $$ begin execute format('grant temporary on database %I to rikuy_ai', current_database()); end $$;
+
 create temp table ids (name text primary key, id uuid);
 grant select, insert on ids to authenticated;
 create function pg_temp.id(p_name text) returns uuid language sql as $$ select id from ids where name = p_name $$;
